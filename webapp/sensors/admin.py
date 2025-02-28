@@ -1,0 +1,122 @@
+from django.contrib import admin
+
+from .models import (
+    Place,
+    Location,
+    Device,
+    DeviceType,
+    Sensor,
+    SensorReading,
+    InfluxSource,
+)
+
+
+@admin.register(Place)
+class PlaceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'address', 'latitude', 'longitude', 'is_active', 'created_at')
+    search_fields = ('name', 'address')
+    list_filter = ('is_active',)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = '1. Places'
+
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'place', 'created_at')
+    search_fields = ('name', 'place__name')
+    list_filter = ('place',)
+
+    class Meta:
+        verbose_name_plural = '2. Locations'
+
+
+@admin.register(Device)
+class DeviceAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'location',
+        'device_type',
+        'serial_number',
+        'is_active'
+    )
+    list_filter = ('device_type', 'is_active', 'location__place')
+    search_fields = ('name', 'serial_number', 'location__name')
+
+    class Meta:
+        verbose_name_plural = '3. Devices'
+
+
+@admin.register(DeviceType)
+class DeviceTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'icon', 'is_active', 'created_at', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('name',)
+
+
+@admin.register(Sensor)
+class SensorAdmin(admin.ModelAdmin):
+    list_display = ('name', 'device', 'sensor_type', 'is_active')
+    list_filter = ('sensor_type', 'is_active', 'device__location')
+    search_fields = ('name', 'device__name')
+    readonly_fields = ('created_at', 'updated_at')
+
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'device', 'sensor_type', 'is_active', 'data_type')
+        }),
+        ('InfluxDB Settings', {
+            'fields': ('influx_source', 'influx_measurement'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+    class Meta:
+        verbose_name_plural = '4. Sensors'
+
+
+@admin.register(SensorReading)
+class SensorReadingAdmin(admin.ModelAdmin):
+    list_display = ('sensor', 'value', 'timestamp')
+    list_filter = ('sensor', 'timestamp', 'sensor__device')
+    search_fields = ('sensor__name', 'notes')
+
+    class Meta:
+        verbose_name_plural = '5. Sensor Readings'
+
+
+@admin.register(InfluxSource)
+class InfluxSourceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'server_dns', 'server_port', 'bucket_name', 'org')
+    search_fields = ('name', 'server_dns', 'bucket_name')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'server_dns',
+                       'server_port', 'bucket_name', 'org')
+        }),
+    )
+    # (None, {
+    #     'fields': ('name', 'server_dns', 'server_port', 'bucket_name', 'org')
+    # }),
+    # ('Authentication', {
+    #     'fields': ('read_token', 'write_token'),
+    #     'classes': ('collapse',)
+    #     'description': 'Authentication tokens for InfluxDB access'
+    # }),
+    # ('Metadata', {
+    #     'fields': ('created_at', 'updated_at'),
+    #     'classes': ('collapse',)
+    # })
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # editing an existing object
+            return tuple(self.readonly_fields) + ('read_token',)
+        return self.readonly_fields

@@ -1,0 +1,207 @@
+{% extends "sensors/base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}
+    {% if object %}Edit Place{% else %}New Place{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.preview-map {
+    height: 300px;
+    border-radius: 0.25rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-geo-alt-fill me-2"></i>
+                    {% if object %}Edit Place{% else %}New Place{% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    
+                    {# Name field #}
+                    <div class="mb-2">
+                        <label class="form-label">
+                            <i class="bi bi-tag"></i> Name
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form.name|add_class:"form-control"|attr:"placeholder:Enter place name" }}
+                        {% if form.name.errors %}
+                            <div class="text-danger small">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    {# Address field #}
+                    <div class="mb-2">
+                        <label class="form-label">
+                            <i class="bi bi-house"></i> Address
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form.address|add_class:"form-control"|attr:"placeholder:Enter address" }}
+                        {% if form.address.errors %}
+                            <div class="text-danger small">{{ form.address.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    {# Coordinates row #}
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="bi bi-geo"></i> Latitude
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.latitude|add_class:"form-control"|attr:"placeholder:Enter latitude (-90 to 90)" }}
+                            {% if form.latitude.errors %}
+                                <div class="text-danger small">{{ form.latitude.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="bi bi-geo"></i> Longitude
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.longitude|add_class:"form-control"|attr:"placeholder:Enter longitude (-180 to 180)" }}
+                            {% if form.longitude.errors %}
+                                <div class="text-danger small">{{ form.longitude.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {# Map Preview #}
+                    <div class="mb-2">
+                        <label class="form-label">
+                            <i class="bi bi-map"></i> Location Preview
+                        </label>
+                        <div id="preview-map" class="preview-map"></div>
+                    </div>
+
+                    {# Site Plan field #}
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-image"></i> Site Plan
+                        </label>
+                        {{ form.site_plan|add_class:"form-control" }}
+                        {% if form.site_plan.help_text %}
+                            <div class="form-text small">{{ form.site_plan.help_text }}</div>
+                        {% endif %}
+                        {% if form.site_plan.errors %}
+                            <div class="text-danger small">{{ form.site_plan.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    {# Active Status #}
+                    <div class="mb-3">
+                        <label class="form-label d-block">
+                            <i class="bi bi-toggle-on"></i> Status
+                        </label>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-danger">Inactive</span>
+                            <div class="form-check form-switch m-0">
+                                {{ form.is_active|add_class:"form-check-input" }}
+                            </div>
+                            <span class="text-success">Active</span>
+                        </div>
+                        {% if form.is_active.help_text %}
+                            <div class="form-text small">{{ form.is_active.help_text }}</div>
+                        {% endif %}
+                        {% if form.is_active.errors %}
+                            <div class="text-danger small">{{ form.is_active.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    {# Form Actions #}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'sensors:place_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize map
+    const map = L.map('preview-map').setView([30.26715, -97.74306], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add marker
+    let marker = L.marker([30.26715, -97.74306], {
+        draggable: true,
+        title: 'Drag me or click anywhere on the map!'
+    }).addTo(map);
+
+    // Add a popup to the marker
+    marker.bindPopup('Drag me or click anywhere to set location!');
+    marker.openPopup();
+
+    // Get form inputs
+    const latInput = document.getElementById('{{ form.latitude.id_for_label }}');
+    const lonInput = document.getElementById('{{ form.longitude.id_for_label }}');
+
+    // Update marker function
+    function updateMarker() {
+        const lat = parseFloat(latInput.value) || 30.26715;
+        const lon = parseFloat(lonInput.value) || -97.74306;
+        
+        marker.setLatLng([lat, lon]);
+        map.setView([lat, lon], 13);
+    }
+
+    // Set initial position if editing
+    if (latInput.value && lonInput.value) {
+        updateMarker();
+    }
+
+    // Add event listeners
+    latInput.addEventListener('input', updateMarker);
+    lonInput.addEventListener('input', updateMarker);
+
+    // Add map click handler
+    map.on('click', function(e) {
+        const lat = e.latlng.lat.toFixed(5);
+        const lng = e.latlng.lng.toFixed(5);
+        latInput.value = lat;
+        lonInput.value = lng;
+        updateMarker();
+    });
+
+    // Add marker drag handler
+    marker.on('dragend', function(e) {
+        const position = e.target.getLatLng();
+        const lat = position.lat.toFixed(5);
+        const lng = position.lng.toFixed(5);
+        latInput.value = lat;
+        lonInput.value = lng;
+    });
+
+    // Add helper text below map
+    const mapContainer = document.getElementById('preview-map');
+    const helpText = document.createElement('small');
+    helpText.className = 'text-muted d-block mt-1';
+    helpText.innerHTML = '<i class="bi bi-info-circle"></i> Click anywhere on the map or drag the marker to set coordinates';
+    mapContainer.after(helpText);
+});
+</script>
+{% endblock %} 

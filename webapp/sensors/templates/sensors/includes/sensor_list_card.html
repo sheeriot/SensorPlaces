@@ -1,0 +1,324 @@
+{% load widget_tweaks %}
+
+<div class="card sensors-card {% if not device.is_active %}opacity-75{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-graph-up"></i>
+            <span class="ms-2">Sensors</span>
+        </div>
+        <a href="{% url 'sensors:sensor_create' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk %}" 
+           class="btn btn-primary btn-sm"
+           {% if not device.is_active %}disabled{% endif %}>
+            <i class="bi bi-plus"></i> Add Sensor
+        </a>
+    </div>
+    <div class="card-body p-2">
+        {% if sensors %}
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr class="small">
+                        <th class="py-2">Name</th>
+                        <th class="py-2">Type</th>
+                        <th class="py-2">Unit</th>
+                        <th class="py-2">Data Source</th>
+                        <th class="py-2">Status</th>
+                        <th class="py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody style="font-size: 0.875rem;">
+                    {% for sensor in sensors %}
+                    <tr {% if not sensor.is_active or not device.is_active %}class="text-muted opacity-50"{% endif %}>
+                        <td class="py-1">{{ sensor.name }}</td>
+                        <td class="py-1">{{ sensor.get_sensor_type_display }}</td>
+                        <td class="py-1">{{ sensor.get_unit_display }}</td>
+                        <td class="py-1">
+                            {{ sensor.get_data_type_display }}
+                            {% if sensor.data_type == 'INFLUX' %}
+                            <button class="btn btn-outline-primary btn-sm ms-2 test-readings-btn py-0" 
+                                    data-sensor-id="{{ sensor.pk }}"
+                                    data-url="{% url 'sensors:sensor_test' place_slug=device.location.place.slug sensor_pk=sensor.pk %}"
+                                    {% if not device.is_active %}disabled{% endif %}>
+                                <i class="bi bi-lightning"></i> Test
+                            </button>
+                            {% endif %}
+                        </td>
+                        <td class="py-1">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input sensor-status-toggle" 
+                                       type="checkbox" 
+                                       id="sensorStatus_{{ sensor.pk }}"
+                                       data-sensor-id="{{ sensor.pk }}"
+                                       data-device-id="{{ device.pk }}"
+                                       data-place-slug="{{ device.location.place.slug }}"
+                                       {% if sensor.is_active %}checked{% endif %}
+                                       {% if not device.is_active %}disabled{% endif %}>
+                            </div>
+                        </td>
+                        <td class="py-1">
+                            <div class="btn-group">
+                                <a href="{% url 'sensors:sensor_update' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk pk=sensor.pk %}" 
+                                   class="btn btn-warning btn-sm py-0"
+                                   {% if not device.is_active %}disabled{% endif %}>
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'sensors:sensor_delete' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk pk=sensor.pk %}" 
+                                   class="btn btn-danger btn-sm py-0"
+                                   {% if not device.is_active %}disabled{% endif %}>
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- Results row (initially hidden) -->
+                    <tr class="readings-results d-none" id="readings-results-{{ sensor.pk }}">
+                        <td colspan="6" class="p-2">
+                            <div class="alert d-none" role="alert"></div>
+                            <div class="readings-summary d-none">
+                                <h6 class="mb-2 small">Last 60 Minutes Summary</h6>
+                                <table class="table table-sm mb-2">
+                                    <thead>
+                                        <tr class="small">
+                                            <th>Total Readings</th>
+                                            <th>Min</th>
+                                            <th>Max</th>
+                                            <th>Average</th>
+                                            <th>Time Range</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="small">
+                                        <tr>
+                                            <td class="count"></td>
+                                            <td class="min"></td>
+                                            <td class="max"></td>
+                                            <td class="avg"></td>
+                                            <td class="timerange"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="recent-readings d-none">
+                                <h6 class="mb-2 small">Most Recent Readings</h6>
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr class="small">
+                                            <th>Timestamp</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="small"></tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-center small mb-0">No sensors found. Click "Add Sensor" to create one.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Listen for device status changes
+    document.addEventListener('deviceStatusChanged', function(event) {
+        const isDeviceActive = event.detail.isActive;
+        const deviceId = event.detail.deviceId;
+        const sensorsCard = document.querySelector('.sensors-card');
+        
+        if (sensorsCard) {
+            // Update card opacity
+            sensorsCard.className = `card sensors-card ${!isDeviceActive ? 'opacity-75' : ''}`;
+            
+            // Update all sensor toggles and rows
+            const sensorToggles = sensorsCard.querySelectorAll('.sensor-status-toggle');
+            const sensorRows = sensorsCard.querySelectorAll('tbody tr:not(.readings-results)');
+            
+            sensorToggles.forEach(toggle => {
+                // Only update toggles for this device
+                if (toggle.dataset.deviceId === deviceId) {
+                    toggle.disabled = !isDeviceActive;
+                }
+            });
+
+            sensorRows.forEach(row => {
+                const toggle = row.querySelector('.sensor-status-toggle');
+                if (toggle && toggle.dataset.deviceId === deviceId) {
+                    if (!isDeviceActive) {
+                        row.classList.add('text-muted', 'opacity-50');
+                    } else {
+                        // Only remove opacity if the sensor itself is active
+                        if (toggle.checked) {
+                            row.classList.remove('text-muted', 'opacity-50');
+                        }
+                    }
+                }
+            });
+
+            // Update all action buttons
+            const buttons = sensorsCard.querySelectorAll('button:not(.sensor-status-toggle), a.btn');
+            buttons.forEach(button => {
+                button.disabled = !isDeviceActive;
+            });
+
+            // Update the Add Sensor button
+            const addSensorBtn = sensorsCard.querySelector('.card-header a.btn-primary');
+            if (addSensorBtn) {
+                addSensorBtn.disabled = !isDeviceActive;
+            }
+        }
+    });
+
+    // Add click handlers for all test buttons
+    document.querySelectorAll('.test-readings-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const sensorId = this.dataset.sensorId;
+            const url = this.dataset.url;
+            const resultsRow = document.getElementById(`readings-results-${sensorId}`);
+            const alertDiv = resultsRow.querySelector('.alert');
+            const summaryDiv = resultsRow.querySelector('.readings-summary');
+            const recentDiv = resultsRow.querySelector('.recent-readings');
+            
+            // Show the results row and loading state
+            resultsRow.classList.remove('d-none');
+            alertDiv.classList.remove('d-none', 'alert-success', 'alert-warning', 'alert-danger');
+            alertDiv.classList.add('alert-info');
+            alertDiv.textContent = 'Testing connection and fetching readings...';
+            summaryDiv.classList.add('d-none');
+            recentDiv.classList.add('d-none');
+            
+            // Make the AJAX call
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Clear previous alert classes
+                alertDiv.classList.remove('alert-info', 'alert-success', 'alert-warning', 'alert-danger');
+                
+                if (data.status === 'success') {
+                    // Show success message
+                    alertDiv.classList.add('alert-success');
+                    alertDiv.textContent = data.message;
+                    
+                    // Update summary table
+                    summaryDiv.classList.remove('d-none');
+                    summaryDiv.querySelector('.count').textContent = data.summary.count;
+                    summaryDiv.querySelector('.min').textContent = `${data.summary.min} ${data.summary.unit}`;
+                    summaryDiv.querySelector('.max').textContent = `${data.summary.max} ${data.summary.unit}`;
+                    summaryDiv.querySelector('.avg').textContent = `${data.summary.avg.toFixed(2)} ${data.summary.unit}`;
+                    summaryDiv.querySelector('.timerange').textContent = 
+                        `${new Date(data.summary.first_timestamp).toLocaleString()} - ${new Date(data.summary.last_timestamp).toLocaleString()}`;
+                    
+                    // Update recent readings table
+                    if (data.readings && data.readings.length > 0) {
+                        recentDiv.classList.remove('d-none');
+                        const tbody = recentDiv.querySelector('tbody');
+                        tbody.innerHTML = '';
+                        data.readings.forEach(reading => {
+                            const row = tbody.insertRow();
+                            row.insertCell(0).textContent = new Date(reading.timestamp).toLocaleString();
+                            row.insertCell(1).textContent = `${reading.value} ${data.summary.unit}`;
+                        });
+                    }
+                } else if (data.status === 'warning') {
+                    alertDiv.classList.add('alert-warning');
+                    alertDiv.textContent = data.message;
+                    summaryDiv.classList.add('d-none');
+                    recentDiv.classList.add('d-none');
+                } else {
+                    alertDiv.classList.add('alert-danger');
+                    alertDiv.textContent = data.message;
+                    summaryDiv.classList.add('d-none');
+                    recentDiv.classList.add('d-none');
+                }
+            })
+            .catch(error => {
+                alertDiv.classList.remove('alert-info');
+                alertDiv.classList.add('alert-danger');
+                alertDiv.textContent = 'An error occurred while testing the sensor readings.';
+                summaryDiv.classList.add('d-none');
+                recentDiv.classList.add('d-none');
+            });
+        });
+    });
+
+    // Add change handlers for sensor status toggles
+    document.querySelectorAll('.sensor-status-toggle').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const sensorId = this.dataset.sensorId;
+            const deviceId = this.dataset.deviceId;
+            const placeSlug = this.dataset.placeSlug;
+            const newStatus = this.checked;
+            const row = this.closest('tr');
+
+            const confirmMessage = newStatus ? 
+                'Are you sure you want to activate this sensor?' : 
+                'Are you sure you want to deactivate this sensor?';
+
+            if (confirm(confirmMessage)) {
+                fetch(`/api/${placeSlug}/sensors/${sensorId}/toggle_active/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({
+                        is_active: newStatus
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update the toggle state
+                        this.checked = data.is_active;
+                        
+                        // Update row styling
+                        if (!data.is_active) {
+                            row.classList.add('text-muted', 'opacity-50');
+                        } else {
+                            row.classList.remove('text-muted', 'opacity-50');
+                        }
+                    } else {
+                        throw new Error(data.message || 'Failed to update sensor status');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    this.checked = !newStatus;
+                    alert('Failed to update sensor status');
+                });
+            } else {
+                this.checked = !newStatus;
+            }
+        });
+    });
+});
+
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script> 

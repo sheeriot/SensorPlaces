@@ -1,0 +1,133 @@
+<div class="form-check form-switch">
+    <input class="form-check-input device-status-toggle" 
+           type="checkbox" 
+           id="deviceStatus_{{ device.pk }}"
+           data-device-id="{{ device.pk }}"
+           data-location-id="{{ device.location.pk }}"
+           data-place-slug="{{ device.location.place.slug }}"
+           {% if device.is_active %}checked{% endif %}
+           {% if not device.location.is_active %}disabled{% endif %}
+           style="opacity: {% if not device.is_active %}0.5{% else %}1{% endif %}">
+    <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
+           for="deviceStatus_{{ device.pk }}"
+           id="deviceStatusLabel_{{ device.pk }}">
+        {% if device.is_active %}Active{% else %}inactive{% endif %}
+    </label>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.device-status-toggle').forEach(toggle => {
+        toggle.addEventListener('change', function(e) {
+            e.preventDefault();
+            
+            const deviceId = this.dataset.deviceId;
+            const locationId = this.dataset.locationId;
+            const placeSlug = this.dataset.placeSlug;
+            const newStatus = this.checked;
+            const statusLabel = document.getElementById(`deviceStatusLabel_${deviceId}`);
+            const deviceCard = document.getElementById(`deviceCard_${deviceId}`);
+            const sensorsCard = document.querySelector('.card.sensors-card');
+            
+            const confirmMessage = newStatus ? 
+                'Are you sure you want to activate this device?' : 
+                'Are you sure you want to deactivate this device? This will also deactivate all associated sensors.';
+            
+            if (confirm(confirmMessage)) {
+                fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({
+                        is_active: newStatus
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update the toggle state and appearance
+                        this.checked = data.is_active;
+                        this.style.opacity = data.is_active ? '1' : '0.5';
+                        
+                        // Update the status label
+                        statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
+                        statusLabel.className = `form-check-label status-label ${data.is_active ? 'text-success' : 'text-danger'}`;
+                        
+                        // Update the device card styling
+                        deviceCard.className = `card rounded-3 shadow-sm border-0 mb-4 ${!data.is_active ? 'opacity-75' : ''}`;
+                        
+                        // Update all value text colors in device card
+                        deviceCard.querySelectorAll('dd').forEach(dd => {
+                            if (!dd.querySelector('.form-check')) {
+                                dd.style.color = data.is_active ? '#212529' : '#6c757d';
+                            }
+                        });
+
+                        // Update sensors card
+                        if (sensorsCard) {
+                            sensorsCard.className = `card sensors-card ${!data.is_active ? 'opacity-75' : ''}`;
+                            
+                            // Check for any active sensors when device is inactive
+                            if (!data.is_active) {
+                                const activeSensors = sensorsCard.querySelectorAll('.badge.bg-success');
+                                if (activeSensors.length > 0) {
+                                    showToast('Warning: Some sensors are still marked as active. They will be automatically deactivated.', 'warning');
+                                }
+                            }
+                        }
+
+                        showToast('Device status updated successfully', 'success');
+                    } else {
+                        throw new Error(data.message || 'Failed to update device status');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    this.checked = !newStatus;
+                    showToast(error.message || 'Failed to update device status', 'danger');
+                });
+            } else {
+                this.checked = !newStatus;
+            }
+        });
+    });
+});
+
+// Helper function to show toasts
+function showToast(message, type) {
+    const toastDiv = document.createElement('div');
+    toastDiv.className = `toast align-items-center text-white bg-${type} border-0 position-fixed top-0 end-0 m-3`;
+    toastDiv.setAttribute('role', 'alert');
+    toastDiv.setAttribute('aria-live', 'assertive');
+    toastDiv.setAttribute('aria-atomic', 'true');
+    toastDiv.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    document.body.appendChild(toastDiv);
+    const toast = new bootstrap.Toast(toastDiv);
+    toast.show();
+    setTimeout(() => toastDiv.remove(), 3000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script> 

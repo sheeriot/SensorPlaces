@@ -1,0 +1,331 @@
+{% extends "sensors/base.html" %}
+{% load widget_tweaks %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if object %}Edit Device{% else %}New Device{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <!-- Simplified Location Details Card -->
+        <div class="card rounded-3 shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-2">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-geo-alt me-2"></i>Location Details
+                </h5>
+            </div>
+            <div class="card-body py-2">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-body-secondary small text-uppercase">Name</dt>
+                    <dd class="col-sm-8">{{ location.name }}</dd>
+                    
+                    <dt class="col-sm-4 text-body-secondary small text-uppercase">Status</dt>
+                    <dd class="col-sm-8">
+                        {% if location.is_active %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle me-1"></i>Active
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-x-circle me-1"></i>Inactive
+                            </span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-4 text-body-secondary small text-uppercase">Place</dt>
+                    <dd class="col-sm-8">
+                        <a href="{% url 'sensors:place_detail' location.place.slug %}" class="text-decoration-none">
+                            {{ location.place.name }}
+                        </a>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Other Devices Card -->
+        <div class="card rounded-3 shadow-sm border-0">
+            <div class="card-header bg-white py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-hdd-rack me-2"></i>Other Devices
+                    </h5>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="hideInactiveDevicesSwitch" checked>
+                        <label class="form-check-label small" for="hideInactiveDevicesSwitch">
+                            Hide Inactive
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for loc in place_locations %}
+                    <div class="list-group-item p-2 {% if loc == location %}bg-light{% endif %}">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-geo-alt text-secondary"></i>
+                            <span class="small fw-medium">{{ loc.name }}</span>
+                            <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %} rounded-pill" style="font-size: 0.7em;">
+                                {% if loc.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </div>
+                        {% if loc.devices.all %}
+                        <div class="list-group list-group-flush border-start ms-2">
+                            {% for device in loc.devices.all %}
+                            <div class="list-group-item border-0 py-1 px-2 {% if device == object %}bg-info bg-opacity-10{% endif %}"
+                                 data-device-active="{{ device.is_active|lower }}">
+                                <div class="d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center gap-2 {% if not device.is_active %}text-body-secondary{% endif %}">
+                                            <i class="bi {{ device.device_type.icon }} {% if device.is_active %}fs-5{% else %}small{% endif %}"></i>
+                                            <small class="{% if device.is_active %}fw-medium{% endif %}">{{ device.name }}</small>
+                                            <small style="font-size: 0.75em;" class="{% if device.is_active %}fw-medium{% endif %}">
+                                                ({{ device.device_type.name }})
+                                                {% if not device.is_active %} - inactive{% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="ms-4 py-1">
+                            <small class="text-body-secondary fst-italic">No devices</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8 order-first order-md-last">
+        <div class="row">
+            <!-- Device Form Card -->
+            <div class="col-12 mb-4">
+                <div class="card rounded-3 shadow-sm border-0">
+                    <div class="card-header bg-white py-2">
+                        <h5 class="card-title mb-0">
+                            {% if object %}
+                                <i class="bi bi-hdd-rack me-2"></i>Edit Device
+                            {% else %}
+                                <i class="bi bi-hdd-rack me-2"></i>New Device
+                            {% endif %}
+                            <small class="text-body-secondary ms-2">
+                                at {{ location.name }} in {{ location.place.name }}
+                            </small>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% crispy form %}
+
+                        {% if form.get_warnings.serial_number %}
+                        <div class="alert alert-warning d-flex align-items-center py-2 mb-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div>
+                                {% for warning in form.get_warnings.serial_number %}
+                                    {{ warning }}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if not location.is_active %}
+                        <div class="alert alert-warning d-flex align-items-center py-2 mb-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div>
+                                This location is inactive. Any devices created here will also be inactive.
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Site Plan Card -->
+            <div class="col-12">
+                <div class="card rounded-3 shadow-sm border-0">
+                    <div class="card-header bg-white py-2">
+                        <h5 class="card-title mb-0">
+                            {% if location.place.site_plan %}Site Plan{% else %}Location Map{% endif %}
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="siteMapContainer" class="position-relative">
+                            {% if location.place.site_plan %}
+                                <img src="{{ location.place.site_plan.url }}" alt="Site plan" class="img-fluid w-100">
+                                {% for loc in place_locations %}
+                                {% if loc != location %}
+                                <div class="location-marker position-absolute" 
+                                     data-location-id="{{ loc.pk }}"
+                                     data-active="{{ loc.is_active|lower }}"
+                                     style="left: {{ loc.x_coord|default:50 }}%; top: {{ loc.y_coord|default:50 }}%;">
+                                    <i class="bi bi-hexagon-fill {% if loc.is_active %}text-primary{% else %}text-secondary{% endif %} fs-4"></i>
+                                    <div class="location-label">
+                                        {{ loc.name }}
+                                        <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %} ms-1">
+                                            {{ loc.active_devices_count }}
+                                        </span>
+                                    </div>
+                                    <!-- Popup content -->
+                                    <div class="location-popup">
+                                        <h6 class="mb-2">                                     
+                                            <small>
+                                            <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ loc.name }}
+                                            </span>
+                                            {% if not loc.is_active %} - inactive{% endif %}
+                                        </small>
+                                        </h6>
+                                        <p class="mb-1">
+                                            <small>
+                                                <span class="text-success">{{ location.active_devices_count }} active devices</span><br>
+                                                <span class="text-danger">{{ location.inactive_devices_count }} inactive devices</span>
+                                            </small>
+                                        </p>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                                
+                                <!-- Current Location Marker -->
+                                <div class="location-marker position-absolute" 
+                                     data-location-id="{{ location.pk }}"
+                                     data-active="{{ location.is_active|lower }}"
+                                     style="left: {{ location.x_coord|default:50 }}%; top: {{ location.y_coord|default:50 }}%;">
+                                    <i class="bi bi-geo-alt-fill {% if location.is_active %}text-success{% else %}text-secondary{% endif %} fs-4"></i>
+                                    <div class="location-label">
+                                        {{ location.name }}
+                                        <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %} ms-1">
+                                            {{ location.active_devices_count }}
+                                        </span>
+                                    </div>
+                                    <!-- Popup content -->
+                                    <div class="location-popup">
+                                        <h6 class="mb-2">                                     
+                                            <small>
+                                            <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ location.name }}
+                                            </span>
+                                            {% if not location.is_active %} - inactive{% endif %}
+                                        </small>
+                                        </h6>
+                                        <p class="mb-1">
+                                            <small>
+                                                <span class="text-success">{{ location.active_devices_count }} active devices</span><br>
+                                                <span class="text-danger">{{ location.inactive_devices_count }} inactive devices</span>
+                                            </small>
+                                        </p>
+                                    </div>
+                                </div>
+                            {% else %}
+                                {{ map_html|safe }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Hide Inactive Devices functionality
+    const hideInactiveDevicesSwitch = document.getElementById('hideInactiveDevicesSwitch');
+    const deviceItems = document.querySelectorAll('[data-device-active]');
+    
+    function filterDevices() {
+        const hideInactive = hideInactiveDevicesSwitch.checked;
+        
+        deviceItems.forEach(item => {
+            const isActive = item.dataset.deviceActive === 'true';
+            item.style.display = (hideInactive && !isActive) ? 'none' : '';
+        });
+    }
+
+    // Initial filter (since switch starts checked)
+    filterDevices();
+
+    // Filter on toggle change
+    hideInactiveDevicesSwitch.addEventListener('change', filterDevices);
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Larger switch styling */
+    .form-switch-lg .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        margin-top: 0;
+    }
+    
+    .form-switch-lg .form-check-input:checked {
+        background-color: var(--bs-success);
+        border-color: var(--bs-success);
+    }
+
+    #siteMapContainer {
+        background: #f8f9fa;
+        border-radius: 0 0 0.375rem 0.375rem;
+    }
+
+    .location-marker {
+        cursor: pointer;
+        transform: translate(-50%, -50%);
+        z-index: 100;
+        position: relative;
+    }
+    
+    .location-label {
+        position: absolute;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        white-space: nowrap;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: -16px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .location-label .badge {
+        font-size: 9px;
+        padding: 3px 6px;
+    }
+    
+    .location-popup {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 10px;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        padding: 8px;
+        width: 180px;
+        z-index: 1000;
+        display: none;
+    }
+    
+    .location-marker:hover .location-popup {
+        display: block;
+    }
+    
+    .location-marker .bi {
+        filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+    }
+</style>
+{% endblock %}
+{% endblock %} 

@@ -1,0 +1,35 @@
+{% load widget_tweaks %}
+
+<div class="card mb-1">
+    <div class="card-header py-2 px-3">
+        <h5 class="card-title mb-0 d-flex align-items-center">
+            <i class="bi bi-building me-2 text-secondary"></i>
+            <span class="text-secondary fw-normal">{{ place.name }}</span>
+        </h5>
+    </div>
+    <div class="card-body px-2 pb-1 pt-2">
+        <dl class="row g-0">
+            <dt class="col-12 text-secondary small mb-1">Address</dt>
+            <dd class="col-12 mb-2 fw-medium">{{ place.address }}</dd>
+            
+            <dt class="col-12 text-secondary small mb-1">Coordinates</dt>
+            <dd class="col-12 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fw-medium">{{ place.latitude }}, {{ place.longitude }}</span>
+                    <a href="https://www.google.com/maps?q={{ place.latitude }},{{ place.longitude }}" 
+                       target="_blank" 
+                       class="btn btn-outline-primary btn-sm rounded-circle p-1" 
+                       title="Open in Google Maps">
+                        <i class="bi bi-globe"></i>
+                    </a>
+                </div>
+            </dd>
+            
+            <dt class="col-12 p-0">
+                <div class="border rounded">
+                    {{ map_html|safe }}
+                </div>
+            </dt>
+        </dl>
+    </div>
+</div> 

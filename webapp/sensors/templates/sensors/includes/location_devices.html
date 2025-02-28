@@ -1,0 +1,53 @@
+<div class="d-flex justify-content-end mb-3">
+    <div class="btn-group btn-group-sm">
+        <a href="{% url 'sensors:location_detail' location.pk %}" class="btn btn-info">
+            <i class="bi bi-eye"></i>
+        </a>
+        <a href="{% url 'sensors:location_update' location.pk %}" class="btn btn-warning">
+            <i class="bi bi-pencil"></i>
+        </a>
+        <a href="{% url 'sensors:location_delete' location.pk %}" class="btn btn-danger">
+            <i class="bi bi-trash"></i>
+        </a>
+    </div>
+</div>
+
+{% if location.devices.exists %}
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Device</th>
+                <th>Type</th>
+                <th>Sensors</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for device in location.devices.all %}
+            <tr data-device="{{ device.pk }}" data-active="{{ device.is_active|lower }}">
+                <td>{{ device.name }}</td>
+                <td>{{ device.device_type }}</td>
+                <td>{{ device.sensors.count }}</td>
+                <td>
+                    {% if device.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'sensors:device_detail' device.pk %}" 
+                       class="btn btn-info btn-sm">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-center mb-0">No devices in this location</p>
+{% endif %} 

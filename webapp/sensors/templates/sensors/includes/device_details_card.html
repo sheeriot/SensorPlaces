@@ -1,0 +1,230 @@
+{% load widget_tweaks %}
+
+<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not device.is_active %}opacity-75{% endif %}" id="deviceCard_{{ device.pk }}">
+    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-hdd-rack me-2"></i>Device Details
+        </h5>
+        <div class="btn-group" role="group" aria-label="Device Actions">
+            <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug location_pk=device.location.pk pk=device.pk %}" 
+               class="btn btn-warning btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+            <a href="{% url 'sensors:device_delete' place_slug=device.location.place.slug location_pk=device.location.pk pk=device.pk %}" 
+               class="btn btn-danger btn-sm">
+                <i class="bi bi-trash"></i> Delete
+            </a>
+        </div>
+    </div>
+    <div class="card-body py-2">
+        <div class="row mb-0">
+            <div class="col-sm-6">
+                <dl class="row mb-0">
+                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Name</dt>
+                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.name }}</dd>
+                    
+                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Type</dt>
+                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.device_type.name }}</dd>
+
+                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Status</dt>
+                    <dd class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input device-status-toggle" 
+                                   type="checkbox" 
+                                   id="deviceStatus_{{ device.pk }}"
+                                   data-device-id="{{ device.pk }}"
+                                   data-location-id="{{ device.location.pk }}"
+                                   data-place-slug="{{ device.location.place.slug }}"
+                                   {% if device.is_active %}checked{% endif %}
+                                   {% if not device.location.is_active %}disabled{% endif %}>
+                            <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
+                                   for="deviceStatus_{{ device.pk }}"
+                                   id="deviceStatusLabel_{{ device.pk }}">
+                                {% if device.is_active %}Active{% else %}inactive{% endif %}
+                            </label>
+                        </div>
+                    </dd>
+                </dl>
+            </div>
+            <div class="col-sm-6">
+                <dl class="row mb-0">
+                    {% if device.manufacturer %}
+                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Manufacturer</dt>
+                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.manufacturer }}</dd>
+                    {% endif %}
+
+                    {% if device.model %}
+                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Model</dt>
+                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.model }}</dd>
+                    {% endif %}
+
+                    {% if device.serial_number %}
+                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Serial</dt>
+                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.serial_number }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function initializeDeviceStatusToggle() {
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.device-status-toggle').forEach(toggle => {
+            toggle.addEventListener('change', function(e) {
+                e.preventDefault();
+                
+                const deviceId = this.dataset.deviceId;
+                const locationId = this.dataset.locationId;
+                const placeSlug = this.dataset.placeSlug;
+                const newStatus = this.checked;
+                const statusLabel = document.getElementById(`deviceStatusLabel_${deviceId}`);
+                const deviceCard = document.getElementById(`deviceCard_${deviceId}`);
+                const sensorsCard = document.querySelector('.sensors-card');
+                
+                const confirmMessage = newStatus ? 
+                    'Are you sure you want to activate this device?' : 
+                    'Are you sure you want to deactivate this device? This will also deactivate all associated sensors.';
+                
+                if (confirm(confirmMessage)) {
+                    fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken'),
+                        },
+                        body: JSON.stringify({
+                            is_active: newStatus
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Update the toggle state and appearance
+                            this.checked = data.is_active;
+                            this.style.opacity = data.is_active ? '1' : '0.5';
+                            
+                            // Update the status label
+                            statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
+                            statusLabel.className = `form-check-label status-label ${data.is_active ? 'text-success' : 'text-danger'}`;
+                            
+                            // Update the device card styling
+                            deviceCard.className = `card rounded-3 shadow-sm border-0 mb-4 ${!data.is_active ? 'opacity-75' : ''}`;
+                            
+                            // Update all value text colors in device card
+                            deviceCard.querySelectorAll('dd').forEach(dd => {
+                                if (!dd.querySelector('.form-check')) {
+                                    dd.style.color = data.is_active ? '#212529' : '#6c757d';
+                                }
+                            });
+
+                            // Update sensors card if it exists
+                            if (sensorsCard) {
+                                // Update card opacity
+                                sensorsCard.className = `card sensors-card ${!data.is_active ? 'opacity-75' : ''}`;
+                                
+                                // Update all sensor toggles and rows
+                                const sensorToggles = sensorsCard.querySelectorAll('.sensor-status-toggle');
+                                const sensorRows = sensorsCard.querySelectorAll('tbody tr:not(.readings-results)');
+                                
+                                sensorToggles.forEach(toggle => {
+                                    toggle.disabled = !data.is_active;
+                                });
+
+                                sensorRows.forEach(row => {
+                                    if (!data.is_active) {
+                                        row.classList.add('text-muted', 'opacity-50');
+                                    } else {
+                                        // Only remove opacity if the sensor itself is active
+                                        const toggle = row.querySelector('.sensor-status-toggle');
+                                        if (toggle && toggle.checked) {
+                                            row.classList.remove('text-muted', 'opacity-50');
+                                        }
+                                    }
+                                });
+
+                                // Update all buttons in the sensors card
+                                const buttons = sensorsCard.querySelectorAll('button, a.btn');
+                                buttons.forEach(button => {
+                                    if (!button.classList.contains('sensor-status-toggle')) {
+                                        button.disabled = !data.is_active;
+                                    }
+                                });
+
+                                // Update the Add Sensor button
+                                const addSensorBtn = sensorsCard.querySelector('.card-header a.btn-primary');
+                                if (addSensorBtn) {
+                                    addSensorBtn.disabled = !data.is_active;
+                                }
+
+                                // Dispatch a custom event to notify the sensor card
+                                const event = new CustomEvent('deviceStatusChanged', {
+                                    detail: {
+                                        isActive: data.is_active,
+                                        deviceId: deviceId
+                                    }
+                                });
+                                document.dispatchEvent(event);
+                            }
+
+                            showDeviceToast('Device status updated successfully', 'success');
+                        } else {
+                            throw new Error(data.message || 'Failed to update device status');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        this.checked = !newStatus;
+                        showDeviceToast(error.message || 'Failed to update device status', 'danger');
+                    });
+                } else {
+                    this.checked = !newStatus;
+                }
+            });
+        });
+    });
+
+    // Helper function to show toasts - renamed to avoid conflicts
+    function showDeviceToast(message, type) {
+        const toastDiv = document.createElement('div');
+        toastDiv.className = `toast align-items-center text-white bg-${type} border-0 position-fixed top-0 end-0 m-3`;
+        toastDiv.setAttribute('role', 'alert');
+        toastDiv.setAttribute('aria-live', 'assertive');
+        toastDiv.setAttribute('aria-atomic', 'true');
+        toastDiv.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        document.body.appendChild(toastDiv);
+        const toast = new bootstrap.Toast(toastDiv);
+        toast.show();
+        setTimeout(() => toastDiv.remove(), 3000);
+    }
+
+    // Helper function to get CSRF token - renamed to avoid conflicts
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+})();
+</script> 
