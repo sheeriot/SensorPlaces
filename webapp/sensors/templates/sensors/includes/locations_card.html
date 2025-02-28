@@ -56,9 +56,7 @@ This template expects the following context variables:
                         <td>
                             <span class="text-success">{{ location.active_devices_count }}</span>
                             {% if location.inactive_devices_count %}
-                            <span class="text-body-secondary">(</span>
-                            <span class="text-danger text-opacity-75">{{ location.inactive_devices_count }}</span>
-                            <span class="text-body-secondary">)</span>
+                            <span class="text-body-secondary text-opacity-75">({{ location.inactive_devices_count }})</span>
                             {% endif %}
                         </td>
                         <td>

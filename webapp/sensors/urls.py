@@ -53,6 +53,6 @@ urlpatterns = [
 
     path('api/<slug:place_slug>/device/<int:pk>/move_location/', views.DeviceMoveLocationView.as_view(), name='device_move_location'),
 
-    path('/api/<slug:place_slug>/sensor_test/<int:sensor_pk>',
+    path('api/<slug:place_slug>/sensor_test/<int:sensor_pk>',
          views.test_sensor_readings, name='sensor_test'),
 ]

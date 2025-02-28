@@ -1,5 +1,8 @@
 {% load widget_tweaks %}
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <div class="card rounded-3 shadow-sm border-0 mb-3">
     <div class="card-header bg-white py-2">
         <div class="d-flex justify-content-between align-items-center">
@@ -8,23 +11,19 @@
             </h5>
             <div class="d-flex align-items-center gap-3 small">
                 <span>
-                    <i class="bi bi-geo-alt me-1"></i>{{ place.address }}
+                    <i class="bi bi-mailbox me-1"></i>{{ place.address }}
                 </span>
                 <span>
-                    <i class="bi bi-geo me-1"></i>{{ place.latitude }}, {{ place.longitude }}
+                    <i class="bi bi-geo-alt me-1"></i>{{ place.latitude }}, {{ place.longitude }}
                 </span>
-                <a href="https://www.google.com/maps?q={{ place.latitude }},{{ place.longitude }}" 
-                   onclick="window.open(this.href, 'googleMaps', 'width=800,height=600'); return false;" 
-                   class="btn btn-outline-primary btn-sm p-1" 
-                   title="Open in Google Maps">
-                    <i class="bi bi-globe"></i>
+                <a href="#" class="btn btn-outline-primary" id="openMap">
+                    View Map
                 </a>
             </div>
         </div>
     </div>
     {% if show_map %}
     <div class="card-body py-2">
-
         <div class="row mt-2">
             <div class="col-12">
                 <div class="border rounded">
@@ -34,4 +33,57 @@
         </div>
     </div>
     {% endif %}
-</div> 
+</div>
+
+<!-- Modal for Map -->
+<div id="mapModal" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ place.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="leafletMap" style="height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const openMapButton = document.getElementById('openMap');
+    const mapModal = document.getElementById('mapModal');
+    let map = null;
+
+    openMapButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        const modal = new bootstrap.Modal(mapModal);
+        modal.show();
+    });
+
+    mapModal.addEventListener('shown.bs.modal', function () {
+        if (!map) {
+            setTimeout(function() {
+                map = L.map('leafletMap');
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                const lat = {{ place.latitude }};
+                const lng = {{ place.longitude }};
+                map.setView([lat, lng], 15);
+                
+                L.marker([lat, lng])
+                    .addTo(map)
+                    .bindPopup("{{ place.name }}")
+                    .openPopup();
+
+                map.invalidateSize();
+            }, 100);
+        } else {
+            map.invalidateSize();
+        }
+    });
+});
+</script> 

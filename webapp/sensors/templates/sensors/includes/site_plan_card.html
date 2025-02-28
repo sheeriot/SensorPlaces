@@ -7,108 +7,183 @@
                 <i class="bi bi-grid"></i> Edit Layout
             </button>
             <button id="savePositions" class="btn btn-sm btn-success d-none">
-                <i class="bi bi-save"></i> Save Positions
+                <i class="bi bi-save"></i> Save
             </button>
         </div>
     </div>
+    <!-- Add controls panel that shows when edit mode is active -->
+    <div id="editControls" class="card-body border-bottom p-2 d-none">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="btn-group btn-group-sm">
+                <button id="zoomIn" class="btn btn-outline-secondary">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button id="zoomOut" class="btn btn-outline-secondary">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button id="moveLeft" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <button id="moveUp" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-up"></i>
+                </button>
+                <button id="moveDown" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-down"></i>
+                </button>
+                <button id="moveRight" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button id="resetView" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
     <div class="card-body p-0">
-        <div id="siteMapContainer" class="position-relative" 
-             style="aspect-ratio: {{ place.site_plan.width }}/{{ place.site_plan.height }}; overflow: hidden;"
-             data-scale="{{ place.site_plan_scale }}"
-             data-x="{{ place.site_plan_x }}"
-             data-y="{{ place.site_plan_y }}">
-            <img src="{{ place.site_plan.url }}" alt="Site plan" 
-                 class="img-fluid w-100 h-100" style="object-fit: contain;">
+        <div class="site-plan-wrapper">
+            <div id="siteMapContainer" 
+                 data-scale="{{ place.site_plan_scale }}"
+                 data-x="{{ place.site_plan_x }}"
+                 data-y="{{ place.site_plan_y }}">
+                <!-- Move markers outside of the scaled content -->
             {% for location in locations %}
-            <div class="location-marker position-absolute" 
+                <div class="location-marker position-absolute p-1 {% if location.is_active %}active{% else %}inactive{% endif %}" 
                  data-location-id="{{ location.pk }}"
                  data-active="{{ location.is_active|lower }}"
                  data-x="{{ location.x_coord|default:50 }}"
                  data-y="{{ location.y_coord|default:50 }}"
                  style="left: {{ location.x_coord|default:50 }}%; top: {{ location.y_coord|default:50 }}%;">
-                <i class="bi bi-hexagon-fill {% if location.is_active %}text-primary{% else %}text-secondary{% endif %} fs-4"></i>
-                <div class="location-label">
-                    {{ location.name }}
-                    <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %} ms-1">
-                        {{ location.active_devices_count }}
-                    </span>
+                    <div class="marker-content p-0 m-0">
+                        <div class="location-name p-0 m-0">{{ location.name }}</div>
+                        <div class="device-count p-0 m-0">{{ location.active_devices_count }}</div>
                 </div>
-                <!-- Popup content -->
-                <div class="location-popup">
-                    <h6 class="mb-2">{{ location.name }}
-                        <small>
-                            <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                {% if location.is_active %}Active{% else %}Inactive{% endif %}
-                            </span>
-                        </small>
-                    </h6>
-                    <p class="mb-1">
-                        <small>
-                            Devices: 
-                            <span class="text-success">{{ location.active_devices_count }} active</span>,
-                            <span class="text-danger">{{ location.inactive_devices_count }} inactive</span>
-                        </small>
-                    </p>
                 </div>
+                {% endfor %}
+                <!-- Background site plan that gets scaled -->
+                <div class="site-plan-background"></div>
             </div>
-            {% endfor %}
         </div>
     </div>
 </div>
 
 <style>
-.location-marker {
-    cursor: move;
-    transform: translate(-50%, -50%);
-    z-index: 100;
-    position: relative;
-}
-.location-marker.dragging {
-    z-index: 1000;
-}
-.location-label {
-    position: absolute;
-    background: rgba(0,0,0,0.7);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 12px;
-    white-space: nowrap;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: -20px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.location-label .badge {
-    font-size: 10px;
-    padding: 3px 6px;
-}
-.location-popup {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-bottom: 10px;
-    background: white;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    padding: 8px;
-    width: 200px;
-    z-index: 1000;
-    display: none;
-}
-.location-marker:hover .location-popup {
-    display: block;
-}
-.location-marker .bi-hexagon-fill {
-    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
-}
 #siteMapContainer {
     background: #f8f9fa;
     border-radius: 0 0 0.375rem 0.375rem;
     max-height: 70vh;
+    position: relative;
+    margin: 0 auto;
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+    height: 500px;
+    width: 100%;
+}
+
+.site-plan-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("{{ place.site_plan.url }}");
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: center;
+}
+
+.location-marker {
+    cursor: move;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    position: absolute;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 4px;
+    padding: 2px 6px !important;  /* Minimal padding */
+    min-width: auto;  /* Remove min-width */
+    text-align: center;
+    line-height: 1;  /* Reduce line height */
+}
+
+.location-marker.active {
+    background: rgba(13, 110, 253, 0.9);  /* Bootstrap primary color */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.location-marker.inactive {
+    background: rgba(108, 117, 125, 0.9);  /* Bootstrap secondary color */
+}
+
+.marker-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;  /* Remove gap */
+}
+
+.location-name {
+    color: white;
+    font-size: 12px;  /* Smaller font */
+    font-weight: 500;
+    line-height: 1.1;
+}
+
+.device-count {
+    color: white;
+    font-size: 14px;  /* Smaller font */
+    font-weight: 700;
+    line-height: 1;
+}
+
+.location-marker.selected {
+    outline: 2px solid white;
+    outline-offset: 2px;
+    z-index: 1001;
+}
+
+#editControls .btn-group:not(:last-child) {
+    margin-right: 1rem;
+}
+
+#siteMapContainer.edit-mode {
+    outline: 2px dashed #0d6efd;
+    outline-offset: -2px;
+}
+
+.site-plan-wrapper {
+    position: relative;
+    height: 500px;
+    padding: 20px;
+    overflow: hidden;
+}
+
+/* Ensure the transformed content stays within bounds */
+.site-plan-content {
+    position: relative;
+    transform-origin: center center;
+    min-height: 200px;
+    margin: 0 auto;
+}
+
+/* Add styles to counter-scale markers */
+.site-plan-content[style*="scale"] .location-marker {
+    transform: translate(-50%, -50%) scale(calc(1 / var(--site-plan-scale)));
+}
+
+.location-marker.dragging {
+    z-index: 1000;
+}
+
+/* Make controls sticky */
+#editControls {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    background: white;
 }
 </style>
 
@@ -117,27 +192,123 @@ document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('siteMapContainer');
     const editModeToggle = document.getElementById('editModeToggle');
     const saveButton = document.getElementById('savePositions');
+    const editControls = document.getElementById('editControls');
     const markers = document.querySelectorAll('.location-marker');
-    let isDragging = false;
-    let currentMarker = null;
-    let startX, startY;
-    let originalX, originalY;
 
     // Initialize layout from saved settings
-    const scale = parseFloat(container.dataset.scale) || 1.0;
-    const x = parseFloat(container.dataset.x) || 0;
-    const y = parseFloat(container.dataset.y) || 0;
+    let scale = parseFloat(container.dataset.scale) || 1.0;
+    let x = parseFloat(container.dataset.x) || 0;
+    let y = parseFloat(container.dataset.y) || 0;
     
-    container.style.transform = `scale(${scale}) translate(${x}px, ${y}px)`;
+    function updateTransform() {
+        // Constrain scale
+        scale = Math.max(0.5, Math.min(3.0, scale));
+        
+        // Only transform the background
+        const background = document.querySelector('.site-plan-background');
+        background.style.transform = `scale(${scale}) translate(${x}px, ${y}px)`;
+    }
+    
+    updateTransform();
 
     // Toggle edit mode
     editModeToggle?.addEventListener('click', function() {
         container.classList.toggle('edit-mode');
         saveButton.classList.toggle('d-none');
+        editControls.classList.toggle('d-none');
         this.classList.toggle('active');
     });
 
-    // Save all positions
+    // Zoom controls
+    document.getElementById('zoomIn')?.addEventListener('click', () => {
+        scale = Math.min(scale * 1.2, 3.0);
+        updateTransform();
+    });
+
+    document.getElementById('zoomOut')?.addEventListener('click', () => {
+        scale = Math.max(scale / 1.2, 0.5);
+        updateTransform();
+    });
+
+    // Modify movement step based on scale
+    function getAdjustedStep() {
+        return MOVE_STEP / scale;
+    }
+
+    // Movement controls
+    const MOVE_STEP = 20;
+    document.getElementById('moveLeft')?.addEventListener('click', () => {
+        x -= getAdjustedStep();
+        updateTransform();
+    });
+    document.getElementById('moveRight')?.addEventListener('click', () => {
+        x += getAdjustedStep();
+        updateTransform();
+    });
+    document.getElementById('moveUp')?.addEventListener('click', () => {
+        y -= getAdjustedStep();
+        updateTransform();
+    });
+    document.getElementById('moveDown')?.addEventListener('click', () => {
+        y += getAdjustedStep();
+        updateTransform();
+    });
+
+    // Reset view
+    document.getElementById('resetView')?.addEventListener('click', () => {
+        scale = 1.0;
+        x = 0;
+        y = 0;
+        updateTransform();
+    });
+
+    // Simple marker movement
+    markers.forEach(marker => {
+        let isDragging = false;
+        let startX, startY;
+        let originalX, originalY;
+        
+        marker.addEventListener('mousedown', function(e) {
+            if (!container.classList.contains('edit-mode')) return;
+            
+            isDragging = true;
+            marker.classList.add('dragging');
+            
+            startX = e.clientX;
+            startY = e.clientY;
+            originalX = parseFloat(marker.dataset.x);
+            originalY = parseFloat(marker.dataset.y);
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            
+            const containerRect = container.getBoundingClientRect();
+            const deltaXPercent = (dx / containerRect.width) * 100;
+            const deltaYPercent = (dy / containerRect.height) * 100;
+            
+            const newX = Math.max(0, Math.min(100, originalX + deltaXPercent));
+            const newY = Math.max(0, Math.min(100, originalY + deltaYPercent));
+            
+            marker.dataset.x = newX.toFixed(2);
+            marker.dataset.y = newY.toFixed(2);
+            marker.style.left = `${newX}%`;
+            marker.style.top = `${newY}%`;
+        });
+        
+        document.addEventListener('mouseup', function() {
+            if (!isDragging) return;
+            isDragging = false;
+            marker.classList.remove('dragging');
+        });
+    });
+
+    // Save positions and layout
     saveButton?.addEventListener('click', async function() {
         const promises = Array.from(markers).map(marker => {
             const locationId = marker.dataset.locationId;
@@ -150,13 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token }}',
                 },
-                credentials: 'same-origin',
                 body: JSON.stringify({ x_coord: x, y_coord: y })
-            }).then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
             });
         });
 
@@ -176,63 +341,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
             
-            alert('All positions saved successfully!');
+            alert('Layout saved successfully!');
             container.classList.remove('edit-mode');
             saveButton.classList.add('d-none');
+            editControls.classList.add('d-none');
             editModeToggle.classList.remove('active');
         } catch (error) {
-            alert('Error saving positions');
+            alert('Error saving layout');
             console.error('Error:', error);
         }
-    });
-
-    // Marker drag functionality
-    markers.forEach(marker => {
-        marker.addEventListener('mousedown', startDragging);
-    });
-
-    function startDragging(e) {
-        if (!container.classList.contains('edit-mode')) return;
-        
-        isDragging = true;
-        currentMarker = e.target.closest('.location-marker');
-        currentMarker.classList.add('dragging');
-        
-        const rect = container.getBoundingClientRect();
-        startX = e.clientX - rect.left;
-        startY = e.clientY - rect.top;
-        originalX = parseFloat(currentMarker.dataset.x);
-        originalY = parseFloat(currentMarker.dataset.y);
-    }
-
-    document.addEventListener('mousemove', function(e) {
-        if (!isDragging || !currentMarker) return;
-
-        const rect = container.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Calculate percentage positions
-        let newX = (x / rect.width) * 100;
-        let newY = (y / rect.height) * 100;
-
-        // Clamp values between 0 and 100
-        newX = Math.max(0, Math.min(100, newX));
-        newY = Math.max(0, Math.min(100, newY));
-
-        // Update marker position
-        currentMarker.style.left = `${newX}%`;
-        currentMarker.style.top = `${newY}%`;
-        currentMarker.dataset.x = newX.toFixed(2);
-        currentMarker.dataset.y = newY.toFixed(2);
-    });
-
-    document.addEventListener('mouseup', function() {
-        if (currentMarker) {
-            currentMarker.classList.remove('dragging');
-        }
-        isDragging = false;
-        currentMarker = null;
     });
 });
 </script> 

@@ -228,7 +228,7 @@ class LocationListView(ListView):
                         folium.Marker(
                             location=[float(location.x_coord), float(location.y_coord)],
                             popup=location.name,
-                            tooltip=location.name,
+                            tooltip=location.name + ' ' + (str(location.active_devices_count) if location.active_devices_count > 0 else ''),
                             icon=folium.Icon(color='blue', icon='info-sign')
                         ).add_to(m)
                 
@@ -247,29 +247,14 @@ class LocationDetailView(DetailView):
         locations = self.object.place.locations.annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        )
-        
+        ).order_by('name')  # Add consistent ordering
+
+        # for location in locations:
+        #     ic(location.name, location.active_devices_count, location.inactive_devices_count)
+
         # Add the annotated locations to the context
         context['place_locations'] = locations
-        
-        # Get the current location with annotations
-        context['location'] = locations.get(pk=self.object.pk)
-        
-        # Create map centered on place
-        m = folium.Map(
-            location=[float(self.object.place.latitude), float(self.object.place.longitude)],
-            zoom_start=15
-        )
-        
-        # Add marker for the place
-        folium.Marker(
-            location=[float(self.object.place.latitude), float(self.object.place.longitude)],
-            popup=self.object.place.name,
-            tooltip=self.object.place.name,
-            icon=folium.Icon(color='red', icon='info-sign')
-        ).add_to(m)
-        
-        context['map_html'] = m._repr_html_()
+        context['place'] = self.object.place
         
         # Get devices for this location with their sensor data
         devices = self.object.devices.all()
@@ -678,16 +663,25 @@ class SensorReadingCreateView(SuccessMessageMixin, CreateView):
 
 def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
     place = get_object_or_404(Place, slug=place_slug)
+    
+    # Get device and sensor counts
     devices_active = Device.objects.filter(location__place=place, is_active=True)
     devices_inactive = Device.objects.filter(location__place=place, is_active=False)
     sensors_active = Sensor.objects.filter(device__location__place=place, is_active=True)
     sensors_inactive = Sensor.objects.filter(device__location__place=place, is_active=False)
+    
+    # Get location statistics
+    locations = place.locations.annotate(
+        active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+        inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+    ).values('id', 'name', 'is_active', 'active_devices_count', 'inactive_devices_count')
     
     return JsonResponse({
         'devices_active': devices_active.count(),
         'devices_inactive': devices_inactive.count(),
         'sensors_active': sensors_active.count(),
         'sensors_inactive': sensors_inactive.count(),
+        'locations': list(locations)
     })
 
 # @staff_member_required

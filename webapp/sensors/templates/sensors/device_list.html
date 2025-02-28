@@ -326,13 +326,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = this.closest('tr');
 
             try {
-                const response = await fetch(`/device/${deviceId}/toggle_active/`, {
+                const response = await fetch(`{% url 'sensors:device_toggle_active' place_slug=place.slug pk='DEVICE_ID' %}`.replace('DEVICE_ID', deviceId), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': getCookie('csrftoken')
                     },
-                    body: JSON.stringify({ is_active: isActive })
+                    body: JSON.stringify({
+                        is_active: isActive
+                    })
                 });
 
                 if (!response.ok) throw new Error('Network response was not ok');

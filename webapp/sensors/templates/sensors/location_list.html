@@ -25,73 +25,20 @@
             </div>
         </div>
     </div>
+
     <!-- Place Title Card -->
     <div class="col-12">
         {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
-    <!-- Left Column: Site Plan -->
-    <div class="col-md-4">
 
-        <!-- Site Plan Card -->
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    {% if place.site_plan %}Site Plan{% else %}Location Map{% endif %}
-                </h5>
-            </div>
-            <div class="card-body p-0">
-                <div id="siteMapContainer" class="position-relative">
-                    {% if place.site_plan %}
-                        <img src="{{ place.site_plan.url }}" alt="Site plan" class="img-fluid w-100">
-                        {% for location in place.locations.all %}
-                        <div class="location-marker position-absolute" 
-                             data-location-id="{{ location.pk }}"
-                             data-active="{{ location.is_active|lower }}"
-                             data-x="{{ location.x_coord|default:50 }}"
-                             data-y="{{ location.y_coord|default:50 }}"
-                             style="left: {{ location.x_coord|default:50 }}%; top: {{ location.y_coord|default:50 }}%;">
-                            <i class="bi bi-hexagon-fill {% if location.is_active %}text-primary{% else %}text-secondary{% endif %} fs-4"></i>
-                            <div class="location-label">
-                                {{ location.name }}
-                                <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %} ms-1">
-                                    {{ location.devices.count }}
-                                </span>
-                            </div>
-                            <!-- Popup content -->
-                            <div class="location-popup">
-                                <h6 class="mb-2">{{ location.name }}</h6>
-                                <p class="mb-1"><small>Devices: {{ location.devices.count }}</small></p>
-                                <p class="mb-1">
-                                    <small>Status: 
-                                        <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                            {% if location.is_active %}Active{% else %}Inactive{% endif %}
-                                        </span>
-                                    </small>
-                                </p>
-                                <div class="d-flex gap-1 mt-2">
-                                    <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
-                                       class="btn btn-outline-primary btn-sm">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{% url 'sensors:location_update' place_slug=place.slug pk=location.pk %}" 
-                                       class="btn btn-outline-warning btn-sm">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        {{ map_html|safe }}
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+    <!-- Left Column: Location List -->
+    <div class="col-md-6">
+        {% include "sensors/includes/location_list_card.html" with locations=place.locations.all place=place %}
     </div>
 
-    <!-- Right Column: Locations Table -->
-    <div class="col-md-8">
-        {% include "sensors/includes/locations_card.html" with locations=locations.all place=place %}
+    <!-- Right Column: Site Plan -->
+    <div class="col-md-6">
+        {% include "sensors/includes/site_plan_card.html" with place=place locations=locations.all %}
     </div>
 </div>
 
@@ -176,89 +123,13 @@ const csrfToken = '{{ csrf_token }}';
 const placeSlug = '{{ place.slug }}';
 
 document.addEventListener('DOMContentLoaded', function() {
-    const showInactiveLocations = document.getElementById('showInactiveLocations');
-    const inactiveLocations = document.querySelectorAll('.inactive-location');
-    
-    // Initial state - hide inactive (checkbox is checked by default)
-    inactiveLocations.forEach(location => {
-        location.style.display = 'none';
-    });
-
-    // Wait for map to load
-    const mapFrame = document.querySelector('.folium-map');
-    mapFrame.addEventListener('load', function() {
-        const markers = mapFrame.contentDocument.querySelectorAll('.leaflet-marker-icon');
-        
-        // Hide inactive markers initially
-        markers.forEach(marker => {
-            if (marker.classList.contains('inactive-location')) {
-                marker.style.display = 'none';
-            }
-        });
-
-        // Update markers when toggle changes
-        showInactiveLocations.addEventListener('change', function() {
-            markers.forEach(marker => {
-                if (marker.classList.contains('inactive-location')) {
-                    marker.style.display = this.checked ? 'none' : 'block';
-                }
-            });
-        });
-    });
-
-    // Handle table rows visibility
-    showInactiveLocations.addEventListener('change', function() {
-        inactiveLocations.forEach(location => {
-            location.style.display = this.checked ? 'none' : 'table-row';
-        });
-    });
-
     // Site Plan Editing
     const container = document.getElementById('siteMapContainer');
-    const editModeToggle = document.getElementById('editModeToggle');
-    const saveButton = document.getElementById('savePositions');
     const locationMarkers = document.querySelectorAll('.location-marker');
     let isDragging = false;
     let currentMarker = null;
     let startX, startY;
     let originalX, originalY;
-
-    // Toggle edit mode
-    editModeToggle?.addEventListener('click', function() {
-        container.classList.toggle('edit-mode');
-        saveButton.classList.toggle('d-none');
-        this.classList.toggle('active');
-    });
-
-    // Save all positions
-    saveButton?.addEventListener('click', async function() {
-        const promises = Array.from(locationMarkers).map(marker => {
-            const locationId = marker.dataset.locationId;
-            const x = marker.dataset.x;
-            const y = marker.dataset.y;
-
-            const url = `/api/${placeSlug}/locations/${locationId}/position/`;
-            return fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({ x_coord: x, y_coord: y })
-            }).then(response => response.json());
-        });
-
-        try {
-            await Promise.all(promises);
-            alert('All positions saved successfully!');
-            container.classList.remove('edit-mode');
-            saveButton.classList.add('d-none');
-            editModeToggle.classList.remove('active');
-        } catch (error) {
-            alert('Error saving positions');
-            console.error('Error:', error);
-        }
-    });
 
     // Marker drag functionality
     locationMarkers.forEach(marker => {
