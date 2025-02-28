@@ -1,0 +1,148 @@
+{
+    "workspace": {
+        "id": "1",
+        "name": "SensorPlaces System",
+        "description": "A system for managing Places, Locations, Devices, and Sensors",
+        "model": {
+            "enterprise": {
+                "name": "SensorPlaces Organization"
+            },
+            "softwareSystems": [
+                {
+                    "id": "1",
+                    "name": "SensorPlaces System",
+                    "description": "A system for managing and monitoring sensor networks across different places and locations",
+                    "containers": [
+                        {
+                            "id": "web_application",
+                            "name": "Web Application",
+                            "description": "Provides functionality for managing places, locations, devices, and sensors through web interface",
+                            "technology": "Django/Python",
+                            "components": [
+                                {
+                                    "id": "places_component",
+                                    "name": "Places Management",
+                                    "description": "Handles the creation and management of places (e.g., buildings, campuses)",
+                                    "technology": "Django Component"
+                                },
+                                {
+                                    "id": "locations_component",
+                                    "name": "Locations Management",
+                                    "description": "Manages specific locations within places (e.g., rooms, areas)",
+                                    "technology": "Django Component"
+                                },
+                                {
+                                    "id": "devices_component",
+                                    "name": "Devices Management",
+                                    "description": "Handles device registration, configuration, and management",
+                                    "technology": "Django Component"
+                                },
+                                {
+                                    "id": "sensors_component",
+                                    "name": "Sensors Management",
+                                    "description": "Manages individual sensors, their data, and configurations",
+                                    "technology": "Django Component"
+                                }
+                            ]
+                        },
+                        {
+                            "id": "database",
+                            "name": "Database",
+                            "description": "Stores places, locations, devices, sensor configurations and relationships",
+                            "technology": "PostgreSQL"
+                        },
+                        {
+                            "id": "api",
+                            "name": "API Application",
+                            "description": "Provides REST API for device and sensor communication",
+                            "technology": "Django REST Framework"
+                        }
+                    ]
+                }
+            ],
+            "relationships": [
+                {
+                    "id": "1",
+                    "source": "places_component",
+                    "destination": "locations_component",
+                    "description": "Contains"
+                },
+                {
+                    "id": "2",
+                    "source": "locations_component",
+                    "destination": "devices_component",
+                    "description": "Houses"
+                },
+                {
+                    "id": "3",
+                    "source": "devices_component",
+                    "destination": "sensors_component",
+                    "description": "Contains"
+                },
+                {
+                    "id": "4",
+                    "source": "web_application",
+                    "destination": "database",
+                    "description": "Reads from and writes to"
+                },
+                {
+                    "id": "5",
+                    "source": "api",
+                    "destination": "database",
+                    "description": "Reads from and writes to"
+                }
+            ]
+        },
+        "views": {
+            "systemContextViews": [
+                {
+                    "key": "SystemContext",
+                    "description": "The system context diagram for the SensorPlaces System",
+                    "softwareSystemId": "1"
+                }
+            ],
+            "containerViews": [
+                {
+                    "key": "Containers",
+                    "description": "The container diagram for the SensorPlaces System",
+                    "softwareSystemId": "1"
+                }
+            ],
+            "componentViews": [
+                {
+                    "key": "Components",
+                    "description": "The component diagram for the SensorPlaces Web Application",
+                    "containerId": "web_application"
+                }
+            ],
+            "configuration": {
+                "branding": {
+                    "logo": "",
+                    "font": {
+                        "name": "Arial",
+                        "size": 32
+                    }
+                },
+                "styles": {
+                    "elements": [
+                        {
+                            "tag": "Software System",
+                            "background": "#1168bd",
+                            "color": "#ffffff"
+                        },
+                        {
+                            "tag": "Container",
+                            "background": "#438dd5",
+                            "color": "#ffffff"
+                        },
+                        {
+                            "tag": "Component",
+                            "background": "#85bbf0",
+                            "color": "#000000"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+} 
