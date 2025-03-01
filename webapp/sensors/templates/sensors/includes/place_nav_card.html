@@ -14,14 +14,6 @@
                 </label>
             </div>
         </div>
-        <div class="btn-group">
-            <a href="{% url 'sensors:place_locations' place_slug=place.slug %}" class="btn btn-info btn-sm">
-                <i class="bi bi-list-ul"></i>
-            </a>
-            <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-primary btn-sm">
-                <i class="bi bi-plus"></i>
-            </a>
-        </div>
     </div>
     <div class="card-body p-0">
         <div class="list-group list-group-flush rounded-bottom">
@@ -30,7 +22,7 @@
                 {% for location in group.list %}
                 <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-1 px-2
-                          {% if location == current_location %}active-location{% endif %}"
+                          {% if location.pk == current_location.pk %}active-location{% endif %}"
                    data-active="{{ location.is_active|lower }}"
                    data-location-id="{{ location.pk }}">
                     <div>
@@ -91,7 +83,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const hideInactiveSwitch = document.getElementById('hideInactiveLocations');
-    const locationItems = document.querySelectorAll('[data-active]');
+    const locationCard = hideInactiveSwitch.closest('.card');
+    const locationItems = locationCard.querySelectorAll('.list-group-item[data-active]');
     const siteMapMarkers = document.querySelectorAll('.location-marker[data-active]');
 
     function filterLocations() {

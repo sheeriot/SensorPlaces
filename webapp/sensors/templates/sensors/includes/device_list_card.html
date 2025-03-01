@@ -1,0 +1,101 @@
+<div class="card">
+    <div class="card-header py-1 px-2 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <h6 class="card-title mb-0">Devices</h6>
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="hideInactiveSwitch">
+                <label class="form-check-label small" for="hideInactiveSwitch">
+                    Hide Inactive
+                </label>
+            </div>
+        </div>
+        {% if location %}
+        <a href="{% url 'sensors:device_create' place_slug=place.slug location_pk=location.pk %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-circle"></i> Add
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        {% if devices %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Type</th>
+                        <th>Sensors</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% regroup devices|dictsort:"location.name" by location as location_list %}
+                    {% for location in location_list %}
+                        <tr class="table-light">
+                            <td colspan="6" class="p-0">
+                                <div class="d-flex align-items-center">
+                                    <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.grouper.pk %}" 
+                                        class="btn py-1 small d-flex align-items-center {% if not location.grouper.is_active %}opacity-50{% else %}text-dark{% endif %}">
+                                        <i class="bi bi-geo-alt me-1" style="font-size: 1rem;"></i>
+                                        <strong class="mb-0">{{ location.grouper.name }}</strong>
+                                        {% if not location.grouper.is_active %}
+                                            <span class="badge bg-danger ms-2">inactive</span>
+                                        {% endif %}
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% for device in location.list|dictsort:"name" %}
+                        <tr data-active="{{ device.is_active|lower }}" 
+                            draggable="true" 
+                            class="device-row"
+                            data-device-id="{{ device.pk }}"
+                            data-location-id="{{ device.location.pk }}">
+                            <td>
+                                <a class="btn btn-outline-success text-dark m-0 p-1 small d-flex align-items-center" href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}">
+                                    <i class="bi bi-eye me-1"></i>
+                                    <span class="d-inline-block text-truncate" style="max-width: 100px;">{{ device.name }}</span>
+                                </a>
+                            </td>
+                            <td>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input device-status-toggle" 
+                                            type="checkbox" 
+                                            id="deviceStatus_{{ device.pk }}"
+                                            data-device-id="{{ device.pk }}"
+                                            data-location-id="{{ device.location.pk }}"
+                                            {% if device.is_active %}checked{% endif %}
+                                            {% if not device.location.is_active %}disabled{% endif %}>
+                                    <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
+                                            for="deviceStatus_{{ device.pk }}">
+                                        {% if device.is_active %}Active{% else %}Inactive{% endif %}
+                                    </label>
+                                </div>
+                            </td>
+                            <td>{{ device.device_type }}</td>
+                            <td>{{ device.sensors.count }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" 
+                                        class="btn btn-warning">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" 
+                                        class="btn btn-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <p class="mb-0">No devices found.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>

@@ -3,7 +3,7 @@
 <div class="card mb-1">
     <div class="card-header py-2 px-3">
         <h5 class="card-title mb-0 d-flex align-items-center">
-            <i class="bi bi-building me-2 text-secondary"></i>
+            <i class="bi bi-house-gear me-2 text-secondary"></i>
             <span class="text-secondary fw-normal">{{ place.name }}</span>
         </h5>
     </div>
@@ -20,11 +20,10 @@
                        target="_blank" 
                        class="btn btn-outline-primary btn-sm rounded-circle p-1" 
                        title="Open in Google Maps">
-                        <i class="bi bi-globe"></i>
+                        <i class="bi bi-google"></i>
                     </a>
                 </div>
             </dd>
-            
             <dt class="col-12 p-0">
                 <div class="border rounded">
                     {{ map_html|safe }}

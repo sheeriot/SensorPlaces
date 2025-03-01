@@ -288,7 +288,7 @@ class DeviceForm(forms.ModelForm):
 class LocationForm(forms.ModelForm):
     class Meta:
         model = Location
-        fields = ['name', 'x_coord', 'y_coord', 'is_active']
+        fields = ['name', 'is_active']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -300,10 +300,6 @@ class LocationForm(forms.ModelForm):
         # Configure field properties
         self.fields['is_active'].label = "Active"
         self.fields['is_active'].help_text = None
-        self.fields['x_coord'].required = False
-        self.fields['y_coord'].required = False
-        self.fields['x_coord'].label = "X Coordinate"
-        self.fields['y_coord'].label = "Y Coordinate"
 
         # Add Bootstrap classes to all fields
         for field in self.fields.values():
@@ -312,7 +308,7 @@ class LocationForm(forms.ModelForm):
 
         # Determine if this is a new location or editing existing
         is_new = not bool(kwargs.get('instance'))
-        submit_text = "Create New Location" if is_new else "Save Changes"
+        submit_text = "Create Location" if is_new else "Update Location"
 
         # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
@@ -320,16 +316,16 @@ class LocationForm(forms.ModelForm):
                 Column('name', css_class='col-md-8'),
                 Column(
                     Div(
-                        Field('is_active', wrapper_class='form-check form-switch'),
+                        Field(
+                            'is_active', 
+                            wrapper_class='form-check form-switch form-switch-lg',
+                            data_location_id='{{ location.pk }}' if not is_new else '',
+                            css_class='location-status-toggle'
+                        ),
                         css_class='d-flex align-items-center h-100'
                     ),
                     css_class='col-md-4'
                 ),
-                css_class='mb-3'
-            ),
-            Row(
-                Column('x_coord', css_class='col-md-6'),
-                Column('y_coord', css_class='col-md-6'),
                 css_class='mb-3'
             ),
             Div(

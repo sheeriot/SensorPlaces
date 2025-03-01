@@ -26,130 +26,11 @@
 
     <!-- Place Title Card -->
     <div class="col-12">
-        {% include "sensors/includes/place_title_card.html" with place=place show_map=True %}
+        {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
 
     <div class="col-md-4">
-        <!-- Locations List Card -->
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center py-2">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-geo-alt me-2"></i>Locations
-                </h5>
-                <a href="{% url 'sensors:location_create' place_slug=place.slug %}" 
-                   class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle"></i> Add
-                </a>
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for location in place.locations.all|dictsort:"name" %}
-                    <div class="list-group-item py-2 {% if object and object.pk == location.pk %}bg-light{% endif %}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
-                               class="btn btn-outline-info text-dark m-0 p-1 small d-flex align-items-center">
-                                <i class="bi bi-geo-alt me-1"></i>
-                                <span class="d-inline-block text-truncate" style="max-width: 150px;">{{ location.name }}</span>
-                                {% if not location.is_active %}
-                                <span class="badge bg-danger ms-2">inactive</span>
-                                {% endif %}
-                            </a>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{% url 'sensors:location_update' place_slug=place.slug pk=location.pk %}" 
-                                   class="btn btn-warning">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <a href="{% url 'sensors:location_delete' place_slug=place.slug pk=location.pk %}" 
-                                   class="btn btn-danger">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="text-center py-4">
-                        <p class="mb-0">No locations found.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        {% if object %}
-        <!-- Devices at this Location -->
-        <div class="card mt-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-hdd-rack me-2"></i>Devices
-                </h5>
-                <a href="{% url 'sensors:device_create' place_slug=place.slug location_pk=object.pk %}" 
-                   class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle"></i> Add Device
-                </a>
-            </div>
-            <div class="card-body p-0">
-                {% if object.devices.exists %}
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Status</th>
-                                <th>Type</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for device in object.devices.all %}
-                            <tr>
-                                <td>
-                                    <a href="{% url 'sensors:device_detail' place_slug=place.slug location_pk=object.pk pk=device.pk %}"
-                                       class="btn btn-outline-success text-dark m-0 p-1 small d-flex align-items-center">
-                                        <i class="bi bi-eye me-1"></i>
-                                        <span class="d-inline-block text-truncate" style="max-width: 100px;">{{ device.name }}</span>
-                                    </a>
-                                </td>
-                                <td>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input device-status-toggle" 
-                                               type="checkbox" 
-                                               id="deviceStatus_{{ device.pk }}"
-                                               data-device-id="{{ device.pk }}"
-                                               data-location-id="{{ device.location.pk }}"
-                                               {% if device.is_active %}checked{% endif %}
-                                               {% if not device.location.is_active %}disabled{% endif %}>
-                                        <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
-                                               for="deviceStatus_{{ device.pk }}">
-                                            {% if device.is_active %}Active{% else %}Inactive{% endif %}
-                                        </label>
-                                    </div>
-                                </td>
-                                <td>{{ device.device_type }}</td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{% url 'sensors:device_update' place_slug=place.slug location_pk=object.pk pk=device.pk %}" 
-                                           class="btn btn-warning">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <a href="{% url 'sensors:device_delete' place_slug=place.slug location_pk=object.pk pk=device.pk %}" 
-                                           class="btn btn-danger">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-4">
-                    <p class="mb-0">No devices at this location.</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
+        {% include "sensors/includes/place_nav_card.html" with place=place locations=locations.all %}
     </div>
 
     <div class="col-md-8">
@@ -162,19 +43,20 @@
             </div>
             <div class="card-body">
                 {% crispy form %}
-
-                {% if not place.is_active %}
-                <div class="alert alert-warning d-flex align-items-center py-2 mb-3" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <div>
-                        This place is inactive. Any locations created here will also be inactive.
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+<!-- Toast Notification -->
+<div class="toast" role="alert" aria-live="polite" aria-atomic="true" id="statusToast">
+    <div class="toast-header">
+        <strong class="me-auto">Status Update</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastMessage"></div>
+</div>
+{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -183,12 +65,93 @@
         width: 3em;
         height: 1.5em;
         margin-top: 0;
+        cursor: pointer;
     }
     
     .form-switch-lg .form-check-input:checked {
         background-color: var(--bs-success);
         border-color: var(--bs-success);
     }
+
+    /* Toast styling */
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+        min-width: 250px;
+    }
 </style>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const locationToggle = document.querySelector('.location-status-toggle');
+    const placeSlug = '{{ place.slug }}';  // Pass placeSlug to JavaScript
+    const locationId = '{{ location.pk }}';
+    if (!locationToggle) return;  // Exit if no toggle found (new location)
+
+    locationToggle.addEventListener('change', async function(e) {
+        const isActive = this.checked;
+        
+        try {
+            // Updated URL to match the pattern in urls.py
+            const response = await fetch(`/api/${placeSlug}/location/${locationId}/toggle_active/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    is_active: isActive
+                })
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            
+            // Show success message
+            showToast(`Location status updated to ${isActive ? 'active' : 'inactive'} successfully`, 'success');
+
+        } catch (error) {
+            console.error('Error:', error);
+            // Revert the toggle if there was an error
+            this.checked = !isActive;
+            showToast('Failed to update location status', 'danger');
+        }
+    });
+
+    function showToast(message, type = 'success') {
+        const toast = document.getElementById('statusToast');
+        const toastBody = document.getElementById('toastMessage');
+        
+        toast.classList.remove('bg-success', 'bg-danger');
+        toast.classList.add(`bg-${type}`);
+        toastBody.classList.remove('text-dark', 'text-white');
+        toastBody.classList.add('text-white');
+        
+        toastBody.textContent = message;
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+
+    // Function to get CSRF token from cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
 {% endblock %} 

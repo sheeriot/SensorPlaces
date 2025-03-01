@@ -2,35 +2,96 @@
 
 <div class="card mb-2">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-            <i class="bi bi-hdd-rack"></i>
-            <span class="ms-2">Devices at {{ location.name }}</span>
+        <div class="d-flex align-items-center gap-3">
+            <div>
+                <div class="ms-2">
+                    <i class="bi bi-hdd-rack"></i>
+                    {{ device.name }}
+                </div>
+                <hr class="my-0">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-geo-alt-fill"></i> 
+                    <span class="ms-2">{{ location.name }}</span>
+                </div>
+            </div>
+            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                <input class="form-check-input" type="checkbox" id="hideInactiveDevicesNav" checked>
+                <label class="form-check-label small-label" for="hideInactiveDevicesNav">
+                    Hide<br>Inactive
+                </label>
+            </div>
         </div>
-        <a href="{% url 'sensors:device_create' place_slug=location.place.slug location_pk=location.pk %}" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus"></i> Add
+        <a href="{% url 'sensors:device_create' place_slug=location.place.slug location_pk=location.pk %}" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-plus-circle"></i>
         </a>
     </div>
     <div class="card-body p-0">
         <div class="list-group list-group-flush rounded-bottom">
-            {% for dev in location.devices.all %}
-            <a href="{% url 'sensors:device_detail' place_slug=location.place.slug location_pk=location.pk pk=dev.pk %}" 
+            {% for device in location.devices.all %}
+            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" 
                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
-                      {% if dev == current_device %}active{% endif %}">
+                      {% if device.pk == current_device.pk %}current-device{% endif %}"
+               data-active="{{ device.is_active|lower }}"
+               data-device-id="{{ device.pk }}">
                 <div>
                     <i class="bi bi-hdd-rack m-0"></i>
-                    {{ dev.name }}
-                    {% if not dev.is_active %}
+                    {{ device.name }}
+                    {% if not device.is_active %}
                     <span class="badge bg-danger ms-2">inactive</span>
                     {% endif %}
                 </div>
                 <div>
-                    <span class="badge bg-success rounded-pill">{{ dev.sensors.filter.is_active.count }}</span>
-                    {% if dev.sensors.filter.is_active.False.count %}
-                    <span class="badge bg-danger rounded-pill">{{ dev.sensors.filter.is_active.False.count }}</span>
+                    <span class="badge bg-success rounded-pill">{{ device.sensors.filter.is_active.count }}</span>
+                    {% if device.sensors.filter.is_active.False.count %}
+                    <span class="badge bg-danger rounded-pill">{{ device.sensors.filter.is_active.False.count }}</span>
                     {% endif %}
                 </div>
             </a>
             {% endfor %}
         </div>
     </div>
-</div> 
+</div>
+
+<style>
+.current-device {
+    background-color: #f0f7ff !important;
+    border-color: #dee2e6 !important;
+    color: inherit !important;
+}
+
+.current-device:hover {
+    background-color: #e5f1ff !important;
+}
+
+.small-label {
+    font-size: 0.7rem;
+    line-height: 0.9;
+    text-align: center;
+}
+
+.list-group-item.hidden {
+    display: none !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const hideInactiveSwitch = document.getElementById('hideInactiveDevicesNav');
+    const deviceCard = hideInactiveSwitch.closest('.card');
+    const deviceItems = deviceCard.querySelectorAll('.list-group-item[data-active]');
+
+    function filterDevices() {
+        const hideInactive = hideInactiveSwitch.checked;
+        
+        deviceItems.forEach(item => {
+            item.classList.toggle('hidden', hideInactive && item.getAttribute('data-active') === 'false');
+        });
+    }
+
+    // Initial filter
+    filterDevices();
+
+    // Filter on toggle change
+    hideInactiveSwitch.addEventListener('change', filterDevices);
+});
+</script> 

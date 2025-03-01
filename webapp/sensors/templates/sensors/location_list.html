@@ -1,28 +1,13 @@
 {% extends "sensors/base.html" %}
 
-{% block title %}Locations - {{ place.name }}{% endblock %}
+{% block title %}Locations @ {{ place.name }}{% endblock %}
 
 {% block content %}
 <div class="row">
-    <!-- Header with Title and Actions -->
-    <div class="col-md-12 mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item">
-                            <a href="{% url 'sensors:place_detail' place.slug %}">{{ place.name }}</a>
-                        </li>
-                        <li class="breadcrumb-item active">Locations</li>
-                    </ol>
-                </nav>
-                <h1 class="mb-0">Locations @ {{ place.name }}</h1>
-            </div>
-            <div class="btn-group">
-                <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add Location
-                </a>
-            </div>
+    <div class="col-12 mb-1">
+        <div class="d-flex align-items-center gap-3">
+            <h2 class="mb-0">Locations</h2>
+            {% include "sensors/includes/place_nav_header_buttons.html" with place=place active_tab='locations' %}
         </div>
     </div>
 
@@ -31,15 +16,17 @@
         {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
 
-    <!-- Left Column: Location List -->
-    <div class="col-md-6">
-        {% include "sensors/includes/location_list_card.html" with locations=place.locations.all place=place %}
+    <!-- Left Column: place_nav and place_details -->
+    <div class="col-md-4">
+        {% include "sensors/includes/place_nav_card.html" with place=place locations=locations.all %}
     </div>
 
-    <!-- Right Column: Site Plan -->
-    <div class="col-md-6">
+    <!-- Right Column: Locations and Site Plan -->
+    <div class="col-md-8">
+        {% include "sensors/includes/locations_list_card.html" with place=place locations=locations.all %}
         {% include "sensors/includes/site_plan_card.html" with place=place locations=locations.all %}
     </div>
+
 </div>
 
 {% endblock %}

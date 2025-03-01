@@ -36,7 +36,7 @@
                     
                     <dt class="col-sm-4 text-body-secondary small text-uppercase">Place</dt>
                     <dd class="col-sm-8">
-                        <a href="{% url 'sensors:place_detail' location.place.slug %}" class="text-decoration-none">
+                        <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-decoration-none">
                             {{ location.place.name }}
                         </a>
                     </dd>

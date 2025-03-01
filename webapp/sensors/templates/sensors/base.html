@@ -59,6 +59,11 @@
                             {% if place %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
+                                <a class="dropdown-item" href="{% url 'sensors:place_detail' place_slug=place.slug %}">
+                                    <i class="bi bi-house"></i> Current Place: {{ place.name }}
+                                </a>
+                            </li>
+                            <li>
                                 <a class="dropdown-item" href="{% url 'sensors:place_locations' place_slug=place.slug %}">
                                     <i class="bi bi-diagram-3"></i> Locations
                                 </a>

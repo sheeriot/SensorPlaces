@@ -2,7 +2,7 @@
 {% load static %}
 {% load widget_tweaks %}
 
-{% block title %}{{ device.name }} - Device Details{% endblock %}
+{% block title %}Device Details - {{ device.name }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -10,33 +10,37 @@
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'sensors:place_list' %}">Places</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'sensors:place_detail' slug=device.location.place.slug %}">{{ device.location.place.name }}</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'sensors:location_detail' place_slug=device.location.place.slug pk=device.location.pk %}">{{ device.location.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'sensors:place_detail' place_slug=place.slug %}">{{ place.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}">{{ location.name }}</a></li>
             <li class="breadcrumb-item active" aria-current="page">{{ device.name }}</li>
         </ol>
     </nav>
 
+    <!-- Add this after the breadcrumb -->
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <h2 class="mb-0"><i class="bi bi-hdd-rack me-2"></i>{{ device.name }}</h2>
+        {% include "sensors/includes/place_nav_header_buttons.html" with place=place active_tab='devices' %}
+    </div>
+
     <!-- Place Title Card - Spans both columns -->
-    {% include 'sensors/includes/place_title_card.html' with place=device.location.place %}
+    {% include 'sensors/includes/place_title_card.html' with place=place %}
 
     <div class="row">
         <!-- Left Column -->
         <div class="col-md-4">
             <!-- Devices Navigation Card -->
-            {% include 'sensors/includes/device_nav_card.html' with location=device.location current_device=device %}
-
+            {% include 'sensors/includes/device_nav_card.html' with place_slug=place.slug pk=device.pk current_device=device %}
             <!-- Locations Navigation Card -->
-            {% include 'sensors/includes/location_nav_card.html' with place=device.location.place current_location=device.location %}
+            {% include 'sensors/includes/place_nav_card.html' with place_slug=place.slug locations=locations location=location active_tab='devices' current_device=device %}
         </div>
 
         <!-- Right Column -->
         <div class="col-md-8">
             <!-- Device Details Card -->
-            {% include 'sensors/includes/device_details_card.html' with device=device %}
+            {% include 'sensors/includes/device_details_card.html' with place_slug=place.slug pk=device.pk %}
 
             <!-- Sensors Card -->
-            {% include 'sensors/includes/sensor_list_card.html' with device=device sensors=sensors %}
+            {% include 'sensors/includes/sensor_list_card.html' with place_slug=place.slug pk=device.pk %}
         </div>
     </div>
 </div>

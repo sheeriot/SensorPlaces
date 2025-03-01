@@ -4,279 +4,27 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-12 mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item">
-                            <a href="{% url 'sensors:place_detail' place.slug %}">{{ place.name }}</a>
-                        </li>
-                        {% if location %}
-                        <li class="breadcrumb-item">
-                            <a href="{% url 'sensors:place_devices' place_slug=place.slug %}">Devices</a>
-                        </li>
-                        <li class="breadcrumb-item active">{{ location.name }}</li>
-                        {% else %}
-                        <li class="breadcrumb-item active">Devices</li>
-                        {% endif %}
-                    </ol>
-                </nav>
-                <h1 class="mb-0">
-                    {% if location %}
-                    Devices in {{ location.name }}
-                    {% else %}
-                    Devices @ {{ place.name }}
-                    {% endif %}
-                </h1>
-            </div>
-            {% if location %}
-            <a href="{% url 'sensors:device_create' place_slug=place.slug location_pk=location.pk %}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Add Device
-            </a>
-            {% endif %}
+    <div class="col-12 mb-1">
+        <div class="d-flex align-items-center gap-3">
+            <h2 class="mb-0">Devices</h2>
+            {% include "sensors/includes/place_nav_header_buttons.html" with place=place active_tab='devices' %}
         </div>
+        {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
-
-    <!-- Place Details Card - Full Width -->
-    <div class="col-12 mb-3">
-        <div class="card">
-            <div class="card-header py-1 px-2">
-                <h6 class="card-title mb-0">
-                    <i class="bi bi-building me-1"></i>Place Details
-                </h6>
-            </div>
-            <div class="card-body p-2">
-                <div class="row g-0 align-items-center">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-geo-alt me-1"></i>
-                            <small>{{ place.address }}</small>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center justify-content-end gap-2">
-                            <small>
-                                <i class="bi bi-geo me-1"></i>{{ place.latitude }}, {{ place.longitude }}
-                            </small>
-                            <a href="https://www.google.com/maps?q={{ place.latitude }},{{ place.longitude }}" 
-                               target="_blank" 
-                               class="btn btn-outline-primary btn-sm p-1" 
-                               title="Open in Google Maps">
-                                <i class="bi bi-globe"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="row mt-1">
-                    <div class="col-12">
-                        <div class="border rounded">
-                            {{ map_html|safe }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Two Column Layout for Locations and Devices -->
-    <div class="col-md-4">
-        <!-- Locations Card -->
-        <div class="card mb-2">
-            <div class="card-header py-1 px-2">
-                <h6 class="card-title mb-0 d-flex align-items-center">
-                    <i class="bi bi-geo-alt me-1"></i>
-                    <span class="d-none d-lg-inline">Locations</span>
-                    <span class="d-lg-none">Loc.</span>
-                </h6>
-            </div>
-            <div class="card-body p-0">
-                <!-- Location List -->
-                <div class="list-group list-group-flush">
-                    <a href="{% url 'sensors:place_devices' place_slug=place.slug %}" 
-                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {% if not location %}bg-light{% endif %}">
-                        <div>
-                            <i class="bi bi-grid me-2"></i>All Devices
-                            <span class="badge bg-secondary ms-2" title="Active Devices">
-                                <i class="bi bi-hdd-rack me-1"></i>{{ active_devices_count }}
-                            </span>
-                        </div>
-                    </a>
-
-                    {% for loc in place_locations|dictsort:"name" %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center py-1 location-drop-zone"
-                         data-location-id="{{ loc.pk }}"
-                         data-active="{{ loc.is_active|lower }}">
-                        <a href="{% url 'sensors:location_devices' place_slug=place.slug location_pk=loc.pk %}" 
-                           class="btn btn-outline-info d-inline-flex align-items-center text-decoration-none flex-grow-1 p-1">
-                            <i class="bi bi-geo-alt me-1"></i>
-                            <span class="me-1 d-inline-block text-truncate" style="max-width: 120px;">{{ loc.name }}</span>
-                            {% if not loc.is_active %}
-                            <span class="badge bg-danger me-1" style="font-size: 0.7em;">
-                                inactive
-                            </span>
-                            {% endif %}
-                            <span class="badge bg-secondary ms-auto">
-                                <i class="bi bi-hdd-rack"></i> {{ loc.active_devices_count }}
-                            </span>
-                        </a>
-                        <a href="{% url 'sensors:device_create' place_slug=place.slug location_pk=loc.pk %}" 
-                           class="btn btn-link p-0 text-primary ms-1" 
-                           title="Add Device to {{ loc.name }}">
-                            <i class="bi bi-plus-circle"></i>
-                        </a>
-                    </div>
-                    {% endfor %}
-                </div>
-
-                <!-- Site Plan with Markers -->
-                {% if place.site_plan %}
-                <div id="siteMapContainer" class="position-relative mb-3">
-                    <img src="{{ place.site_plan.url }}" alt="Site plan" class="img-fluid w-100">
-                    {% for loc in place_locations %}
-                    <div class="location-marker position-absolute" 
-                         data-location-id="{{ loc.pk }}"
-                         data-active="{{ loc.is_active|lower }}"
-                         style="left: {{ loc.x_coord|default:50 }}%; top: {{ loc.y_coord|default:50 }}%;">
-                        <i class="bi bi-hexagon-fill {% if loc.is_active %}text-primary{% else %}text-secondary{% endif %} fs-4"></i>
-                        <div class="location-label">
-                            {{ loc.name }}
-                            <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %} ms-1">
-                                {{ loc.active_devices_count }}
-                            </span>
-                        </div>
-                        <!-- Popup content -->
-                        <div class="location-popup">
-                            <h6 class="mb-2">{{ loc.name }}                                     
-                                <small>
-                                <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                    {% if loc.is_active %}Active{% else %}Inactive{% endif %}
-                                </span>
-                            </small>
-                            </h6>
-                            <p class="mb-1">
-                                <small>
-                                    Devices: 
-                                    <span class="text-success">{{ loc.active_devices_count }} active</span>,
-                                    <span class="text-danger">{{ loc.inactive_devices_count }} inactive</span>
-                                </small>
-                            </p>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-            <div class="card-footer text-end p-2">
-                <a href="{% url 'sensors:location_create' place_slug=place.slug %}" 
-                   class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle"></i> Add Location
-                </a>
-            </div>
+    <div class="row">
+        <div class="col-md-4">
+            {% include "sensors/includes/place_nav_card.html" with place=place locations=locations.all %}
         </div>
-    </div>
-
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header py-1 px-2 d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-2">
-                    <h6 class="card-title mb-0">Devices</h6>
-                    <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" id="hideInactiveSwitch">
-                        <label class="form-check-label small" for="hideInactiveSwitch">
-                            Hide Inactive
-                        </label>
-                    </div>
-                </div>
-                {% if location %}
-                <a href="{% url 'sensors:device_create' place_slug=place.slug location_pk=location.pk %}" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle"></i> Add Device
-                </a>
-                {% endif %}
-            </div>
-            <div class="card-body p-0">
-                {% if devices %}
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Status</th>
-                                <th>Type</th>
-                                <th>Sensors</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% regroup devices|dictsort:"location.name" by location as location_list %}
-                            {% for location in location_list %}
-                                <tr class="table-light">
-                                    <td colspan="6" class="p-0">
-                                        <div class="d-flex align-items-center">
-                                            <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.grouper.pk %}" 
-                                               class="btn py-1 small d-flex align-items-center {% if not location.grouper.is_active %}opacity-50{% else %}text-dark{% endif %}">
-                                                <i class="bi bi-geo-alt me-1" style="font-size: 1rem;"></i>
-                                                <strong class="mb-0">{{ location.grouper.name }}</strong>
-                                                {% if not location.grouper.is_active %}
-                                                    <span class="badge bg-danger ms-2">inactive</span>
-                                                {% endif %}
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% for device in location.list|dictsort:"name" %}
-                                <tr data-active="{{ device.is_active|lower }}" 
-                                    draggable="true" 
-                                    class="device-row"
-                                    data-device-id="{{ device.pk }}"
-                                    data-location-id="{{ device.location.pk }}">
-                                    <td>
-                                        <a class="btn btn-outline-success text-dark m-0 p-1 small d-flex align-items-center" href="{% url 'sensors:device_detail' place_slug=place.slug location_pk=device.location.pk pk=device.pk %}">
-                                            <i class="bi bi-eye me-1"></i>
-                                            <span class="d-inline-block text-truncate" style="max-width: 100px;">{{ device.name }}</span>
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input device-status-toggle" 
-                                                   type="checkbox" 
-                                                   id="deviceStatus_{{ device.pk }}"
-                                                   data-device-id="{{ device.pk }}"
-                                                   data-location-id="{{ device.location.pk }}"
-                                                   {% if device.is_active %}checked{% endif %}
-                                                   {% if not device.location.is_active %}disabled{% endif %}>
-                                            <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
-                                                   for="deviceStatus_{{ device.pk }}">
-                                                {% if device.is_active %}Active{% else %}Inactive{% endif %}
-                                            </label>
-                                        </div>
-                                    </td>
-                                    <td>{{ device.device_type }}</td>
-                                    <td>{{ device.sensors.count }}</td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'sensors:device_update' place_slug=place.slug location_pk=device.location.pk pk=device.pk %}" 
-                                               class="btn btn-warning">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <a href="{% url 'sensors:device_delete' place_slug=place.slug location_pk=device.location.pk pk=device.pk %}" 
-                                               class="btn btn-danger">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-4">
-                    <p class="mb-0">No devices found.</p>
-                </div>
-                {% endif %}
-            </div>
+        <!-- right column -->
+        <div class="col-md-8">
+            {% if location %}
+                <div class="mb-3">Location: {{ location.name }}</div>
+                {% include "sensors/includes/device_list_card.html" with place=place locations=locations.all location=location %}
+            {% else %}
+                {% include "sensors/includes/device_list_card.html" with place=place locations=locations.all %}
+            {% endif %}
+            
         </div>
     </div>
 </div>
@@ -289,16 +37,16 @@
     </div>
     <div class="toast-body" id="toastMessage"></div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 {{ block.super }}
-<script>
+<script data-place-slug="{{ place.slug }}">
 document.addEventListener('DOMContentLoaded', function() {
     const hideInactiveSwitch = document.getElementById('hideInactiveSwitch');
     const deviceRows = document.querySelectorAll('tr[data-active]');
     const deviceToggles = document.querySelectorAll('.device-status-toggle');
+    const placeSlug = document.currentScript.getAttribute('data-place-slug');
     
     function filterDevices() {
         const hideInactive = hideInactiveSwitch.checked;
@@ -326,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = this.closest('tr');
 
             try {
-                const response = await fetch(`{% url 'sensors:device_toggle_active' place_slug=place.slug pk='DEVICE_ID' %}`.replace('DEVICE_ID', deviceId), {
+                const response = await fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

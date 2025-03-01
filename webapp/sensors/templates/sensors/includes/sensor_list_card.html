@@ -6,7 +6,7 @@
             <i class="bi bi-graph-up"></i>
             <span class="ms-2">Sensors</span>
         </div>
-        <a href="{% url 'sensors:sensor_create' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk %}" 
+        <a href="{% url 'sensors:sensor_create' place_slug=place.slug pk=device.pk %}" 
            class="btn btn-primary btn-sm"
            {% if not device.is_active %}disabled{% endif %}>
             <i class="bi bi-plus"></i> Add Sensor

@@ -3,11 +3,17 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<div class="card rounded-3 shadow-sm border-0 mb-3">
+<div class="card rounded-3 shadow-sm border-0 mb-1">
     <div class="card-header bg-white py-2">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">
-                <i class="bi bi-building me-2"></i>{{ place.name }}
+                <i class="bi bi-house-gear me-2"></i>Place:
+                <a href="{% url 'sensors:place_detail' place.slug %}" class="text-secondary fw-normal">{{ place.name }}</a>
+                {% if place.is_active %}
+                <span class="badge bg-success ms-2">Active</span>
+                {% else %}
+                <span class="badge bg-danger ms-2">Inactive</span>
+                {% endif %}
             </h5>
             <div class="d-flex align-items-center gap-3 small">
                 <span>
@@ -16,23 +22,12 @@
                 <span>
                     <i class="bi bi-geo-alt me-1"></i>{{ place.latitude }}, {{ place.longitude }}
                 </span>
-                <a href="#" class="btn btn-outline-primary" id="openMap">
-                    View Map
+                <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openMap">
+                    <i class="bi bi-globe"></i>
                 </a>
             </div>
         </div>
     </div>
-    {% if show_map %}
-    <div class="card-body py-2">
-        <div class="row mt-2">
-            <div class="col-12">
-                <div class="border rounded">
-                    {{ map_html|safe }}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
 <!-- Modal for Map -->

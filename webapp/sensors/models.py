@@ -7,6 +7,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 import uuid
+from django.db.models.functions import Lower
 
 def validate_image_size(image):
     filesize = image.size
@@ -42,6 +43,7 @@ class Place(models.Model):
 
     class Meta:
         verbose_name_plural = '1. Places'
+        ordering = ['-is_active', Lower('name')]
 
 class Location(models.Model):
     name = models.CharField(max_length=100)
@@ -66,6 +68,7 @@ class Location(models.Model):
 
     class Meta:
         verbose_name_plural = '2. Locations'
+        ordering = ['-is_active', Lower('name')]
 
 class DeviceType(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -106,7 +109,7 @@ class Device(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name} ({self.device_type.name})"
+        return f"{self.name} ({self.device_type.name if self.device_type else 'No Type'})"
 
     def save(self, *args, **kwargs):
         # If location is inactive, device must be inactive
@@ -122,6 +125,7 @@ class Device(models.Model):
 
     class Meta:
         verbose_name_plural = '4. Devices'
+        ordering = ['location', '-is_active', Lower('name')]
 
 class InfluxSource(models.Model):
     name = models.CharField(max_length=100)
@@ -205,7 +209,12 @@ class Sensor(models.Model):
 
     class Meta:
         verbose_name_plural = '5. Sensors'
-        ordering = ['name']
+        ordering = [
+            Lower('device__location__name'),
+            Lower('device__name'),
+            '-is_active',
+            Lower('name')
+        ]
 
 class SensorReading(models.Model):
     sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE, related_name='readings')

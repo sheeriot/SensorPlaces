@@ -3,14 +3,14 @@
 <div class="card rounded-3 shadow-sm border-0 mb-4 {% if not device.is_active %}opacity-75{% endif %}" id="deviceCard_{{ device.pk }}">
     <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
-            <i class="bi bi-hdd-rack me-2"></i>Device Details
+            <i class="bi bi-hdd-rack me-2"></i>Device Details: {{ device.name }}
         </h5>
         <div class="btn-group" role="group" aria-label="Device Actions">
-            <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug location_pk=device.location.pk pk=device.pk %}" 
+            <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" 
                class="btn btn-warning btn-sm">
                 <i class="bi bi-pencil"></i> Edit
             </a>
-            <a href="{% url 'sensors:device_delete' place_slug=device.location.place.slug location_pk=device.location.pk pk=device.pk %}" 
+            <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" 
                class="btn btn-danger btn-sm">
                 <i class="bi bi-trash"></i> Delete
             </a>
@@ -116,6 +116,31 @@
                             
                             // Update the device card styling
                             deviceCard.className = `card rounded-3 shadow-sm border-0 mb-4 ${!data.is_active ? 'opacity-75' : ''}`;
+                            
+                            // Update device nav card item
+                            const deviceNavItem = document.querySelector(`.list-group-item[data-device-id="${deviceId}"]`);
+                            if (deviceNavItem) {
+                                deviceNavItem.setAttribute('data-active', data.is_active.toString());
+                                const statusBadge = deviceNavItem.querySelector('.badge.bg-danger');
+                                if (data.is_active) {
+                                    if (statusBadge) statusBadge.remove();
+                                } else {
+                                    if (!statusBadge) {
+                                        const badge = document.createElement('span');
+                                        badge.className = 'badge bg-danger ms-2';
+                                        badge.textContent = 'inactive';
+                                        deviceNavItem.querySelector('div:first-child').appendChild(badge);
+                                    }
+                                }
+                                
+                                // Update visibility based on hide inactive switch
+                                const hideInactiveDevices = document.getElementById('hideInactiveDevicesNav');
+                                if (hideInactiveDevices && hideInactiveDevices.checked && !data.is_active) {
+                                    deviceNavItem.classList.add('hidden');
+                                } else {
+                                    deviceNavItem.classList.remove('hidden');
+                                }
+                            }
                             
                             // Update all value text colors in device card
                             deviceCard.querySelectorAll('dd').forEach(dd => {

@@ -5,7 +5,7 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from .models import Place, Location, Device, Sensor, SensorReading
 from .utils import get_sensor_readings  #, write_sensor_reading
-from .forms import SensorForm, PlaceForm, DeviceForm
+from .forms import SensorForm, PlaceForm, DeviceForm, LocationForm
 import folium
 from django.conf import settings
 from django.http import JsonResponse, HttpRequest
@@ -76,7 +76,7 @@ class PlaceListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         places = self.get_queryset()
-        # ic(places)
+        # places)
         
         # Get geographic center of all places
         center_lat, center_lon = self.get_map_center(places)
@@ -85,7 +85,7 @@ class PlaceListView(ListView):
         
         # Add markers for all places
         for place in places:
-            # ic(vars(place))
+            # vars(place))
             marker_color = 'green' if place.is_active else 'red'
             # Create rich tooltip with place details
             tooltip_html = f'''
@@ -114,6 +114,8 @@ class PlaceDetailView(DetailView):
     model = Place
     context_object_name = 'place'
     template_name = 'sensors/place_detail.html'
+    slug_url_kwarg = 'place_slug'
+    slug_field = 'slug'  # This specifies which model field to use for the lookup
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -127,7 +129,7 @@ class PlaceDetailView(DetailView):
         locations = place.locations.annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).order_by('name')  # Add consistent ordering
+        ).order_by('name')
         
         context['locations'] = locations
         
@@ -146,6 +148,7 @@ class PlaceDetailView(DetailView):
         ).add_to(m)
         
         context['map_html'] = m._repr_html_()
+        context['show_map'] = True  # Add this to control map display
 
         context.update({
             'devices_active': devices.filter(is_active=True).count(),
@@ -153,6 +156,7 @@ class PlaceDetailView(DetailView):
             'sensors_active': sensors.filter(is_active=True).count(),
             'sensors_inactive': sensors.filter(is_active=False).count(),
         })
+        context['active_tab'] = 'locations'  # Set active tab for locations
         return context
 
 class PlaceCreateView(SuccessMessageMixin, CreateView):
@@ -166,16 +170,36 @@ class PlaceUpdateView(SuccessMessageMixin, UpdateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
-    success_url = reverse_lazy('sensors:place_list')
     success_message = "Place %(name)s was updated successfully"
+    slug_url_kwarg = 'place_slug'
+    slug_field = 'slug'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        place_slug = self.kwargs.get('place_slug')
+        if place_slug:
+            context['place'] = get_object_or_404(Place, slug=place_slug)
+        return context
+
+    def get_success_url(self):
+        return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        # If place is set to inactive, cascade to all locations
+        if not form.instance.is_active:
+            self.object.locations.all().update(is_active=False)
+        return response
 
 class PlaceDeleteView(DeleteView):
     model = Place
     template_name = 'sensors/place_confirm_delete.html'
     success_url = reverse_lazy('sensors:place_list')
+    slug_url_kwarg = 'place_slug'
+    slug_field = 'slug'
     
     def delete(self, request, *args, **kwargs):
-        messages.success(self.request, f"Place {self.get_object().name} was deleted successfully") # type: ignore
+        messages.success(self.request, f"Place {self.get_object().name} was deleted successfully")
         return super().delete(request, *args, **kwargs)
 
 # Location Views
@@ -191,8 +215,7 @@ class LocationListView(ListView):
         place_slug = self.kwargs.get('place_slug')
         if place_slug:
             queryset = queryset.filter(place__slug=place_slug)
-        
-        # Annotate with device counts
+        # Annotate with device active counts
         return queryset.annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
@@ -203,9 +226,11 @@ class LocationListView(ListView):
         
         # Add place context if slug provided
         place_slug = self.kwargs.get('place_slug')
+
         if place_slug:
             place = get_object_or_404(Place, slug=place_slug)
             context['place'] = place
+            context['active_tab'] = 'locations'  # Set active tab for locations
             
             # Create map centered on place
             if not place.site_plan:
@@ -233,7 +258,7 @@ class LocationListView(ListView):
                         ).add_to(m)
                 
                 context['map_html'] = m._repr_html_()
-        ic(context)
+
         return context
 
 class LocationDetailView(DetailView):
@@ -247,17 +272,16 @@ class LocationDetailView(DetailView):
         locations = self.object.place.locations.annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).order_by('name')  # Add consistent ordering
-
-        # for location in locations:
-        #     ic(location.name, location.active_devices_count, location.inactive_devices_count)
+        ).order_by('name')
 
         # Add the annotated locations to the context
-        context['place_locations'] = locations
+        context['locations'] = locations
         context['place'] = self.object.place
         
         # Get devices for this location with their sensor data
-        devices = self.object.devices.all()
+        devices = self.object.devices.all().order_by('-is_active', 'name')
+        context['devices'] = devices  # Add devices to context
+        
         device_data = []
         for device in devices:
             device_data.append({
@@ -295,7 +319,7 @@ class LocationCreateView(SuccessMessageMixin, CreateView):
 
 class LocationUpdateView(SuccessMessageMixin, UpdateView):
     model = Location
-    fields = ['name', 'is_active']
+    form_class = LocationForm
     template_name = 'sensors/location_form.html'
     success_message = "Location %(name)s was updated successfully"
 
@@ -304,6 +328,10 @@ class LocationUpdateView(SuccessMessageMixin, UpdateView):
         place_slug = self.kwargs.get('place_slug')
         if place_slug:
             context['place'] = get_object_or_404(Place, slug=place_slug)
+            context['locations'] = context['place'].locations.annotate(
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+            )
         return context
 
     def get_success_url(self):
@@ -334,32 +362,26 @@ class DeviceListView(ListView):
         if place_slug:
             queryset = queryset.filter(location__place__slug=place_slug)
             if location_pk:
-                queryset = queryset.filter(location_id=location_pk)
+                queryset = queryset.filter(location_id=location_pk).order_by('-is_active', 'name')
         
         return queryset
 
-    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         place_slug = self.kwargs.get('place_slug')
-        location_pk = self.kwargs.get('location_pk')
         
         if place_slug:
             context['place'] = get_object_or_404(Place, slug=place_slug)
-            # Get all locations for this place with device counts
-            locations = context['place'].locations.annotate(
+            context['active_tab'] = 'devices'  # Set active tab for devices
+            location_pk = self.kwargs.get('location_pk')
+            if location_pk:
+                context['location'] = get_object_or_404(Location, pk=location_pk)
+
+            # Annotate locations for the place
+            context['locations'] = context['place'].locations.annotate(
                 active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
                 inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
             )
-            context['place_locations'] = locations
-            if location_pk:
-                # Get current location with annotations
-                context['location'] = locations.get(pk=location_pk)
-            
-            # Add total active devices count
-            context['active_devices_count'] = Device.objects.filter(
-                location__place=context['place'],
-                is_active=True
-            ).count()
         
         return context
 
@@ -372,10 +394,19 @@ class DeviceDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         sensors = self.object.sensors.all()
         
+        # Get the place and location
+        context['place'] = self.object.location.place  # Get the place from the device's location
+        context['location'] = self.object.location  # Get the location directly from the device
+        
+        context['locations'] = context['place'].locations.annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        )
         context.update({
             'total_sensors': sensors.count(),
             'active_sensors': sensors.filter(is_active=True).count(),
-            'sensors': sensors,  # Pass all sensors to template
+            'sensors': sensors,  # Pass all sensors to template       
+            'active_tab': 'devices'  # Set active tab for devices
         })
         return context
 
@@ -397,7 +428,7 @@ class DeviceCreateView(SuccessMessageMixin, CreateView):
                     active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
                     inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
                 )
-                context['place_locations'] = locations
+                context['locations'] = locations
                 # Get current location with annotations
                 context['location'] = locations.get(pk=location_pk)
         return context
@@ -440,18 +471,19 @@ class DeviceUpdateView(SuccessMessageMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         place_slug = self.kwargs.get('place_slug')
-        location_pk = self.kwargs.get('location_pk')
+        
+        # Get the location from the device being edited
+        context['location'] = self.object.location
+        
         if place_slug:
             context['place'] = get_object_or_404(Place, slug=place_slug)
-            if location_pk:
-                # Get all locations for this place with device counts
-                locations = context['place'].locations.annotate(
-                    active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-                    inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-                )
-                context['place_locations'] = locations
-                # Get current location with annotations
-                context['location'] = locations.get(pk=location_pk)
+            # Get all locations for this place with device counts
+            locations = context['place'].locations.annotate(
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+            )
+            context['locations'] = locations
+            
         return context
 
     def get_initial(self):
@@ -515,6 +547,7 @@ class SensorListView(ListView):
         place_slug = self.kwargs.get('place_slug')
         if place_slug:
             context['place'] = get_object_or_404(Place, slug=place_slug)
+            context['active_tab'] = 'sensors'  # Set active tab for sensors
         return context
 
 class SensorDetailView(DetailView):
@@ -529,6 +562,7 @@ class SensorDetailView(DetailView):
             sensor=self.object,
             limit=100
         )
+        context['active_tab'] = 'sensors'  # Set active tab for sensors
         return context
 
 class SensorCreateView(SuccessMessageMixin, CreateView):
@@ -764,18 +798,17 @@ class DeviceMoveLocationView(View):
     def post(self, request, pk):
         # Get the device and validate it exists
         device = get_object_or_404(Device, pk=pk)
-        ic('device move location - from', device.location)
         
         try:
             data = json.loads(request.body)
             new_location_id = data.get('new_location_id')
-            # ic('new_location_id', new_location_id)
+            # 'new_location_id', new_location_id)
             if not new_location_id:
                 return JsonResponse({'error': 'new_location_id is required'}, status=400)
             
             # Get the new location and validate it exists
             new_location = get_object_or_404(Location, pk=new_location_id)
-            # ic('new_location', new_location)
+            # 'new_location', new_location)
             # Store old location for counter updates
             old_location = device.location
             
@@ -796,7 +829,7 @@ class DeviceMoveLocationView(View):
             # Update the device's location
             device.location = new_location
             device.save()
-            # ic('saved device.location', device.location)
+            # 'saved device.location', device.location)
             # Get updated counts
             old_location_count = old_location.devices.filter(is_active=True).count()
             new_location_count = new_location.devices.filter(is_active=True).count()
@@ -810,7 +843,6 @@ class DeviceMoveLocationView(View):
                     is_active=True
                 ).count()
             })
-            ic('results', results)
             return results
             
         except json.JSONDecodeError:
@@ -885,3 +917,29 @@ def test_sensor_readings(request, place_slug, sensor_pk):
             'status': 'error',
             'message': f'Failed to connect to InfluxDB: {str(e)}'
         }, status=500)
+
+@require_POST
+def location_toggle_active(request, place_slug, pk):
+    """Toggle location active status"""
+    location = get_object_or_404(Location, pk=pk)
+    
+    try:
+        data = json.loads(request.body)
+        is_active = data.get('is_active', False)
+        
+        # Update location status
+        location.is_active = is_active
+        location.save()
+        
+        # If location is set to inactive, cascade to all devices
+        if not is_active:
+            location.devices.all().update(is_active=False)
+        
+        return JsonResponse({
+            'status': 'success',
+            'is_active': location.is_active
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
