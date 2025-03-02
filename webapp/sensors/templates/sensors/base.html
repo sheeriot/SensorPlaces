@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,35 +7,7 @@
     <title>{% block title %}Sensor Management{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <style>
-        html, body {
-            height: 100%;
-        }
-        body {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-        .container {
-            flex: 1 0 auto;
-        }
-        .footer {
-            flex-shrink: 0;
-        }
-        /* Fix for list-group-item corners in cards */
-        .card .list-group-flush .list-group-item:last-child {
-            border-bottom-left-radius: inherit;
-            border-bottom-right-radius: inherit;
-        }
-        .card .list-group-flush:last-child {
-            border-bottom-left-radius: inherit;
-            border-bottom-right-radius: inherit;
-        }
-        .card .list-group-flush .list-group-item:first-child {
-            border-top-left-radius: inherit;
-            border-top-right-radius: inherit;
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'sensors/css/common.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -91,6 +64,22 @@
             {% endfor %}
         {% endif %}
 
+        <!-- Breadcrumb and Toast Section -->
+        <div class="page-header">
+            {% include "sensors/includes/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
+
+            <!-- Toast container -->
+            <div class="toast-container position-fixed bottom-0 end-0 p-3">
+                <div id="statusToast" class="toast" role="alert" aria-live="polite" aria-atomic="true">
+                    <div class="toast-header">
+                        <strong class="me-auto">Status Update</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body" id="toastMessage"></div>
+                </div>
+            </div>
+        </div>
+
         {% block content %}{% endblock %}
     </div>
 
@@ -118,84 +107,12 @@
         </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // Initialize tooltips
-    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    const tooltipList = [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
-
-    // Time-based color themes
-    const timeThemes = {
-        morning: { color: '#FF8C00' },     // 5-11
-        afternoon: { color: '#000000' },   // 11-17
-        evening: { color: '#4B0082' },     // 17-21
-        night: { color: '#1E4B9C' }       // 21-5
-    };
-
-    function updateLocalTime() {
-        const now = new Date();
-        const offset = -now.getTimezoneOffset();
-        const offsetHours = Math.floor(Math.abs(offset) / 60);
-        const offsetMinutes = Math.abs(offset) % 60;
-        const offsetSign = offset >= 0 ? '+' : '-';
-        const offsetString = offsetSign + 
-            String(offsetHours).padStart(2, '0') + 
-            String(offsetMinutes).padStart(2, '0');
-
-        const hour = now.getHours();
-        // Set color based on time of day
-        const timeSpan = document.getElementById('localTime');
-        if (hour >= 5 && hour < 11) {
-            timeSpan.style.color = timeThemes.morning.color;
-        } else if (hour >= 11 && hour < 17) {
-            timeSpan.style.color = timeThemes.afternoon.color;
-        } else if (hour >= 17 && hour < 21) {
-            timeSpan.style.color = timeThemes.evening.color;
-        } else {
-            timeSpan.style.color = timeThemes.night.color;
-        }
-
-        const weekday = now.toLocaleString('en-US', { weekday: 'long' });
-        const timeString = now.toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-
-        timeSpan.textContent = `${weekday}, ${timeString} (UTC${offsetString})`;
-        
-        // Update tooltip with alternative formats
-        const isoTime = now.toISOString();
-        const unixTime = Math.floor(now.getTime() / 1000);
-        timeSpan.setAttribute('data-bs-title', 
-            `ISO: ${isoTime}\nUNIX: ${unixTime}\nClick to copy current timestamp`);
-    }
-
-    // Update immediately and then every second
-    updateLocalTime();
-    setInterval(updateLocalTime, 1000);
-
-    // Add click handler to copy timestamp
-    document.getElementById('localTime').addEventListener('click', function() {
-        const now = new Date();
-        navigator.clipboard.writeText(now.toISOString()).then(() => {
-            const tooltip = bootstrap.Tooltip.getInstance(this);
-            const originalTitle = this.getAttribute('data-bs-title');
-            
-            // Show "Copied!" message
-            tooltip.setContent({ '.tooltip-inner': 'Copied!' });
-            
-            // Reset tooltip after 1 second
-            setTimeout(() => {
-                tooltip.setContent({ '.tooltip-inner': originalTitle });
-            }, 1000);
-        });
-    });
+        // Set global place slug from Django context
+        window.currentPlaceSlug = {% if place %}"{{ place.slug|escapejs }}"{% else %}null{% endif %};
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'sensors/js/common.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html> 

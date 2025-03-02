@@ -3,11 +3,13 @@
 {% block title %}Delete Location{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Delete Location</h2>
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card rounded-3 shadow-sm border-0">
+            <div class="card-header bg-white py-2">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-trash me-2"></i>Delete Location
+                </h5>
             </div>
             <div class="card-body">
                 <p>Are you sure you want to delete the location "{{ object.name }}"?</p>
@@ -18,11 +20,15 @@
                     Deleting this location will also delete all associated devices and their sensors.
                 </div>
                 {% endif %}
-                <form method="post">
+                <p class="text-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    This action cannot be undone.
+                </p>
+                <form method="post" data-delete-form>
                     {% csrf_token %}
                     <div class="d-flex justify-content-between">
-                        <a href="{% url 'sensors:place_locations' place_slug=location.place.slug %}" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> Back
+                        <a href="{{ request.META.HTTP_REFERER|default:place_url }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
                         </a>
                         <button type="submit" class="btn btn-danger">
                             <i class="bi bi-trash"></i> Delete

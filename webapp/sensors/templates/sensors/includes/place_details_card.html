@@ -5,6 +5,14 @@
         <h5 class="card-title mb-0 d-flex align-items-center">
             <i class="bi bi-house-gear me-2 text-secondary"></i>
             <span class="text-secondary fw-normal">{{ place.name }}</span>
+            <div class="btn-group btn-group-sm ms-auto">
+                <a href="{% url 'sensors:place_update' place.slug %}" class="btn btn-warning">
+                    <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'sensors:place_delete' place.slug %}" class="btn btn-danger">
+                    <i class="bi bi-trash"></i>
+                </a>
+            </div>
         </h5>
     </div>
     <div class="card-body px-2 pb-1 pt-2">

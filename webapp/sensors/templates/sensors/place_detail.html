@@ -1,48 +1,11 @@
 {% extends "sensors/base.html" %}
 {% load sensor_filters %}
 
-{% block extra_css %}
-<style>
-    .bg-light-success {
-        background-color: #d1e7dd !important;
-    }
-    .location-marker {
-        cursor: move;
-        transform: translate(-50%, -50%);
-        z-index: 100;
-        position: relative;
-    }
-    .location-marker.dragging {
-        z-index: 1000;
-    }
-
-    #siteMapContainer {
-        background: #f8f9fa;
-        border-radius: 0 0.375rem 0.375rem 0.375rem;
-        max-height: 70vh;
-    }
-</style>
-{% endblock %}
-
-{% block title %}{{ place.name }}{% endblock %}
+{% block title %}Sensor Places - {{ place.name }}{% endblock %}
 
 {% block content %}
 <div class="row">
     <!-- Header with Title and Navigation -->
-    <div class="col-md-12 mb-1">
-        <div class="d-flex align-items-center gap-3">
-            <h2 class="mb-0">{{ place.name }}</h2>
-            {% include "sensors/includes/place_nav_header_buttons.html" with place=place active_tab='locations' %}
-            <div class="btn-group btn-group-sm ms-auto">
-                <a href="{% url 'sensors:place_update' place.slug %}" class="btn btn-warning">
-                    <i class="bi bi-pencil"></i> Edit
-                </a>
-                <a href="{% url 'sensors:place_delete' place.slug %}" class="btn btn-danger">
-                    <i class="bi bi-trash"></i> Delete
-                </a>
-            </div>
-        </div>
-    </div>
 
     <!-- Place Title Card -->
     <div class="col-12">
@@ -51,8 +14,6 @@
 
     <!-- Left Column: Place Details -->
     <div class="col-md-4">
-        <!-- Place Details Card -->
-        {% include "sensors/includes/place_details_card.html" with place=place %}
         
         <div class="card mb-4">
             <div class="card bg-light p-0">
@@ -95,6 +56,9 @@
                 </table>
             </div>
         </div>
+        <!-- Place Details Card -->
+        {% include "sensors/includes/place_details_card.html" with place=place %}
+ 
     </div>
 
     <!-- Right Column: Locations and Site Plan/Map -->
@@ -117,57 +81,4 @@
         {% endif %}
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-// Add CSRF token to the page
-const csrfToken = '{{ csrf_token }}';
-
-document.addEventListener('DOMContentLoaded', function() {
-    const hideInactiveSwitch = document.getElementById('hideInactiveSwitch');
-    const locationRows = document.querySelectorAll('tr[data-active]');
-    const locationMarkers = document.querySelectorAll('.location-marker');
-
-    function filterLocations() {
-        const hideInactive = hideInactiveSwitch.checked;
-        
-        // Filter table rows
-        locationRows.forEach(row => {
-            const isActive = row.dataset.active === 'true';
-            row.style.display = (hideInactive && !isActive) ? 'none' : '';
-        });
-
-        // Filter map markers
-        locationMarkers.forEach(marker => {
-            const isActive = marker.dataset.active === 'true';
-            marker.style.display = (hideInactive && !isActive) ? 'none' : '';
-        });
-    }
-
-    // Initial filter
-    hideInactiveSwitch.checked = true;  // Start with inactive locations hidden
-    filterLocations();
-
-    // Filter on toggle change
-    hideInactiveSwitch.addEventListener('change', filterLocations);
-});
-
-// Real-time updates (every 30 seconds)
-function updateStatistics() {
-    fetch(`{% url 'sensors:place_stats' place_slug=place.slug %}`)
-        .then(response => response.json())
-        .then(data => {
-            // Update device counts
-            document.getElementById('devices-active').textContent = data.devices_active;
-            document.getElementById('devices-inactive').textContent = data.devices_inactive;
-            
-            // Update sensor counts
-            document.getElementById('sensors-active').textContent = data.sensors_active;
-            document.getElementById('sensors-inactive').textContent = data.sensors_inactive;
-        });
-}
-
-setInterval(updateStatistics, 30000);
-</script>
 {% endblock %} 

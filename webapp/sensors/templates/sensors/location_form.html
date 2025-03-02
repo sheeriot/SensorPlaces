@@ -1,6 +1,7 @@
 {% extends "sensors/base.html" %}
 {% load widget_tweaks %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}
     {% if object %}Edit Location{% else %}New Location{% endif %}
@@ -44,6 +45,16 @@
             <div class="card-body">
                 {% crispy form %}
             </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between">
+                    <a href="{{ request.META.HTTP_REFERER|default:place_url }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -58,100 +69,6 @@
 </div>
 {% endblock %}
 
-{% block extra_css %}
-<style>
-    /* Larger switch styling */
-    .form-switch-lg .form-check-input {
-        width: 3em;
-        height: 1.5em;
-        margin-top: 0;
-        cursor: pointer;
-    }
-    
-    .form-switch-lg .form-check-input:checked {
-        background-color: var(--bs-success);
-        border-color: var(--bs-success);
-    }
+{% block extra_css %}{% endblock %}
 
-    /* Toast styling */
-    .toast {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1050;
-        min-width: 250px;
-    }
-</style>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const locationToggle = document.querySelector('.location-status-toggle');
-    const placeSlug = '{{ place.slug }}';  // Pass placeSlug to JavaScript
-    const locationId = '{{ location.pk }}';
-    if (!locationToggle) return;  // Exit if no toggle found (new location)
-
-    locationToggle.addEventListener('change', async function(e) {
-        const isActive = this.checked;
-        
-        try {
-            // Updated URL to match the pattern in urls.py
-            const response = await fetch(`/api/${placeSlug}/location/${locationId}/toggle_active/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({
-                    is_active: isActive
-                })
-            });
-
-            if (!response.ok) throw new Error('Network response was not ok');
-            
-            const data = await response.json();
-            
-            // Show success message
-            showToast(`Location status updated to ${isActive ? 'active' : 'inactive'} successfully`, 'success');
-
-        } catch (error) {
-            console.error('Error:', error);
-            // Revert the toggle if there was an error
-            this.checked = !isActive;
-            showToast('Failed to update location status', 'danger');
-        }
-    });
-
-    function showToast(message, type = 'success') {
-        const toast = document.getElementById('statusToast');
-        const toastBody = document.getElementById('toastMessage');
-        
-        toast.classList.remove('bg-success', 'bg-danger');
-        toast.classList.add(`bg-${type}`);
-        toastBody.classList.remove('text-dark', 'text-white');
-        toastBody.classList.add('text-white');
-        
-        toastBody.textContent = message;
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-    }
-
-    // Function to get CSRF token from cookies
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-});
-</script>
-{% endblock %} 
+{% block extra_js %}{% endblock %} 

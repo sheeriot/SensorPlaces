@@ -76,7 +76,7 @@ class SensorForm(forms.ModelForm):
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML("""
-                        <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug location_pk=device.location.pk pk=device.pk %}" 
+                        <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug pk=device.pk %}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>

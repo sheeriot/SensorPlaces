@@ -1,13 +1,16 @@
 {% if place %}
-<div class="btn-group btn-group-sm">
-    <a href="{% url 'sensors:place_locations' place.slug %}" class="btn btn-outline-info {% if active_tab == 'locations' %}active{% endif %}">
+<div class="btn-group btn-group-sm ms-3">
+    <a href="{% url 'sensors:place_locations' place.slug %}" 
+       class="btn btn-outline-info {% if model_name == 'location' %}active{% endif %}">
         <i class="bi bi-geo-alt me-1"></i>Locations
     </a>
-    <a href="{% url 'sensors:place_devices' place.slug %}" class="btn btn-outline-dark {% if active_tab == 'devices' %}active{% endif %}">
+    <a href="{% url 'sensors:place_devices' place.slug %}" 
+       class="btn btn-outline-dark {% if model_name == 'device' %}active{% endif %}">
         <i class="bi bi-hdd-rack me-1"></i>Devices
     </a>
-    <a href="{% url 'sensors:place_sensors' place.slug %}" class="btn btn-outline-success {% if active_tab == 'sensors' %}active{% endif %}">
+    <a href="{% url 'sensors:place_sensors' place.slug %}" 
+       class="btn btn-outline-success {% if model_name == 'sensor' %}active{% endif %}">
         <i class="bi bi-thermometer me-1"></i>Sensors
     </a>
 </div>
-{% endif %} 
+{% endif %}

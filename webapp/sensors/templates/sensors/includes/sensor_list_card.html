@@ -1,122 +1,146 @@
 {% load widget_tweaks %}
 
-<div class="card sensors-card {% if not device.is_active %}opacity-75{% endif %}">
+<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div>
             <i class="bi bi-graph-up"></i>
-            <span class="ms-2">Sensors</span>
+            <span class="ms-2">Sensors by Device</span>
         </div>
-        <a href="{% url 'sensors:sensor_create' place_slug=place.slug pk=device.pk %}" 
-           class="btn btn-primary btn-sm"
-           {% if not device.is_active %}disabled{% endif %}>
-            <i class="bi bi-plus"></i> Add Sensor
-        </a>
     </div>
     <div class="card-body p-2">
-        {% if sensors %}
-        <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
-                <thead>
-                    <tr class="small">
-                        <th class="py-2">Name</th>
-                        <th class="py-2">Type</th>
-                        <th class="py-2">Unit</th>
-                        <th class="py-2">Data Source</th>
-                        <th class="py-2">Status</th>
-                        <th class="py-2">Actions</th>
-                    </tr>
-                </thead>
-                <tbody style="font-size: 0.875rem;">
-                    {% for sensor in sensors %}
-                    <tr {% if not sensor.is_active or not device.is_active %}class="text-muted opacity-50"{% endif %}>
-                        <td class="py-1">{{ sensor.name }}</td>
-                        <td class="py-1">{{ sensor.get_sensor_type_display }}</td>
-                        <td class="py-1">{{ sensor.get_unit_display }}</td>
-                        <td class="py-1">
-                            {{ sensor.get_data_type_display }}
-                            {% if sensor.data_type == 'INFLUX' %}
-                            <button class="btn btn-outline-primary btn-sm ms-2 test-readings-btn py-0" 
-                                    data-sensor-id="{{ sensor.pk }}"
-                                    data-url="{% url 'sensors:sensor_test' place_slug=device.location.place.slug sensor_pk=sensor.pk %}"
-                                    {% if not device.is_active %}disabled{% endif %}>
-                                <i class="bi bi-lightning"></i> Test
-                            </button>
+        {% if devices %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    {% for device in devices %}
+                        <!-- Device Header Row -->
+                        <thead>
+                            <tr class="bg-light">
+                                <th colspan="4" class="py-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <i class="bi bi-hdd-rack"></i>
+                                            <span class="ms-2">{{ device.name }}</span>
+                                            <span class="badge {% if device.is_active %}bg-success{% else %}bg-danger{% endif %} ms-2">
+                                                {{ device.is_active|yesno:"Active,Inactive" }}
+                                            </span>
+                                            <span class="text-muted ms-2 small">{{ device.location.name }}</span>
+                                        </div>
+                                        <a href="{% url 'sensors:sensor_create' place_slug=place.slug pk=device.pk %}" 
+                                           class="btn btn-primary btn-sm"
+                                           {% if not device.is_active %}disabled{% endif %}>
+                                            <i class="bi bi-plus"></i> Add Sensor
+                                        </a>
+                                    </div>
+                                </th>
+                            </tr>
+                            {% if device.sensor_set.exists %}
+                            <tr class="small">
+                                <th class="py-2">Name</th>
+                                <th class="py-2">Type</th>
+                                <th class="py-2">Status</th>
+                                <th class="py-2">Actions</th>
+                            </tr>
                             {% endif %}
-                        </td>
-                        <td class="py-1">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input sensor-status-toggle" 
-                                       type="checkbox" 
-                                       id="sensorStatus_{{ sensor.pk }}"
-                                       data-sensor-id="{{ sensor.pk }}"
-                                       data-device-id="{{ device.pk }}"
-                                       data-place-slug="{{ device.location.place.slug }}"
-                                       {% if sensor.is_active %}checked{% endif %}
-                                       {% if not device.is_active %}disabled{% endif %}>
-                            </div>
-                        </td>
-                        <td class="py-1">
-                            <div class="btn-group">
-                                <a href="{% url 'sensors:sensor_update' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk pk=sensor.pk %}" 
-                                   class="btn btn-warning btn-sm py-0"
-                                   {% if not device.is_active %}disabled{% endif %}>
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <a href="{% url 'sensors:sensor_delete' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk pk=sensor.pk %}" 
-                                   class="btn btn-danger btn-sm py-0"
-                                   {% if not device.is_active %}disabled{% endif %}>
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
-                    <!-- Results row (initially hidden) -->
-                    <tr class="readings-results d-none" id="readings-results-{{ sensor.pk }}">
-                        <td colspan="6" class="p-2">
-                            <div class="alert d-none" role="alert"></div>
-                            <div class="readings-summary d-none">
-                                <h6 class="mb-2 small">Last 60 Minutes Summary</h6>
-                                <table class="table table-sm mb-2">
-                                    <thead>
-                                        <tr class="small">
-                                            <th>Total Readings</th>
-                                            <th>Min</th>
-                                            <th>Max</th>
-                                            <th>Average</th>
-                                            <th>Time Range</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="small">
-                                        <tr>
-                                            <td class="count"></td>
-                                            <td class="min"></td>
-                                            <td class="max"></td>
-                                            <td class="avg"></td>
-                                            <td class="timerange"></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="recent-readings d-none">
-                                <h6 class="mb-2 small">Most Recent Readings</h6>
-                                <table class="table table-sm mb-0">
-                                    <thead>
-                                        <tr class="small">
-                                            <th>Timestamp</th>
-                                            <th>Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="small"></tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
+                        </thead>
+                        <tbody style="font-size: 0.875rem;">
+                            {% for sensor in device.sensor_set.all %}
+                            <tr {% if not sensor.is_active or not device.is_active %}class="text-muted opacity-50"{% endif %}>
+                                <td class="py-1">
+                                    {{ sensor.name }}
+                                    {% if sensor.data_type == 'INFLUX' %}
+                                    <button class="btn btn-outline-primary btn-sm ms-2 test-readings-btn py-0" 
+                                            data-sensor-id="{{ sensor.pk }}"
+                                            data-url="{% url 'sensors:sensor_test' place_slug=device.location.place.slug sensor_pk=sensor.pk %}"
+                                            {% if not device.is_active %}disabled{% endif %}>
+                                        <i class="bi bi-lightning"></i> Test
+                                    </button>
+                                    {% endif %}
+                                </td>
+                                <td class="py-1">
+                                    {{ sensor.get_sensor_type_display }}
+                                    <small class="text-muted">({{ sensor.get_unit_display }})</small>
+                                </td>
+                                <td class="py-1">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input sensor-status-toggle" 
+                                               type="checkbox" 
+                                               id="sensorStatus_{{ sensor.pk }}"
+                                               data-sensor-id="{{ sensor.pk }}"
+                                               data-device-id="{{ device.pk }}"
+                                               data-place-slug="{{ device.location.place.slug }}"
+                                               {% if sensor.is_active %}checked{% endif %}
+                                               {% if not device.is_active %}disabled{% endif %}>
+                                    </div>
+                                </td>
+                                <td class="py-1">
+                                    <div class="btn-group">
+                                        <a href="{% url 'sensors:sensor_update' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk pk=sensor.pk %}" 
+                                           class="btn btn-warning btn-sm py-0"
+                                           {% if not device.is_active %}disabled{% endif %}>
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{% url 'sensors:sensor_delete' place_slug=device.location.place.slug location_pk=device.location.pk device_pk=device.pk pk=sensor.pk %}" 
+                                           class="btn btn-danger btn-sm py-0"
+                                           {% if not device.is_active %}disabled{% endif %}>
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <!-- Results row (initially hidden) -->
+                            <tr class="readings-results d-none" id="readings-results-{{ sensor.pk }}">
+                                <td colspan="4" class="p-2">
+                                    <div class="alert d-none" role="alert"></div>
+                                    <div class="readings-summary d-none">
+                                        <h6 class="mb-2 small">Last 60 Minutes Summary</h6>
+                                        <table class="table table-sm mb-2">
+                                            <thead>
+                                                <tr class="small">
+                                                    <th>Total Readings</th>
+                                                    <th>Min</th>
+                                                    <th>Max</th>
+                                                    <th>Average</th>
+                                                    <th>Time Range</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="small">
+                                                <tr>
+                                                    <td class="count"></td>
+                                                    <td class="min"></td>
+                                                    <td class="max"></td>
+                                                    <td class="avg"></td>
+                                                    <td class="timerange"></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="recent-readings d-none">
+                                        <h6 class="mb-2 small">Most Recent Readings</h6>
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr class="small">
+                                                    <th>Timestamp</th>
+                                                    <th>Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="small"></tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center small py-3">
+                                    No sensors found for this device. Click "Add Sensor" to create one.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                </table>
+            </div>
         {% else %}
-        <p class="text-center small mb-0">No sensors found. Click "Add Sensor" to create one.</p>
+            <p class="text-center small mb-0">No devices found. Add devices to start creating sensors.</p>
         {% endif %}
     </div>
 </div>
@@ -127,48 +151,45 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('deviceStatusChanged', function(event) {
         const isDeviceActive = event.detail.isActive;
         const deviceId = event.detail.deviceId;
-        const sensorsCard = document.querySelector('.sensors-card');
         
-        if (sensorsCard) {
-            // Update card opacity
-            sensorsCard.className = `card sensors-card ${!isDeviceActive ? 'opacity-75' : ''}`;
-            
-            // Update all sensor toggles and rows
-            const sensorToggles = sensorsCard.querySelectorAll('.sensor-status-toggle');
-            const sensorRows = sensorsCard.querySelectorAll('tbody tr:not(.readings-results)');
-            
-            sensorToggles.forEach(toggle => {
-                // Only update toggles for this device
-                if (toggle.dataset.deviceId === deviceId) {
-                    toggle.disabled = !isDeviceActive;
-                }
-            });
-
-            sensorRows.forEach(row => {
-                const toggle = row.querySelector('.sensor-status-toggle');
-                if (toggle && toggle.dataset.deviceId === deviceId) {
-                    if (!isDeviceActive) {
-                        row.classList.add('text-muted', 'opacity-50');
-                    } else {
-                        // Only remove opacity if the sensor itself is active
-                        if (toggle.checked) {
-                            row.classList.remove('text-muted', 'opacity-50');
-                        }
-                    }
-                }
-            });
-
-            // Update all action buttons
-            const buttons = sensorsCard.querySelectorAll('button:not(.sensor-status-toggle), a.btn');
-            buttons.forEach(button => {
-                button.disabled = !isDeviceActive;
-            });
-
-            // Update the Add Sensor button
-            const addSensorBtn = sensorsCard.querySelector('.card-header a.btn-primary');
+        // Find the device's section
+        const deviceHeader = document.querySelector(`thead tr[data-device-id="${deviceId}"]`);
+        if (deviceHeader) {
+            const addSensorBtn = deviceHeader.querySelector('.btn-primary');
             if (addSensorBtn) {
                 addSensorBtn.disabled = !isDeviceActive;
             }
+
+            // Update status badge
+            const statusBadge = deviceHeader.querySelector('.badge');
+            if (statusBadge) {
+                statusBadge.className = `badge ${isDeviceActive ? 'bg-success' : 'bg-danger'} ms-2`;
+                statusBadge.textContent = isDeviceActive ? 'Active' : 'Inactive';
+            }
+
+            // Update all sensor rows for this device
+            const sensorRows = deviceHeader.closest('table').querySelectorAll(`tr[data-device-id="${deviceId}"]:not(.readings-results)`);
+            sensorRows.forEach(row => {
+                const toggle = row.querySelector('.sensor-status-toggle');
+                if (toggle) {
+                    toggle.disabled = !isDeviceActive;
+                }
+                if (!isDeviceActive) {
+                    row.classList.add('text-muted', 'opacity-50');
+                } else {
+                    // Only remove opacity if the sensor itself is active
+                    const toggle = row.querySelector('.sensor-status-toggle');
+                    if (toggle && toggle.checked) {
+                        row.classList.remove('text-muted', 'opacity-50');
+                    }
+                }
+
+                // Update action buttons
+                const buttons = row.querySelectorAll('button:not(.sensor-status-toggle), a.btn');
+                buttons.forEach(button => {
+                    button.disabled = !isDeviceActive;
+                });
+            });
         }
     });
 

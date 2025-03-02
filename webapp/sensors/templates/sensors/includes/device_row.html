@@ -1,0 +1,28 @@
+{% load static %}
+<tr class="device-row {% if not device.is_active %}inactive{% endif %}" data-device-id="{{ device.id }}" data-active="{{ device.is_active|lower }}">
+    <td class="align-middle">
+        <i class="{{ device.device_type.icon }} me-2"></i><a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.id %}" class="text-decoration-none">{{ device.name }}</a>
+    </td>
+    <td class="align-middle">
+        <div class="form-check form-switch">
+            <input class="form-check-input device-status-toggle" type="checkbox" role="switch" 
+                   id="deviceToggle{{ device.id }}" {% if device.is_active %}checked{% endif %}>
+            <label class="form-check-label status-label" for="deviceToggle{{ device.id }}">
+                {% if device.is_active %}active{% else %}inactive{% endif %}
+            </label>
+        </div>
+    </td>
+    <td class="align-middle">{{ device.model }}</td>
+    <td class="align-middle">{{ device.manufacturer }}</td>
+    <td class="align-middle">{{ device.serial_number }}</td>
+    <td class="align-middle text-end">
+        <div class="btn-group">
+            <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.id %}" class="btn btn-sm btn-outline-warning">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.id %}" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+    </td>
+</tr> 

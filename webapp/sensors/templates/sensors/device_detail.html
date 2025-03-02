@@ -7,21 +7,6 @@
 {% block content %}
 <div class="container-fluid">
 
-    <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'sensors:place_detail' place_slug=place.slug %}">{{ place.name }}</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}">{{ location.name }}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ device.name }}</li>
-        </ol>
-    </nav>
-
-    <!-- Add this after the breadcrumb -->
-    <div class="d-flex align-items-center gap-3 mb-3">
-        <h2 class="mb-0"><i class="bi bi-hdd-rack me-2"></i>{{ device.name }}</h2>
-        {% include "sensors/includes/place_nav_header_buttons.html" with place=place active_tab='devices' %}
-    </div>
-
     <!-- Place Title Card - Spans both columns -->
     {% include 'sensors/includes/place_title_card.html' with place=place %}
 
@@ -29,9 +14,9 @@
         <!-- Left Column -->
         <div class="col-md-4">
             <!-- Devices Navigation Card -->
-            {% include 'sensors/includes/device_nav_card.html' with place_slug=place.slug pk=device.pk current_device=device %}
+            {% include 'sensors/includes/place_nav_card.html' with place_slug=place.slug pk=device.pk current_device=device %}
             <!-- Locations Navigation Card -->
-            {% include 'sensors/includes/place_nav_card.html' with place_slug=place.slug locations=locations location=location active_tab='devices' current_device=device %}
+            {% include 'sensors/includes/device_nav_card.html' with place_slug=place.slug locations=locations location=location active_tab='devices' current_device=device %}
         </div>
 
         <!-- Right Column -->
@@ -44,4 +29,27 @@
         </div>
     </div>
 </div>
+
+<!-- Toast Notification -->
+<div class="toast" role="alert" aria-live="polite" aria-atomic="true" id="statusToast">
+    <div class="toast-header">
+        <strong class="me-auto">Status Update</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastMessage"></div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* Toast styling */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    min-width: 250px;
+}
+</style>
 {% endblock %}

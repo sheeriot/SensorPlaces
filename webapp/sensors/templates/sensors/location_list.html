@@ -4,15 +4,12 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-12 mb-1">
-        <div class="d-flex align-items-center gap-3">
-            <h2 class="mb-0">Locations</h2>
-            {% include "sensors/includes/place_nav_header_buttons.html" with place=place active_tab='locations' %}
-        </div>
-    </div>
 
     <!-- Place Title Card -->
-    <div class="col-12">
+    <div class="col-12 mb-1">
+        <div class="d-flex align-items-center gap-3">
+            <h2 class="mb-0">Locations @ {{ place.name }}</h2>
+        </div>
         {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
 

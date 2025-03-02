@@ -32,7 +32,7 @@
             </label>
         </div>
     </div>
-    <a href="{% url 'sensors:place_create' %}" class="btn btn-primary">
+    <a href="{% url 'sensors:place_create' %}" class="btn btn-outline-primary">
         <i class="bi bi-plus-circle"></i> Add Place
     </a>
 </div>
@@ -54,7 +54,7 @@
             <tr class="{% if not place.is_active %}inactive-place{% endif %}">
                 <td>                        
                     <a href="{% url 'sensors:place_detail' place.slug %}" class="btn btn-sm btn-info">
-                        <i class="bi bi-eye"></i>
+                        <i class="bi bi-house-gear"></i>
                         {{ place.name }}
                     </a>
                 </td>

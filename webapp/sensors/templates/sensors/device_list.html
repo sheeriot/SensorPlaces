@@ -6,8 +6,7 @@
 <div class="row">
     <div class="col-12 mb-1">
         <div class="d-flex align-items-center gap-3">
-            <h2 class="mb-0">Devices</h2>
-            {% include "sensors/includes/place_nav_header_buttons.html" with place=place active_tab='devices' %}
+            <h2 class="mb-0">Devices @ {{ place.name }}</h2>
         </div>
         {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
@@ -24,7 +23,6 @@
             {% else %}
                 {% include "sensors/includes/device_list_card.html" with place=place locations=locations.all %}
             {% endif %}
-            
         </div>
     </div>
 </div>
@@ -41,116 +39,8 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script data-place-slug="{{ place.slug }}">
+<script>
 document.addEventListener('DOMContentLoaded', function() {
-    const hideInactiveSwitch = document.getElementById('hideInactiveSwitch');
-    const deviceRows = document.querySelectorAll('tr[data-active]');
-    const deviceToggles = document.querySelectorAll('.device-status-toggle');
-    const placeSlug = document.currentScript.getAttribute('data-place-slug');
-    
-    function filterDevices() {
-        const hideInactive = hideInactiveSwitch.checked;
-        
-        deviceRows.forEach(row => {
-            const isActive = row.dataset.active === 'true';
-            row.style.display = (hideInactive && !isActive) ? 'none' : '';
-        });
-    }
-
-    // Initial filter
-    hideInactiveSwitch.checked = true;  // Start with inactive devices hidden
-    filterDevices();
-
-    // Filter on toggle change
-    hideInactiveSwitch.addEventListener('change', filterDevices);
-
-    // Handle device status toggle
-    deviceToggles.forEach(toggle => {
-        toggle.addEventListener('change', async function(e) {
-            const deviceId = this.dataset.deviceId;
-            const locationId = this.dataset.locationId;
-            const isActive = this.checked;
-            const label = this.nextElementSibling;
-            const row = this.closest('tr');
-
-            try {
-                const response = await fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({
-                        is_active: isActive
-                    })
-                });
-
-                if (!response.ok) throw new Error('Network response was not ok');
-                
-                const data = await response.json();
-                
-                // Update the status label
-                label.textContent = isActive ? 'Active' : 'Inactive';
-                label.classList.toggle('text-success', isActive);
-                label.classList.toggle('text-danger', !isActive);
-                
-                // Update the row's active state
-                row.dataset.active = isActive.toString();
-                
-                // Apply filter if hide inactive is checked
-                if (hideInactiveSwitch.checked) {
-                    filterDevices();
-                }
-
-                // Update the location card counts
-                const locationListItem = document.querySelector(`.location-drop-zone[data-location-id="${locationId}"]`);
-                if (locationListItem) {
-                    const badge = locationListItem.querySelector('.badge.bg-secondary');
-                    if (badge) {
-                        badge.innerHTML = `<i class="bi bi-hdd-rack"></i> ${data.active_devices_count}`;
-                    }
-                }
-
-                // Update the All Devices count
-                const allDevicesItem = document.querySelector('.list-group-item[href*="/devices/"]');
-                if (allDevicesItem) {
-                    const badge = allDevicesItem.querySelector('.badge.bg-secondary');
-                    if (badge && data.total_active_devices) {
-                        badge.innerHTML = `<i class="bi bi-hdd-rack me-1"></i>${data.total_active_devices}`;
-                    }
-                }
-
-                // Update the location marker on the site plan
-                const locationMarker = document.querySelector(`.location-marker[data-location-id="${locationId}"]`);
-                if (locationMarker) {
-                    // Update the badge in the label
-                    const markerBadge = locationMarker.querySelector('.location-label .badge');
-                    if (markerBadge) {
-                        markerBadge.textContent = data.active_devices_count;
-                    }
-
-                    // Update the popup content
-                    const popupContent = locationMarker.querySelector('.location-popup p small');
-                    if (popupContent) {
-                        popupContent.innerHTML = `Devices: <span class="text-success">${data.active_devices_count} active</span>, <span class="text-danger">${data.inactive_devices_count} inactive</span>`;
-                    }
-                }
-
-                // Show success message
-                const toast = new bootstrap.Toast(document.getElementById('statusToast'));
-                document.getElementById('toastMessage').textContent = 
-                    `Device status updated to ${isActive ? 'active' : 'inactive'} successfully`;
-                toast.show();
-
-            } catch (error) {
-                console.error('Error:', error);
-                // Revert the toggle if there was an error
-                this.checked = !isActive;
-                alert('Failed to update device status. Please try again.');
-            }
-        });
-    });
-
     // Function to get CSRF token from cookies
     function getCookie(name) {
         let cookieValue = null;
@@ -165,153 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         return cookieValue;
-    }
-
-    // Drag and Drop functionality
-    const dropZones = document.querySelectorAll('.location-drop-zone');
-    let draggedDevice = null;
-
-    deviceRows.forEach(row => {
-        row.addEventListener('dragstart', (e) => {
-            draggedDevice = row;
-            e.dataTransfer.setData('text/plain', ''); // Required for Firefox
-            row.classList.add('dragging');
-        });
-
-        row.addEventListener('dragend', () => {
-            row.classList.remove('dragging');
-        });
-    });
-
-    dropZones.forEach(zone => {
-        zone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            if (zone.dataset.active === 'true') {
-                zone.classList.add('drag-over');
-            }
-        });
-
-        zone.addEventListener('dragleave', () => {
-            zone.classList.remove('drag-over');
-        });
-
-        zone.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            zone.classList.remove('drag-over');
-
-            if (zone.dataset.active !== 'true') {
-                showToast('Cannot move device to inactive location', 'danger');
-                return;
-            }
-
-            const newLocationId = zone.dataset.locationId;
-            const deviceId = draggedDevice.dataset.deviceId;
-            const oldLocationId = draggedDevice.dataset.locationId;
-
-            if (newLocationId === oldLocationId) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/device/${deviceId}/move_location/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({ 
-                        new_location_id: newLocationId 
-                    })
-                });
-
-                if (!response.ok) throw new Error('Network response was not ok');
-                
-                const data = await response.json();
-
-                // Find the new location's section in the table
-                const newLocationHeader = Array.from(document.querySelectorAll('.table-light')).find(
-                    header => header.querySelector('strong').textContent === data.new_location_name
-                );
-
-                if (newLocationHeader) {
-                    // Get all device rows in the new location
-                    let nextRow = newLocationHeader.nextElementSibling;
-                    const deviceName = draggedDevice.querySelector('td:first-child .text-truncate').textContent;
-                    let insertBefore = null;
-
-                    // Find where to insert the device row alphabetically
-                    while (nextRow && !nextRow.classList.contains('table-light')) {
-                        const currentName = nextRow.querySelector('td:first-child .text-truncate').textContent;
-                        if (currentName > deviceName) {
-                            insertBefore = nextRow;
-                            break;
-                        }
-                        nextRow = nextRow.nextElementSibling;
-                    }
-
-                    // Update device's location ID
-                    draggedDevice.dataset.locationId = newLocationId;
-
-                    // Move the row to its new position
-                    if (insertBefore) {
-                        insertBefore.parentNode.insertBefore(draggedDevice, insertBefore);
-                    } else {
-                        // If no insertion point found, append to the end of the location group
-                        while (nextRow && !nextRow.classList.contains('table-light')) {
-                            nextRow = nextRow.nextElementSibling;
-                        }
-                        if (nextRow) {
-                            nextRow.parentNode.insertBefore(draggedDevice, nextRow);
-                        } else {
-                            newLocationHeader.parentNode.appendChild(draggedDevice);
-                        }
-                    }
-                }
-
-                // Update location counters
-                updateLocationCounter(oldLocationId, data.old_location_count, data.total_active_devices);
-                updateLocationCounter(newLocationId, data.new_location_count, data.total_active_devices);
-
-                showToast('Device moved successfully', 'success');
-            } catch (error) {
-                console.error('Error:', error);
-                showToast('Failed to move device', 'danger');
-            }
-        });
-    });
-
-    function updateLocationCounter(locationId, count, all_count) {
-        // Update specific location counter
-        const locationItem = document.querySelector(`.location-drop-zone[data-location-id="${locationId}"]`);
-        if (locationItem) {
-            const badge = locationItem.querySelector('.badge.bg-secondary');
-            if (badge) {
-                badge.innerHTML = `<i class="bi bi-hdd-rack"></i> ${count}`;
-            }
-        }
-
-        // Update "All Devices" counter
-        const allDevicesItem = document.querySelector('.list-group-item[href*="/devices/"]');
-        if (allDevicesItem) {
-            const badge = allDevicesItem.querySelector('.badge.bg-secondary');
-            if (badge && count) {
-                badge.innerHTML = `<i class="bi bi-hdd-rack me-1"></i>${all_count}`;
-            }
-        }
-    }
-
-    function showToast(message, type = 'success') {
-        const toast = document.getElementById('statusToast');
-        const toastBody = document.getElementById('toastMessage');
-        
-        toast.classList.remove('bg-success', 'bg-danger');
-        toast.classList.add(`bg-${type}`);
-        toastBody.classList.remove('text-dark', 'text-white');
-        toastBody.classList.add('text-white');
-        
-        toastBody.textContent = message;
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
     }
 });
 </script>

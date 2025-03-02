@@ -34,7 +34,7 @@
                     <div class="d-flex align-items-center">
                         <span class="device-counts me-2">
                             <span class="text-success font-monospace fw-bold active-count" id="location-{{ location.pk }}-active">{{ location.active_devices_count }}</span>
-                            <span class="text-body-secondary font-monospace" id="location-{{ location.pk }}-inactive">({{ location.inactive_devices_count|default:0 }})</span>
+                            (<span class="text-body-secondary font-monospace" id="location-{{ location.pk }}-inactive">{{ location.inactive_devices_count|default:0 }}</span>)
                         </span>
                         <i class="bi bi-hdd-rack"></i>
                     </div>

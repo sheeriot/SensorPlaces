@@ -68,7 +68,7 @@ class Location(models.Model):
 
     class Meta:
         verbose_name_plural = '2. Locations'
-        ordering = ['-is_active', Lower('name')]
+        ordering = ['-is_active', 'name']
 
 class DeviceType(models.Model):
     name = models.CharField(max_length=50, unique=True)

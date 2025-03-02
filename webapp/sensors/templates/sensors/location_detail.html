@@ -4,22 +4,6 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-12 mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item">
-                            <a href="{% url 'sensors:place_detail' location.place.slug %}">
-                                {{ location.place.name }}
-                            </a>
-                        </li>
-                        <li class="breadcrumb-item active">{{ location.name }}</li>
-                    </ol>
-                </nav>
-            </div>
-        </div>
-    </div>
 
     <!-- Place Title Card -->
     <div class="col-12">
@@ -38,204 +22,21 @@
     <!-- Right Column -->
     <div class="col-md-8">
         <!-- Include Device List Card -->
-        {% include "sensors/includes/device_list_card.html" with place=location.place locations=locations.all location=location devices=devices %}
+        {% include "sensors/includes/device_list_card.html" with place=location.place locations=locations location=location devices=devices %}
 
     </div>
 </div>
+{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
-<style>
-    #siteMapContainer {
-        background: #f8f9fa;
-    }
-
-    #siteMapContent {
-        transition: transform 0.2s ease-out;
-    }
-
-    .location-marker {
-        cursor: pointer;
-        transform: translate(-50%, -50%);
-        z-index: 100;
-        position: relative;
-    }
-    
-    .location-label {
-        position: absolute;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 12px;
-        white-space: nowrap;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: -20px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .location-label .badge {
-        font-size: 10px;
-        padding: 3px 6px;
-    }
-    
-    .location-popup {
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        margin-bottom: 10px;
-        background: white;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        padding: 8px;
-        width: 200px;
-        z-index: 1000;
-        display: none;
-    }
-    
-    .location-marker:hover .location-popup {
-        display: block;
-    }
-    
-    .location-marker .bi {
-        filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
-    }
-</style>
 {% endblock %}
 
 {% block extra_js %}
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Handle device visibility toggle
-        const showInactiveDevices = document.getElementById('showInactiveDevices');
-        const inactiveDevices = document.querySelectorAll('.inactive-device');
-        
-        // Initial state - hide inactive
-        showInactiveDevices.checked = true;
-        inactiveDevices.forEach(device => {
-            device.style.display = 'none';
-        });
-
-        showInactiveDevices.addEventListener('change', function() {
-            inactiveDevices.forEach(device => {
-                device.style.display = !this.checked ? 'block' : 'none';
-            });
-        });
-
-        // Add device toggle functionality
-        document.querySelectorAll('.device-status-toggle').forEach(toggle => {
-            toggle.addEventListener('change', function(e) {
-                e.preventDefault();
-                
-                const deviceId = this.dataset.deviceId;
-                const locationId = this.dataset.locationId;
-                const placeSlug = this.dataset.placeSlug;
-                const newStatus = this.checked;
-                const statusLabel = document.getElementById(`deviceStatusLabel_${deviceId}`);
-                const deviceCard = document.getElementById(`deviceCard_${deviceId}`);
-                
-                // Show confirmation dialog
-                const confirmMessage = newStatus ? 
-                    'Are you sure you want to activate this device?' : 
-                    'Are you sure you want to deactivate this device? This will also deactivate all associated sensors.';
-                
-                if (confirm(confirmMessage)) {
-                    fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken'),
-                        },
-                        body: JSON.stringify({
-                            is_active: newStatus
-                        })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.status === 'success') {
-                            this.checked = data.is_active;
-                            
-                            // Update device counts in the location list if present
-                            if (data.active_devices_count !== undefined) {
-                                const locationItem = document.querySelector(`[data-location-id="${locationId}"]`);
-                                if (locationItem) {
-                                    const activeCount = locationItem.querySelector('.active-count');
-                                    const inactiveCount = locationItem.querySelector('.inactive-count');
-                                    if (activeCount) activeCount.textContent = data.active_devices_count;
-                                    if (inactiveCount) inactiveCount.textContent = data.inactive_devices_count;
-                                }
-                            }
-                            
-                            // Show success toast
-                            showToast('Device status updated successfully', 'success');
-                        } else {
-                            throw new Error(data.message || 'Failed to update device status');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        this.checked = !newStatus;
-                        showToast(error.message || 'Failed to update device status', 'danger');
-                    });
-                } else {
-                    this.checked = !newStatus;
-                }
-            });
-        });
+        // Site plan specific functionality can stay here if needed
     });
-
-    // Helper function to show toasts
-    function showToast(message, type) {
-        const toast = new bootstrap.Toast(Object.assign(document.createElement('div'), {
-            className: `toast align-items-center text-white bg-${type} border-0 position-fixed top-0 end-0 m-3`,
-            innerHTML: `
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            `
-        }));
-        document.body.appendChild(toast.element);
-        toast.show();
-        setTimeout(() => toast.element.remove(), 3000);
-    }
-
-    // Helper function to get CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
 </script>
-{% endblock %}
-
-<!-- Add Toast component -->
-<div class="toast" role="alert" aria-live="polite" aria-atomic="true" id="statusToast">
-    <div class="toast-header">
-        <strong class="me-auto">Status Update</strong>
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-    <div class="toast-body" id="toastMessage"></div>
-</div>
 {% endblock %} 

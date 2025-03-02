@@ -3,20 +3,24 @@
 {% block title %}Delete Device{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Delete Device</h2>
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card rounded-3 shadow-sm border-0">
+            <div class="card-header bg-white py-2">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-trash me-2"></i>Delete Device
+                </h5>
             </div>
             <div class="card-body">
-                <p class="mb-0">Are you sure you want to delete device "{{ device.name }}"?</p>
-            </div>
-            <div class="card-footer">
-                <form method="post">
+                <p>Are you sure you want to delete the device "{{ object.name }}"?</p>
+                <p class="text-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    This action cannot be undone.
+                </p>
+                <form method="post" data-delete-form>
                     {% csrf_token %}
                     <div class="d-flex justify-content-between">
-                        <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" class="btn btn-secondary">
+                        <a href="{{ request.META.HTTP_REFERER|default:location_url }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Cancel
                         </a>
                         <button type="submit" class="btn btn-danger">
