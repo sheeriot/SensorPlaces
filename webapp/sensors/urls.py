@@ -55,7 +55,8 @@ urlpatterns = [
     path('api/<slug:place_slug>/locations/<int:pk>/position/', views.location_update_position, name='location_update_position'),
     path('api/<slug:place_slug>/sensor/<int:pk>/toggle_active/', views.sensor_toggle_active, name='sensor_toggle_active'),
     path('api/<slug:place_slug>/device/<int:pk>/toggle_active/', views.DeviceToggleActiveView.as_view(), name='device_toggle_active'),
+    path('api/<slug:place_slug>/device/<int:pk>/active_sensors/', views.DeviceActiveSensorsView.as_view(), name='device_active_sensors'),
     path('api/<slug:place_slug>/device/<int:pk>/move_location/', views.DeviceMoveLocationView.as_view(), name='device_move_location'),
-    path('api/<slug:place_slug>/sensor_test/<int:sensor_pk>', views.test_sensor_readings, name='sensor_test'),
+    path('api/<slug:place_slug>/sensor_test/<int:pk>', views.test_sensor_readings, name='sensor_test'),
     path('api/<slug:place_slug>/location/<int:pk>/toggle_active/', views.location_toggle_active, name='location_toggle_active'),
 ]

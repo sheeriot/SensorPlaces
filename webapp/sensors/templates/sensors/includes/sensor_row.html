@@ -1,0 +1,85 @@
+<!-- webapp/sensors/templates/sensors/includes/sensor_row.html -->
+<tr class="sensor-row {% if not sensor.is_active %}inactive{% endif %}" 
+    data-sensor-active="{{ sensor.is_active|lower }}" 
+    data-sensor-id="{{ sensor.pk }}">
+    <td>
+        <a href="{% url 'sensors:sensor_detail' place_slug=device.location.place.slug pk=sensor.pk %}" class="text-decoration-none">
+            <i class="bi bi-thermometer me-2"></i>{{ sensor.name }}
+        </a>
+    </td>
+    <td>
+        <div class="form-check form-switch">
+            <input class="form-check-input sensor-status-toggle" 
+                   type="checkbox" 
+                   role="switch"
+                   id="sensorToggle{{ sensor.pk }}"
+                   data-sensor-id="{{ sensor.pk }}"
+                   data-device-id="{{ device.pk }}"
+                   data-place-slug="{{ device.location.place.slug }}"
+                   {% if sensor.is_active %}checked{% endif %}
+                   {% if not device.is_active %}disabled{% endif %}>
+            <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
+                   for="sensorToggle{{ sensor.pk }}"
+                   id="sensorStatusLabel_{{ sensor.pk }}">
+                {% if sensor.is_active %}Active{% else %}inactive{% endif %}
+            </label>
+        </div>
+    </td>
+    <td>{{ sensor.get_sensor_type_display }}</td>
+    <td>{{ sensor.get_unit_display }}</td>
+    <td class="text-end">
+        <div class="btn-group" role="group">
+            <button type="button" 
+                    class="btn btn-info btn-sm test-readings-btn"
+                    data-sensor-id="{{ sensor.pk }}"
+                    data-url="{% url 'sensors:sensor_test' place_slug=place.slug pk=sensor.pk %}"
+                    {% if not sensor.is_active or not device.is_active %}disabled{% endif %}>
+                <i class="bi bi-play"></i>
+            </button>
+            <a href="{% url 'sensors:sensor_update' place_slug=device.location.place.slug pk=sensor.pk %}" 
+               class="btn btn-warning btn-sm"
+               {% if not sensor.is_active or not device.is_active %}disabled{% endif %}>
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'sensors:sensor_delete' place_slug=device.location.place.slug pk=sensor.pk %}" 
+               class="btn btn-danger btn-sm"
+               {% if not sensor.is_active or not device.is_active %}disabled{% endif %}>
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+    </td>
+</tr>
+{% if sensor.is_active and device.is_active %}
+<tr id="readings-results-{{ sensor.pk }}" class="readings-results d-none">
+    <td colspan="5">
+        <div class="alert mb-3" role="alert"></div>
+        <div class="readings-summary d-none">
+            <h6>Summary</h6>
+            <dl class="row mb-3">
+                <dt class="col-sm-3">Count</dt>
+                <dd class="col-sm-9 count">-</dd>
+                <dt class="col-sm-3">Range</dt>
+                <dd class="col-sm-9">
+                    <span class="min">-</span> to <span class="max">-</span>
+                </dd>
+                <dt class="col-sm-3">Average</dt>
+                <dd class="col-sm-9 avg">-</dd>
+                <dt class="col-sm-3">Time Range</dt>
+                <dd class="col-sm-9 timerange">-</dd>
+            </dl>
+        </div>
+        <div class="recent-readings d-none">
+            <h6>Recent Readings</h6>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </td>
+</tr>
+{% endif %}

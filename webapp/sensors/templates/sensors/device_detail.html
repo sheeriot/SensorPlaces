@@ -25,18 +25,9 @@
             {% include 'sensors/includes/device_details_card.html' with place_slug=place.slug pk=device.pk %}
 
             <!-- Sensors Card -->
-            {% include 'sensors/includes/sensor_list_card.html' with place_slug=place.slug pk=device.pk %}
+            {% include 'sensors/includes/sensor_list_card.html' with place_slug=place.slug location=location device=device sensors=sensors %}
         </div>
     </div>
-</div>
-
-<!-- Toast Notification -->
-<div class="toast" role="alert" aria-live="polite" aria-atomic="true" id="statusToast">
-    <div class="toast-header">
-        <strong class="me-auto">Status Update</strong>
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-    <div class="toast-body" id="toastMessage"></div>
 </div>
 {% endblock %}
 

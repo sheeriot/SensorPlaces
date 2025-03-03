@@ -162,13 +162,29 @@ class PlaceCreateView(SuccessMessageMixin, CreateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
-    success_url = reverse_lazy('sensors:place_list')
     success_message = "Place %(name)s was created successfully"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
         return context
+
+    def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
+        return reverse('sensors:place_list')
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -188,6 +204,14 @@ class PlaceUpdateView(SuccessMessageMixin, UpdateView):
     slug_url_kwarg = 'place_slug'
     slug_field = 'slug'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
@@ -197,6 +221,12 @@ class PlaceUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
 
     def form_valid(self, form):
@@ -303,17 +333,32 @@ class LocationDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        context['active_tab'] = 'locations'
         location = self.get_object()
-        context['place'] = location.place
-        context['devices'] = location.devices.all()
+        context['location'] = location
+        place_slug = self.kwargs.get('place_slug')
+        if place_slug:
+            context['place'] = get_object_or_404(Place, slug=place_slug)
+            # context['place_url'] = reverse('sensors:place_detail', kwargs={'place_slug': place_slug})
+            context['locations'] = context['place'].locations.annotate(
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+            )
+            context['devices'] = location.devices.all()
         return context
 
 class LocationCreateView(SuccessMessageMixin, CreateView):
     model = Location
-    fields = ['name', 'is_active']
+    form_class = LocationForm
     template_name = 'sensors/location_form.html'
     success_message = "Location %(name)s was created successfully"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -322,6 +367,10 @@ class LocationCreateView(SuccessMessageMixin, CreateView):
         if place_slug:
             context['place'] = get_object_or_404(Place, slug=place_slug)
             context['place_url'] = reverse('sensors:place_detail', kwargs={'place_slug': place_slug})
+            context['locations'] = context['place'].locations.annotate(
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+            )
         return context
 
     def form_valid(self, form):
@@ -337,6 +386,12 @@ class LocationCreateView(SuccessMessageMixin, CreateView):
         return response
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         return reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
 
 class LocationUpdateView(SuccessMessageMixin, UpdateView):
@@ -344,6 +399,14 @@ class LocationUpdateView(SuccessMessageMixin, UpdateView):
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
     success_message = "Location %(name)s was updated successfully"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -359,7 +422,23 @@ class LocationUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         return reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': self.get_success_message(form.cleaned_data),
+                'redirect_url': self.get_success_url()
+            })
+        return response
 
 class LocationDeleteView(DeleteView):
     model = Location
@@ -368,6 +447,14 @@ class LocationDeleteView(DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
+        place_slug = self.kwargs.get('place_slug')
+        context['place'] = get_object_or_404(Place, slug=place_slug)
+        context['locations'] = context['place'].locations.annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        )
+        location = get_object_or_404(Location, pk=self.kwargs.get('pk'))
+        context['location'] = location
         context['place_url'] = reverse('sensors:place_locations', kwargs={
             'place_slug': self.object.place.slug
         })
@@ -468,7 +555,8 @@ class DeviceDetailView(DetailView):
             active_devices=Count('devices', filter=Q(devices__is_active=True)),
             total_devices=Count('devices')
         )
-        
+        context['sensors'] = device.sensors.all()
+
         # Get other devices for this location
         context['other_devices'] = Device.objects.filter(
             location=location
@@ -490,6 +578,14 @@ class DeviceCreateView(SuccessMessageMixin, CreateView):
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
     success_message = "Device %(name)s was created successfully"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -555,15 +651,23 @@ class DeviceCreateView(SuccessMessageMixin, CreateView):
         location = get_object_or_404(Location, pk=location_pk)
         form.instance.location = location
         response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        messages.success(self.request, success_message)
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
                 'status': 'success',
-                'message': self.get_success_message(form.cleaned_data),
+                'message': success_message,
                 'redirect_url': self.get_success_url()
             })
         return response
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         return reverse('sensors:device_detail', kwargs={
             'place_slug': self.kwargs.get('place_slug'),
             'location_pk': self.kwargs.get('location_pk'),
@@ -575,6 +679,14 @@ class DeviceUpdateView(SuccessMessageMixin, UpdateView):
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
     success_message = "Device %(name)s was updated successfully"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -624,6 +736,12 @@ class DeviceUpdateView(SuccessMessageMixin, UpdateView):
         return initial
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         device = self.get_object()
         return reverse('sensors:device_detail', kwargs={
             'place_slug': device.location.place.slug,
@@ -632,14 +750,19 @@ class DeviceUpdateView(SuccessMessageMixin, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
+        
+        # Handle inactive state after save
         if not form.instance.is_active:
             self.object.sensors.all().update(is_active=False)
+            
+        # Return JSON for AJAX requests
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
                 'status': 'success',
                 'message': self.get_success_message(form.cleaned_data),
                 'redirect_url': self.get_success_url()
             })
+            
         return response
 
 class DeviceDeleteView(DeleteView):
@@ -821,72 +944,35 @@ class SensorCreateView(SuccessMessageMixin, CreateView):
     template_name = 'sensors/sensor_form.html'
     success_message = "Sensor %(name)s was created successfully"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        device = get_object_or_404(Device, pk=self.kwargs.get('device_pk'))
+        kwargs['device'] = device
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        ic(self.kwargs)
+        
         place_slug = self.kwargs.get('place_slug')
+        place = get_object_or_404(Place, slug=place_slug)
+        context['place'] = place
+        
         device_pk = self.kwargs.get('device_pk')
         device = get_object_or_404(Device, pk=device_pk)
-
-        place = device.location.place
-        context['place'] = place
-        location_pk = device.location.pk
-        location = get_object_or_404(Location, pk=location_pk)
+        context['device'] = device
+        
+        location = device.location
         context['location'] = location
         
-        # Get locations for this place
-        locations = Location.objects.filter(place=place).prefetch_related(
-            'devices'
-        ).annotate(
-            active_devices=Count('devices', filter=Q(devices__is_active=True)),
-            total_devices=Count('devices')
-        )
-        context['locations'] = locations
-        
-        # Get devices filtered by location if provided
-        devices_query = Device.objects.filter(location__place=place)
-        devices_query = devices_query.filter(location_id=location.pk)
-        
-        # Annotate devices with sensor counts
-        devices = devices_query.select_related(
-            'location'
-        ).prefetch_related(
-            'sensors'
-        ).annotate(
-            active_sensors=Count('sensors', filter=Q(sensors__is_active=True)),
-            total_sensors=Count('sensors')
-        )
-        
-        if device_pk:
-            context['device'] = get_object_or_404(devices, pk=device_pk)
-            context['device_url'] = reverse('sensors:device_detail', kwargs={
-                'place_slug': place_slug,
-                'pk': device_pk
-            })
-        else:
-            context['devices'] = devices
-            
         return context
 
-    def get_initial(self):
-        initial = super().get_initial()
-        device = get_object_or_404(Device, pk=self.kwargs.get('device_pk'))
-        if not device.is_active:
-            initial['is_active'] = False
-        return initial
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        device = get_object_or_404(Device, pk=self.kwargs.get('device_pk'))
-        if not device.is_active:
-            form.fields['is_active'].disabled = True
-            form.fields['is_active'].initial = False
-        return form
-
     def form_valid(self, form):
-        device_pk = self.kwargs.get('device_pk')
-        device = get_object_or_404(Device, pk=device_pk)
+        device = get_object_or_404(Device, pk=self.kwargs.get('device_pk'))
         form.instance.device = device
         response = super().form_valid(form)
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -898,9 +984,14 @@ class SensorCreateView(SuccessMessageMixin, CreateView):
         return response
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         return reverse('sensors:device_detail', kwargs={
             'place_slug': self.kwargs.get('place_slug'),
-            'location_pk': self.kwargs.get('location_pk'),
             'pk': self.kwargs.get('device_pk')
         })
 
@@ -910,19 +1001,28 @@ class SensorUpdateView(SuccessMessageMixin, UpdateView):
     template_name = 'sensors/sensor_form.html'
     success_message = "Sensor %(name)s was updated successfully"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        
         sensor = self.get_object()
-        device = sensor.device
-        location = device.location
-        place = location.place
-        
-        context['device'] = device
-        context['location'] = location
+
+        place_slug = self.kwargs.get('place_slug')
+        place = get_object_or_404(Place, slug=place_slug)
         context['place'] = place
-        
+
+        location = sensor.device.location
+        device = sensor.device
+        context['location'] = location
+        context['device'] = device
+
         # Get locations for this place
         context['locations'] = Location.objects.filter(place=place).prefetch_related(
             'devices'
@@ -932,9 +1032,8 @@ class SensorUpdateView(SuccessMessageMixin, UpdateView):
         )
         
         # Get devices for this location
-        context['devices'] = Device.objects.filter(
-            location=location
-        ).select_related(
+        context['devices'] = Device.objects.filter(location=location
+            ).select_related(
             'location'
         ).prefetch_related(
             'sensors'
@@ -945,16 +1044,20 @@ class SensorUpdateView(SuccessMessageMixin, UpdateView):
         
         context['device_url'] = reverse('sensors:device_detail', kwargs={
             'place_slug': place.slug,
-            'location_pk': location.pk,
             'pk': device.pk
         })
         return context
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         sensor = self.get_object()
         return reverse('sensors:device_detail', kwargs={
             'place_slug': sensor.device.location.place.slug,
-            'location_pk': sensor.device.location.pk,
             'pk': sensor.device.pk
         })
 
@@ -972,52 +1075,43 @@ class SensorDeleteView(DeleteView):
     model = Sensor
     template_name = 'sensors/sensor_confirm_delete.html'
     
+    def dispatch(self, request, *args, **kwargs):
+        # Store the referrer URL in session if it's not from our success URL
+        referrer = request.META.get('HTTP_REFERER')
+        if referrer and not referrer.endswith(self.get_success_url()):
+            request.session['sensor_redirect_url'] = referrer
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        
         sensor = self.get_object()
-        device = sensor.device
-        location = device.location
-        place = location.place
-        
-        context['device'] = device
-        context['location'] = location
+
+        place_slug = self.kwargs.get('place_slug')
+        place = get_object_or_404(Place, slug=place_slug)
         context['place'] = place
-        
-        # Get locations for this place
-        context['locations'] = Location.objects.filter(place=place).prefetch_related(
-            'devices'
-        ).annotate(
-            active_devices=Count('devices', filter=Q(devices__is_active=True)),
-            total_devices=Count('devices')
-        )
-        
-        # Get devices for this location
-        context['devices'] = Device.objects.filter(
-            location=location
-        ).select_related(
-            'location'
-        ).prefetch_related(
-            'sensors'
-        ).annotate(
-            active_sensors=Count('sensors', filter=Q(sensors__is_active=True)),
-            total_sensors=Count('sensors')
-        )
-        
+
+        context['location'] = sensor.device.location
+        context['device'] = sensor.device
+
         context['device_url'] = reverse('sensors:device_detail', kwargs={
             'place_slug': place.slug,
-            'location_pk': location.pk,
-            'pk': device.pk
+            'pk': context['device'].pk
         })
         return context
 
     def get_success_url(self):
-        sensor = self.get_object()
+        # Try to get the stored referrer URL from session
+        if 'sensor_redirect_url' in self.request.session:
+            success_url = self.request.session.pop('sensor_redirect_url')
+            return success_url
+            
+        # Fall back to the default URL if no referrer stored
+        place_slug = self.kwargs.get('place_slug')
+        place = get_object_or_404(Place, slug=place_slug)
         return reverse('sensors:device_detail', kwargs={
-            'place_slug': sensor.device.location.place.slug,
-            'location_pk': sensor.device.location.pk,
-            'pk': sensor.device.pk
+            'place_slug': place.slug,
+            'pk': self.get_object().device.pk
         })
 
     def delete(self, request, *args, **kwargs):
@@ -1191,6 +1285,30 @@ class DeviceToggleActiveView(View):
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+
+class DeviceActiveSensorsView(View):
+    def get(self, request, place_slug, pk):
+        device = get_object_or_404(Device, pk=pk)
+        ic(place_slug, device)
+        try:
+
+            active_sensors = device.sensors.filter(is_active=True)
+            
+            sensors_data = [{
+                'name': sensor.name,
+                'type': sensor.sensor_type if sensor.sensor_type else 'Unknown',
+                'id': sensor.pk
+            } for sensor in active_sensors]
+            
+            return JsonResponse({
+                'status': 'success',
+                'sensors': sensors_data
+            })
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=400)
 
 class DeviceMoveLocationView(View):
     def post(self, request, pk):

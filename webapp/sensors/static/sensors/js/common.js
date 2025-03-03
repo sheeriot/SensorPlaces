@@ -16,14 +16,34 @@ function getCookie(name) {
 
 // Show toast message
 function showToast(message, type = 'success') {
+    console.log('Showing toast:', message, type);
     const toast = document.getElementById('statusToast');
     const toastMessage = document.getElementById('toastMessage');
     
     if (toast && toastMessage) {
+        console.log('Toast elements found');
         toastMessage.textContent = message;
         toastMessage.className = `toast-body text-${type}`;
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
+        
+        // Make sure Bootstrap is loaded
+        if (typeof bootstrap === 'undefined') {
+            console.error('Bootstrap is not loaded!');
+            return;
+        }
+
+        // Create new Toast instance
+        try {
+            const bsToast = bootstrap.Toast.getOrCreateInstance(toast);
+            // Set options
+            toast.dataset.bsDelay = '8000';  // 8 seconds
+            // Show the toast
+            bsToast.show();
+            console.log('Toast shown successfully');
+        } catch (error) {
+            console.error('Error showing toast:', error);
+        }
+    } else {
+        console.error('Toast elements not found:', {toast, toastMessage});
     }
 }
 
@@ -136,8 +156,46 @@ function updateLocalTime() {
         `ISO: ${isoTime}\nUNIX: ${unixTime}\nClick to copy current timestamp`);
 }
 
+// Convert Django messages to Toasts
+function convertMessagesToToasts() {
+    console.log('Converting messages to toasts...');
+    const messages = document.querySelectorAll('.alert:not(.processed)');
+    console.log('Found unprocessed messages:', messages.length);
+    
+    messages.forEach(message => {
+        // Get text content without the close button text
+        const messageText = message.childNodes[0] ? 
+            message.childNodes[0].textContent.trim() : 
+            message.textContent.trim();
+
+        // Skip empty messages
+        if (!messageText) {
+            message.remove();
+            return;
+        }
+
+        console.log('Processing message:', messageText);
+        
+        const type = message.classList.contains('alert-success') ? 'success' :
+                    message.classList.contains('alert-warning') ? 'warning' :
+                    message.classList.contains('alert-danger') ? 'danger' : 'info';
+        
+        // Mark message as processed and remove it before showing toast
+        message.classList.add('processed');
+        message.remove();
+        
+        // Show the toast
+        showToast(messageText, type);
+    });
+}
+
 // Initialize time display and tooltips
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
+    
+    // Convert messages immediately
+    convertMessagesToToasts();
+
     // Initialize tooltips
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     const tooltipList = [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
@@ -186,73 +244,57 @@ function initializeDeviceList() {
         hideInactiveSwitch.addEventListener('change', updateDeviceVisibility);
         updateDeviceVisibility();
     }
+}
 
-    // Device status toggle handling
-    document.querySelectorAll('.device-status-toggle').forEach(toggle => {
-        toggle.addEventListener('change', async function(e) {
-            const deviceRow = this.closest('.device-row');
-            const deviceId = deviceRow.dataset.deviceId;
-            const newStatus = !this.checked;
-            
-            if (!confirm(`Are you sure you want to ${newStatus ? 'deactivate' : 'activate'} this device?`)) {
-                e.preventDefault();
-                this.checked = !newStatus;
-                return;
-            }
+// Initialize sensor list functionality
+function initializeSensorList() {
+    const hideInactiveSwitch = document.getElementById('hideSensorInactiveSwitch');
+    const sensorRows = document.querySelectorAll('.sensor-row');
 
-            try {
-                if (!window.currentPlaceSlug) {
-                    throw new Error('Place slug not available');
-                }
-
-                const response = await fetch(`/api/${window.currentPlaceSlug}/device/${deviceId}/toggle_active/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({ is_active: !newStatus })
-                });
-
-                if (!response.ok) throw new Error('Network response was not ok');
-                
-                const data = await response.json();
-                
-                // Update UI elements
-                const statusLabel = deviceRow.querySelector('.status-label');
-                deviceRow.dataset.active = (!newStatus).toString();
-                statusLabel.textContent = newStatus ? 'inactive' : 'active';
-                
-                if (newStatus) {
-                    deviceRow.classList.add('inactive');
-                    if (hideInactiveSwitch && hideInactiveSwitch.checked) {
-                        deviceRow.classList.add('d-none');
-                    }
+    function updateSensorVisibility() {
+        sensorRows.forEach(row => {
+            if (row.dataset.sensorActive === 'false') {
+                if (hideInactiveSwitch.checked) {
+                    row.classList.add('d-none');
                 } else {
-                    deviceRow.classList.remove('inactive');
-                    deviceRow.classList.remove('d-none');
+                    row.classList.remove('d-none');
                 }
-
-                // Update place nav card counts if they exist
-                const activeCountElement = document.getElementById('active-device-count');
-                const inactiveCountElement = document.getElementById('inactive-device-count');
-                if (activeCountElement && data.active_count !== undefined) {
-                    activeCountElement.textContent = data.active_count;
-                }
-                if (inactiveCountElement && data.inactive_count !== undefined) {
-                    inactiveCountElement.textContent = `(${data.inactive_count})`;
-                }
-
-                // Dispatch event for other components
-                document.dispatchEvent(new CustomEvent('deviceStatusChanged', {
-                    detail: { deviceId, isActive: !newStatus }
-                }));
-
-            } catch (error) {
-                console.error('Error:', error);
-                this.checked = !newStatus;
-                alert('Failed to update device status. Please try again.');
             }
+        });
+    }
+
+    if (hideInactiveSwitch) {
+        hideInactiveSwitch.addEventListener('change', updateSensorVisibility);
+        // Initial state
+        updateSensorVisibility();
+    }
+
+    // Initialize sensor status toggles with mousedown event instead of click
+    document.querySelectorAll('.sensor-status-toggle').forEach(toggle => {
+        toggle.addEventListener('mousedown', function(event) {
+            // Prevent any default actions
+            event.preventDefault();
+            
+            const sensorId = this.dataset.sensorId;
+            const deviceId = this.dataset.deviceId;
+            const placeSlug = this.dataset.placeSlug;
+            
+            // Get the current state - this is guaranteed to be the actual current state
+            const currentState = this.checked;
+            // The intended state is the opposite of what it currently is
+            const intendedState = !currentState;
+            
+            handleSensorStatusToggle(this, sensorId, placeSlug, intendedState);
+        });
+        
+        // Prevent the click event from changing the state
+        toggle.addEventListener('click', function(event) {
+            event.preventDefault();
+        });
+        
+        // Prevent the change event from firing
+        toggle.addEventListener('change', function(event) {
+            event.preventDefault();
         });
     });
 }
@@ -260,155 +302,238 @@ function initializeDeviceList() {
 // Initialize device list functionality when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeDeviceList();
+    initializeSensorList();
 });
+
+// Update device UI elements after status change
+function updateDeviceUI(toggle, deviceId, data) {
+    const statusLabel = document.getElementById(`deviceStatusLabel_${deviceId}`);
+    const deviceCard = document.getElementById(`deviceCard_${deviceId}`);
+    const deviceRow = toggle.closest('tr');  // Get the device's row
+    const hideInactiveSwitch = document.getElementById('hideInactiveDevices');
+    
+    // Update toggle
+    toggle.checked = data.is_active;
+    toggle.style.opacity = data.is_active ? '1' : '0.5';
+    
+    // Update status label
+    if (statusLabel) {
+        statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
+        statusLabel.className = `form-check-label status-label ${data.is_active ? 'text-success' : 'text-danger'}`;
+    }
+    
+    // Update device card
+    if (deviceCard) {
+        if (data.is_active) {
+            deviceCard.classList.remove('opacity-75');
+        } else {
+            deviceCard.classList.add('opacity-75');
+        }
+        deviceCard.querySelectorAll('dd').forEach(dd => {
+            if (!dd.querySelector('.form-check')) {
+                dd.style.color = data.is_active ? '#212529' : '#6c757d';
+            }
+        });
+    }
+
+    // Update device row
+    if (deviceRow) {
+        if (data.is_active) {
+            deviceRow.classList.remove('text-muted', 'opacity-50', 'inactive', 'd-none');
+            deviceRow.classList.add('active');
+        } else {
+            deviceRow.classList.remove('active');
+            deviceRow.classList.add('text-muted', 'opacity-50', 'inactive');
+            // Hide the row if the hide inactive switch is checked
+            if (hideInactiveSwitch && hideInactiveSwitch.checked) {
+                deviceRow.classList.add('d-none');
+            }
+        }
+        deviceRow.setAttribute('data-device-active', data.is_active.toString());
+    }
+}
+
+// Update device navigation item
+function updateDeviceNavItem(deviceId, isActive) {
+    const deviceNavItem = document.querySelector(`.list-group-item[data-device-id="${deviceId}"]`);
+    if (!deviceNavItem) return;
+
+    deviceNavItem.setAttribute('data-active', isActive.toString());
+    const statusBadge = deviceNavItem.querySelector('.badge.bg-danger');
+    
+    if (isActive) {
+        if (statusBadge) statusBadge.remove();
+    } else {
+        if (!statusBadge) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-danger ms-2';
+            badge.textContent = 'inactive';
+            deviceNavItem.querySelector('div:first-child').appendChild(badge);
+        }
+    }
+    
+    // Update visibility based on hide inactive switch
+    const hideInactiveDevices = document.getElementById('hideInactiveDevicesNav');
+    if (hideInactiveDevices && hideInactiveDevices.checked && !isActive) {
+        deviceNavItem.classList.add('hidden');
+    } else {
+        deviceNavItem.classList.remove('hidden');
+    }
+}
+
+// Update location device counts
+function updateLocationDeviceCounts(locationId, isActive, previousState) {
+    if (locationId) {
+        const activeCountEl = document.getElementById(`location-${locationId}-active`);
+        const inactiveCountEl = document.getElementById(`location-${locationId}-inactive`);
+        
+        if (activeCountEl && inactiveCountEl) {
+            let activeCount = parseInt(activeCountEl.textContent);
+            let inactiveCount = parseInt(inactiveCountEl.textContent);
+            
+            // Only update if the state has actually changed
+            if (isActive !== previousState) {
+                if (isActive) {
+                    activeCount++;
+                    inactiveCount--;
+                } else {
+                    activeCount--;
+                    inactiveCount++;
+                }
+                
+                activeCountEl.textContent = activeCount;
+                inactiveCountEl.textContent = inactiveCount;
+            }
+        }
+    }
+}
+
+// Update sensors card UI
+function updateSensorsCard(isActive) {
+    const sensorsCard = document.querySelector('.sensors-card');
+    if (!sensorsCard) return;
+
+    // Update card opacity
+    sensorsCard.className = `card sensors-card ${!isActive ? 'opacity-75' : ''}`;
+    
+    // Update all sensor toggles and rows
+    const sensorToggles = sensorsCard.querySelectorAll('.sensor-status-toggle');
+    const sensorRows = sensorsCard.querySelectorAll('tbody tr:not(.readings-results)');
+    
+    sensorToggles.forEach(toggle => {
+        toggle.disabled = !isActive;
+    });
+
+    sensorRows.forEach(row => {
+        if (!isActive) {
+            row.classList.add('text-muted', 'opacity-50');
+        } else {
+            const toggle = row.querySelector('.sensor-status-toggle');
+            if (toggle && toggle.checked) {
+                row.classList.remove('text-muted', 'opacity-50');
+            }
+        }
+    });
+
+    // Update all buttons in the sensors card
+    const buttons = sensorsCard.querySelectorAll('button:not(.sensor-status-toggle), a.btn');
+    buttons.forEach(button => {
+        if (!button.classList.contains('sensor-status-toggle')) {
+            button.disabled = !isActive;
+        }
+    });
+
+    // Update the Add Sensor button
+    const addSensorBtn = sensorsCard.querySelector('.card-header a.btn-primary');
+    if (addSensorBtn) {
+        addSensorBtn.disabled = !isActive;
+    }
+}
 
 // Initialize device status toggle functionality
 function initializeDeviceStatusToggle() {
     document.querySelectorAll('.device-status-toggle').forEach(toggle => {
-        toggle.addEventListener('change', function(e) {
-            e.preventDefault();
-            
-            const deviceId = this.dataset.deviceId;
-            const locationId = this.dataset.locationId;
-            const placeSlug = this.dataset.placeSlug;
+        const deviceId = toggle.dataset.deviceId;
+        const locationId = toggle.dataset.locationId;
+        const placeSlug = toggle.dataset.placeSlug;
+        
+        if (!deviceId || !placeSlug) {
+            console.error('Toggle element missing required data attributes:', toggle);
+            toggle.disabled = true;
+            return;
+        }
+
+        toggle.addEventListener('change', async function(e) {
             const newStatus = this.checked;
-            const statusLabel = document.getElementById(`deviceStatusLabel_${deviceId}`);
-            const deviceCard = document.getElementById(`deviceCard_${deviceId}`);
-            const sensorsCard = document.querySelector('.sensors-card');
             
-            const confirmMessage = newStatus ? 
-                'Are you sure you want to activate this device?' : 
-                'Are you sure you want to deactivate this device? This will also deactivate all associated sensors.';
-            
-            if (confirm(confirmMessage)) {
-                fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
+            // Only show confirmation when deactivating
+            if (!newStatus) {
+                // First, fetch the list of active sensors that will be affected
+                try {
+                    const response = await fetch(`/api/${placeSlug}/device/${deviceId}/active_sensors/`);
+                    if (!response.ok) throw new Error('Failed to fetch sensor information');
+                    const data = await response.json();
+                    
+                    let confirmMessage = 'Are you sure you want to deactivate this device?\n\n';
+                    if (data.sensors && data.sensors.length > 0) {
+                        confirmMessage += 'The following sensors will be deactivated:\n';
+                        data.sensors.forEach(sensor => {
+                            confirmMessage += `- ${sensor.name} (${sensor.type})\n`;
+                        });
+                    } else {
+                        confirmMessage += 'No active sensors will be affected.';
+                    }
+
+                    if (!confirm(confirmMessage)) {
+                        // Revert the toggle state since user cancelled
+                        this.checked = true;
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error fetching sensor information:', error);
+                    // Revert the toggle state and show error
+                    this.checked = true;
+                    showToast('Failed to fetch sensor information', 'danger');
+                    return;
+                }
+            } else if (!confirm('Are you sure you want to activate this device?')) {
+                // Revert the toggle state since user cancelled activation
+                this.checked = false;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': getCookie('csrftoken'),
                     },
-                    body: JSON.stringify({
-                        is_active: newStatus
-                    })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.status === 'success') {
-                        // Update the toggle state and appearance
-                        this.checked = data.is_active;
-                        this.style.opacity = data.is_active ? '1' : '0.5';
-                        
-                        // Update the status label
-                        if (statusLabel) {
-                            statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
-                            statusLabel.className = `form-check-label status-label ${data.is_active ? 'text-success' : 'text-danger'}`;
-                        }
-                        
-                        // Update the device card styling
-                        if (deviceCard) {
-                            deviceCard.className = `card rounded-3 shadow-sm border-0 mb-4 ${!data.is_active ? 'opacity-75' : ''}`;
-                        }
-                        
-                        // Update device nav card item
-                        const deviceNavItem = document.querySelector(`.list-group-item[data-device-id="${deviceId}"]`);
-                        if (deviceNavItem) {
-                            deviceNavItem.setAttribute('data-active', data.is_active.toString());
-                            const statusBadge = deviceNavItem.querySelector('.badge.bg-danger');
-                            if (data.is_active) {
-                                if (statusBadge) statusBadge.remove();
-                            } else {
-                                if (!statusBadge) {
-                                    const badge = document.createElement('span');
-                                    badge.className = 'badge bg-danger ms-2';
-                                    badge.textContent = 'inactive';
-                                    deviceNavItem.querySelector('div:first-child').appendChild(badge);
-                                }
-                            }
-                            
-                            // Update visibility based on hide inactive switch
-                            const hideInactiveDevices = document.getElementById('hideInactiveDevicesNav');
-                            if (hideInactiveDevices && hideInactiveDevices.checked && !data.is_active) {
-                                deviceNavItem.classList.add('hidden');
-                            } else {
-                                deviceNavItem.classList.remove('hidden');
-                            }
-                        }
-                        
-                        // Update all value text colors in device card
-                        if (deviceCard) {
-                            deviceCard.querySelectorAll('dd').forEach(dd => {
-                                if (!dd.querySelector('.form-check')) {
-                                    dd.style.color = data.is_active ? '#212529' : '#6c757d';
-                                }
-                            });
-                        }
-
-                        // Update sensors card if it exists
-                        if (sensorsCard) {
-                            // Update card opacity
-                            sensorsCard.className = `card sensors-card ${!data.is_active ? 'opacity-75' : ''}`;
-                            
-                            // Update all sensor toggles and rows
-                            const sensorToggles = sensorsCard.querySelectorAll('.sensor-status-toggle');
-                            const sensorRows = sensorsCard.querySelectorAll('tbody tr:not(.readings-results)');
-                            
-                            sensorToggles.forEach(toggle => {
-                                toggle.disabled = !data.is_active;
-                            });
-
-                            sensorRows.forEach(row => {
-                                if (!data.is_active) {
-                                    row.classList.add('text-muted', 'opacity-50');
-                                } else {
-                                    // Only remove opacity if the sensor itself is active
-                                    const toggle = row.querySelector('.sensor-status-toggle');
-                                    if (toggle && toggle.checked) {
-                                        row.classList.remove('text-muted', 'opacity-50');
-                                    }
-                                }
-                            });
-
-                            // Update all buttons in the sensors card
-                            const buttons = sensorsCard.querySelectorAll('button, a.btn');
-                            buttons.forEach(button => {
-                                if (!button.classList.contains('sensor-status-toggle')) {
-                                    button.disabled = !data.is_active;
-                                }
-                            });
-
-                            // Update the Add Sensor button
-                            const addSensorBtn = sensorsCard.querySelector('.card-header a.btn-primary');
-                            if (addSensorBtn) {
-                                addSensorBtn.disabled = !data.is_active;
-                            }
-
-                            // Dispatch a custom event to notify the sensor card
-                            const event = new CustomEvent('deviceStatusChanged', {
-                                detail: {
-                                    isActive: data.is_active,
-                                    deviceId: deviceId
-                                }
-                            });
-                            document.dispatchEvent(event);
-                        }
-
-                        showToast('Device status updated successfully', 'success');
-                    } else {
-                        throw new Error(data.message || 'Failed to update device status');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    this.checked = !newStatus;
-                    showToast(error.message || 'Failed to update device status', 'danger');
+                    body: JSON.stringify({ is_active: newStatus })
                 });
-            } else {
+
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    updateDeviceUI(this, deviceId, data);
+                    updateDeviceNavItem(deviceId, data.is_active);
+                    updateSensorsCard(data.is_active);
+                    updateLocationDeviceCounts(locationId, data.is_active, !newStatus);
+                    
+                    document.dispatchEvent(new CustomEvent('deviceStatusChanged', {
+                        detail: { isActive: data.is_active, deviceId, locationId }
+                    }));
+
+                    showToast('Device status updated successfully', 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to update device status');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                // Revert the toggle state since update failed
                 this.checked = !newStatus;
+                showToast(error.message || 'Failed to update device status', 'danger');
             }
         });
     });
@@ -647,20 +772,37 @@ function handleSensorTestError(alertDiv, summaryDiv, recentDiv) {
     recentDiv.classList.add('d-none');
 }
 
-function handleSensorStatusToggle(toggle, sensorId, placeSlug, newStatus, row) {
-    const confirmMessage = newStatus ? 
+function handleSensorStatusToggle(toggle, sensorId, placeSlug, intendedState) {
+    // The confirmation message should be based on what we're trying to do
+    const confirmMessage = intendedState ? 
         'Are you sure you want to activate this sensor?' : 
         'Are you sure you want to deactivate this sensor?';
-
-    if (confirm(confirmMessage)) {
-        fetch(`/api/${placeSlug}/sensors/${sensorId}/toggle_active/`, {
+    
+    // Get the modal elements
+    const modal = document.getElementById('sensorStatusModal');
+    const modalBody = document.getElementById('sensorStatusModalBody');
+    const confirmButton = document.getElementById('sensorStatusConfirm');
+    
+    // Set the confirmation message
+    modalBody.textContent = confirmMessage;
+    
+    // Get or create Bootstrap modal instance
+    let bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+    
+    // Handle confirmation
+    const handleConfirm = () => {
+        // Hide modal
+        bsModal.hide();
+        
+        // Proceed with the status change - toggle will only change on success
+        fetch(`/api/${placeSlug}/sensor/${sensorId}/toggle_active/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
             },
             body: JSON.stringify({
-                is_active: newStatus
+                is_active: intendedState
             })
         })
         .then(response => {
@@ -671,78 +813,79 @@ function handleSensorStatusToggle(toggle, sensorId, placeSlug, newStatus, row) {
         })
         .then(data => {
             if (data.status === 'success') {
-                // Update the toggle state
-                toggle.checked = data.is_active;
-                
-                // Update row styling
-                if (!data.is_active) {
-                    row.classList.add('text-muted', 'opacity-50');
-                } else {
-                    row.classList.remove('text-muted', 'opacity-50');
-                }
+                // Only update UI elements after successful response
+                updateSensorUI(toggle, sensorId, data);
+
+                // Show success message
+                showToast(`Sensor ${data.is_active ? 'activated' : 'deactivated'} successfully`, 'success');
+
+                // Dispatch event to notify other components
+                document.dispatchEvent(new CustomEvent('sensorStatusChanged', {
+                    detail: {
+                        isActive: data.is_active,
+                        sensorId: sensorId
+                    }
+                }));
             } else {
                 throw new Error(data.message || 'Failed to update sensor status');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            toggle.checked = !newStatus;
-            alert('Failed to update sensor status');
+            showToast(error.message || 'Failed to update sensor status', 'danger');
         });
-    } else {
-        toggle.checked = !newStatus;
-    }
+    };
+
+    // Handle modal hidden event (triggered by both X button and Cancel button)
+    const handleHidden = () => {
+        confirmButton.clicked = false;
+    };
+
+    // Remove any existing event listeners
+    modal.removeEventListener('hidden.bs.modal', handleHidden);
+    confirmButton.removeEventListener('click', handleConfirm);
+    
+    // Add new event listeners
+    modal.addEventListener('hidden.bs.modal', handleHidden);
+    confirmButton.addEventListener('click', () => {
+        confirmButton.clicked = true;
+        handleConfirm();
+    });
+    
+    // Show the modal
+    bsModal.show();
 }
 
-// Handle form submissions
-document.addEventListener('DOMContentLoaded', function() {
-    // Handle delete forms
-    document.querySelectorAll('form[data-delete-form]').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            if (!confirm('Are you sure you want to delete this item?')) {
-                return;
+// Update sensor UI elements after status change
+function updateSensorUI(toggle, sensorId, data) {
+    const statusLabel = document.getElementById(`sensorStatusLabel_${sensorId}`);
+    const sensorRow = toggle.closest('tr');
+    const hideInactiveSwitch = document.getElementById('hideSensorInactiveSwitch');
+    
+    // Update toggle state to match backend state
+    toggle.checked = data.is_active;
+    
+    // Update row data attribute and classes
+    if (sensorRow) {
+        sensorRow.setAttribute('data-sensor-active', data.is_active.toString());
+        
+        // Update inactive class
+        if (!data.is_active) {
+            sensorRow.classList.add('inactive');
+            // Hide row if the hide inactive switch is checked
+            if (hideInactiveSwitch && hideInactiveSwitch.checked) {
+                sensorRow.classList.add('d-none');
             }
-            
-            fetch(this.action, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                showToast(data.message, data.status);
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                }
-            })
-            .catch(error => {
-                showToast('An error occurred while processing your request.', 'danger');
-                console.error('Error:', error);
-            });
-        });
-    });
+        } else {
+            // Remove both inactive and d-none classes when activating
+            sensorRow.classList.remove('inactive');
+            sensorRow.classList.remove('d-none');
+        }
+    }
 
-    // Handle create/update forms
-    document.querySelectorAll('form:not([data-delete-form])').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-            }
-            
-            // Let the form submit normally, but show any Django messages as toasts
-            const messages = document.querySelectorAll('.alert');
-            messages.forEach(message => {
-                const type = message.classList.contains('alert-success') ? 'success' :
-                            message.classList.contains('alert-warning') ? 'warning' :
-                            message.classList.contains('alert-danger') ? 'danger' : 'info';
-                showToast(message.textContent, type);
-                message.remove();
-            });
-        });
-    });
-}); 
+    // Update status label
+    if (statusLabel) {
+        statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
+        statusLabel.className = `form-check-label status-label ${data.is_active ? 'text-success' : 'text-danger'}`;
+    }
+}

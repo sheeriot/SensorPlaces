@@ -22,21 +22,9 @@
     <!-- Right Column -->
     <div class="col-md-8">
         <!-- Include Device List Card -->
-        {% include "sensors/includes/device_list_card.html" with place=location.place locations=locations location=location devices=devices %}
+        {% include "sensors/includes/device_list_card.html" with place=place locations=locations location=location devices=devices %}
 
     </div>
 </div>
 {% endblock %}
-
-{% block extra_css %}
-{{ block.super }}
-{% endblock %}
-
-{% block extra_js %}
-{{ block.super }}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Site plan specific functionality can stay here if needed
-    });
-</script>
-{% endblock %} 
+ 

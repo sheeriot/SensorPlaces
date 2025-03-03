@@ -38,7 +38,7 @@
                                         {% if not device.location.is_active %}disabled{% endif %}>
                                 <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
                                         for="deviceStatus_{{ device.pk }}">
-                                    {% if device.is_active %}Active{% else %}Inactive{% endif %}
+                                    {% if device.is_active %}Active{% else %}inactive{% endif %}
                                 </label>
                             </div>
                         </td>

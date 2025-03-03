@@ -8,6 +8,8 @@
 
 {% block content %}
 <div class="row">
+    <!-- Place Title Card -->
+    {% include 'sensors/includes/place_title_card.html' with place=place %}
     <div class="col-md-4">
         <!-- Simplified Location Details Card -->
         <div class="card rounded-3 shadow-sm border-0 mb-4">
@@ -67,7 +69,7 @@
                             <i class="bi bi-geo-alt text-secondary"></i>
                             <span class="small fw-medium">{{ loc.name }}</span>
                             <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %} rounded-pill" style="font-size: 0.7em;">
-                                {% if loc.is_active %}Active{% else %}Inactive{% endif %}
+                                {% if loc.is_active %}Active{% else %}inactive{% endif %}
                             </span>
                         </div>
                         {% if loc.devices.all %}
@@ -141,100 +143,6 @@
                             </div>
                         </div>
                         {% endif %}
-                    </div>
-                    <div class="card-footer">
-                        <div class="d-flex justify-content-between">
-                            <a href="{{ request.META.HTTP_REFERER|default:location_url }}" class="btn btn-secondary">
-                                <i class="bi bi-arrow-left"></i> Cancel
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-lg"></i> Save
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Site Plan Card -->
-            <div class="col-12">
-                <div class="card rounded-3 shadow-sm border-0">
-                    <div class="card-header bg-white py-2">
-                        <h5 class="card-title mb-0">
-                            {% if location.place.site_plan %}Site Plan{% else %}Location Map{% endif %}
-                        </h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div id="siteMapContainer" class="position-relative">
-                            {% if location.place.site_plan %}
-                                <img src="{{ location.place.site_plan.url }}" alt="Site plan" class="img-fluid w-100">
-                                {% for loc in place_locations %}
-                                {% if loc != location %}
-                                <div class="location-marker position-absolute" 
-                                     data-location-id="{{ loc.pk }}"
-                                     data-active="{{ loc.is_active|lower }}"
-                                     style="left: {{ loc.x_coord|default:50 }}%; top: {{ loc.y_coord|default:50 }}%;">
-                                    <i class="bi bi-hexagon-fill {% if loc.is_active %}text-primary{% else %}text-secondary{% endif %} fs-4"></i>
-                                    <div class="location-label">
-                                        {{ loc.name }}
-                                        <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %} ms-1">
-                                            {{ loc.active_devices_count }}
-                                        </span>
-                                    </div>
-                                    <!-- Popup content -->
-                                    <div class="location-popup">
-                                        <h6 class="mb-2">                                     
-                                            <small>
-                                            <span class="badge {% if loc.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                                {{ loc.name }}
-                                            </span>
-                                            {% if not loc.is_active %} - inactive{% endif %}
-                                        </small>
-                                        </h6>
-                                        <p class="mb-1">
-                                            <small>
-                                                <span class="text-success">{{ location.active_devices_count }} active devices</span><br>
-                                                <span class="text-danger">{{ location.inactive_devices_count }} inactive devices</span>
-                                            </small>
-                                        </p>
-                                    </div>
-                                </div>
-                                {% endif %}
-                                {% endfor %}
-                                
-                                <!-- Current Location Marker -->
-                                <div class="location-marker position-absolute" 
-                                     data-location-id="{{ location.pk }}"
-                                     data-active="{{ location.is_active|lower }}"
-                                     style="left: {{ location.x_coord|default:50 }}%; top: {{ location.y_coord|default:50 }}%;">
-                                    <i class="bi bi-geo-alt-fill {% if location.is_active %}text-success{% else %}text-secondary{% endif %} fs-4"></i>
-                                    <div class="location-label">
-                                        {{ location.name }}
-                                        <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %} ms-1">
-                                            {{ location.active_devices_count }}
-                                        </span>
-                                    </div>
-                                    <!-- Popup content -->
-                                    <div class="location-popup">
-                                        <h6 class="mb-2">                                     
-                                            <small>
-                                            <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                                {{ location.name }}
-                                            </span>
-                                            {% if not location.is_active %} - inactive{% endif %}
-                                        </small>
-                                        </h6>
-                                        <p class="mb-1">
-                                            <small>
-                                                <span class="text-success">{{ location.active_devices_count }} active devices</span><br>
-                                                <span class="text-danger">{{ location.inactive_devices_count }} inactive devices</span>
-                                            </small>
-                                        </p>
-                                    </div>
-                                </div>
-                            {% else %}
-                                {{ map_html|safe }}
-                            {% endif %}
-                        </div>
                     </div>
                 </div>
             </div>

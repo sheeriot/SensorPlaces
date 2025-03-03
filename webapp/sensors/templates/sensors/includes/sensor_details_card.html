@@ -22,14 +22,17 @@
                 <div class="form-check form-switch">
                     <input class="form-check-input sensor-status-toggle" 
                            type="checkbox" 
-                           id="sensorStatus_{{ sensor.pk }}"
+                           role="switch"
+                           id="sensorToggle{{ sensor.pk }}"
                            data-sensor-id="{{ sensor.pk }}"
                            data-device-id="{{ sensor.device.pk }}"
+                           data-place-slug="{{ sensor.device.location.place.slug }}"
                            {% if sensor.is_active %}checked{% endif %}
                            {% if not sensor.device.is_active %}disabled{% endif %}>
                     <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
-                           for="sensorStatus_{{ sensor.pk }}">
-                        {% if sensor.is_active %}Active{% else %}Inactive{% endif %}
+                           for="sensorToggle{{ sensor.pk }}"
+                           id="sensorStatusLabel_{{ sensor.pk }}">
+                        {% if sensor.is_active %}Active{% else %}inactive{% endif %}
                     </label>
                 </div>
             </dd>

@@ -17,13 +17,10 @@
             <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
                 <input class="form-check-input" type="checkbox" id="hideInactiveDevicesNav" checked>
                 <label class="form-check-label small-label" for="hideInactiveDevicesNav">
-                    Hide<br>Inactive
+                    Hide<br>inactive
                 </label>
             </div>
         </div>
-        <a href="{% url 'sensors:sensor_create' place_slug=location.place.slug pk=device.pk %}" class="btn btn-outline-success btn-sm">
-            <i class="bi bi-plus-circle"></i>Add Sensor
-        </a>
     </div>
     <div class="card-body p-0">
         <div class="list-group list-group-flush rounded-bottom">

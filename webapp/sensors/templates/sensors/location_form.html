@@ -9,21 +9,6 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-12 mb-3">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item">
-                    <a href="{% url 'sensors:place_detail' place.slug %}">{{ place.name }}</a>
-                </li>
-                <li class="breadcrumb-item">
-                    <a href="{% url 'sensors:place_locations' place_slug=place.slug %}">Locations</a>
-                </li>
-                <li class="breadcrumb-item active">
-                    {% if object %}Edit Location{% else %}New Location{% endif %}
-                </li>
-            </ol>
-        </nav>
-    </div>
 
     <!-- Place Title Card -->
     <div class="col-12">
@@ -45,30 +30,7 @@
             <div class="card-body">
                 {% crispy form %}
             </div>
-            <div class="card-footer">
-                <div class="d-flex justify-content-between">
-                    <a href="{{ request.META.HTTP_REFERER|default:place_url }}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i> Cancel
-                    </a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-lg"></i> Save
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 </div>
-
-<!-- Toast Notification -->
-<div class="toast" role="alert" aria-live="polite" aria-atomic="true" id="statusToast">
-    <div class="toast-header">
-        <strong class="me-auto">Status Update</strong>
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-    <div class="toast-body" id="toastMessage"></div>
-</div>
 {% endblock %}
-
-{% block extra_css %}{% endblock %}
-
-{% block extra_js %}{% endblock %} 

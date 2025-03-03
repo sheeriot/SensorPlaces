@@ -55,23 +55,28 @@
     </nav>
 
     <div class="container my-2">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
+        <!-- Hidden container for Django messages that will be converted to toasts -->
+        <div class="d-none">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
 
         <!-- Breadcrumb and Toast Section -->
-        <div class="page-header">
+        <div class="page-header d-flex justify-content-between align-items-start">
             {% include "sensors/includes/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
 
-            <!-- Toast container -->
-            <div class="toast-container position-fixed bottom-0 end-0 p-3">
-                <div id="statusToast" class="toast" role="alert" aria-live="polite" aria-atomic="true">
+            <!-- Global Toast Container -->
+            <div class="toast-container position-fixed top-0 end-0 p-3">
+                <!-- Status Toast -->
+                <div id="statusToast" class="toast" role="alert" aria-live="polite" aria-atomic="true" data-bs-delay="15000">
                     <div class="toast-header">
+                        <i class="bi bi-info-circle me-2"></i>
                         <strong class="me-auto">Status Update</strong>
                         <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
                     </div>
@@ -106,6 +111,25 @@
             </div>
         </div>
     </footer>
+
+    <!-- Sensor Status Confirmation Modal -->
+    <div class="modal fade" id="sensorStatusModal" tabindex="-1" aria-labelledby="sensorStatusModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sensorStatusModalLabel">Confirm Status Change</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="sensorStatusModalBody">
+                    <!-- Message will be inserted here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="sensorStatusConfirm">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Set global place slug from Django context

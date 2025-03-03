@@ -1,13 +1,10 @@
 {% extends "sensors/base.html" %}
 
-{% block title %}Sensors for {{ place.name }}{% endblock %}
+{% block title %}Sensors @ {{ place.name }}{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12 mb-1">
-        <div class="d-flex align-items-center gap-3">
-            <h2 class="mb-0">Sensors @ {{ place.name }}</h2>
-        </div>
         {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
 

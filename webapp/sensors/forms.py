@@ -7,17 +7,35 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div
 from django.db import models
 
+from icecream import ic
+
 class SensorForm(forms.ModelForm):
+    device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+    
     class Meta:
         model = Sensor
-        fields = ['name', 'sensor_type', 'unit', 'data_type', 'influx_source', 'influx_measurement', 'is_active']
+        fields = ['device', 'name', 'sensor_type', 'unit', 'data_type', 'influx_source', 'influx_measurement', 'is_active']
 
     def __init__(self, *args, **kwargs):
+        device = kwargs.pop('device', None)
+        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
+        self.helper.form_action = ''  # Empty string means submit to same URL
+        self.helper.form_id = 'sensor-form'
+
+        if device:
+            self.fields['device'].initial = device
+            self.fields['device'].widget.attrs['readonly'] = True
+            # Set the queryset to only include this device
+            self.fields['device'].queryset = Device.objects.filter(pk=device.pk)
+        
+        if referrer:
+            self.fields['referrer'].initial = referrer
 
         # Configure field properties
         self.fields['is_active'].label = "Active"
@@ -36,10 +54,12 @@ class SensorForm(forms.ModelForm):
 
         # Determine if this is a new sensor or editing existing
         is_new = not bool(kwargs.get('instance'))
-        submit_text = "Create New Sensor" if is_new else "Save Changes"
+        submit_text = "Create New" if is_new else "Update"
 
         # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
+            Field('device', type='hidden'),
+            Field('referrer', type='hidden'),
             Row(
                 Column('name', css_class='col-md-8'),
                 Column(
@@ -83,7 +103,7 @@ class SensorForm(forms.ModelForm):
                     """),
                     HTML(f"""
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save me-1"></i>{submit_text}
+                            <i class="bi bi-thermometer me-1"></i>{submit_text}
                         </button>
                     """),
                     css_class='d-flex justify-content-between align-items-center'
@@ -97,6 +117,10 @@ class SensorForm(forms.ModelForm):
         data_type = cleaned_data.get('data_type')
         influx_source = cleaned_data.get('influx_source')
         influx_measurement = cleaned_data.get('influx_measurement')
+        device = cleaned_data.get('device')
+
+        if not device:
+            raise forms.ValidationError("Device is required")
 
         if data_type == 'INFLUX':
             if not influx_source:
@@ -169,6 +193,7 @@ class PlaceForm(forms.ModelForm):
 class DeviceForm(forms.ModelForm):
     place_slug = forms.CharField(widget=forms.HiddenInput(), required=False)
     location_pk = forms.IntegerField(widget=forms.HiddenInput(), required=False)
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     class Meta:
         model = Device
@@ -218,12 +243,16 @@ class DeviceForm(forms.ModelForm):
         return getattr(self, '_warnings', {})
 
     def __init__(self, *args, **kwargs):
+        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
         
+        if referrer:
+            self.fields['referrer'].initial = referrer
+
         # Configure field properties
         self.fields['is_active'].label = "Active"
         self.fields['is_active'].help_text = None
@@ -286,16 +315,22 @@ class DeviceForm(forms.ModelForm):
         ) 
 
 class LocationForm(forms.ModelForm):
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+
     class Meta:
         model = Location
         fields = ['name', 'is_active']
 
     def __init__(self, *args, **kwargs):
+        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
+
+        if referrer:
+            self.fields['referrer'].initial = referrer
 
         # Configure field properties
         self.fields['is_active'].label = "Active"

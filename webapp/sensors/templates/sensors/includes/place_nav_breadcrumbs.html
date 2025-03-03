@@ -22,7 +22,7 @@
                 </a>
             </li>
             <li class="breadcrumb-item">
-                <a href="{% url 'sensors:device_detail' place_slug=place.slug device_id=device.id %}">
+                <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}">
                     {{ device.name }}
                 </a>
             </li>

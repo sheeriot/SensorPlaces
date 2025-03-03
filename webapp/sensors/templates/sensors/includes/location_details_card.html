@@ -9,34 +9,21 @@
     <div class="card-body py-2">
         <dl class="row mb-0">
             <dt class="col-sm-4 text-body-secondary small text-uppercase">Name</dt>
-            <dd class="col-sm-8">{{ location.name }}</dd>
+            <dd class="col-sm-8">
+                <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}">
+                    {{ location.name }}
+                </a>
+            </dd>
             
             <dt class="col-sm-4 text-body-secondary small text-uppercase">Place</dt>
             <dd class="col-sm-8">{{ location.place.name }}</dd>
 
             <dt class="col-sm-4 text-body-secondary small text-uppercase">Status</dt>
             <dd class="col-sm-8">
-                <div class="form-check form-switch">
-                    <input class="form-check-input location-status-toggle" 
-                           type="checkbox" 
-                           id="locationStatus_{{ location.pk }}"
-                           data-location-id="{{ location.pk }}"
-                           data-place-id="{{ location.place.pk }}"
-                           {% if location.is_active %}checked{% endif %}>
-                    <label class="form-check-label status-label {% if location.is_active %}text-success{% else %}text-danger{% endif %}" 
-                           for="locationStatus_{{ location.pk }}">
-                        {% if location.is_active %}Active{% else %}Inactive{% endif %}
-                    </label>
-                </div>
+                <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                    {% if location.is_active %}Active{% else %}inactive{% endif %}
+                </span>
             </dd>
-
-            {% if location.x_coord and location.y_coord %}
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">Position</dt>
-            <dd class="col-sm-8">
-                <span class="text-body-secondary small">X:</span> {{ location.x_coord }},
-                <span class="text-body-secondary small">Y:</span> {{ location.y_coord }}
-            </dd>
-            {% endif %}
         </dl>
     </div>
 </div> 
