@@ -230,7 +230,29 @@ body {
     top: 20px;
     right: 20px;
     z-index: 1050;
-    min-width: 250px;
+    min-width: 400px;
+    max-width: 600px;
+}
+
+.toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1050;
+}
+
+/* Ensure toast text doesn't wrap icons awkwardly */
+.toast-body {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Icon spacing in toast messages */
+.toast-body i.bi {
+    margin: 0 0.25rem;
 }
 
 /* Responsive styles */
@@ -276,4 +298,91 @@ body {
 .nav-card .list-group-item.active {
     background-color: var(--bs-primary);
     color: white;
+}
+
+/* Toast Container Styles */
+#toastContainer {
+    position: fixed;
+    top: 4rem;
+    right: 1rem;
+    width: 600px;
+    z-index: 1050;
+    pointer-events: none;
+}
+
+/* Custom Toast Styles */
+.custom-toast {
+    position: absolute;
+    right: 0;
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.25rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    pointer-events: auto;
+}
+
+.custom-toast .toast-body {
+    padding: 0.25rem 0.5rem;
+    line-height: 1.2;
+}
+
+.custom-toast .btn-close {
+    padding: 0.5rem;
+    margin: 0;
+    font-size: 0.75rem;
+}
+
+/* Toast Type Styles */
+.success-toast {
+    background-color: #e8f5e9;  /* pale green */
+}
+
+.warning-toast {
+    background-color: #fff3e0;  /* pale orange */
+}
+
+.danger-toast {
+    background-color: #ffebee;  /* pale red */
+}
+
+.info-toast {
+    background-color: #e3f2fd;  /* pale blue */
+}
+
+/* Toast Animation */
+.toast.showing {
+    opacity: 1;
+}
+
+.toast.hide {
+    display: none;
+}
+
+.toast.fade {
+    transition: opacity 0.15s linear;
+}
+
+/* Toast History Modal Styles */
+.toast-history-list {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.toast-history-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.toast-history-time {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+}
+
+.toast-history-content {
+    flex: 1;
 } 

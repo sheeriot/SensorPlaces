@@ -14,37 +14,225 @@ function getCookie(name) {
     return cookieValue;
 }
 
+// Toast history management
+let toastHistory = [];
+const MAX_TOAST_HISTORY = 50;
+
+// Load toast history from Django session
+function loadToastHistory() {
+    fetch('/api/toast-history/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.history) {
+                toastHistory = data.history.map(item => ({
+                    ...item,
+                    timestamp: new Date(item.timestamp)
+                }));
+                updateToastHistoryBadge();
+            }
+        })
+        .catch(error => console.error('Error loading toast history:', error));
+}
+
+// Save toast history to Django session
+function saveToastHistory() {
+    fetch('/api/toast-history/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({ history: toastHistory })
+    })
+    .catch(error => console.error('Error saving toast history:', error));
+}
+
 // Show toast message
 function showToast(message, type = 'success') {
     console.log('Showing toast:', message, type);
-    const toast = document.getElementById('statusToast');
-    const toastMessage = document.getElementById('toastMessage');
+    // Add to history
+    toastHistory.unshift({
+        message,
+        type,
+        timestamp: new Date()
+    });
     
-    if (toast && toastMessage) {
-        console.log('Toast elements found');
-        toastMessage.textContent = message;
-        toastMessage.className = `toast-body text-${type}`;
-        
-        // Make sure Bootstrap is loaded
-        if (typeof bootstrap === 'undefined') {
-            console.error('Bootstrap is not loaded!');
-            return;
-        }
-
-        // Create new Toast instance
-        try {
-            const bsToast = bootstrap.Toast.getOrCreateInstance(toast);
-            // Set options
-            toast.dataset.bsDelay = '8000';  // 8 seconds
-            // Show the toast
-            bsToast.show();
-            console.log('Toast shown successfully');
-        } catch (error) {
-            console.error('Error showing toast:', error);
-        }
-    } else {
-        console.error('Toast elements not found:', {toast, toastMessage});
+    // Keep history within limit
+    if (toastHistory.length > MAX_TOAST_HISTORY) {
+        toastHistory = toastHistory.slice(0, MAX_TOAST_HISTORY);
     }
+    
+    // Save to session storage
+    saveToastHistory();
+    
+    // Update history badge
+    updateToastHistoryBadge();
+    
+    // Get or create toast container
+    let toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toastContainer';
+        document.body.appendChild(toastContainer);
+    }
+
+    // Create a unique ID for this toast
+    const toastId = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Find first available position
+    const toastHeight = 40; // Reduced height for more compact toasts
+    const gap = 4; // Reduced gap between toasts
+    const existingToasts = Array.from(toastContainer.children);
+    const occupiedPositions = existingToasts.map(toast => {
+        return parseInt(toast.style.top) || 0;
+    }).sort((a, b) => a - b);
+
+    // Find first available gap
+    let position = 0;
+    for (const pos of occupiedPositions) {
+        if (position + toastHeight + gap < pos) {
+            break;
+        }
+        position = pos + toastHeight + gap;
+    }
+    
+    // Create the toast element
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast custom-toast ${type}-toast`;
+    toastEl.id = toastId;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+    toastEl.style.top = `${position}px`;
+    
+    // Set the toast content with a more compact design
+    toastEl.innerHTML = `
+        <div class="d-flex align-items-center">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close me-1" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+
+    // Set background color based on type
+    switch (type) {
+        case 'success':
+            toastEl.style.backgroundColor = '#e8f5e9';
+            break;
+        case 'warning':
+            toastEl.style.backgroundColor = '#fff3e0';
+            break;
+        case 'danger':
+            toastEl.style.backgroundColor = '#ffebee';
+            break;
+        default:
+            toastEl.style.backgroundColor = '#e3f2fd';
+    }
+
+    // Add the toast to the container
+    toastContainer.appendChild(toastEl);
+
+    // Make sure Bootstrap is loaded
+    if (typeof bootstrap === 'undefined') {
+        return;
+    }
+
+    // Create and show the toast
+    try {
+        const bsToast = new bootstrap.Toast(toastEl, {
+            delay: 4000, // Keep at 4 seconds as requested
+            autohide: true,
+            animation: true
+        });
+        
+        // Show the toast
+        bsToast.show();
+        
+        // Remove the toast after it's hidden
+        toastEl.addEventListener('hidden.bs.toast', () => {
+            toastContainer.removeChild(toastEl);
+        });
+    } catch (error) {
+        toastContainer.removeChild(toastEl);
+    }
+}
+
+// Update toast history badge
+function updateToastHistoryBadge() {
+    const badge = document.getElementById('toastHistoryBadge');
+    if (badge && toastHistory.length > 0) {
+        badge.textContent = toastHistory.length;
+        badge.classList.remove('d-none');
+    }
+}
+
+// Show toast history modal
+function showToastHistory() {
+    const modalHtml = `
+        <div class="modal fade" id="toastHistoryModal" tabindex="-1" aria-labelledby="toastHistoryModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="toastHistoryModalLabel">Notification History</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="toast-history-list">
+                            ${toastHistory.map(toast => `
+                                <div class="toast-history-item">
+                                    <div class="toast-history-time">
+                                        ${toast.timestamp.toLocaleTimeString()}
+                                    </div>
+                                    <div class="toast-history-content text-${toast.type}">
+                                        ${toast.message}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-danger" onclick="clearToastHistory()">Clear History</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if present
+    const existingModal = document.getElementById('toastHistoryModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Add modal to document
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('toastHistoryModal'));
+    modal.show();
+}
+
+// Clear toast history from Django session
+function clearToastHistory() {
+    fetch('/api/toast-history/', {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+        }
+    })
+    .then(() => {
+        toastHistory = [];
+        const badge = document.getElementById('toastHistoryBadge');
+        if (badge) {
+            badge.textContent = '';
+            badge.classList.add('d-none');
+        }
+        const modal = bootstrap.Modal.getInstance(document.getElementById('toastHistoryModal'));
+        if (modal) {
+            modal.hide();
+        }
+    })
+    .catch(error => console.error('Error clearing toast history:', error));
 }
 
 // Update device status in UI
@@ -269,32 +457,115 @@ function initializeSensorList() {
         updateSensorVisibility();
     }
 
-    // Initialize sensor status toggles with mousedown event instead of click
+    // Add change handlers for sensor status toggles
     document.querySelectorAll('.sensor-status-toggle').forEach(toggle => {
-        toggle.addEventListener('mousedown', function(event) {
-            // Prevent any default actions
-            event.preventDefault();
-            
+        // Remove any existing listeners
+        toggle.replaceWith(toggle.cloneNode(true));
+        const newToggle = document.querySelector(`.sensor-status-toggle[data-sensor-id="${toggle.dataset.sensorId}"]`);
+
+        // Prevent the default change and click events
+        newToggle.addEventListener('click', e => e.preventDefault());
+        newToggle.addEventListener('change', e => e.preventDefault());
+
+        // Use mousedown to capture state before any changes
+        newToggle.addEventListener('mousedown', async function(e) {
+            e.preventDefault();
             const sensorId = this.dataset.sensorId;
             const deviceId = this.dataset.deviceId;
             const placeSlug = this.dataset.placeSlug;
             
-            // Get the current state - this is guaranteed to be the actual current state
+            // Get the current state before any changes
             const currentState = this.checked;
-            // The intended state is the opposite of what it currently is
             const intendedState = !currentState;
             
-            handleSensorStatusToggle(this, sensorId, placeSlug, intendedState);
-        });
-        
-        // Prevent the click event from changing the state
-        toggle.addEventListener('click', function(event) {
-            event.preventDefault();
-        });
-        
-        // Prevent the change event from firing
-        toggle.addEventListener('change', function(event) {
-            event.preventDefault();
+            // Get the modal elements
+            const modal = document.getElementById('sensorStatusModal');
+            const modalBody = document.getElementById('sensorStatusModalBody');
+            const confirmButton = document.getElementById('sensorStatusConfirm');
+            
+            // Get or create Bootstrap modal instance
+            let bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+            
+            // Set the confirmation message
+            modalBody.textContent = intendedState ? 
+                'Are you sure you want to activate this sensor?' : 
+                'Are you sure you want to deactivate this sensor?';
+            
+            // Reset modal state
+            confirmButton.clicked = false;
+
+            // Create a promise to handle the modal result
+            const modalResult = new Promise((resolve) => {
+                const handleConfirm = () => {
+                    confirmButton.clicked = true;
+                    bsModal.hide();
+                    resolve(true);
+                };
+
+                const handleHidden = () => {
+                    if (!confirmButton.clicked) {
+                        resolve(false);
+                    }
+                    // Clean up event listeners
+                    confirmButton.removeEventListener('click', handleConfirm);
+                    modal.removeEventListener('hidden.bs.modal', handleHidden);
+                };
+
+                // Set up event listeners
+                confirmButton.addEventListener('click', handleConfirm);
+                modal.addEventListener('hidden.bs.modal', handleHidden);
+            });
+
+            // Show the modal
+            bsModal.show();
+
+            // Wait for the modal result
+            const confirmed = await modalResult;
+            if (!confirmed) {
+                this.checked = currentState;
+                bsModal.hide();
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/${placeSlug}/sensor/${sensorId}/toggle_active/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({
+                        is_active: intendedState
+                    })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Only update UI elements after successful response
+                    this.checked = data.is_active;
+                    updateSensorUI(this, sensorId, data);
+                    showToast(data.message, data.type);
+
+                    // Dispatch event to notify other components
+                    document.dispatchEvent(new CustomEvent('sensorStatusChanged', {
+                        detail: {
+                            isActive: data.is_active,
+                            sensorId: sensorId
+                        }
+                    }));
+                } else {
+                    this.checked = currentState;
+                    throw new Error(data.message || 'Failed to update sensor status');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                this.checked = currentState;
+                showToast(error.message || 'Failed to update sensor status', 'danger');
+            } finally {
+                bsModal.hide(); // Ensure modal is hidden in all cases
+            }
         });
     });
 }
@@ -452,6 +723,16 @@ function updateSensorsCard(isActive) {
 
 // Initialize device status toggle functionality
 function initializeDeviceStatusToggle() {
+    const modal = document.getElementById('sensorStatusModal');
+    const modalBody = document.getElementById('sensorStatusModalBody');
+    const confirmButton = document.getElementById('sensorStatusConfirm');
+    let bsModal = null;
+
+    // Create modal instance once
+    if (modal) {
+        bsModal = new bootstrap.Modal(modal);
+    }
+
     document.querySelectorAll('.device-status-toggle').forEach(toggle => {
         const deviceId = toggle.dataset.deviceId;
         const locationId = toggle.dataset.locationId;
@@ -463,13 +744,24 @@ function initializeDeviceStatusToggle() {
             return;
         }
 
-        toggle.addEventListener('change', async function(e) {
-            const newStatus = this.checked;
+        // Remove any existing listeners
+        toggle.replaceWith(toggle.cloneNode(true));
+        const newToggle = document.querySelector(`.device-status-toggle[data-device-id="${deviceId}"]`);
+
+        // Prevent the default change and click events
+        newToggle.addEventListener('click', e => e.preventDefault());
+        newToggle.addEventListener('change', e => e.preventDefault());
+
+        // Use mousedown to capture state before any changes
+        newToggle.addEventListener('mousedown', async function(e) {
+            e.preventDefault();
+            const currentState = this.checked;
+            const intendedState = !currentState;
             
             // Only show confirmation when deactivating
-            if (!newStatus) {
-                // First, fetch the list of active sensors that will be affected
+            if (!intendedState) {
                 try {
+                    // First, fetch the list of active sensors that will be affected
                     const response = await fetch(`/api/${placeSlug}/device/${deviceId}/active_sensors/`);
                     if (!response.ok) throw new Error('Failed to fetch sensor information');
                     const data = await response.json();
@@ -484,24 +776,54 @@ function initializeDeviceStatusToggle() {
                         confirmMessage += 'No active sensors will be affected.';
                     }
 
-                    if (!confirm(confirmMessage)) {
-                        // Revert the toggle state since user cancelled
-                        this.checked = true;
-                        return;
-                    }
+                    // Set the confirmation message in the modal
+                    modalBody.innerHTML = confirmMessage.replace(/\n/g, '<br>');
                 } catch (error) {
                     console.error('Error fetching sensor information:', error);
-                    // Revert the toggle state and show error
-                    this.checked = true;
                     showToast('Failed to fetch sensor information', 'danger');
                     return;
                 }
-            } else if (!confirm('Are you sure you want to activate this device?')) {
-                // Revert the toggle state since user cancelled activation
-                this.checked = false;
+            } else {
+                modalBody.textContent = 'Are you sure you want to activate this device?';
+            }
+
+            // Reset modal state
+            confirmButton.clicked = false;
+
+            // Create a promise to handle the modal result
+            const modalResult = new Promise((resolve) => {
+                const handleConfirm = () => {
+                    confirmButton.clicked = true;
+                    bsModal.hide(); // Explicitly hide the modal after confirmation
+                    resolve(true);
+                };
+
+                const handleHidden = () => {
+                    if (!confirmButton.clicked) {
+                        resolve(false);
+                    }
+                    // Clean up event listeners
+                    confirmButton.removeEventListener('click', handleConfirm);
+                    modal.removeEventListener('hidden.bs.modal', handleHidden);
+                };
+
+                // Set up event listeners
+                confirmButton.addEventListener('click', handleConfirm);
+                modal.addEventListener('hidden.bs.modal', handleHidden);
+            });
+
+            // Show the modal
+            bsModal.show();
+
+            // Wait for the modal result
+            const confirmed = await modalResult;
+            if (!confirmed) {
+                this.checked = currentState;
+                bsModal.hide(); // Ensure modal is hidden when cancelled
                 return;
             }
 
+            // Proceed with the status change
             try {
                 const response = await fetch(`/api/${placeSlug}/device/${deviceId}/toggle_active/`, {
                     method: 'POST',
@@ -509,31 +831,35 @@ function initializeDeviceStatusToggle() {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': getCookie('csrftoken'),
                     },
-                    body: JSON.stringify({ is_active: newStatus })
+                    body: JSON.stringify({ is_active: intendedState })
                 });
 
                 if (!response.ok) throw new Error('Network response was not ok');
                 const data = await response.json();
 
                 if (data.status === 'success') {
+                    // Update the toggle state only after successful backend confirmation
+                    this.checked = data.is_active;
                     updateDeviceUI(this, deviceId, data);
                     updateDeviceNavItem(deviceId, data.is_active);
                     updateSensorsCard(data.is_active);
-                    updateLocationDeviceCounts(locationId, data.is_active, !newStatus);
+                    updateLocationDeviceCounts(locationId, data.is_active, currentState);
                     
                     document.dispatchEvent(new CustomEvent('deviceStatusChanged', {
                         detail: { isActive: data.is_active, deviceId, locationId }
                     }));
 
-                    showToast('Device status updated successfully', 'success');
+                    showToast(data.message, data.type);
                 } else {
+                    this.checked = currentState;
                     throw new Error(data.message || 'Failed to update device status');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                // Revert the toggle state since update failed
-                this.checked = !newStatus;
-                showToast(error.message || 'Failed to update device status', 'danger');
+                console.error('Error updating device status:', error);
+                this.checked = currentState;
+                showToast('Failed to update device status', 'danger');
+            } finally {
+                bsModal.hide(); // Ensure modal is hidden in all cases
             }
         });
     });
@@ -766,7 +1092,7 @@ function updateRecentReadings(data, recentDiv) {
 
 function handleSensorTestError(alertDiv, summaryDiv, recentDiv) {
     alertDiv.classList.remove('alert-info');
-    alertDiv.classList.add('alert-danger');
+    alertDiv.add('alert-danger');
     alertDiv.textContent = 'An error occurred while testing the sensor readings.';
     summaryDiv.classList.add('d-none');
     recentDiv.classList.add('d-none');
@@ -816,8 +1142,8 @@ function handleSensorStatusToggle(toggle, sensorId, placeSlug, intendedState) {
                 // Only update UI elements after successful response
                 updateSensorUI(toggle, sensorId, data);
 
-                // Show success message
-                showToast(`Sensor ${data.is_active ? 'activated' : 'deactivated'} successfully`, 'success');
+                // Show success message with the full path and icons
+                showToast(data.message, data.type);
 
                 // Dispatch event to notify other components
                 document.dispatchEvent(new CustomEvent('sensorStatusChanged', {
@@ -889,3 +1215,147 @@ function updateSensorUI(toggle, sensorId, data) {
         statusLabel.className = `form-check-label status-label ${data.is_active ? 'text-success' : 'text-danger'}`;
     }
 }
+
+// Initialize location status toggle functionality
+function initializeLocationStatusToggle() {
+    document.querySelectorAll('.location-status-toggle').forEach(toggle => {
+        const locationId = toggle.dataset.locationId;
+        const placeSlug = toggle.dataset.placeSlug;
+        
+        if (!locationId || !placeSlug) {
+            console.error('Toggle element missing required data attributes:', toggle);
+            toggle.disabled = true;
+            return;
+        }
+
+        // Prevent the default change and click events
+        toggle.addEventListener('click', e => e.preventDefault());
+        toggle.addEventListener('change', e => e.preventDefault());
+
+        // Use mousedown to capture state before any changes
+        toggle.addEventListener('mousedown', async function(e) {
+            e.preventDefault();
+            const currentState = this.checked;
+            const intendedState = !currentState;
+            
+            // Only show confirmation when deactivating
+            if (!intendedState) {
+                try {
+                    // First, fetch the list of active devices that will be affected
+                    const response = await fetch(`/api/${placeSlug}/location/${locationId}/active_devices/`);
+                    if (!response.ok) throw new Error('Failed to fetch device information');
+                    const data = await response.json();
+                    
+                    let confirmMessage = 'Are you sure you want to deactivate this location?\n\n';
+                    if (data.devices && data.devices.length > 0) {
+                        confirmMessage += 'The following devices and their sensors will be deactivated:\n';
+                        data.devices.forEach(device => {
+                            confirmMessage += `- ${device.name} (${device.active_sensors} active sensors)\n`;
+                        });
+                    } else {
+                        confirmMessage += 'No active devices will be affected.';
+                    }
+
+                    if (!confirm(confirmMessage)) {
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error fetching device information:', error);
+                    showToast('Failed to fetch device information', 'danger');
+                    return;
+                }
+            } else if (!confirm('Are you sure you want to activate this location?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/${placeSlug}/location/${locationId}/toggle_active/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ is_active: intendedState })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Update the toggle state only after successful backend confirmation
+                    this.checked = data.is_active;
+                    
+                    // Update location UI elements
+                    const locationRow = document.querySelector(`[data-location-id="${locationId}"]`);
+                    if (locationRow) {
+                        locationRow.setAttribute('data-active', data.is_active.toString());
+                        const statusLabel = locationRow.querySelector('.status-label');
+                        if (statusLabel) {
+                            statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
+                            statusLabel.classList.toggle('text-success', data.is_active);
+                            statusLabel.classList.toggle('text-danger', !data.is_active);
+                        }
+                    }
+
+                    // Disable/enable device toggles in this location
+                    document.querySelectorAll(`.device-status-toggle[data-location-id="${locationId}"]`)
+                        .forEach(deviceToggle => {
+                            deviceToggle.disabled = !data.is_active;
+                            if (!data.is_active) {
+                                deviceToggle.checked = false;
+                            }
+                        });
+
+                    showToast('Location status updated successfully', 'success');
+                    
+                    // Trigger a custom event for other components to react
+                    document.dispatchEvent(new CustomEvent('locationStatusChanged', {
+                        detail: { isActive: data.is_active, locationId }
+                    }));
+                } else {
+                    throw new Error(data.message || 'Failed to update location status');
+                }
+            } catch (error) {
+                console.error('Error updating location status:', error);
+                showToast('Failed to update location status', 'danger');
+            }
+        });
+    });
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    loadToastHistory(); // Load toast history from session storage
+    convertMessagesToToasts();
+    initializeDeviceList();
+    initializeSensorList();
+    initializeLocationStatusToggle();
+    
+    // Initialize tooltips
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
+
+    // Initialize time display
+    updateLocalTime();
+    setInterval(updateLocalTime, 1000);
+
+    // Add click handler to copy timestamp
+    const timeSpan = document.getElementById('localTime');
+    if (timeSpan) {
+        timeSpan.addEventListener('click', function() {
+            const now = new Date();
+            navigator.clipboard.writeText(now.toISOString()).then(() => {
+                const tooltip = bootstrap.Tooltip.getInstance(this);
+                const originalTitle = this.getAttribute('data-bs-title');
+                
+                // Show "Copied!" message
+                tooltip.setContent({ '.tooltip-inner': 'Copied!' });
+                
+                // Reset tooltip after 1 second
+                setTimeout(() => {
+                    tooltip.setContent({ '.tooltip-inner': originalTitle });
+                }, 1000);
+            });
+        });
+    }
+});

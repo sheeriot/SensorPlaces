@@ -1224,27 +1224,46 @@ def location_update_position(request: HttpRequest, place_slug: str, pk: int) -> 
     except ValueError as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-@require_POST
-def sensor_toggle_active(request, place_slug, pk):
-    """Toggle sensor active status"""
-    sensor = get_object_or_404(Sensor, pk=pk,
-                              device__location__place__slug=place_slug)
-    
-    # Toggle the status
-    sensor.is_active = not sensor.is_active
-    sensor.save()
-    
-    # Get updated statistics
-    device = sensor.device
-    total_sensors = device.sensors.count()
-    active_sensors = device.sensors.filter(is_active=True).count()
-    
-    return JsonResponse({
-        'status': 'success',
-        'is_active': sensor.is_active,
-        'total_sensors': total_sensors,
-        'active_sensors': active_sensors,
-    })
+class SensorToggleActiveView(View):
+    def post(self, request, place_slug, pk):
+        sensor = get_object_or_404(Sensor, pk=pk,
+                                 device__location__place__slug=place_slug)
+        
+        try:
+            data = json.loads(request.body)
+            is_active = data.get('is_active', False)
+            
+            # Update sensor status
+            sensor.is_active = is_active
+            sensor.save()
+            
+            # Get updated statistics
+            device = sensor.device
+            total_sensors = device.sensors.count()
+            active_sensors = device.sensors.filter(is_active=True).count()
+            
+            # Create descriptive message with full path and icons
+            message = (
+                f'<i class="bi bi-house-gear"></i> {sensor.device.location.place.name} &gt; '
+                f'<i class="bi bi-geo-alt"></i> {sensor.device.location.name} &gt; '
+                f'<i class="bi bi-hdd-rack"></i> {sensor.device.name} &gt; '
+                f'<i class="bi bi-thermometer"></i> {sensor.name} '
+                f'{is_active and "activated" or "deactivated"}'
+            )
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': message,
+                'is_active': sensor.is_active,
+                'total_sensors': total_sensors,
+                'active_sensors': active_sensors,
+                'device_id': device.pk,
+                'type': 'success' if is_active else 'danger'  # Set toast type based on activation status
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
 
 class DeviceToggleActiveView(View):
     def post(self, request, place_slug, pk):
@@ -1273,13 +1292,22 @@ class DeviceToggleActiveView(View):
                 is_active=True
             ).count()
             
+            # Create descriptive message with full path and icons
+            message = (
+                f'<i class="bi bi-house-gear"></i> {location.place.name} &gt; '
+                f'<i class="bi bi-geo-alt"></i> {location.name} &gt; '
+                f'<i class="bi bi-hdd-rack"></i> {device.name} '
+                f'{is_active and "activated" or "deactivated"}'
+            )
             return JsonResponse({
                 'status': 'success',
+                'message': message,
                 'is_active': device.is_active,
                 'active_devices_count': active_devices_count,
                 'inactive_devices_count': inactive_devices_count,
                 'total_active_devices': total_active_devices,
-                'location_id': location.pk  # Add location ID to response
+                'location_id': location.pk,
+                'type': 'success' if is_active else 'danger'  # Set toast type based on activation status
             })
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
@@ -1459,3 +1487,50 @@ def location_toggle_active(request, place_slug, pk):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+class ToastHistoryView(View):
+    """API view for managing toast notification history in the session."""
+    
+    def get(self, request):
+        """Retrieve the toast history from the session."""
+        history = request.session.get('toast_history', [])
+        return JsonResponse({'history': history})
+
+    def post(self, request):
+        """Update the toast history in the session."""
+        try:
+            data = json.loads(request.body)
+            history = data.get('history', [])
+            
+            # Ensure history doesn't exceed maximum size (50 items)
+            history = history[:50]
+            
+            # Store in session
+            request.session['toast_history'] = history
+            request.session.modified = True
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Toast history updated successfully'
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid JSON data'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=500)
+
+    def delete(self, request):
+        """Clear the toast history from the session."""
+        if 'toast_history' in request.session:
+            del request.session['toast_history']
+            request.session.modified = True
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Toast history cleared successfully'
+        })
