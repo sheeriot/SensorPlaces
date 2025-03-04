@@ -31,14 +31,18 @@
                         </tr>
                         {% regroup location.list by device as device_list %}
                         {% for device in device_list %}
-                            <tr class="table-light {% if not device.grouper.is_active %}text-muted opacity-50{% endif %}">
-                                <td colspan="5" class="ps-2">
-                                    <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
-                                    <span class="badge {% if device.grouper.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                        {% if device.grouper.is_active %}Active{% else %}Inactive{% endif %}
-                                    </span>
-                                </td>
-                            </tr>
+                            {% if device.grouper.is_active or not hideInactiveSwitch.checked %}
+                                <tr class="table-light {% if not device.grouper.is_active %}text-muted opacity-50 d-none{% endif %}">
+                                    <td colspan="4">
+                                        <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
+                                    </td>  
+                                    <td>
+                                        <span class="badge {% if device.grouper.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                            {% if device.grouper.is_active %}Active{% else %}inactive{% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endif %}
                             {% for sensor in device.list %}
                                 {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
                             {% endfor %}

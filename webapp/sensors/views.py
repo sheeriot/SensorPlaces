@@ -487,7 +487,7 @@ class DeviceListView(ListView):
             '-location__is_active',  # Active locations first
             'location__name',
             '-is_active',           # Active devices first
-            'name'
+            'name',
         )
 
     def get_context_data(self, **kwargs):
@@ -1331,7 +1331,7 @@ class DeviceToggleActiveView(View):
                 'active_devices_count': active_devices_count,
                 'location_id': location.pk,
                 'affected_sensors': affected_sensors,
-                'type': 'warning' if not is_active and affected_sensors else 'success'  # Set toast type based on activation status and affected sensors
+                'type': 'success' if is_active else 'warning'  # Set toast type based on activation status and affected sensors
             })
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
