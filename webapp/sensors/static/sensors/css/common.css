@@ -68,12 +68,19 @@
     color: var(--bs-gray-600);
 }
 
-/* Site Map specific styles */
+/* Site Plan specific styles */
+.site-plan-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    background-color: #f8f9fa;
+    padding-bottom: 75%; /* 4:3 aspect ratio */
+}
+
 #siteMapContainer {
     position: relative;
     width: 100%;
-    padding-top: 56.25%;
-    max-height: 70vh;
+    height: 100%;
 }
 
 .site-plan-background {
@@ -82,18 +89,47 @@
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
-    transform-origin: center;
+    transition: transform 0.3s ease-out;
 }
 
 /* Location marker specific styles */
 .location-marker {
     position: absolute;
-    transform: translate(-50%, -50%);
-    z-index: 100;
+    cursor: pointer;
+    z-index: 10;
+    border-radius: 4px;
+    transition: transform 0.2s;
 }
 
-.location-marker.dragging {
-    z-index: 1000;
+.location-marker:hover {
+    transform: scale(1.1);
+    z-index: 11;
+}
+
+.location-marker .marker-content {
+    font-size: 0.75rem;
+    line-height: 1;
+    color: white;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Editor styles */
+.site-plan-editor {
+    position: relative;
+    width: 100%;
+    height: 600px;
+    overflow: hidden;
+}
+
+#siteMapEditorContainer {
+    width: 100%;
+    height: 100%;
+}
+
+.dragging {
+    opacity: 0.8;
+    z-index: 1000 !important;
 }
 
 /* Remove all other styles that can be replaced with Bootstrap classes */ 

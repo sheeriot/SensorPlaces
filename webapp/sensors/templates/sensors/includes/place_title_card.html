@@ -8,7 +8,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">
                 <i class="bi bi-house-gear me-2"></i>Place:
-                <a href="{% url 'sensors:place_detail' place.slug %}" class="text-secondary fw-normal">{{ place.name }}</a>
+                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-secondary fw-normal">{{ place.name }}</a>
                 {% if place.is_active %}
                 <span class="badge bg-success ms-2">Active</span>
                 {% else %}
@@ -29,56 +29,3 @@
         </div>
     </div>
 </div>
-
-<!-- Modal for Map -->
-<div id="mapModal" class="modal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ place.name }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div id="leafletMap" style="height: 500px;"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const openMapButton = document.getElementById('openMap');
-    const mapModal = document.getElementById('mapModal');
-    let map = null;
-
-    openMapButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        const modal = new bootstrap.Modal(mapModal);
-        modal.show();
-    });
-
-    mapModal.addEventListener('shown.bs.modal', function () {
-        if (!map) {
-            setTimeout(function() {
-                map = L.map('leafletMap');
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(map);
-
-                const lat = {{ place.latitude }};
-                const lng = {{ place.longitude }};
-                map.setView([lat, lng], 15);
-                
-                L.marker([lat, lng])
-                    .addTo(map)
-                    .bindPopup("{{ place.name }}")
-                    .openPopup();
-
-                map.invalidateSize();
-            }, 100);
-        } else {
-            map.invalidateSize();
-        }
-    });
-});
-</script> 

@@ -7,12 +7,12 @@
         </button>
     </div>
     <div class="card-body p-0">
-        <div class="site-plan-wrapper">
+        <div class="site-plan-wrapper position-relative">
             <div id="siteMapContainer" 
+                 class="position-absolute w-100 h-100"
                  data-scale="{{ place.site_plan_scale }}"
                  data-x="{{ place.site_plan_x }}"
                  data-y="{{ place.site_plan_y }}">
-                <!-- Move markers outside of the scaled content -->
             {% for location in locations %}
                 <div class="location-marker position-absolute p-1 {% if not location.is_active %}opacity-50 bg-secondary{% else %}bg-primary{% endif %}" 
                      data-location-id="{{ location.pk }}"
@@ -26,8 +26,9 @@
                     </div>
                 </div>
             {% endfor %}
-                <!-- Background site plan that gets scaled -->
-                <div class="site-plan-background" style="background-image: url('{{ place.site_plan.url }}');"></div>
+                <div class="site-plan-background position-absolute w-100 h-100" 
+                     style="background-image: url('{{ place.site_plan.url }}');">
+                </div>
             </div>
         </div>
     </div>
@@ -87,172 +88,4 @@
             </div>
         </div>
     </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const container = document.getElementById('siteMapContainer');
-    const editButton = document.getElementById('editSitePlan');
-    const saveButton = document.getElementById('savePositions');
-    const modal = new bootstrap.Modal(document.getElementById('sitePlanModal'));
-    const editorContainer = document.getElementById('siteMapEditorContainer');
-    
-    // Initialize layout from saved settings
-    let scale = parseFloat(container.dataset.scale) || 1.0;
-    let x = parseFloat(container.dataset.x) || 0;
-    let y = parseFloat(container.dataset.y) || 0;
-    
-    function updateTransform(target) {
-        // Constrain scale
-        scale = Math.max(0.5, Math.min(3.0, scale));
-        
-        // Only transform the background
-        const background = target.querySelector('.site-plan-background');
-        background.style.transform = `scale(${scale}) translate(${x}px, ${y}px)`;
-    }
-    
-    // Initial transform
-    updateTransform(container);
-
-    // Open editor
-    editButton.addEventListener('click', function() {
-        // Clone the site map content
-        editorContainer.innerHTML = container.innerHTML;
-        updateTransform(editorContainer);
-        
-        // Initialize draggable markers
-        const markers = editorContainer.querySelectorAll('.location-marker');
-        markers.forEach(initializeDraggable);
-        
-        modal.show();
-    });
-
-    // Zoom controls
-    document.getElementById('zoomIn')?.addEventListener('click', () => {
-        scale = Math.min(scale * 1.2, 3.0);
-        updateTransform(editorContainer);
-    });
-
-    document.getElementById('zoomOut')?.addEventListener('click', () => {
-        scale = Math.max(scale / 1.2, 0.5);
-        updateTransform(editorContainer);
-    });
-
-    // Movement controls
-    const MOVE_STEP = 20;
-    document.getElementById('moveLeft')?.addEventListener('click', () => {
-        x -= MOVE_STEP / scale;
-        updateTransform(editorContainer);
-    });
-    document.getElementById('moveRight')?.addEventListener('click', () => {
-        x += MOVE_STEP / scale;
-        updateTransform(editorContainer);
-    });
-    document.getElementById('moveUp')?.addEventListener('click', () => {
-        y -= MOVE_STEP / scale;
-        updateTransform(editorContainer);
-    });
-    document.getElementById('moveDown')?.addEventListener('click', () => {
-        y += MOVE_STEP / scale;
-        updateTransform(editorContainer);
-    });
-
-    // Reset view
-    document.getElementById('resetView')?.addEventListener('click', () => {
-        scale = 1.0;
-        x = 0;
-        y = 0;
-        updateTransform(editorContainer);
-    });
-
-    function initializeDraggable(marker) {
-        let isDragging = false;
-        let startX, startY;
-        let originalX, originalY;
-        
-        marker.addEventListener('mousedown', function(e) {
-            isDragging = true;
-            marker.classList.add('dragging');
-            
-            startX = e.clientX;
-            startY = e.clientY;
-            originalX = parseFloat(marker.dataset.x);
-            originalY = parseFloat(marker.dataset.y);
-            
-            e.preventDefault();
-        });
-        
-        document.addEventListener('mousemove', function(e) {
-            if (!isDragging) return;
-            
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            
-            const containerRect = editorContainer.getBoundingClientRect();
-            const deltaXPercent = (dx / containerRect.width) * 100;
-            const deltaYPercent = (dy / containerRect.height) * 100;
-            
-            const newX = Math.max(0, Math.min(100, originalX + deltaXPercent));
-            const newY = Math.max(0, Math.min(100, originalY + deltaYPercent));
-            
-            marker.dataset.x = newX.toFixed(2);
-            marker.dataset.y = newY.toFixed(2);
-            marker.style.left = `${newX}%`;
-            marker.style.top = `${newY}%`;
-        });
-        
-        document.addEventListener('mouseup', function() {
-            if (!isDragging) return;
-            isDragging = false;
-            marker.classList.remove('dragging');
-        });
-    }
-
-    // Save positions and layout
-    saveButton?.addEventListener('click', async function() {
-        const markers = editorContainer.querySelectorAll('.location-marker');
-        const promises = Array.from(markers).map(marker => {
-            const locationId = marker.dataset.locationId;
-            const x = marker.dataset.x;
-            const y = marker.dataset.y;
-
-            return fetch(`/api/{{ place.slug }}/locations/${locationId}/position/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}',
-                },
-                body: JSON.stringify({ x_coord: x, y_coord: y })
-            });
-        });
-
-        try {
-            await Promise.all(promises);
-            
-            // Save layout settings
-            await fetch(`{% url 'sensors:update_site_plan_layout' place_slug=place.slug %}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}',
-                },
-                body: JSON.stringify({
-                    site_plan_scale: scale,
-                    site_plan_x: x,
-                    site_plan_y: y
-                })
-            });
-            
-            // Update the main container
-            container.innerHTML = editorContainer.innerHTML;
-            updateTransform(container);
-            
-            modal.hide();
-            showToast('Layout saved successfully!', 'success');
-        } catch (error) {
-            showToast('Error saving layout', 'danger');
-            console.error('Error:', error);
-        }
-    });
-});
-</script> 
+</div> 

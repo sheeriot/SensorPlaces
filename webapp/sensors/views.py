@@ -290,25 +290,31 @@ class LocationListView(ListView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         place_slug = self.kwargs.get('place_slug')
+        context['place'] = get_object_or_404(Place, slug=place_slug)
 
-        if place_slug:
-            locations = Location.objects.filter(
-                place__slug=place_slug
-            ).annotate(
-                active_devices_count=Count(
-                    'devices',
-                    filter=Q(devices__is_active=True)
-                ),
-                inactive_devices_count=Count(
-                    'devices',
-                    filter=Q(devices__is_active=False)
-                )
-            ).order_by('name')
+        context['locations'] = Location.objects.filter(
+            place__slug=place_slug
+        ).annotate(
+            active_devices_count=Count(
+                'devices',
+                filter=Q(devices__is_active=True)
+            ),
+            inactive_devices_count=Count(
+                'devices',
+                filter=Q(devices__is_active=False)
+            )
+        ).order_by('-is_active', 'name')
 
-            context['locations'] = locations
-            
-            if self.kwargs.get('location_pk'):
-                context['location'] = locations.filter(pk=self.kwargs.get('location_pk')).first()
+        # Add site plan context
+        place = context['place']
+        if place.site_plan:
+            context['show_site_plan'] = True
+            context['site_plan_url'] = place.site_plan.url
+            context['site_plan_scale'] = place.site_plan_scale or 1.0
+            context['site_plan_x'] = place.site_plan_x or 0
+            context['site_plan_y'] = place.site_plan_y or 0
+        else:
+            context['show_site_plan'] = False
 
         return context
 
@@ -1461,12 +1467,12 @@ class DeviceMoveLocationView(View):
             return JsonResponse({'error': str(e)}, status=500)
 
 @require_POST
-def update_site_plan_layout(request, slug):
+def update_site_plan_layout(request, place_slug):
     """Update the site plan layout settings for a place"""
     if not request.user.has_perm('sensors.change_place'):
         return JsonResponse({'error': 'Permission denied'}, status=403)
         
-    place = get_object_or_404(Place, slug=slug)
+    place = get_object_or_404(Place, slug=place_slug)
     try:
         data = json.loads(request.body)
         place.site_plan_scale = float(data.get('site_plan_scale', 1.0))

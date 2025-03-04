@@ -27,6 +27,8 @@ const utils = {
                 'X-CSRFToken': this.getCookie('csrftoken'),
             }
         };
+        // Ensure URL doesn't start with double slashes
+        url = url.replace(/^\/+/, '/');
         return fetch(url, { ...defaultOptions, ...options });
     }
 };
@@ -896,6 +898,328 @@ const navigationSystem = {
     }
 };
 
+// Site Plan Management System
+const sitePlanManager = {
+    editorMode: false,
+    currentScale: 1.0,
+    currentX: 0,
+    currentY: 0,
+    modal: null,
+    
+    initialize() {
+        const container = document.getElementById('siteMapContainer');
+        if (!container) return;
+
+        // Initialize from data attributes
+        this.currentScale = parseFloat(container.dataset.scale) || 1.0;
+        this.currentX = parseFloat(container.dataset.x) || 0;
+        this.currentY = parseFloat(container.dataset.y) || 0;
+
+        // Apply initial transform
+        this.updateTransform(container);
+
+        // Set up edit button
+        const editButton = document.getElementById('editSitePlan');
+        if (editButton) {
+            editButton.addEventListener('click', () => this.openEditor());
+        }
+
+        // Initialize controls
+        this.initializeControls();
+    },
+
+    updateTransform(target) {
+        // Constrain scale
+        this.currentScale = Math.max(0.5, Math.min(3.0, this.currentScale));
+        
+        // Only transform the background
+        const background = target.querySelector('.site-plan-background');
+        if (background) {
+            background.style.transform = `scale(${this.currentScale}) translate(${this.currentX}px, ${this.currentY}px)`;
+        }
+    },
+
+    initializeControls() {
+        // Zoom controls
+        document.getElementById('zoomIn')?.addEventListener('click', () => {
+            this.currentScale = Math.min(this.currentScale * 1.2, 3.0);
+            this.updateTransform(this.editorMode ? document.getElementById('siteMapEditorContainer') : document.getElementById('siteMapContainer'));
+        });
+
+        document.getElementById('zoomOut')?.addEventListener('click', () => {
+            this.currentScale = Math.max(this.currentScale / 1.2, 0.5);
+            this.updateTransform(this.editorMode ? document.getElementById('siteMapEditorContainer') : document.getElementById('siteMapContainer'));
+        });
+
+        // Movement controls
+        const MOVE_STEP = 20;
+        document.getElementById('moveLeft')?.addEventListener('click', () => {
+            this.currentX -= MOVE_STEP / this.currentScale;
+            this.updateTransform(this.editorMode ? document.getElementById('siteMapEditorContainer') : document.getElementById('siteMapContainer'));
+        });
+
+        document.getElementById('moveRight')?.addEventListener('click', () => {
+            this.currentX += MOVE_STEP / this.currentScale;
+            this.updateTransform(this.editorMode ? document.getElementById('siteMapEditorContainer') : document.getElementById('siteMapContainer'));
+        });
+
+        document.getElementById('moveUp')?.addEventListener('click', () => {
+            this.currentY -= MOVE_STEP / this.currentScale;
+            this.updateTransform(this.editorMode ? document.getElementById('siteMapEditorContainer') : document.getElementById('siteMapContainer'));
+        });
+
+        document.getElementById('moveDown')?.addEventListener('click', () => {
+            this.currentY += MOVE_STEP / this.currentScale;
+            this.updateTransform(this.editorMode ? document.getElementById('siteMapEditorContainer') : document.getElementById('siteMapContainer'));
+        });
+
+        // Reset view
+        document.getElementById('resetView')?.addEventListener('click', () => {
+            this.currentScale = 1.0;
+            this.currentX = 0;
+            this.currentY = 0;
+            this.updateTransform(this.editorMode ? document.getElementById('siteMapEditorContainer') : document.getElementById('siteMapContainer'));
+        });
+
+        // Save button
+        document.getElementById('savePositions')?.addEventListener('click', () => this.saveChanges());
+    },
+
+    initializeDraggable(marker) {
+        // Remove any existing listeners first
+        if (marker._dragListeners) {
+            this.cleanupDraggable(marker);
+        }
+
+        let isDragging = false;
+        let containerRect;
+        let markerRect;
+
+        const onMouseDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isDragging = true;
+            containerRect = marker.closest('#siteMapEditorContainer').getBoundingClientRect();
+            markerRect = marker.getBoundingClientRect();
+            
+            // Calculate click position relative to marker
+            const clickOffsetX = e.clientX - markerRect.left;
+            const clickOffsetY = e.clientY - markerRect.top;
+            
+            // Store these as percentages of marker size
+            marker._dragData = {
+                offsetX: clickOffsetX / markerRect.width,
+                offsetY: clickOffsetY / markerRect.height
+            };
+            
+            marker.classList.add('dragging');
+        };
+
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            // Get the stored offset percentages
+            const { offsetX, offsetY } = marker._dragData;
+            
+            // Calculate marker dimensions as percentages of container
+            const markerWidthPercent = (markerRect.width / containerRect.width) * 100;
+            const markerHeightPercent = (markerRect.height / containerRect.height) * 100;
+            
+            // Calculate new position considering the click offset
+            const rawX = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            const rawY = ((e.clientY - containerRect.top) / containerRect.height) * 100;
+            
+            // Adjust position by the offset
+            const adjustedX = rawX - (offsetX * markerWidthPercent);
+            const adjustedY = rawY - (offsetY * markerHeightPercent);
+            
+            // Constrain to container bounds
+            const xPercent = Math.max(0, Math.min(100 - markerWidthPercent, adjustedX));
+            const yPercent = Math.max(0, Math.min(100 - markerHeightPercent, adjustedY));
+            
+            // Update position
+            marker.style.left = `${xPercent}%`;
+            marker.style.top = `${yPercent}%`;
+            marker.dataset.x = xPercent.toFixed(2);
+            marker.dataset.y = yPercent.toFixed(2);
+        };
+
+        const onMouseUp = (e) => {
+            if (!isDragging) return;
+            
+            e.preventDefault();
+            isDragging = false;
+            delete marker._dragData;
+            marker.classList.remove('dragging');
+        };
+
+        // Add new event listeners
+        marker.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        // Store listeners for cleanup
+        marker._dragListeners = { onMouseDown, onMouseMove, onMouseUp };
+    },
+
+    cleanupDraggable(marker) {
+        if (marker._dragListeners) {
+            const { onMouseDown, onMouseMove, onMouseUp } = marker._dragListeners;
+            marker.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('mousemove', onMouseMove);
+            marker.removeEventListener('mouseup', onMouseUp);
+            delete marker._dragListeners;
+        }
+    },
+
+    openEditor() {
+        this.editorMode = true;
+        const container = document.getElementById('siteMapContainer');
+        const editorContainer = document.getElementById('siteMapEditorContainer');
+        const modalElement = document.getElementById('sitePlanModal');
+        
+        // Clone the site map content
+        editorContainer.innerHTML = container.innerHTML;
+        this.updateTransform(editorContainer);
+        
+        // Initialize draggable markers
+        const markers = editorContainer.querySelectorAll('.location-marker');
+        markers.forEach(marker => this.initializeDraggable(marker));
+        
+        // Initialize and store modal instance
+        this.modal = new bootstrap.Modal(modalElement);
+        
+        // Set up modal cleanup
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            this.editorMode = false;
+            // Cleanup draggable markers
+            markers.forEach(marker => this.cleanupDraggable(marker));
+            // Ensure modal backdrop is removed
+            document.body.classList.remove('modal-open');
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) backdrop.remove();
+        }, { once: true });
+
+        this.modal.show();
+    },
+
+    async saveChanges() {
+        const editorContainer = document.getElementById('siteMapEditorContainer');
+        const mainContainer = document.getElementById('siteMapContainer');
+        const markers = editorContainer.querySelectorAll('.location-marker');
+        const placeSlug = window.currentPlaceSlug;
+
+        console.log('Starting saveChanges operation...');
+
+        // Store original state for potential rollback and change comparison
+        const originalState = {
+            html: mainContainer.innerHTML,
+            scale: parseFloat(mainContainer.dataset.scale) || 1.0,
+            x: parseFloat(mainContainer.dataset.x) || 0,
+            y: parseFloat(mainContainer.dataset.y) || 0
+        };
+
+        try {
+            if (!placeSlug) {
+                throw new Error('Place slug not found. Please refresh the page and try again.');
+            }
+
+            console.log('Preparing marker position updates...');
+            // Prepare marker position updates
+            const markerPromises = Array.from(markers).map(marker => {
+                const locationId = marker.dataset.locationId;
+                const x = marker.dataset.x;
+                const y = marker.dataset.y;
+                
+                console.log(`Updating marker position for location ${locationId}: x=${x}, y=${y}`);
+                return utils.fetchWithCSRF(`/api/${placeSlug}/locations/${locationId}/position/`, {
+                    method: 'POST',
+                    body: JSON.stringify({ x_coord: x, y_coord: y })
+                });
+            });
+
+            console.log('Preparing layout settings update...');
+            // Prepare layout settings update
+            const layoutData = {
+                site_plan_scale: this.currentScale,
+                site_plan_x: this.currentX,
+                site_plan_y: this.currentY
+            };
+            console.log('Layout update data:', layoutData);
+
+            // Combine all promises into a single Promise.all call
+            const responses = await Promise.all([
+                // Layout settings update
+                utils.fetchWithCSRF(`/api/${placeSlug}/update_site_plan_layout/`, {
+                    method: 'POST',
+                    body: JSON.stringify(layoutData)
+                }),
+                // Marker position updates
+                ...markerPromises
+            ]);
+            
+            console.log('All updates completed, checking responses...');
+            // Check if any response was not ok
+            for (const response of responses) {
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to save changes');
+                }
+            }
+            
+            // Update the main container
+            mainContainer.innerHTML = editorContainer.innerHTML;
+            this.updateTransform(mainContainer);
+            
+            // Close modal properly
+            if (this.modal) {
+                this.modal.hide();
+            }
+            
+            console.log('Save operation completed successfully');
+            
+            // Build success message with changes
+            let successParts = ['Layout saved successfully!'];
+            
+            // Only add scale if it changed
+            if (Math.abs(this.currentScale - originalState.scale) > 0.01) {
+                successParts.push(`• Scale: ${this.currentScale.toFixed(2)}x`);
+            }
+            
+            // Only add position if it changed
+            if (Math.abs(this.currentX - originalState.x) > 1 || Math.abs(this.currentY - originalState.y) > 1) {
+                successParts.push(`• Position: (${this.currentX.toFixed(0)}, ${this.currentY.toFixed(0)})`);
+            }
+            
+            // Add marker count if any were updated
+            if (markers.length > 0) {
+                successParts.push(`• Updated ${markers.length} location marker${markers.length !== 1 ? 's' : ''}`);
+            }
+            
+            toastSystem.show(successParts.join('\n'), 'success');
+        } catch (error) {
+            console.error('Error in saveChanges:', error);
+            
+            // Restore original state
+            mainContainer.innerHTML = originalState.html;
+            this.currentScale = originalState.scale;
+            this.currentX = originalState.x;
+            this.currentY = originalState.y;
+            this.updateTransform(mainContainer);
+            
+            // Show error toast
+            toastSystem.show(error.message || 'Error saving layout', 'danger');
+            
+            // Close modal
+            if (this.modal) {
+                this.modal.hide();
+            }
+        }
+    }
+};
+
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize toast system
@@ -1003,6 +1327,9 @@ document.addEventListener('DOMContentLoaded', function() {
     navigationSystem.initializeDeviceNav();
     navigationSystem.initializeDeviceList();
     navigationSystem.initializeSensorList();
+
+    // Initialize site plan manager
+    sitePlanManager.initialize();
 });
 
 function showToast(message, type = 'info') {

@@ -10,8 +10,6 @@ urlpatterns = [
     path('<slug:place_slug>/', views.PlaceDetailView.as_view(), name='place_detail'),
     path('<slug:place_slug>/update/', views.PlaceUpdateView.as_view(), name='place_update'),
     path('<slug:place_slug>/delete/', views.PlaceDeleteView.as_view(), name='place_delete'),
-
-    path('<slug:place_slug>/update_site_plan_layout/', views.update_site_plan_layout, name='update_site_plan_layout'),
     
     # Location URLs - nested under places
     path('<slug:place_slug>/location/create/', views.LocationCreateView.as_view(), name='location_create'),
@@ -52,6 +50,7 @@ urlpatterns = [
     
     # API URLs
     path('api/<slug:place_slug>/stats/', views.place_stats, name='place_stats'),
+    path('api/<slug:place_slug>/update_site_plan_layout/', views.update_site_plan_layout, name='update_site_plan_layout'),
     path('api/<slug:place_slug>/locations/<int:pk>/position/', views.location_update_position, name='location_update_position'),
     path('api/<slug:place_slug>/sensor/<int:pk>/toggle_active/', views.SensorToggleActiveView.as_view(), name='sensor_toggle_active'),
     path('api/<slug:place_slug>/device/<int:pk>/toggle_active/', views.DeviceToggleActiveView.as_view(), name='device_toggle_active'),

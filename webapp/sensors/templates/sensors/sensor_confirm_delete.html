@@ -4,34 +4,42 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-4">
-        {% include "sensors/includes/place_nav_card.html" with place=place locations=locations location=location %}
+    <!-- Place Title Card -->
+    <div class="col-12">
+        {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
-    <div class="col-md-8">
-        <div class="card rounded-3 shadow-sm border-0">
-            <div class="card-header bg-white py-2">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-trash me-2"></i>Delete Sensor
-                </h5>
-            </div>
-            <div class="card-body">
-                <p>Are you sure you want to delete the sensor "{{ object.name }}"?</p>
-                <p class="text-danger">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    This action cannot be undone.
-                </p>
-                <form method="post" data-delete-form>
-                    {% csrf_token %}
-                    <div class="d-flex justify-content-between">
-                        <a href="{{ request.META.HTTP_REFERER|default:device_url }}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Cancel
-                        </a>
-                        <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash"></i> Delete
-                        </button>
-                    </div>
-                </form>
-            </div>
+</div>
+
+<div class="row">
+
+<!-- Two Column Layout -->
+<div class="col-md-4">
+    {% include "sensors/includes/place_nav_card.html" with place=place locations=locations location=location %}
+</div>
+<div class="col-md-8">
+    <div class="card rounded-3 shadow-sm border-0">
+        <div class="card-header bg-white py-2">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-trash me-2"></i>Delete Sensor
+            </h5>
+        </div>
+        <div class="card-body">
+            <p>Are you sure you want to delete the sensor "{{ object.name }}"?</p>
+            <p class="text-danger">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                This action cannot be undone.
+            </p>
+            <form method="post" data-delete-form>
+                {% csrf_token %}
+                <div class="d-flex justify-content-between">
+                    <a href="{{ request.META.HTTP_REFERER|default:device_url }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

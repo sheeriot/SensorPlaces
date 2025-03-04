@@ -3,8 +3,9 @@ from django import template
 register = template.Library()
 
 @register.filter
-def filter_active(queryset):
-    return [obj for obj in queryset if obj.is_active]
+def filter_active(locations):
+    """Filter to return active locations."""
+    return [location for location in locations if location.is_active]  # Adjust according to your model
 
 @register.filter
 def filter_inactive(queryset):
