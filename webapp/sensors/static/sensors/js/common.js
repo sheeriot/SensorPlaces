@@ -1,18 +1,18 @@
 // Utility Functions
 const utils = {
     getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
             }
         }
-        return cookieValue;
+    }
+    return cookieValue;
     },
 
     async fetchWithCSRF(url, options = {}) {
@@ -50,7 +50,7 @@ const toastSystem = {
     async saveHistory() {
         try {
             await utils.fetchWithCSRF('/api/toast-history/', {
-                method: 'POST',
+        method: 'POST',
                 body: JSON.stringify({ history: this.history })
             });
         } catch (error) {
@@ -59,6 +59,8 @@ const toastSystem = {
     },
 
     show(message, type = 'success') {
+        console.log('Creating toast with type:', type);
+        
         // Add to history
         this.history.unshift({
             message,
@@ -81,27 +83,45 @@ const toastSystem = {
             toastContainer.className = 'toast-container';
             document.body.appendChild(toastContainer);
         }
-        
+
         // Create and show toast
         const toastId = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const toastClass = `toast-${type}`; // Add a specific class for the toast type
+        
+        console.log('Toast classes to be applied:', {
+            toastId,
+            type,
+            fullClassName: `toast fade show bg-${type}`
+        });
+
         const toastHtml = `
-            <div class="toast fade show bg-${type}" role="alert" aria-live="assertive" aria-atomic="true" id="${toastId}">
+            <div class="toast fade show text-${type}" role="alert" aria-live="assertive" aria-atomic="true" id="${toastId}">
                 <div class="d-flex align-items-center">
-                    <div class="toast-body flex-grow-1">
-                        ${type === 'success' ? '<i class="bi bi-check-circle"></i>' : ''}
-                        ${type === 'danger' ? '<i class="bi bi-exclamation-circle"></i>' : ''}
-                        ${type === 'warning' ? '<i class="bi bi-exclamation-triangle"></i>' : ''}
-                        ${type === 'info' ? '<i class="bi bi-info-circle"></i>' : ''}
-                        <span class="ms-2">${message}</span>
+                    <div class="toast-body d-flex align-items-center flex-grow-1">
+                        <i class="bi bi-${
+                            type === 'success' ? 'check-circle' : 
+                            type === 'danger' ? 'exclamation-circle' :
+                            type === 'warning' ? 'exclamation-triangle' : 
+                            'info-circle'
+                        } me-2"></i>
+                        <span>${message}</span>
                     </div>
                     <button type="button" class="btn-close me-2" data-bs-dismiss="toast" aria-label="Close"></button>
                 </div>
             </div>
         `;
-        
+
         toastContainer.insertAdjacentHTML('afterbegin', toastHtml);
         const toastEl = document.getElementById(toastId);
         
+        // Log the created element's classes
+        console.log('Created toast element classes:', toastEl.className);
+        console.log('Toast computed styles:', {
+            backgroundColor: window.getComputedStyle(toastEl).backgroundColor,
+            color: window.getComputedStyle(toastEl).color,
+            borderColor: window.getComputedStyle(toastEl).borderColor
+        });
+
         const toast = new bootstrap.Toast(toastEl, {
             delay: 4000,
             autohide: true
@@ -119,7 +139,7 @@ const toastSystem = {
     },
 
     updateHistoryBadge() {
-        const badge = document.getElementById('toastHistoryBadge');
+    const badge = document.getElementById('toastHistoryBadge');
         if (badge) {
             badge.textContent = this.history.length || '';
             badge.classList.toggle('d-none', !this.history.length);
@@ -127,39 +147,39 @@ const toastSystem = {
     },
 
     showHistory() {
-        const modalHtml = `
+    const modalHtml = `
             <div class="modal fade" id="toastHistoryModal" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
                             <h5 class="modal-title">Notification History</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="toast-history-list">
+                    </div>
+                    <div class="modal-body">
+                        <div class="toast-history-list">
                                 ${this.history.map(toast => `
-                                    <div class="toast-history-item">
-                                        <div class="toast-history-time">
-                                            ${toast.timestamp.toLocaleTimeString()}
-                                        </div>
-                                        <div class="text-${toast.type}">
-                                            ${toast.message}
-                                        </div>
+                                <div class="toast-history-item">
+                                    <div class="toast-history-time">
+                                        ${toast.timestamp.toLocaleTimeString()}
                                     </div>
-                                `).join('')}
-                            </div>
+                                        <div class="text-${toast.type}">
+                                        ${toast.message}
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                             <button type="button" class="btn btn-danger" onclick="toastSystem.clearHistory()">Clear History</button>
-                        </div>
                     </div>
                 </div>
             </div>
-        `;
+        </div>
+    `;
 
         document.getElementById('toastHistoryModal')?.remove();
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
         new bootstrap.Modal(document.getElementById('toastHistoryModal')).show();
     },
 
@@ -191,8 +211,28 @@ const statusManager = {
             const data = await response.json();
             
             if (data.status === 'success') {
+                // Find the row and update its visibility if it's a sensor
+                if (type === 'sensor') {
+                    const sensorRow = document.querySelector(`[data-sensor-id="${id}"]`);
+                    const hideInactiveSwitch = document.getElementById('hideSensorInactiveSwitch');
+                    
+                    if (sensorRow && hideInactiveSwitch) {
+                        sensorRow.setAttribute('data-sensor-active', data.is_active.toString());
+                        // Only hide if switch is checked and sensor is now inactive
+                        if (hideInactiveSwitch.checked && !data.is_active) {
+                            sensorRow.classList.add('d-none');
+                        } else {
+                            sensorRow.classList.remove('d-none');
+                        }
+                    }
+                }
+
                 document.dispatchEvent(new CustomEvent(`${type}StatusChanged`, {
-                    detail: { isActive: data.is_active, id, type }
+                    detail: { 
+                        id, 
+                        type,
+                        isActive: data.is_active 
+                    }
                 }));
                 toastSystem.show(data.message, data.type);
                 return data;
@@ -258,23 +298,22 @@ const statusManager = {
             document.body.insertAdjacentHTML('beforeend', modalHtml);
         }
 
-        console.log('Initializing device toggles...');
+
         const deviceToggles = document.querySelectorAll('.device-status-toggle');
-        console.log('Found device toggles:', deviceToggles.length);
+
 
         deviceToggles.forEach(toggle => {
-            console.log('Setting up toggle for device:', toggle.dataset.deviceId);
             
             // Remove any existing event listeners
             toggle.removeEventListener('change', this.handleDeviceToggle);
             
             // Add new event listener
             toggle.addEventListener('change', async function(e) {
-                e.preventDefault();
+            e.preventDefault();
                 console.log('Device toggle changed!');
                 
-                const deviceId = this.dataset.deviceId;
-                const placeSlug = this.dataset.placeSlug;
+            const deviceId = this.dataset.deviceId;
+            const placeSlug = this.dataset.placeSlug;
                 const newStatus = this.checked;
                 const statusLabel = document.getElementById(`deviceStatusLabel_${deviceId}`);
                 const deviceCard = document.getElementById(`deviceCard_${deviceId}`);
@@ -302,8 +341,8 @@ const statusManager = {
                 if (!newStatus) {
                     try {
                         const response = await fetch(`/api/${placeSlug}/device/${deviceId}/active_sensors/`);
-                        const data = await response.json();
-                        
+                const data = await response.json();
+
                         if (data.status === 'success' && data.sensors.length > 0) {
                             // Show warning about sensors that will be deactivated
                             modal.querySelector('.confirmation-message').textContent = 'Are you sure you want to deactivate this device? This will also deactivate all associated sensors:';
@@ -315,12 +354,12 @@ const statusManager = {
                             ).join('');
                             
                             modal.querySelector('.affected-sensors-list').classList.remove('d-none');
-                        } else {
+                } else {
                             // No active sensors to warn about
                             modal.querySelector('.confirmation-message').textContent = 'Are you sure you want to deactivate this device?';
                             modal.querySelector('.affected-sensors-list').classList.add('d-none');
-                        }
-                    } catch (error) {
+                }
+            } catch (error) {
                         console.error('Error fetching active sensors:', error);
                         modal.querySelector('.confirmation-message').textContent = 'Are you sure you want to deactivate this device?';
                         modal.querySelector('.affected-sensors-list').classList.add('d-none');
@@ -349,25 +388,25 @@ const statusManager = {
                     this.style.opacity = result.is_active ? '1' : '0.5';
                     
                     // Update the status label if it exists
-                    if (statusLabel) {
+    if (statusLabel) {
                         statusLabel.textContent = result.is_active ? 'Active' : 'inactive';
                         statusLabel.className = `form-check-label status-label ${result.is_active ? 'text-success' : 'text-danger'}`;
-                    }
-                    
+    }
+    
                     // Update the device card styling if it exists
-                    if (deviceCard) {
+    if (deviceCard) {
                         deviceCard.className = `card rounded-3 shadow-sm border-0 mb-4 ${!result.is_active ? 'opacity-50' : ''}`;
                         
                         // Update all value text colors in device card
-                        deviceCard.querySelectorAll('dd').forEach(dd => {
-                            if (!dd.querySelector('.form-check')) {
+        deviceCard.querySelectorAll('dd').forEach(dd => {
+            if (!dd.querySelector('.form-check')) {
                                 dd.classList.toggle('text-muted', !result.is_active);
-                            }
-                        });
-                    }
+            }
+        });
+    }
 
                     // Update device row if it exists
-                    if (deviceRow) {
+    if (deviceRow) {
                         deviceRow.classList.toggle('opacity-50', !result.is_active);
                         deviceRow.classList.toggle('text-muted', !result.is_active);
                         deviceRow.setAttribute('data-device-active', result.is_active.toString());
@@ -475,14 +514,14 @@ const statusManager = {
                                 if (hideInactiveSwitch && hideInactiveSwitch.checked) {
                                     row.classList.add('hidden');
                                 }
-                            } else {
+        } else {
                                 // When device is activated, only enable controls but maintain visual state based on sensor's active state
                                 const sensorActive = row.getAttribute('data-sensor-active') === 'true';
                                 
                                 // Keep opacity and text-muted if sensor itself is inactive
                                 if (sensorActive) {
-                                    row.classList.remove('text-muted', 'opacity-50');
-                                }
+                row.classList.remove('text-muted', 'opacity-50');
+            }
                                 
                                 const toggle = row.querySelector('.sensor-status-toggle');
                                 if (toggle) {
@@ -499,18 +538,18 @@ const statusManager = {
                                 row.querySelectorAll('.btn-group .btn').forEach(btn => {
                                     btn.disabled = !sensorActive;
                                 });
-                            }
-                        });
+        }
+    });
 
-                        // Update all buttons in the sensors card
-                        const buttons = sensorsCard.querySelectorAll('button:not(.sensor-status-toggle), a.btn');
-                        buttons.forEach(button => {
+    // Update all buttons in the sensors card
+    const buttons = sensorsCard.querySelectorAll('button:not(.sensor-status-toggle), a.btn');
+    buttons.forEach(button => {
                             button.disabled = !result.is_active;
-                        });
+    });
 
-                        // Update the Add Sensor button
-                        const addSensorBtn = sensorsCard.querySelector('.card-header a.btn-primary');
-                        if (addSensorBtn) {
+    // Update the Add Sensor button
+    const addSensorBtn = sensorsCard.querySelector('.card-header a.btn-primary');
+    if (addSensorBtn) {
                             addSensorBtn.disabled = !result.is_active;
                         }
                     }
@@ -565,7 +604,7 @@ const statusManager = {
 
         document.querySelectorAll('.sensor-status-toggle').forEach(toggle => {
             toggle.addEventListener('change', async function(e) {
-                e.preventDefault();
+            e.preventDefault();
                 
                 const sensorId = this.dataset.sensorId;
                 const placeSlug = this.dataset.placeSlug;
@@ -595,8 +634,8 @@ const statusManager = {
                     
                     if (!result) {
                         this.checked = !newStatus;
-                        return;
-                    }
+                    return;
+                }
 
                     // Update the toggle state
                     this.checked = result.is_active;
@@ -630,7 +669,7 @@ const statusManager = {
                 // Set up the confirmation button click handler
                 confirmButton.addEventListener('click', handleConfirm);
 
-                // Show the modal
+            // Show the modal
                 modalInstance.show();
 
                 // Clean up the event listener when the modal is hidden
@@ -703,9 +742,9 @@ const timeDisplay = {
                 setTimeout(() => {
                     tooltip.setContent({ '.tooltip-inner': originalTitle });
                 }, 1000);
-            });
         });
-    }
+    });
+}
 };
 
 // Navigation System
@@ -719,17 +758,17 @@ const navigationSystem = {
         const siteMapMarkers = document.querySelectorAll('.location-marker[data-active]');
 
         const filterLocations = () => {
-            const hideInactive = hideInactiveSwitch.checked;
-            
+        const hideInactive = hideInactiveSwitch.checked;
+        
             // Filter list items
             locationItems.forEach(item => {
                 item.classList.toggle('hidden', hideInactive && item.getAttribute('data-active') === 'false');
-            });
+        });
 
-            // Filter map markers
+        // Filter map markers
             siteMapMarkers.forEach(marker => {
                 marker.style.display = (hideInactive && marker.getAttribute('data-active') === 'false') ? 'none' : 'block';
-            });
+        });
         };
 
         // Initial filter
@@ -820,14 +859,11 @@ const navigationSystem = {
             const hideInactive = hideInactiveSwitch.checked;
             sensorRows.forEach(row => {
                 const isActive = row.getAttribute('data-sensor-active') === 'true';
-                row.classList.toggle('hidden', hideInactive && !isActive);
+                row.classList.toggle('d-none', hideInactive && !isActive);
             });
         };
 
-        // Initial filter
         filterSensors();
-
-        // Filter on toggle change
         hideInactiveSwitch.addEventListener('change', filterSensors);
     }
 };
@@ -927,8 +963,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 });
-            });
         });
+    });
 
         observer.observe(messagesContainer, {
             childList: true,

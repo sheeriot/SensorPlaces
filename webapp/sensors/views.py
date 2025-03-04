@@ -286,42 +286,26 @@ class LocationListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        locations = self.get_queryset()
-        ic([vars(location) for location in locations])
-        # Add place context if slug provided
         place_slug = self.kwargs.get('place_slug')
 
         if place_slug:
-            place = get_object_or_404(Place, slug=place_slug)
-            context['place'] = place
-            context['active_tab'] = 'locations'  # Set active tab for locations
-
-            # Create map centered on place
-            if not place.site_plan:
-                m = folium.Map(
-                    location=[float(place.latitude), float(place.longitude)],
-                    zoom_start=15
+            locations = Location.objects.filter(
+                place__slug=place_slug
+            ).annotate(
+                active_devices_count=Count(
+                    'devices',
+                    filter=Q(devices__is_active=True)
+                ),
+                inactive_devices_count=Count(
+                    'devices',
+                    filter=Q(devices__is_active=False)
                 )
-                
-                # Add marker for the place
-                folium.Marker(
-                    location=[float(place.latitude), float(place.longitude)],
-                    popup=place.name,
-                    tooltip=place.name,
-                    icon=folium.Icon(color='red', icon='info-sign')
-                ).add_to(m)
-                
-                # Add markers for all locations
-                for location in self.get_queryset():
-                    if location.x_coord and location.y_coord:
-                        folium.Marker(
-                            location=[float(location.x_coord), float(location.y_coord)],
-                            popup=location.name,
-                            tooltip=location.name + ' ' + (str(location.active_devices_count) if location.active_devices_count > 0 else ''),
-                            icon=folium.Icon(color='blue', icon='info-sign')
-                        ).add_to(m)
-                
-                context['map_html'] = m._repr_html_()
+            ).order_by('name')
+
+            context['locations'] = locations
+            
+            if self.kwargs.get('location_pk'):
+                context['location'] = locations.filter(pk=self.kwargs.get('location_pk')).first()
 
         return context
 
@@ -491,11 +475,19 @@ class DeviceListView(ListView):
             if location_pk:
                 queryset = queryset.filter(location_id=location_pk)
         
-        return queryset.select_related('location', 'location__place').prefetch_related(
+        return queryset.select_related(
+            'location', 
+            'location__place'
+        ).prefetch_related(
             'sensors'
         ).annotate(
             active_sensors=Count('sensors', filter=Q(sensors__is_active=True)),
             total_sensors=Count('sensors')
+        ).order_by(
+            '-location__is_active',  # Active locations first
+            'location__name',
+            '-is_active',           # Active devices first
+            'name'
         )
 
     def get_context_data(self, **kwargs):
@@ -504,31 +496,29 @@ class DeviceListView(ListView):
         place_slug = self.kwargs.get('place_slug')
         location_pk = self.kwargs.get('location_pk')
         
-        if place_slug:
-            place = get_object_or_404(Place, slug=place_slug)
-            context['place'] = place
-            context['active_tab'] = 'devices'  # Set active tab for devices
-            
-            # Get locations with prefetched devices and their sensor counts
-            locations = Location.objects.filter(place=place).prefetch_related(
-                'devices'
-            ).annotate(
-                active_devices=Count('devices', filter=Q(devices__is_active=True)),
-                total_devices=Count('devices')
-            )
-            context['locations'] = locations
-            
-            if location_pk:
-                location = get_object_or_404(locations, pk=location_pk)
-                context['location'] = location
-                
-                # Get other devices for this location
-                context['other_devices'] = self.get_queryset().filter(
-                    location=location
-                ).exclude(
-                    pk__in=[d.pk for d in context['devices']] if 'devices' in context else []
-                )
+        place = get_object_or_404(Place, slug=place_slug)
+        context['place'] = place
+        context['active_tab'] = 'devices'  # Set active tab for devices
         
+         # Get locations for this place with correct device count annotations
+        context['locations'] = Location.objects.filter(place=place).prefetch_related(
+            'devices'
+        ).annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        )
+        
+        if location_pk:
+            location = get_object_or_404(locations, pk=location_pk)
+            context['location'] = location
+            
+            # Get other devices for this location
+            context['other_devices'] = self.get_queryset().filter(
+                location=location
+            ).exclude(
+                pk__in=[d.pk for d in context['devices']] if 'devices' in context else []
+            )
+    
         return context
 
 class DeviceDetailView(DetailView):
@@ -670,7 +660,6 @@ class DeviceCreateView(SuccessMessageMixin, CreateView):
         # Fall back to the default URL if no referrer
         return reverse('sensors:device_detail', kwargs={
             'place_slug': self.kwargs.get('place_slug'),
-            'location_pk': self.kwargs.get('location_pk'),
             'pk': self.object.pk
         })
 
@@ -834,7 +823,7 @@ class SensorListView(ListView):
     context_object_name = 'sensors'
     template_name = 'sensors/sensor_list.html'
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         queryset = super().get_queryset()
         place_slug = self.kwargs.get('place_slug')
         location_pk = self.kwargs.get('location_pk')
@@ -846,8 +835,19 @@ class SensorListView(ListView):
                 queryset = queryset.filter(device__location_id=location_pk)
             if device_pk:
                 queryset = queryset.filter(device_id=device_pk)
-        
-        return queryset.select_related('device', 'device__location', 'device__location__place')
+
+        return queryset.select_related(
+            'device', 
+            'device__location', 
+            'device__location__place'
+        ).order_by(
+            '-device__location__is_active',  # Active locations first
+            'device__location__name',
+            '-device__is_active',           # Active devices first
+            'device__name',
+            '-is_active',                   # Active sensors first
+            'name'
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -861,12 +861,12 @@ class SensorListView(ListView):
             place = get_object_or_404(Place, slug=place_slug)
             context['place'] = place
             
-            # Get locations with prefetched devices and their sensor counts
+            # Get locations with prefetched devices and their device counts
             locations = Location.objects.filter(place=place).prefetch_related(
                 'devices'
             ).annotate(
-                active_devices=Count('devices', filter=Q(devices__is_active=True)),
-                total_devices=Count('devices')
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
             )
             context['locations'] = locations
             
@@ -901,7 +901,6 @@ class SensorDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['active_tab'] = 'sensors'
         
         sensor = self.get_object()
         device = sensor.device
@@ -912,13 +911,14 @@ class SensorDetailView(DetailView):
         context['location'] = location
         context['place'] = place
         
-        # Get locations for this place
-        context['locations'] = Location.objects.filter(place=place).prefetch_related(
+        # Get locations with prefetched devices and their sensor counts
+        locations = Location.objects.filter(place=place).prefetch_related(
             'devices'
         ).annotate(
-            active_devices=Count('devices', filter=Q(devices__is_active=True)),
-            total_devices=Count('devices')
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
         )
+        context['locations'] = locations
         
         # Get devices for this location
         context['devices'] = Device.objects.filter(
@@ -928,8 +928,8 @@ class SensorDetailView(DetailView):
         ).prefetch_related(
             'sensors'
         ).annotate(
-            active_sensors=Count('sensors', filter=Q(sensors__is_active=True)),
-            total_sensors=Count('sensors')
+            total_active_sensors=Count('sensors', filter=Q(sensors__is_active=True)),
+            total_inactive_sensors=Count('sensors', filter=Q(sensors__is_active=False))
         )
         
         context['influx_readings'] = get_sensor_readings(
@@ -968,6 +968,14 @@ class SensorCreateView(SuccessMessageMixin, CreateView):
         
         location = device.location
         context['location'] = location
+        # Get locations with prefetched devices and their sensor counts
+        locations = Location.objects.filter(place=place).prefetch_related(
+            'devices'
+        ).annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        )
+        context['locations'] = locations
         
         return context
 
@@ -1023,13 +1031,14 @@ class SensorUpdateView(SuccessMessageMixin, UpdateView):
         context['location'] = location
         context['device'] = device
 
-        # Get locations for this place
-        context['locations'] = Location.objects.filter(place=place).prefetch_related(
+        # Get locations with prefetched devices and their sensor counts
+        locations = Location.objects.filter(place=place).prefetch_related(
             'devices'
         ).annotate(
-            active_devices=Count('devices', filter=Q(devices__is_active=True)),
-            total_devices=Count('devices')
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
         )
+        context['locations'] = locations
         
         # Get devices for this location
         context['devices'] = Device.objects.filter(location=location
@@ -1292,7 +1301,7 @@ class DeviceToggleActiveView(View):
             inactive_devices_count = location.devices.filter(is_active=False).count()
             
             # Get total active devices count for the place
-            total_active_devices = Device.objects.filter(
+            active_devices_count = Device.objects.filter(
                 location__place=location.place,
                 is_active=True
             ).count()
@@ -1319,7 +1328,7 @@ class DeviceToggleActiveView(View):
                 'is_active': device.is_active,
                 'active_devices_count': active_devices_count,
                 'inactive_devices_count': inactive_devices_count,
-                'total_active_devices': total_active_devices,
+                'active_devices_count': active_devices_count,
                 'location_id': location.pk,
                 'affected_sensors': affected_sensors,
                 'type': 'warning' if not is_active and affected_sensors else 'success'  # Set toast type based on activation status and affected sensors
@@ -1397,7 +1406,7 @@ class DeviceMoveLocationView(View):
                 'new_location_name': new_location.name,
                 'old_location_count': old_location_count,
                 'new_location_count': new_location_count,
-                'total_active_devices': Device.objects.filter(
+                'active_devices_count': Device.objects.filter(
                     location__place=device.location.place,
                     is_active=True
                 ).count()

@@ -11,15 +11,15 @@
     <!-- Two Column Layout for Locations and Devices -->
     <div class="row">
         <div class="col-md-4">
-            {% include "sensors/includes/place_nav_card.html" with place=place locations=locations %}
+            {% include "sensors/includes/place_nav_card.html" with place=place location=location device=device locations=locations %}
         </div>
         <!-- right column -->
         <div class="col-md-8">
             {% if device %}
                 <div class="mb-3">Device: {{ device.name }}</div>
-                {% include "sensors/includes/sensor_list_card.html" with place=place device=device %}
+                {% include "sensors/includes/sensor_list_card.html" with place=place device=device location=location locations=locations sensors=sensors %}
             {% else %}
-                {% include "sensors/includes/sensor_list_card.html" with place=place devices=devices %}
+                {% include "sensors/includes/sensor_list_card.html" with place=place devices=devices locations=locations sensors=sensors %}
             {% endif %}
         </div>
     </div>
