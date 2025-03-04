@@ -1,7 +1,8 @@
 <!-- webapp/sensors/templates/sensors/includes/sensor_row.html -->
 <tr class="sensor-row {% if not sensor.is_active %}opacity-50 text-muted{% endif %}" 
     data-sensor-active="{{ sensor.is_active|lower }}" 
-    data-sensor-id="{{ sensor.pk }}">
+    data-sensor-id="{{ sensor.pk }}"
+    data-device-id="{{ device.pk }}">
     <td>
         <a href="{% url 'sensors:sensor_detail' place_slug=device.location.place.slug pk=sensor.pk %}" class="text-decoration-none">
             <i class="bi bi-thermometer me-2"></i>{{ sensor.name }}

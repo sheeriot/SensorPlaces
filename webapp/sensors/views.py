@@ -1273,6 +1273,11 @@ class DeviceToggleActiveView(View):
             data = json.loads(request.body)
             is_active = data.get('is_active', False)
             
+            # If deactivating, get list of active sensors first
+            affected_sensors = []
+            if not is_active:
+                affected_sensors = list(device.sensors.filter(is_active=True).values('name', 'sensor_type'))
+            
             # Update device status
             device.is_active = is_active
             device.save()
@@ -1299,6 +1304,15 @@ class DeviceToggleActiveView(View):
                 f'<i class="bi bi-hdd-rack"></i> {device.name} '
                 f'{is_active and "activated" or "deactivated"}'
             )
+            
+            # If sensors were affected, add them to the message
+            if affected_sensors:
+                message += '<br><br>The following sensors were deactivated:'
+                message += '<ul class="mb-0">'
+                for sensor in affected_sensors:
+                    message += f'<li><i class="bi bi-thermometer"></i> {sensor["name"]} ({sensor["sensor_type"]})</li>'
+                message += '</ul>'
+            
             return JsonResponse({
                 'status': 'success',
                 'message': message,
@@ -1307,7 +1321,8 @@ class DeviceToggleActiveView(View):
                 'inactive_devices_count': inactive_devices_count,
                 'total_active_devices': total_active_devices,
                 'location_id': location.pk,
-                'type': 'success' if is_active else 'danger'  # Set toast type based on activation status
+                'affected_sensors': affected_sensors,
+                'type': 'warning' if not is_active and affected_sensors else 'success'  # Set toast type based on activation status and affected sensors
             })
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)

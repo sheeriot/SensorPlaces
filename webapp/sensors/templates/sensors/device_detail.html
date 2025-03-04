@@ -30,13 +30,4 @@
     </div>
 </div>
 
-{% for location in locations %}
-<div class="col-md-4">
-    <div>
-        {{ location.name }}
-        {{ location.active_devices_count }}
-        {{ location.inactive_devices_count }}
-    </div>
-</div>
-{% endfor %}
 {% endblock %}
