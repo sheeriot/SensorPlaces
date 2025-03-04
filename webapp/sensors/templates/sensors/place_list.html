@@ -102,7 +102,11 @@
         </h5>
     </div>
     <div class="card-body p-0">
-        {{ map_html|safe }}
+        {% if place_map_html %}
+            <div class="map-container">
+                {{ place_map_html|safe }}
+            </div>
+        {% endif %}
     </div>
 </div>
 

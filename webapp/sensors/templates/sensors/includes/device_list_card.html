@@ -38,9 +38,7 @@
                             <th style="width: 10%" class="text-end">Actions</th>
                         </tr>
                         {% for device in devices %}
-                        <tr>
                             {% include "sensors/includes/device_row.html" with place=place device=device %}
-                        </tr>
                         {% endfor %}
                     {% else %}
                         {% regroup devices by location as location_list %}
@@ -65,9 +63,7 @@
                                 <th style="width: 10%" class="text-end">Actions</th>
                             </tr>
                             {% for device in location.list %}
-                            <tr class="table-light {% if not device.is_active %}text-muted opacity-50 d-none{% endif %}">
                                 {% include "sensors/includes/device_row.html" with place=place device=device %}
-                            </tr>
                             {% endfor %}
                         {% endfor %}
                     {% endif %}

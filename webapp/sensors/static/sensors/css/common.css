@@ -13,6 +13,12 @@
     font-family: var(--sensor-font-mono);
 }
 
+/* Map Preview */
+.preview-map {
+    height: 300px;
+    border-radius: 0.25rem;
+}
+
 /* Toast System */
 .toast-container {
     position: fixed;

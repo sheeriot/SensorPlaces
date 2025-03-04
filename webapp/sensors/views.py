@@ -80,7 +80,6 @@ class PlaceListView(ListView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
         places = self.get_queryset()
-        # places)
         
         # Get geographic center of all places
         center_lat, center_lon = self.get_map_center(places)
@@ -89,7 +88,6 @@ class PlaceListView(ListView):
         
         # Add markers for all places
         for place in places:
-            # vars(place))
             marker_color = 'green' if place.is_active else 'red'
             # Create rich tooltip with place details
             tooltip_html = f'''
@@ -110,9 +108,44 @@ class PlaceListView(ListView):
                 options={'className': 'inactive-place' if not place.is_active else ''}
             ).add_to(m)
         
-        # Add the map HTML to context
-        context['map_html'] = m._repr_html_()
+        # Add the map HTML to context with consistent naming
+        context['place_map_html'] = m._repr_html_()
         return context
+
+def place_map_create(latitude, longitude, name, zoom_start=15, color='red', icon='info-sign'):
+    """
+    Create a Folium map for a place with a marker at the specified location.
+    
+    Args:
+        latitude (float): Latitude coordinate
+        longitude (float): Longitude coordinate
+        name (str): Place name to display in popup and tooltip
+        zoom_start (int): Initial zoom level
+        color (str): Color of the marker icon
+        icon (str): Icon name from FontAwesome
+        
+    Returns:
+        str or None: HTML representation of the map if successful, None otherwise
+    """
+    if not latitude or not longitude:
+        return None
+        
+    try:
+        m = folium.Map(
+            location=[float(latitude), float(longitude)],
+            zoom_start=zoom_start
+        )
+        
+        folium.Marker(
+            location=[float(latitude), float(longitude)],
+            popup=name,
+            tooltip=name,
+            icon=folium.Icon(color=color, icon=icon)
+        ).add_to(m)
+        
+        return m._repr_html_()
+    except (ValueError, TypeError):
+        return None
 
 class PlaceDetailView(DetailView):
     model = Place
@@ -131,28 +164,16 @@ class PlaceDetailView(DetailView):
         locations = place.locations.annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).order_by('name')
+        ).order_by('-is_active', 'name')
         
         context['locations'] = locations
         
-        # Create map centered on place
-        if place.latitude and place.longitude:
-            m = folium.Map(
-                location=[float(place.latitude), float(place.longitude)],
-                zoom_start=15
-            )
-            
-            # Add marker for the place
-            folium.Marker(
-                location=[float(place.latitude), float(place.longitude)],
-                popup=place.name,
-                tooltip=place.name,
-                icon=folium.Icon(color='red', icon='info-sign')
-            ).add_to(m)
-            
-            context['map_html'] = m._repr_html_()
-            context['show_map'] = True
-
+        # Create map using utility function
+        context['place_map_html'] = place_map_create(
+            place.latitude,
+            place.longitude,
+            place.name
+        )
         context.update({
             'devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
             'devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
@@ -273,49 +294,24 @@ class LocationListView(ListView):
     context_object_name = 'locations'
     template_name = 'sensors/location_list.html'
 
-    def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset()
-        
-        # Filter by place if slug provided
+    def get_queryset(self):
         place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            queryset = queryset.filter(place__slug=place_slug)
-        # Annotate with device active counts
-        return queryset.annotate(
-            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        )
-
+        return Location.objects.filter(place__slug=place_slug).order_by('name')
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
+        context['place'] = place
         context['model_name'] = 'location'
-        place_slug = self.kwargs.get('place_slug')
-        context['place'] = get_object_or_404(Place, slug=place_slug)
-
-        context['locations'] = Location.objects.filter(
-            place__slug=place_slug
-        ).annotate(
-            active_devices_count=Count(
-                'devices',
-                filter=Q(devices__is_active=True)
-            ),
-            inactive_devices_count=Count(
-                'devices',
-                filter=Q(devices__is_active=False)
-            )
-        ).order_by('-is_active', 'name')
-
-        # Add site plan context
-        place = context['place']
-        if place.site_plan:
-            context['show_site_plan'] = True
-            context['site_plan_url'] = place.site_plan.url
-            context['site_plan_scale'] = place.site_plan_scale or 1.0
-            context['site_plan_x'] = place.site_plan_x or 0
-            context['site_plan_y'] = place.site_plan_y or 0
-        else:
-            context['show_site_plan'] = False
-
+        
+        # Create map using utility function
+        context['place_map_html'] = place_map_create(
+            place.latitude,
+            place.longitude,
+            place.name,
+            zoom_start=13  # Slightly zoomed out for location list view
+        )
+        
         return context
 
 class LocationDetailView(DetailView):

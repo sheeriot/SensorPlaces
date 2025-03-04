@@ -17,7 +17,12 @@
     <!-- Right Column: Locations and Site Plan -->
     <div class="col-md-8">
         {% include "sensors/includes/locations_list_card.html" with place=place locations=locations %}
-        {% include "sensors/includes/site_plan_card.html" with place=place locations=locations %}
+        {% if place_map_html %}
+            <div class="map-container">
+                {{ place_map_html|safe }}
+            </div>
+        {% endif %}
+        {# {% include "sensors/includes/site_plan_card.html" with place=place locations=locations %} #}
     </div>
 </div>
 

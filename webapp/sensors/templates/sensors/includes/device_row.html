@@ -1,5 +1,5 @@
 {% load static %}
-<tr class="device-row {% if not device.is_active %}opacity-50 text-muted d-none{% endif %}" data-device-active="{{ device.is_active|lower }}" data-device-id="{{ device.pk }}">
+<tr class="device-row {% if not device.is_active %}opacity-50 text-muted{% endif %}" data-device-active="{{ device.is_active|lower }}" data-device-id="{{ device.pk }}">
     <td>
         <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
             <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}
@@ -14,7 +14,6 @@
                    data-device-id="{{ device.pk }}"
                    data-location-id="{{ device.location.pk }}"
                    data-place-slug="{{ place.slug }}"
-                   style="opacity: {% if device.is_active %}1{% else %}0.5{% endif %};"
                    {% if device.is_active %}checked{% endif %}
                    {% if not device.location.is_active %}disabled{% endif %}>
             <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 

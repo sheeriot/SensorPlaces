@@ -3,6 +3,70 @@ if (typeof window.currentPlaceSlug === 'undefined') {
     window.currentPlaceSlug = null;
 }
 
+// Map Initialization
+function initializeLocationMap(options = {}) {
+    const {
+        mapId = 'preview-map',
+        latInputId,
+        lonInputId,
+        initialLat = 30.26715,
+        initialLon = -97.74306,
+        zoom = 13
+    } = options;
+
+    const map = L.map(mapId).setView([initialLat, initialLon], zoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker = L.marker([initialLat, initialLon], {
+        draggable: true,
+        title: 'Drag me or click anywhere on the map!'
+    }).addTo(map);
+
+    marker.bindPopup('Drag me or click anywhere to set location!');
+    marker.openPopup();
+
+    if (latInputId && lonInputId) {
+        const latInput = document.getElementById(latInputId);
+        const lonInput = document.getElementById(lonInputId);
+
+        function updateMarker() {
+            const lat = parseFloat(latInput.value) || initialLat;
+            const lon = parseFloat(lonInput.value) || initialLon;
+            marker.setLatLng([lat, lon]);
+            map.setView([lat, lon], zoom);
+        }
+
+        if (latInput && lonInput) {
+            if (latInput.value && lonInput.value) {
+                updateMarker();
+            }
+
+            latInput.addEventListener('input', updateMarker);
+            lonInput.addEventListener('input', updateMarker);
+
+            map.on('click', function(e) {
+                const lat = e.latlng.lat.toFixed(5);
+                const lng = e.latlng.lng.toFixed(5);
+                latInput.value = lat;
+                lonInput.value = lng;
+                updateMarker();
+            });
+
+            marker.on('dragend', function(e) {
+                const position = e.target.getLatLng();
+                const lat = position.lat.toFixed(5);
+                const lng = position.lng.toFixed(5);
+                latInput.value = lat;
+                lonInput.value = lng;
+            });
+        }
+    }
+
+    return { map, marker };
+}
+
 // Utility Functions
 const utils = {
     getCookie(name) {
@@ -25,11 +89,23 @@ const utils = {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': this.getCookie('csrftoken'),
-            }
+            },
+            cache: 'no-store'
         };
         // Ensure URL doesn't start with double slashes
         url = url.replace(/^\/+/, '/');
-        return fetch(url, { ...defaultOptions, ...options });
+        
+        // Store original console.log
+        const originalLog = console.log;
+        // Temporarily disable console.log
+        console.log = function() {};
+        
+        try {
+            return await fetch(url, { ...defaultOptions, ...options });
+        } finally {
+            // Restore console.log
+            console.log = originalLog;
+        }
     }
 };
 
@@ -361,7 +437,7 @@ const toggleActiveManager = {
                 // If deactivating, first get the list of active sensors
                 if (!newStatus) {
                     try {
-                        const response = await fetch(`/api/${placeSlug}/device/${deviceId}/active_sensors/`);
+                        const response = await utils.fetchWithCSRF(`/api/${placeSlug}/device/${deviceId}/active_sensors/`);
                         const data = await response.json();
 
                         if (data.status === 'success' && data.sensors.length > 0) {
@@ -714,51 +790,53 @@ const timeDisplay = {
             hour >= 17 && hour < 21 ? this.themes.evening.color :
             this.themes.night.color;
 
-        // Get timezone offset
-        const offset = -now.getTimezoneOffset();
-        const offsetHours = Math.floor(Math.abs(offset) / 60);
-        const offsetMinutes = Math.abs(offset) % 60;
-        const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
-
-        // Get short timezone code
-        const shortTZ = new Intl.DateTimeFormat('en', { timeZoneName: 'short' })
-            .formatToParts(now)
-            .find(part => part.type === 'timeZoneName')?.value || '';
+        // Format date in YYYY/MM/DD format
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const dateStr = `${year}/${month}/${day}`;
         
-        // Format date and time
-        const dateString = now.toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-        });
-        
-        const timeString = now.toLocaleString('en-US', {
+        const timeStr = now.toLocaleString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
             hour12: false
         });
 
-        timeSpan.textContent = `${dateString} ${timeString} ${shortTZ} UTC${offsetString}`;
+        // Get timezone info
+        const shortTZ = new Intl.DateTimeFormat('en', { timeZoneName: 'short' })
+            .formatToParts(now)
+            .find(part => part.type === 'timeZoneName')?.value || '';
+
+        // Get offset in compact format
+        const offset = -now.getTimezoneOffset();
+        const offsetHours = Math.floor(Math.abs(offset) / 60);
+        const offsetMinutes = Math.abs(offset) % 60;
+        const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
         
+        // Update display with compact format
+        timeSpan.innerHTML = `<small>${dateStr} ${timeStr} ${offsetString} (${shortTZ})</small>`;
+        
+        // Update tooltip with full details
         const isoTime = now.toISOString();
         const unixTime = Math.floor(now.getTime() / 1000);
         const fullTimeString = now.toLocaleString('en-US', {
             weekday: 'long',
             year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
+            month: 'long',
+            day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
             hour12: false,
             timeZoneName: 'long'
         });
+        
         timeSpan.setAttribute('data-bs-title', 
             `${fullTimeString}\nISO: ${isoTime}\nUNIX: ${unixTime}\nClick to copy current timestamp`);
     },
 
-    initializeClickToCopy() {
+    initializeTimestampCopy() {
         const timeSpan = document.getElementById('localTime');
         if (!timeSpan) return;
 
@@ -772,66 +850,50 @@ const timeDisplay = {
                 setTimeout(() => {
                     tooltip.setContent({ '.tooltip-inner': originalTitle });
                 }, 1000);
+            });
         });
-    });
-}
+    }
 };
 
 // Navigation System
 const navigationSystem = {
     initializeLocationNav() {
-        const hideInactiveSwitch = document.getElementById('hideInactiveLocations');
-        if (!hideInactiveSwitch) return;
+        // Initialize list card switch
+        const hideInactiveListSwitch = document.getElementById('hideInactiveLocationsListCard');
+        if (hideInactiveListSwitch) {
+            const locationRows = document.querySelectorAll('.location-row[data-location-active]');
 
-        const locationCard = hideInactiveSwitch.closest('.card');
-        const locationItems = locationCard.querySelectorAll('.list-group-item[data-active]');
-        const siteMapMarkers = document.querySelectorAll('.location-marker[data-active]');
-
-        const filterLocations = () => {
-        const hideInactive = hideInactiveSwitch.checked;
-        
-            // Filter list items
-            locationItems.forEach(item => {
-                item.classList.toggle('d-none', hideInactive && item.getAttribute('data-active') === 'false');
-        });
-
-        // Filter map markers
-            siteMapMarkers.forEach(marker => {
-                marker.style.display = (hideInactive && marker.getAttribute('data-active') === 'false') ? 'none' : 'block';
-        });
-        };
-
-        // Initial filter
-        filterLocations();
-
-        // Filter on toggle change
-        hideInactiveSwitch.addEventListener('change', filterLocations);
-
-        // Update location stats every 30 seconds if we're on a place page
-        const placeSlug = document.body.dataset.placeSlug;
-        if (placeSlug) {
-            const updateLocationStats = async () => {
-                try {
-                    const response = await utils.fetchWithCSRF(`/api/${placeSlug}/stats/`);
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    
-                    const data = await response.json();
-                    data.locations.forEach(loc => {
-                        const activeCountEl = document.getElementById(`location-${loc.id}-active`);
-                        const inactiveCountEl = document.getElementById(`location-${loc.id}-inactive`);
-                        if (activeCountEl) activeCountEl.textContent = loc.active_devices_count;
-                        if (inactiveCountEl) inactiveCountEl.textContent = loc.inactive_devices_count || '0';
-                    });
-                } catch (error) {
-                    console.error('Error updating location stats:', error);
-                }
+            const filterLocationsList = () => {
+                const hideInactive = hideInactiveListSwitch.checked;
+                locationRows.forEach(row => {
+                    const isActive = row.getAttribute('data-location-active') === 'true';
+                    row.classList.toggle('d-none', hideInactive && !isActive);
+                });
             };
 
-            // Initial stats update
-            updateLocationStats();
+            // Initial filter
+            filterLocationsList();
+            // Filter on toggle change
+            hideInactiveListSwitch.addEventListener('change', filterLocationsList);
+        }
 
-            // Set up interval for updates
-            setInterval(updateLocationStats, 30000);
+        // Initialize place nav card switch
+        const hideInactivePlaceNavSwitch = document.getElementById('hideInactiveLocationsPlaceNavCard');
+        if (hideInactivePlaceNavSwitch) {
+            const locationItems = document.querySelectorAll('.list-group-item[data-active]');
+
+            const filterLocationsNav = () => {
+                const hideInactive = hideInactivePlaceNavSwitch.checked;
+                locationItems.forEach(item => {
+                    const isActive = item.getAttribute('data-active') === 'true';
+                    item.classList.toggle('d-none', hideInactive && !isActive);
+                });
+            };
+
+            // Initial filter
+            filterLocationsNav();
+            // Filter on toggle change
+            hideInactivePlaceNavSwitch.addEventListener('change', filterLocationsNav);
         }
     },
 
@@ -1111,8 +1173,6 @@ const sitePlanManager = {
         const markers = editorContainer.querySelectorAll('.location-marker');
         const placeSlug = window.currentPlaceSlug;
 
-        console.log('Starting saveChanges operation...');
-
         // Store original state for potential rollback and change comparison
         const originalState = {
             html: mainContainer.innerHTML,
@@ -1126,28 +1186,24 @@ const sitePlanManager = {
                 throw new Error('Place slug not found. Please refresh the page and try again.');
             }
 
-            console.log('Preparing marker position updates...');
             // Prepare marker position updates
             const markerPromises = Array.from(markers).map(marker => {
                 const locationId = marker.dataset.locationId;
                 const x = marker.dataset.x;
                 const y = marker.dataset.y;
                 
-                console.log(`Updating marker position for location ${locationId}: x=${x}, y=${y}`);
                 return utils.fetchWithCSRF(`/api/${placeSlug}/locations/${locationId}/position/`, {
                     method: 'POST',
                     body: JSON.stringify({ x_coord: x, y_coord: y })
                 });
             });
 
-            console.log('Preparing layout settings update...');
             // Prepare layout settings update
             const layoutData = {
                 site_plan_scale: this.currentScale,
                 site_plan_x: this.currentX,
                 site_plan_y: this.currentY
             };
-            console.log('Layout update data:', layoutData);
 
             // Combine all promises into a single Promise.all call
             const responses = await Promise.all([
@@ -1160,7 +1216,6 @@ const sitePlanManager = {
                 ...markerPromises
             ]);
             
-            console.log('All updates completed, checking responses...');
             // Check if any response was not ok
             for (const response of responses) {
                 if (!response.ok) {
@@ -1177,8 +1232,6 @@ const sitePlanManager = {
             if (this.modal) {
                 this.modal.hide();
             }
-            
-            console.log('Save operation completed successfully');
             
             // Build success message with changes
             let successParts = ['Layout saved successfully!'];
@@ -1220,6 +1273,49 @@ const sitePlanManager = {
     }
 };
 
+// Live Stats System
+const liveStats = {
+    async fetchAndUpdateStats() {
+        if (!window.currentPlaceSlug) return;
+        
+        try {
+            const response = await utils.fetchWithCSRF(`/api/${window.currentPlaceSlug}/stats/`);
+            if (!response.ok) throw new Error('Failed to fetch stats');
+            
+            const data = await response.json();
+            
+            // Update device counts
+            const devicesActive = document.getElementById('devices-active');
+            const devicesInactive = document.getElementById('devices-inactive');
+            if (devicesActive) devicesActive.textContent = data.devices_active;
+            if (devicesInactive) devicesInactive.textContent = data.devices_inactive;
+            
+            // Update sensor counts
+            const sensorsActive = document.getElementById('sensors-active');
+            const sensorsInactive = document.getElementById('sensors-inactive');
+            if (sensorsActive) sensorsActive.textContent = data.sensors_active;
+            if (sensorsInactive) sensorsInactive.textContent = data.sensors_inactive;
+            
+            // Update location counts
+            const activeLocations = data.locations.filter(loc => loc.is_active).length;
+            const inactiveLocations = data.locations.filter(loc => !loc.is_active).length;
+            
+            const locationsActive = document.querySelector('.locations-active');
+            const locationsInactive = document.querySelector('.locations-inactive');
+            if (locationsActive) locationsActive.textContent = activeLocations;
+            if (locationsInactive) locationsInactive.textContent = inactiveLocations;
+            
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        }
+    },
+
+    startPolling(interval = 30000) { // Default to 30 seconds
+        this.fetchAndUpdateStats(); // Initial fetch
+        setInterval(() => this.fetchAndUpdateStats(), interval);
+    }
+};
+
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize toast system
@@ -1238,34 +1334,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize time display
     timeDisplay.update();
     setInterval(() => timeDisplay.update(), 1000);
-    timeDisplay.initializeClickToCopy();
+    timeDisplay.initializeTimestampCopy();
     
-    // Initialize device toggles
-    toggleActiveManager.initializeDeviceToggles();
+    // Initialize navigation systems
+    navigationSystem.initializeLocationNav();
+    navigationSystem.initializeDeviceNav();
+    navigationSystem.initializeDeviceList();
+    navigationSystem.initializeSensorList();
     
-    // Initialize sensor toggles
-    toggleActiveManager.initializeSensorToggles();
+    // Initialize site plan manager
+    sitePlanManager.initialize();
     
-    // Initialize status toggles
-    document.querySelectorAll('[data-toggle-type]').forEach(toggle => {
-        // Skip device toggles as they're handled by initializeDeviceToggles
-        if (toggle.classList.contains('device-status-toggle')) {
-            return;
-        }
-        
-        toggle.addEventListener('change', async function() {
-            const type = this.dataset.toggleType;
-            const id = this.dataset.id;
-            const placeSlug = this.dataset.placeSlug;
-            const currentState = this.checked;
-            
-            const result = await toggleActiveManager.toggleStatus(type, id, placeSlug, currentState);
-            if (!result) {
-                this.checked = !currentState; // Revert on failure
-            }
-        });
-    });
-    
+    // Initialize live stats
+    liveStats.startPolling();
+
     // Convert any Django messages to toasts
     document.querySelectorAll('.alert:not(.processed)').forEach(message => {
         const type = message.classList.contains('alert-success') ? 'success' :
@@ -1276,13 +1358,8 @@ document.addEventListener('DOMContentLoaded', function() {
                           message.textContent.trim();
         
         if (messageText) {
-            // Mark the message as processed
             message.classList.add('processed');
-            
-            // Remove the alert from DOM
             message.remove();
-            
-            // Show toast and automatically store in history
             toastSystem.show(messageText, type);
         }
     });
@@ -1302,40 +1379,26 @@ document.addEventListener('DOMContentLoaded', function() {
                                           node.textContent.trim();
                         
                         if (messageText) {
-                            // Mark the message as processed
                             node.classList.add('processed');
-                            
-                            // Remove the alert from DOM
                             node.remove();
-                            
-                            // Show toast and automatically store in history
                             toastSystem.show(messageText, type);
                         }
                     }
                 });
+            });
         });
-    });
 
         observer.observe(messagesContainer, {
             childList: true,
             subtree: true
         });
     }
-
-    // Initialize navigation
-    navigationSystem.initializeLocationNav();
-    navigationSystem.initializeDeviceNav();
-    navigationSystem.initializeDeviceList();
-    navigationSystem.initializeSensorList();
-
-    // Initialize site plan manager
-    sitePlanManager.initialize();
 });
 
 function showToast(message, type = 'info') {
     toastSystem.show({
         message: message,
         type: type,
-        addToHistory: true  // Ensure all toasts are added to history
+        addToHistory: true
     });
 }

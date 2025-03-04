@@ -14,13 +14,13 @@
                  data-x="{{ place.site_plan_x }}"
                  data-y="{{ place.site_plan_y }}">
             {% for location in locations %}
-                <div class="location-marker position-absolute p-1 {% if not location.is_active %}opacity-50 bg-secondary{% else %}bg-primary{% endif %}" 
+                <div class="location-marker {% if not location.is_active %}opacity-50 d-none{% endif %} position-absolute p-1" 
                      data-location-id="{{ location.pk }}"
-                     data-active="{{ location.is_active|lower }}"
+                     data-location-active="{{ location.is_active|lower }}"
                      data-x="{{ location.x_coord|default:50 }}"
                      data-y="{{ location.y_coord|default:50 }}"
                      style="left: {{ location.x_coord|default:50 }}%; top: {{ location.y_coord|default:50 }}%;">
-                    <div class="marker-content p-0 m-0">
+                    <div class="marker-content p-0 m-0 {% if location.is_active %}bg-primary{% else %}bg-secondary{% endif %}">
                         <div class="location-name p-0 m-0">{{ location.name }}</div>
                         <div class="device-count p-0 m-0">{{ location.active_devices_count }}</div>
                     </div>

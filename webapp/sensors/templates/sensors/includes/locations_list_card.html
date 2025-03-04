@@ -10,9 +10,9 @@ This template expects the following context variables:
         <div class="d-flex align-items-center gap-3">
             <h5 class="card-title mb-0"><i class="bi bi-geo-alt me-1"></i> Locations</h5>
             <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="hideInactiveSwitch" checked>
-                <label class="form-check-label" for="hideInactiveSwitch">
-                    Hide Inactive
+                <input class="form-check-input" type="checkbox" role="switch" id="hideInactiveLocationsListCard" checked>
+                <label class="form-check-label" for="hideInactiveLocationsListCard">
+                    Hide inactive
                 </label>
             </div>
         </div>
@@ -30,44 +30,12 @@ This template expects the following context variables:
                         <th>Name</th>
                         <th>Status</th>
                         <th>Devices</th>
-                        <th>Delete</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for location in locations %}
-                    <tr data-active="{{ location.is_active|lower }}">
-                        <td>
-                            <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
-                               class="btn btn-outline-info text-dark m-0 p-1 small d-flex align-items-center">
-                                <span class="d-inline-block text-truncate" style="max-width: 150px;">{{ location.name }}</span>
-                            </a>
-                        </td>
-                        <td>
-                            {% if location.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-danger">inactive</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="text-success">{{ location.active_devices_count }}</span>
-                            {% if location.inactive_devices_count %}
-                            <span class="text-body-secondary text-opacity-75">({{ location.inactive_devices_count }})</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{% url 'sensors:location_update' place_slug=place.slug pk=location.pk %}" 
-                                   class="btn btn-warning">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <a href="{% url 'sensors:location_delete' place_slug=place.slug pk=location.pk %}" 
-                                   class="btn btn-danger">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
+                        {% include "sensors/includes/location_row.html" with place=place location=location %}
                     {% empty %}
                     <tr>
                         <td colspan="4" class="text-center p-3">No locations found.</td>
