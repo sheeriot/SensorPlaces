@@ -21,7 +21,7 @@
             </span>
         </div>
         {% if model_name == 'device' %}
-        <div class="btn-group" role="group" aria-label="Device Actions">
+        <div class="btn-group">
             <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" 
                class="btn btn-warning btn-sm">
                 <i class="bi bi-pencil"></i>

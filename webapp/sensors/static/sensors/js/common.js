@@ -1,3 +1,8 @@
+// Global state
+if (typeof window.currentPlaceSlug === 'undefined') {
+    window.currentPlaceSlug = null;
+}
+
 // Utility Functions
 const utils = {
     getCookie(name) {
@@ -58,56 +63,65 @@ const toastSystem = {
         }
     },
 
-    show(message, type = 'success') {
-        // Add to history
-        this.history.unshift({
-            message,
-            type,
-            timestamp: new Date()
-        });
-        
-        // Keep history within limit
-        if (this.history.length > this.MAX_HISTORY) {
-            this.history = this.history.slice(0, this.MAX_HISTORY);
+    show(message, type = 'success', addToHistory = true) {
+        // Create toast data with consistent structure
+        const toastData = {
+            id: `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            message: typeof message === 'object' ? message.message : message,
+            type: typeof message === 'object' ? message.type : type,
+            timestamp: new Date().toISOString(),
+            addToHistory: typeof message === 'object' ? message.addToHistory : addToHistory
+        };
+
+        // Only add to history if addToHistory is true
+        if (toastData.addToHistory) {
+            // Add to history
+            this.history.unshift({
+                ...toastData,
+                timestamp: new Date(toastData.timestamp)
+            });
+            
+            // Keep history within limit
+            if (this.history.length > this.MAX_HISTORY) {
+                this.history = this.history.slice(0, this.MAX_HISTORY);
+            }
+            
+            // Save to server and update badge
+            this.saveHistory();
+            this.updateHistoryBadge();
         }
-        
-        this.saveHistory();
-        this.updateHistoryBadge();
         
         // Create toast container if it doesn't exist
         let toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
-            toastContainer.className = 'toast-container';
+            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
             document.body.appendChild(toastContainer);
         }
 
         // Create and show toast
-        const toastId = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const toastClass = `toast-${type}`; // Add a specific class for the toast type
-
         const toastHtml = `
-            <div class="toast fade show text-${type}" id="${toastId}">
+            <div class="toast fade show text-${toastData.type}" id="${toastData.id}">
                 <div class="d-flex align-items-center">
                     <div class="toast-body d-flex align-items-center flex-grow-1" style="font-family: 'monospace';">
                         <i class="bi bi-${
-                            type === 'success' ? 'check-circle' : 
-                            type === 'danger' ? 'exclamation-circle' :
-                            type === 'warning' ? 'exclamation-triangle' : 
+                            toastData.type === 'success' ? 'check-circle' : 
+                            toastData.type === 'danger' ? 'exclamation-circle' :
+                            toastData.type === 'warning' ? 'exclamation-triangle' : 
                             'info-circle'
                         } me-2"></i>
-                        <span>${message}</span>
+                        <span>${toastData.message}</span>
                     </div>
-                    <button type="button" class="btn-close me-2" data-bs-dismiss="toast" aria-label="Close"></button>
+                    <button type="button" class="btn-close me-2" data-bs-dismiss="toast"></button>
                 </div>
             </div>
         `;
 
         toastContainer.insertAdjacentHTML('afterbegin', toastHtml);
-        const toastEl = document.getElementById(toastId);
+        const toastEl = document.getElementById(toastData.id);
         
         const toast = new bootstrap.Toast(toastEl, {
-            delay: 20000,
+            delay: 5000,
             autohide: true
         });
         
@@ -123,17 +137,23 @@ const toastSystem = {
     },
 
     updateHistoryBadge() {
-    const badge = document.getElementById('toastHistoryBadge');
+        const badge = document.getElementById('toastHistoryBadge');
         if (badge) {
-            badge.textContent = this.history.length || '';
-            badge.classList.toggle('d-none', !this.history.length);
+            const count = this.history.length;
+            badge.textContent = count || '';
+            badge.classList.toggle('d-none', count === 0);
+            // Also update the aria-label for accessibility
+            const btn = document.getElementById('toastHistoryBtn');
+            if (btn) {
+                btn.setAttribute('aria-label', `Notification History (${count} notifications)`);
+            }
         }
     },
 
     showHistory() {
     const modalHtml = `
             <div class="modal fade" id="toastHistoryModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div class="modal-header">
                             <h5 class="modal-title">Notification History</h5>
@@ -141,16 +161,38 @@ const toastSystem = {
                     </div>
                     <div class="modal-body">
                         <div class="toast-history-list">
-                                ${this.history.map(toast => `
-                                <div class="toast-history-item">
-                                    <div class="toast-history-time font-monospace">
-                                        ${toast.timestamp.toLocaleTimeString()}
-                                    </div>
-                                        <div class="text-${toast.type} font-monospace">
-                                        ${toast.message}
-                                    </div>
-                                </div>
-                            `).join('')}
+                                ${this.history.map(toast => {
+                                    const timestamp = new Date(toast.timestamp);
+                                    const dateStr = timestamp.toLocaleString('en-US', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit'
+                                    });
+                                    const timeStr = timestamp.toLocaleString('en-US', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                        hour12: false
+                                    });
+                                    const shortTZ = new Intl.DateTimeFormat('en', { timeZoneName: 'short' })
+                                        .formatToParts(timestamp)
+                                        .find(part => part.type === 'timeZoneName')?.value || '';
+                                    const offset = -timestamp.getTimezoneOffset();
+                                    const offsetHours = Math.floor(Math.abs(offset) / 60);
+                                    const offsetMinutes = Math.abs(offset) % 60;
+                                    const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
+                                    
+                                    return `
+                                        <div class="toast-history-item mb-3">
+                                            <div class="toast-history-time font-monospace text-muted" style="font-size: 0.75em;">
+                                                ${dateStr} ${timeStr} ${shortTZ} UTC${offsetString}
+                                            </div>
+                                            <div class="text-${toast.type} font-monospace">
+                                                ${toast.message}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -670,28 +712,48 @@ const timeDisplay = {
             hour >= 17 && hour < 21 ? this.themes.evening.color :
             this.themes.night.color;
 
+        // Get timezone offset
         const offset = -now.getTimezoneOffset();
         const offsetHours = Math.floor(Math.abs(offset) / 60);
         const offsetMinutes = Math.abs(offset) % 60;
         const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
 
-        const weekday = now.toLocaleString('en-US', { weekday: 'long' });
-        const timeString = now.toLocaleString('en-US', {
+        // Get short timezone code
+        const shortTZ = new Intl.DateTimeFormat('en', { timeZoneName: 'short' })
+            .formatToParts(now)
+            .find(part => part.type === 'timeZoneName')?.value || '';
+        
+        // Format date and time
+        const dateString = now.toLocaleString('en-US', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
+        });
+        
+        const timeString = now.toLocaleString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
             hour12: false
         });
 
-        timeSpan.textContent = `${weekday}, ${timeString} (UTC${offsetString})`;
+        timeSpan.textContent = `${dateString} ${timeString} ${shortTZ} UTC${offsetString}`;
         
         const isoTime = now.toISOString();
         const unixTime = Math.floor(now.getTime() / 1000);
+        const fullTimeString = now.toLocaleString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+            timeZoneName: 'long'
+        });
         timeSpan.setAttribute('data-bs-title', 
-            `ISO: ${isoTime}\nUNIX: ${unixTime}\nClick to copy current timestamp`);
+            `${fullTimeString}\nISO: ${isoTime}\nUNIX: ${unixTime}\nClick to copy current timestamp`);
     },
 
     initializeClickToCopy() {
@@ -942,3 +1004,11 @@ document.addEventListener('DOMContentLoaded', function() {
     navigationSystem.initializeDeviceList();
     navigationSystem.initializeSensorList();
 });
+
+function showToast(message, type = 'info') {
+    toastSystem.show({
+        message: message,
+        type: type,
+        addToHistory: true  // Ensure all toasts are added to history
+    });
+}

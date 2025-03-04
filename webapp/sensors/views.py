@@ -16,6 +16,9 @@ from django.db.models.query import QuerySet
 from django.db.models import Count, Q
 import json
 from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin
+import time
+from django.utils import timezone
 
 from icecream import ic
 
@@ -663,11 +666,10 @@ class DeviceCreateView(SuccessMessageMixin, CreateView):
             'pk': self.object.pk
         })
 
-class DeviceUpdateView(SuccessMessageMixin, UpdateView):
+class DeviceUpdateView(UpdateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
-    success_message = "Device %(name)s was updated successfully"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -743,15 +745,55 @@ class DeviceUpdateView(SuccessMessageMixin, UpdateView):
         # Handle inactive state after save
         if not form.instance.is_active:
             self.object.sensors.all().update(is_active=False)
+        
+        # Create path string with icons
+        device = self.object
+        location = device.location
+        place = location.place
+        path = f'<i class="bi bi-house-gear"></i> {place.name} > <i class="bi bi-geo-alt"></i> {location.name} > <i class="bi bi-hdd-rack"></i> {device.name}'
+        
+        # Create status message
+        status_text = "active" if form.instance.is_active else "inactive"
+        message = f'Device updated: {path} ({status_text})'
+        
+        # Get or initialize toast history
+        toast_history = self.request.session.get('toast_history', [])
+        
+        # Create toast data
+        toast_data = {
+            'id': f'device_update_{device.pk}_{int(time.time())}',
+            'title': 'Device Update',
+            'message': message,
+            'type': 'success',
+            'timestamp': timezone.now().isoformat(),
+            'addToHistory': True
+        }
+        
+        # Add to history
+        toast_history.append(toast_data)
+        
+        # Trim history to last 50 items
+        toast_history = toast_history[-50:]
+        
+        # Update session
+        self.request.session['toast_history'] = toast_history
+        self.request.session.modified = True
             
         # Return JSON for AJAX requests
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
                 'status': 'success',
-                'message': self.get_success_message(form.cleaned_data),
+                'type': 'success',
+                'message': message,
+                'title': 'Device Update',
+                'addToHistory': True,
+                'id': toast_data['id'],
+                'timestamp': toast_data['timestamp'],
                 'redirect_url': self.get_success_url()
             })
-            
+        
+        # For non-AJAX requests, add to messages
+        messages.success(self.request, message)
         return response
 
 class DeviceDeleteView(DeleteView):

@@ -98,9 +98,9 @@ document.addEventListener('DOMContentLoaded', function() {
         locationNavItems.forEach(item => {
             const isActive = item.getAttribute('data-active') === 'true';
             if (hideInactive && !isActive) {
-                item.classList.add('hidden');
+                item.classList.add('d-none');
             } else {
-                item.classList.remove('hidden');
+                item.classList.remove('d-none');
             }
         });
 
