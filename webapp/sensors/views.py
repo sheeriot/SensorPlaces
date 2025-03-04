@@ -548,12 +548,12 @@ class DeviceDetailView(DetailView):
         context['location'] = location
         context['place'] = place
         
-        # Get locations for this place
+        # Get locations for this place with correct device count annotations
         context['locations'] = Location.objects.filter(place=place).prefetch_related(
             'devices'
         ).annotate(
-            active_devices=Count('devices', filter=Q(devices__is_active=True)),
-            total_devices=Count('devices')
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
         )
         context['sensors'] = device.sensors.all()
 

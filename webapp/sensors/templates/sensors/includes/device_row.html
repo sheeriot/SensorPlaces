@@ -1,5 +1,5 @@
 {% load static %}
-<tr class="device-row {% if device.is_active %}active{% else %}inactive text-muted opacity-50{% endif %}" data-device-active="{{ device.is_active|lower }}" data-device-id="{{ device.pk }}">
+<tr class="device-row {% if not device.is_active %}opacity-50 text-muted{% endif %}" data-device-active="{{ device.is_active|lower }}" data-device-id="{{ device.pk }}">
     <td>
         <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
             <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}

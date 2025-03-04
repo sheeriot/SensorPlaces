@@ -1,5 +1,5 @@
 <!-- webapp/sensors/templates/sensors/includes/sensor_row.html -->
-<tr class="sensor-row {% if not sensor.is_active %}inactive{% endif %}" 
+<tr class="sensor-row {% if not sensor.is_active %}opacity-50 text-muted{% endif %}" 
     data-sensor-active="{{ sensor.is_active|lower }}" 
     data-sensor-id="{{ sensor.pk }}">
     <td>

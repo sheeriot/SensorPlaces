@@ -78,27 +78,3 @@ This template expects the following context variables:
         </div>
     </div>
 </div>
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const hideInactiveSwitch = document.getElementById('hideInactiveSwitch');
-    const locationRows = document.querySelectorAll('tr[data-active]');
-
-    function filterLocations() {
-        const hideInactive = hideInactiveSwitch.checked;
-        locationRows.forEach(row => {
-            const isActive = row.dataset.active === 'true';
-            row.style.display = (hideInactive && !isActive) ? 'none' : '';
-        });
-    }
-
-    // Initial filter
-    hideInactiveSwitch.checked = true;  // Start with inactive locations hidden
-    filterLocations();
-
-    // Filter on toggle change
-    hideInactiveSwitch.addEventListener('change', filterLocations);
-});
-</script>
-{% endblock %} 

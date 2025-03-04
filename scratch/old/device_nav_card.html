@@ -47,4 +47,48 @@
             {% endfor %}
         </div>
     </div>
-</div> 
+</div>
+
+<style>
+.current-device {
+    background-color: #f0f7ff !important;
+    border-color: #dee2e6 !important;
+    color: inherit !important;
+}
+
+.current-device:hover {
+    background-color: #e5f1ff !important;
+}
+
+.small-label {
+    font-size: 0.7rem;
+    line-height: 0.9;
+    text-align: center;
+}
+
+.list-group-item.hidden {
+    display: none !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const hideInactiveSwitch = document.getElementById('hideInactiveDevicesNav');
+    const deviceCard = hideInactiveSwitch.closest('.card');
+    const deviceItems = deviceCard.querySelectorAll('.list-group-item[data-active]');
+
+    function filterDevices() {
+        const hideInactive = hideInactiveSwitch.checked;
+        
+        deviceItems.forEach(item => {
+            item.classList.toggle('hidden', hideInactive && item.getAttribute('data-active') === 'false');
+        });
+    }
+
+    // Initial filter
+    filterDevices();
+
+    // Filter on toggle change
+    hideInactiveSwitch.addEventListener('change', filterDevices);
+});
+</script> 

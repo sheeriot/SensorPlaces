@@ -14,7 +14,7 @@
                  data-y="{{ place.site_plan_y }}">
                 <!-- Move markers outside of the scaled content -->
             {% for location in locations %}
-                <div class="location-marker position-absolute p-1 {% if location.is_active %}active{% else %}inactive{% endif %}" 
+                <div class="location-marker position-absolute p-1 {% if not location.is_active %}opacity-50 bg-secondary{% else %}bg-primary{% endif %}" 
                      data-location-id="{{ location.pk }}"
                      data-active="{{ location.is_active|lower }}"
                      data-x="{{ location.x_coord|default:50 }}"

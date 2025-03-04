@@ -13,8 +13,8 @@
     <div class="row">
         <!-- Left Column -->
         <div class="col-md-4">
-            <!-- Devices Navigation Card -->
-            {% include 'sensors/includes/place_nav_card.html' with place_slug=place.slug pk=device.pk current_device=device %}
+            <!-- Place Navigation Card -->
+            {% include 'sensors/includes/place_nav_card.html' with place_slug=place.slug location=location locations=locations current_device=device %}
             <!-- Locations Navigation Card -->
             {% include 'sensors/includes/device_nav_card.html' with place_slug=place.slug locations=locations location=location active_tab='devices' current_device=device %}
         </div>
@@ -29,18 +29,14 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_css %}
-{{ block.super }}
-<style>
-/* Toast styling */
-.toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1050;
-    min-width: 250px;
-}
-</style>
+{% for location in locations %}
+<div class="col-md-4">
+    <div>
+        {{ location.name }}
+        {{ location.active_devices_count }}
+        {{ location.inactive_devices_count }}
+    </div>
+</div>
+{% endfor %}
 {% endblock %}

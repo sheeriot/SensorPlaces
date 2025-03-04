@@ -58,9 +58,9 @@ body {
     position: relative;
     width: 100%;
     padding-top: 56.25%; /* 16:9 Aspect Ratio */
-    background: #f8f9fa;
+    background-color: var(--bs-gray-100);
     border-radius: 0 0.375rem 0.375rem 0.375rem;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--bs-border-color);
     overflow: hidden;
     max-height: 70vh;
 }
@@ -81,7 +81,7 @@ body {
     width: 100%;
     height: 70vh;
     overflow: hidden;
-    background: #f8f9fa;
+    background-color: var(--bs-gray-100);
 }
 
 #siteMapEditorContainer {
@@ -90,25 +90,16 @@ body {
     overflow: hidden;
 }
 
+/* Location Marker Styles */
 .location-marker {
     cursor: default;
     transform: translate(-50%, -50%);
     z-index: 100;
     position: absolute;
-    background: rgba(0, 0, 0, 0.7);
-    border-radius: 4px;
-    padding: 2px 6px !important;
+    border-radius: var(--bs-border-radius-sm);
+    padding: 0.25rem 0.5rem;
     text-align: center;
     line-height: 1;
-}
-
-.location-marker.active {
-    background: rgba(13, 110, 253, 0.9);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.location-marker.inactive {
-    background: rgba(108, 117, 125, 0.9);
 }
 
 .location-marker.dragging {
@@ -123,21 +114,111 @@ body {
 }
 
 .location-name {
-    color: white;
-    font-size: 12px;
+    color: var(--bs-white);
+    font-size: 0.75rem;
     font-weight: 500;
     line-height: 1.1;
 }
 
 .device-count {
-    color: white;
-    font-size: 14px;
+    color: var(--bs-white);
+    font-size: 0.875rem;
     font-weight: 700;
     line-height: 1;
 }
 
-#editControls .btn-group:not(:last-child) {
-    margin-right: 1rem;
+/* Sensor Display */
+.sensor-value {
+    font-family: var(--bs-font-monospace);
+}
+
+.sensor-timestamp {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.875rem;
+}
+
+/* Toast Container */
+.toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1050;
+    width: 600px;
+    max-width: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.toast {
+    pointer-events: auto;
+    width: 100%;
+    min-width: 400px;
+    max-width: 600px;
+    position: relative;
+    backdrop-filter: blur(10px);
+    font-size: 0.875rem;
+    margin: 0 !important;
+}
+
+/* Status Indicators */
+.status-indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.5rem;
+}
+
+.status-indicator.active {
+    background-color: var(--bs-success);
+}
+
+.status-indicator.inactive {
+    background-color: var(--bs-danger);
+}
+
+/* Consistent opacity levels */
+.opacity-light {
+    opacity: 0.75;
+}
+
+.opacity-lighter {
+    opacity: 0.5;
+}
+
+.opacity-lightest {
+    opacity: 0.25;
+}
+
+/* Form switch large variant */
+.form-switch-lg .form-check-input {
+    width: 3em;
+    height: 1.5em;
+    margin-top: 0;
+}
+
+.form-switch-lg .form-check-input:checked {
+    background-color: var(--bs-success);
+    border-color: var(--bs-success);
+}
+
+/* Toast History */
+.toast-history-list {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.toast-history-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.toast-history-time {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.75rem;
+    color: var(--bs-gray-600);
 }
 
 /* Make markers draggable in edit mode */
@@ -224,35 +305,62 @@ body {
     font-size: 0.75em;
 }
 
-/* Toast Notification */
-.toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1050;
-    min-width: 400px;
-    max-width: 600px;
+/* Toast Type Styles */
+.toast.bg-success {
+    background-color: #e8f5e9 !important;  /* pale green */
+    color: #198754;  /* Bootstrap success text color */
+    border: 1px solid #198754;
 }
 
-.toast-container {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: 1050;
+.toast.bg-danger {
+    background-color: #ffebee !important;  /* pale red */
+    color: #dc3545;  /* Bootstrap danger text color */
+    border: 1px solid #dc3545;
 }
 
-/* Ensure toast text doesn't wrap icons awkwardly */
+.toast.bg-warning {
+    background-color: #fff3e0 !important;  /* pale orange */
+    color: #ffc107;  /* Bootstrap warning text color */
+    border: 1px solid #ffc107;
+}
+
+.toast.bg-info {
+    background-color: #e3f2fd !important;  /* pale blue */
+    color: #0dcaf0;  /* Bootstrap info text color */
+    border: 1px solid #0dcaf0;
+}
+
+/* Toast Animation */
+.toast.showing {
+    opacity: 1;
+}
+
+.toast.hide {
+    display: none;
+}
+
+.toast.fade {
+    transition: opacity 0.15s linear;
+}
+
+/* Toast Body */
 .toast-body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     white-space: pre-wrap;
     word-wrap: break-word;
+    padding: 0.75rem 1.25rem;
 }
 
-/* Icon spacing in toast messages */
-.toast-body i.bi {
-    margin: 0 0.25rem;
+.toast .btn-close {
+    padding: 1rem;
+    margin: 0;
+    opacity: 0.75;
+}
+
+.toast .btn-close:hover {
+    opacity: 1;
 }
 
 /* Responsive styles */
@@ -336,36 +444,6 @@ body {
     font-size: 0.75rem;
 }
 
-/* Toast Type Styles */
-.success-toast {
-    background-color: #e8f5e9;  /* pale green */
-}
-
-.warning-toast {
-    background-color: #fff3e0;  /* pale orange */
-}
-
-.danger-toast {
-    background-color: #ffebee;  /* pale red */
-}
-
-.info-toast {
-    background-color: #e3f2fd;  /* pale blue */
-}
-
-/* Toast Animation */
-.toast.showing {
-    opacity: 1;
-}
-
-.toast.hide {
-    display: none;
-}
-
-.toast.fade {
-    transition: opacity 0.15s linear;
-}
-
 /* Toast History Modal Styles */
 .toast-history-list {
     max-height: 70vh;
@@ -385,4 +463,48 @@ body {
 
 .toast-history-content {
     flex: 1;
-} 
+}
+
+/* Navigation Card Styles */
+.small-label {
+    font-size: 0.7rem;
+    line-height: 0.9;
+    text-align: center;
+}
+
+.device-counts {
+    font-size: 0.875rem;
+}
+
+.active-count {
+    font-size: 1.1rem;
+}
+
+.active-location {
+    background-color: var(--bs-primary-bg-subtle) !important;
+    border-color: var(--bs-border-color) !important;
+    color: inherit !important;
+}
+
+.active-location:hover {
+    background-color: var(--bs-primary-bg-subtle) !important;
+}
+
+.current-device {
+    background-color: var(--bs-primary-bg-subtle) !important;
+    border-color: var(--bs-border-color) !important;
+    color: inherit !important;
+}
+
+.current-device:hover {
+    background-color: var(--bs-primary-bg-subtle) !important;
+}
+
+.list-group-item.hidden,
+tr.hidden,
+.hidden {
+    display: none !important;
+}
+
+/* Remove the inline style from sensor_list_card.html */
+/* Removing .inactive class as we're using Bootstrap's opacity classes */ 
