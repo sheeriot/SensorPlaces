@@ -1,16 +1,13 @@
 {% extends "sensors/base.html" %}
 {% block title %}{{ sensor.name }}{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css">
-{% endblock %}
-
 {% block content %}
 <div class="row">
     <div class="col-md-12 mb-4">
         <div class="d-flex align-items-center gap-3">
-            <h1 class="mb-0">{{ sensor.name }}</h1>
-            {% include "sensors/includes/place_nav_header_buttons.html" with place=sensor.device.location.place active_tab='sensors' %}
+            <div>
+                <h1 class="mb-0">Sensor: {{ sensor.name }}</h1>
+            </div>
             <div class="btn-group ms-auto">
                 <a href="{% url 'sensors:sensor_update' place_slug=sensor.device.location.place.slug pk=sensor.pk %}" class="btn btn-warning">
                     <i class="bi bi-pencil"></i> Edit
@@ -23,43 +20,7 @@
     </div>
 
     <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Sensor Details</h5>
-            </div>
-            <div class="card-body">
-                <dl class="row mb-0">
-                    <dt class="col-sm-4">Type</dt>
-                    <dd class="col-sm-8">{{ sensor.get_sensor_type_display }}</dd>
-                    
-                    <dt class="col-sm-4">Device</dt>
-                    <dd class="col-sm-8">{{ sensor.device }}</dd>
-                    
-                    <dt class="col-sm-4">Status</dt>
-                    <dd class="col-sm-8">
-                        {% if sensor.is_active %}
-                            <span class="badge bg-success">Active</span>
-                        {% else %}
-                            <span class="badge bg-danger">inactive</span>
-                        {% endif %}
-                    </dd>
-                    
-                    <dt class="col-sm-4">Data Type</dt>
-                    <dd class="col-sm-8">{{ sensor.get_data_type_display }}</dd>
-                    
-                    {% if sensor.data_type == 'INFLUX' and sensor.influx_source %}
-                    <dt class="col-sm-4">InfluxDB</dt>
-                    <dd class="col-sm-8">{{ sensor.influx_source.name }}</dd>
-                    
-                    <dt class="col-sm-4">Bucket</dt>
-                    <dd class="col-sm-8">{{ sensor.influx_source.bucket_name }}</dd>
-                    
-                    <dt class="col-sm-4">Measurement</dt>
-                    <dd class="col-sm-8">{{ sensor.influx_measurement }}</dd>
-                    {% endif %}
-                </dl>
-            </div>
-        </div>
+        {% include "sensors/includes/sensor_detail_card.html" with sensor=sensor %}
     </div>
 
     <div class="col-md-8">
@@ -68,37 +29,14 @@
                 <h5 class="card-title mb-0">Recent Readings</h5>
             </div>
             <div class="card-body">
-                <canvas id="readingsChart"></canvas>
+                <div class="readings-chart-container" 
+                     data-sensor-id="{{ sensor.pk }}"
+                     data-unit="{{ sensor.get_unit_display }}"
+                     data-name="{{ sensor.name }}">
+                    <canvas id="readingsChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
-<script>
-const ctx = document.getElementById('readingsChart').getContext('2d');
-const data = {
-    labels: [{% for reading in influx_readings %}'{{ reading.time|date:"Y-m-d H:i" }}',{% endfor %}],
-    datasets: [{
-        label: '{{ sensor.get_sensor_type_display }} Readings',
-        data: [{% for reading in influx_readings %}{{ reading.value }},{% endfor %}],
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1
-    }]
-};
-new Chart(ctx, {
-    type: 'line',
-    data: data,
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: false
-            }
-        }
-    }
-});
-</script>
 {% endblock %} 

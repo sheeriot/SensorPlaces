@@ -7,6 +7,11 @@
     --toast-min-width: 400px;
     --toast-warning-bg: #fff8e6;     /* Very light yellow background */
     --toast-warning-text: #663c00;   /* Very dark orange text */
+    --chart-line-color: rgb(75, 192, 192);
+    --chart-grid-color: rgba(0, 0, 0, 0.1);
+    --chart-tooltip-bg: rgba(0, 0, 0, 0.8);
+    --chart-tooltip-text: #ffffff;
+    --chart-font-size: 12px;
 }
 
 /* Essential custom styles that Bootstrap doesn't provide */
@@ -201,4 +206,46 @@
     z-index: 1000 !important;
 }
 
-/* Remove all other styles that can be replaced with Bootstrap classes */ 
+/* Remove all other styles that can be replaced with Bootstrap classes */
+
+/* Chart styles */
+.readings-chart-container {
+    position: relative;
+    width: 100%;
+    height: 400px;
+}
+
+/* Chart tooltip customization */
+.chartjs-tooltip {
+    background-color: var(--chart-tooltip-bg) !important;
+    color: var(--chart-tooltip-text) !important;
+    font-family: var(--sensor-font-mono) !important;
+    font-size: var(--chart-font-size) !important;
+    padding: 8px 12px !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Chart axis labels */
+.chartjs-axis-label {
+    font-family: var(--sensor-font-mono) !important;
+    font-size: var(--chart-font-size) !important;
+    color: var(--bs-body-color) !important;
+}
+
+/* Chart grid lines */
+.chartjs-grid-line {
+    stroke: var(--chart-grid-color) !important;
+}
+
+/* Chart point styling */
+.chartjs-point {
+    stroke: var(--chart-line-color) !important;
+    fill: var(--bs-body-bg) !important;
+}
+
+/* Chart line styling */
+.chartjs-line {
+    stroke: var(--chart-line-color) !important;
+    stroke-width: 2px !important;
+} 

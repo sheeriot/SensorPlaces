@@ -1,22 +1,24 @@
 {% if place %}
-<div class="btn-group btn-group-sm ms-3">
-    <a href="{% url 'sensors:place_locations' place.slug %}" 
-       class="btn btn-outline-info {% if model_name == 'location' %}active{% endif %}">
-        <i class="bi bi-geo-alt me-1"></i>Locations
-    </a>
-    <a href="{% url 'sensors:place_devices' place.slug %}" 
-       class="btn btn-outline-dark {% if model_name == 'device' %}active{% endif %}">
-        <i class="bi bi-hdd-rack me-1"></i>Devices
-    </a>
-    <a href="{% url 'sensors:place_sensors' place.slug %}" 
-       class="btn btn-outline-success {% if model_name == 'sensor' %}active{% endif %}">
-        <i class="bi bi-thermometer me-1"></i>Sensors
-    </a>
-    <button id="toastHistoryBtn" class="btn btn-outline-secondary position-relative">
-        <i class="bi bi-bell"></i>
-        <span id="toastHistoryBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
-            0
-        </span>
-    </button>
+<div class="d-flex align-items-center gap-3">
+    <div class="btn-group btn-group-sm">
+        <a href="{% url 'sensors:place_locations' place.slug %}" 
+           class="btn btn-outline-info {% if model_name == 'location' %}active{% endif %}">
+            <i class="bi bi-geo-alt me-1"></i>Locations
+        </a>
+        <a href="{% url 'sensors:place_devices' place.slug %}" 
+           class="btn btn-outline-dark {% if model_name == 'device' %}active{% endif %}">
+            <i class="bi bi-hdd-rack me-1"></i>Devices
+        </a>
+        <a href="{% url 'sensors:place_sensors' place.slug %}" 
+           class="btn btn-outline-success {% if model_name == 'sensor' %}active{% endif %}">
+            <i class="bi bi-thermometer me-1"></i>Sensors
+        </a>
+        <button id="toastHistoryBtn" class="btn btn-outline-secondary position-relative">
+            <i class="bi bi-bell"></i>
+            <span id="toastHistoryBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
+                0
+            </span>
+        </button>
+    </div>
 </div>
 {% endif %}
