@@ -20,11 +20,4 @@ def subtract(value, arg):
 
 @register.simple_tag
 def load_leaflet_once():
-    global _LEAFLET_LOADED
-    if not _LEAFLET_LOADED:
-        _LEAFLET_LOADED = True
-        return mark_safe('''
-            <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-        ''')
-    return '' 
+    return ''  # Deprecated - Leaflet is now loaded in base.html 

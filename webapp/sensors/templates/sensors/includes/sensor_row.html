@@ -3,7 +3,7 @@
     data-sensor-active="{{ sensor.is_active|lower }}" 
     data-sensor-id="{{ sensor.pk }}"
     data-device-id="{{ device.pk }}">
-    <td>
+    <td class="ps-3">
         <a href="{% url 'sensors:sensor_detail' place_slug=device.location.place.slug pk=sensor.pk %}" class="text-decoration-none">
             <i class="bi bi-thermometer me-2"></i>{{ sensor.name }}
         </a>
@@ -26,8 +26,7 @@
             </label>
         </div>
     </td>
-    <td>{{ sensor.get_sensor_type_display }}</td>
-    <td>{{ sensor.get_unit_display }}</td>
+    <td>{{ sensor.sensor_type }}</td>
     <td class="text-end">
         <div class="btn-group" role="group">
             <button type="button" 

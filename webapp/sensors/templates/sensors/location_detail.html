@@ -21,6 +21,9 @@
     
     <!-- Right Column -->
     <div class="col-md-8">
+        <!-- Include Location Details Card -->
+        {% include "sensors/includes/location_details_card.html" with location=location %}
+        
         <!-- Include Device List Card -->
         {% include "sensors/includes/device_list_card.html" with place=place locations=locations location=location devices=devices %}
 

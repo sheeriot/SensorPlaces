@@ -5,6 +5,8 @@
     --sensor-font-mono: var(--bs-font-monospace);
     --toast-width: 600px;
     --toast-min-width: 400px;
+    --toast-warning-bg: #fff8e6;     /* Very light yellow background */
+    --toast-warning-text: #663c00;   /* Very dark orange text */
 }
 
 /* Essential custom styles that Bootstrap doesn't provide */
@@ -17,6 +19,51 @@
 .preview-map {
     height: 300px;
     border-radius: 0.25rem;
+}
+
+/* Place Map Container */
+.place-map-container {
+    height: 500px;
+    width: 100%;
+    border-radius: 0.25rem;
+    z-index: 1;
+}
+
+.place-map-container .leaflet-container {
+    height: 100%;
+    width: 100%;
+}
+
+/* Popup styling */
+.place-popup.leaflet-popup {
+    margin-bottom: 5px;  /* Space between marker and popup */
+}
+
+.place-popup .leaflet-popup-content-wrapper {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    padding: 2px 5px;
+}
+
+.place-popup .leaflet-popup-content {
+    margin: 5px;
+    font-size: 14px;
+    line-height: 1.2;
+    color: #333;
+    text-align: center;
+}
+
+.place-popup .leaflet-popup-tip-container {
+    width: 20px;
+    height: 10px;
+}
+
+.place-popup .leaflet-popup-tip {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: none;
+    width: 10px;
+    height: 10px;
 }
 
 /* Toast System */
@@ -36,25 +83,34 @@
     min-width: var(--toast-min-width);
     max-width: var(--toast-width);
     backdrop-filter: blur(10px);
-    background-color: white !important;
-    border: 1px solid currentColor !important;
+    background-color: var(--bs-body-bg) !important;
+    border: 1px solid var(--bs-border-color) !important;
 }
 
 /* Custom Toast Colors with Bootstrap theme colors */
 .toast.text-success {
     color: var(--bs-success) !important;
+    background-color: var(--bs-success-bg-subtle) !important;
+    border-color: var(--bs-success-border-subtle) !important;
 }
 
 .toast.text-danger {
     color: var(--bs-danger) !important;
+    background-color: var(--bs-danger-bg-subtle) !important;
+    border-color: var(--bs-danger-border-subtle) !important;
 }
 
 .toast.text-warning {
-    color: var(--bs-warning) !important;
+    color: var(--toast-warning-text) !important;
+    background-color: var(--toast-warning-bg) !important;
+    border-color: #ffb700 !important;
+    font-weight: 600 !important;
 }
 
 .toast.text-info {
     color: var(--bs-info) !important;
+    background-color: var(--bs-info-bg-subtle) !important;
+    border-color: var(--bs-info-border-subtle) !important;
 }
 
 /* Toast History */
@@ -79,7 +135,7 @@
     position: relative;
     width: 100%;
     overflow: hidden;
-    background-color: #f8f9fa;
+    background-color: var(--bs-tertiary-bg);
     padding-bottom: 75%; /* 4:3 aspect ratio */
 }
 
@@ -98,12 +154,19 @@
     transition: transform 0.3s ease-out;
 }
 
+/* Navigation styles */
+.current-location {
+    font-weight: 500 !important;
+    background-color: var(--bs-primary-bg-subtle) !important;
+    color: var(--bs-primary) !important;
+}
+
 /* Location marker specific styles */
 .location-marker {
     position: absolute;
     cursor: pointer;
     z-index: 10;
-    border-radius: 4px;
+    border-radius: var(--bs-border-radius);
     transition: transform 0.2s;
 }
 

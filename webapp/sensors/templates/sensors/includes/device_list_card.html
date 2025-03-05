@@ -16,6 +16,16 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-light table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 30%">Name</th>
+                        <th style="width: 15%">Status</th>
+                        <th style="width: 15%">Model</th>
+                        <th style="width: 15%">Manufacturer</th>
+                        <th style="width: 15%">Serial</th>
+                        <th style="width: 10%" class="text-end">Actions</th>
+                    </tr>
+                </thead>
                 <tbody>
                     {% if location %}
                         <tr>
@@ -29,14 +39,6 @@
                                 </div>
                             </th>
                         </tr>
-                        <tr>
-                            <th style="width: 30%">Name</th>
-                            <th style="width: 15%">Status</th>
-                            <th style="width: 15%">Model</th>
-                            <th style="width: 15%">Manufacturer</th>
-                            <th style="width: 15%">Serial</th>
-                            <th style="width: 10%" class="text-end">Actions</th>
-                        </tr>
                         {% for device in devices %}
                             {% include "sensors/includes/device_row.html" with place=place device=device %}
                         {% endfor %}
@@ -47,20 +49,18 @@
                                 <th colspan="6">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div><i class="bi bi-geo-alt me-2"></i>{{ location.grouper.name }}</div>
-                                        <div class="d-flex gap-2">
-                                            <span class="badge bg-success" id="location-{{ location.grouper.id }}-active">{{ location.grouper.active_devices_count }}</span>
-                                            <span class="badge bg-danger" id="location-{{ location.grouper.id }}-inactive">{{ location.grouper.inactive_devices_count }}</span>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-success" id="location-{{ location.grouper.id }}-active">{{ location.grouper.active_devices_count }}</span>
+                                                <span class="badge bg-danger" id="location-{{ location.grouper.id }}-inactive">{{ location.grouper.inactive_devices_count }}</span>
+                                            </div>
+                                            <a href="{% url 'sensors:device_create' place_slug=place.slug location_pk=location.grouper.id %}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-hdd-rack"></i><i class="bi bi-plus-lg"></i>Add Device
+                                            </a>
                                         </div>
                                     </div>
                                 </th>
-                            </tr>
-                            <tr>
-                                <th style="width: 30%">Name</th>
-                                <th style="width: 15%">Status</th>
-                                <th style="width: 15%">Model</th>
-                                <th style="width: 15%">Manufacturer</th>
-                                <th style="width: 15%">Serial</th>
-                                <th style="width: 10%" class="text-end">Actions</th>
                             </tr>
                             {% for device in location.list %}
                                 {% include "sensors/includes/device_row.html" with place=place device=device %}

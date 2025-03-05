@@ -13,12 +13,12 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="d-none">
+                <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th style="width: 25%">Name</th>
+                        <th style="width: 20%">Status</th>
+                        <th style="width: 20%">Type</th>
+                        <th style="width: 15%" class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -33,13 +33,22 @@
                         {% for device in device_list %}
                             {% if device.grouper.is_active or not hideInactiveSwitch.checked %}
                                 <tr class="table-light {% if not device.grouper.is_active %}text-muted opacity-50 d-none{% endif %}">
-                                    <td colspan="4">
+                                    <td>
                                         <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
-                                    </td>  
+                                    </td>
                                     <td>
                                         <span class="badge {% if device.grouper.is_active %}bg-success{% else %}bg-danger{% endif %}">
                                             {% if device.grouper.is_active %}Active{% else %}inactive{% endif %}
                                         </span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ device.grouper.device_type }}</strong> ({{ device.grouper.model }})
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.grouper.id %}" class="btn btn-outline-dark"><i class="bi bi-hdd-rack"></i></a>
+                                            <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.grouper.id %}" class="btn btn-outline-primary"><i class="bi bi-thermometer"></i><i class="bi bi-plus-lg"></i></a>
+                                        </div>
                                     </td>
                                 </tr>
                             {% endif %}
