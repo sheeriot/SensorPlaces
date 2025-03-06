@@ -1,5 +1,5 @@
 {% load static %}
-<tr class="device-row {% if not device.is_active %}opacity-50 text-muted{% endif %}" data-device-active="{{ device.is_active|lower }}" data-device-id="{{ device.pk }}">
+<tr class="device-row {% if not device.is_active %}opacity-50 text-muted d-none{% endif %}" data-device-active="{{ device.is_active|lower }}" data-device-id="{{ device.pk }}">
     <td>
         <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
             <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}
@@ -10,14 +10,13 @@
             <input class="form-check-input device-status-toggle" 
                    type="checkbox" 
                    role="switch"
-                   id="deviceToggle{{ device.pk }}"
+                   id="deviceStatus_{{ device.pk }}"
                    data-device-id="{{ device.pk }}"
-                   data-location-id="{{ device.location.pk }}"
                    data-place-slug="{{ place.slug }}"
                    {% if device.is_active %}checked{% endif %}
                    {% if not device.location.is_active %}disabled{% endif %}>
             <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
-                   for="deviceToggle{{ device.pk }}"
+                   for="deviceStatus_{{ device.pk }}"
                    id="deviceStatusLabel_{{ device.pk }}">
                 {% if device.is_active %}Active{% else %}inactive{% endif %}
             </label>
@@ -40,4 +39,33 @@
             </a>
         </div>
     </td>
-</tr> 
+</tr>
+
+<!-- Device Status Change Modal -->
+<div class="modal fade" id="deviceStatusModal-{{ device.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Device Status Change</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to <span class="action-text"></span> device "{{ device.name }}"?</p>
+                {% if device.sensors.exists %}
+                <div class="alert alert-warning static-alert">
+                    <h6>This will affect the following sensors:</h6>
+                    <ul class="mb-0">
+                    {% for sensor in device.sensors.all %}
+                        <li>{{ sensor.name }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary confirm-status-change">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div> 

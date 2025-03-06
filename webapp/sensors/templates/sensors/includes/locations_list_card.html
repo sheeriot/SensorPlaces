@@ -10,15 +10,15 @@ This template expects the following context variables:
         <div class="d-flex align-items-center gap-3">
             <h5 class="card-title mb-0"><i class="bi bi-geo-alt me-1"></i> Locations</h5>
             <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" role="switch" id="hideInactiveLocationsListCard" checked>
-                <label class="form-check-label" for="hideInactiveLocationsListCard">
+                <input class="form-check-input hideInactive-switch" type="checkbox" role="switch" id="hideInactiveLocations" checked>
+                <label class="form-check-label" for="hideInactiveLocations">
                     Hide inactive
                 </label>
             </div>
         </div>
         <div>
             <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-plus-circle"></i> Add
+                <i class="bi bi-geo-alt"></i><i class="bi bi-plus-circle"></i> Add Location
             </a>
         </div>
     </div>

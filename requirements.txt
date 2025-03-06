@@ -6,3 +6,4 @@ pillow >= 11.1
 icecream
 django-crispy-forms
 crispy-bootstrap5
+geopy

@@ -131,29 +131,115 @@ class SensorForm(forms.ModelForm):
         return cleaned_data
 
 class PlaceForm(forms.ModelForm):
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+    slug = forms.CharField(widget=forms.HiddenInput(), required=False)
+
     class Meta:
         model = Place
-        fields = ['name', 'address', 'latitude', 'longitude', 'site_plan', 'is_active', 'slug']
+        fields = ['name', 'is_active', 'latitude', 'longitude', 'slug']
 
     def __init__(self, *args, **kwargs):
+        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
-        self.fields['slug'].required = False  # We'll auto-generate it
-        self.fields['slug'].widget = forms.HiddenInput()  # Hide it from the form
+        self.helper = FormHelper()
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
+        self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
+        
+        # Add referrer to form if provided
+        if referrer:
+            self.fields['referrer'].initial = referrer
+
+        # Configure field properties
+        self.fields['is_active'].label = "Active"
+        self.fields['is_active'].help_text = None
+        
+        # If this is an existing Place, preserve its slug
+        if self.instance and self.instance.pk:
+            self.fields['slug'].initial = self.instance.slug
+        
+        # Add Bootstrap classes and configure fields
+        for field in self.fields.values():
+            if not isinstance(field.widget, (forms.HiddenInput, forms.CheckboxInput)):
+                field.widget.attrs['class'] = 'form-control'
+
+        # Determine if this is a new place or editing existing
+        is_new = not bool(kwargs.get('instance'))
+        submit_text = "Create Place" if is_new else "Update Place"
+
+        # Custom layout with Bootstrap grid
+        self.helper.layout = Layout(
+            Field('slug', type='hidden'),
+            Field('referrer', type='hidden'),
+            Row(
+                Column('name', css_class='col-md-8'),
+                Column(
+                    Div(
+                        Field('is_active', wrapper_class='form-check form-switch'),
+                        css_class='d-flex align-items-center h-100'
+                    ),
+                    css_class='col-md-4'
+                ),
+                css_class='mb-3'
+            ),
+            Row(
+                Column('latitude', css_class='col-md-6'),
+                Column('longitude', css_class='col-md-6'),
+                css_class='mb-3'
+            ),
+            Div(
+                HTML('<div id="preview-map" class="preview-map mb-3"></div>'),
+                css_class='mb-3'
+            ),
+            Div(
+                HTML('<hr class="mt-4">'),
+                Div(
+                    HTML("""
+                        <a href="{% url 'sensors:place_list' %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Cancel
+                        </a>
+                    """),
+                    HTML(f"""
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-house-gear me-1"></i>{submit_text}
+                        </button>
+                    """),
+                    css_class='d-flex justify-content-between align-items-center'
+                ),
+                css_class='mt-3'
+            )
+        )
 
     def clean(self):
         cleaned_data = super().clean()
         name = cleaned_data.get('name')
+        current_slug = cleaned_data.get('slug')
+        
         if name:
-            # Generate slug from name if not provided
-            if not cleaned_data.get('slug'):
+            # Only generate new slug if this is a new place or slug is missing
+            if not current_slug:
                 base_slug = slugify(name)
                 slug = base_slug
                 # Ensure unique slug
                 counter = 1
-                while Place.objects.filter(slug=slug).exists():
+                # Don't check against self when verifying uniqueness
+                slug_qs = Place.objects.filter(slug=slug)
+                if self.instance and self.instance.pk:
+                    slug_qs = slug_qs.exclude(pk=self.instance.pk)
+                
+                while slug_qs.exists():
                     slug = f"{base_slug}-{counter}"
                     counter += 1
+                    slug_qs = Place.objects.filter(slug=slug)
+                    if self.instance and self.instance.pk:
+                        slug_qs = slug_qs.exclude(pk=self.instance.pk)
+                
                 cleaned_data['slug'] = slug
+            else:
+                # Keep existing slug
+                cleaned_data['slug'] = current_slug
+        
         return cleaned_data
 
     def clean_site_plan(self):
@@ -172,7 +258,7 @@ class PlaceForm(forms.ModelForm):
 
     def clean_latitude(self):
         lat = self.cleaned_data['latitude']
-        if lat:
+        if lat is not None:
             # Round to 5 decimal places
             lat = Decimal(str(lat)).quantize(Decimal('0.00001'), rounding=ROUND_HALF_UP)
             # Validate range
@@ -182,7 +268,7 @@ class PlaceForm(forms.ModelForm):
 
     def clean_longitude(self):
         lon = self.cleaned_data['longitude']
-        if lon:
+        if lon is not None:
             # Round to 5 decimal places
             lon = Decimal(str(lon)).quantize(Decimal('0.00001'), rounding=ROUND_HALF_UP)
             # Validate range
@@ -264,7 +350,7 @@ class DeviceForm(forms.ModelForm):
 
         # Determine if this is a new device or editing existing
         is_new = not bool(kwargs.get('instance'))
-        submit_text = "Create New Device" if is_new else "Save Changes"
+        submit_text = "New" if is_new else "Save"
 
         # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
@@ -305,7 +391,7 @@ class DeviceForm(forms.ModelForm):
                     """),
                     HTML(f"""
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save me-1"></i>{submit_text}
+                            <i class="bi bi-hdd-rack me-1"></i>{submit_text}
                         </button>
                     """),
                     css_class='d-flex justify-content-between align-items-center'

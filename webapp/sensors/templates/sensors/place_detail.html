@@ -29,7 +29,7 @@
 
         <!-- Site Plan/Map Card -->
         {% if place.site_plan %}
-            {% include "sensors/includes/site_plan_card.html" with place=place locations=locations %}
+            {% include "sensors/includes/site_plan_card.html" with place=place locations=locations editable=True %}
         {% else %}
             <div class="card mb-4">
                 <div class="card-header">

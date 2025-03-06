@@ -2,13 +2,17 @@
 <div class="card" id="sensors-card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <i class="bi bi-thermometer"></i>
-            <span class="ms-2">Sensors</span>
+            <h5 class="card-title mb-0"><i class="bi bi-thermometer me-1"></i> Sensors</h5>
             <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="hideSensorInactiveSwitch" checked>
-                <label class="form-check-label" for="hideSensorInactiveSwitch">Hide inactive</label>
+                <input class="form-check-input hideInactive-switch" type="checkbox" role="switch" id="hideInactiveSensors" checked>
+                <label class="form-check-label" for="hideInactiveSensors">Hide inactive</label>
             </div>
         </div>
+        {% if device %}
+        <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.pk %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-thermometer"></i><i class="bi bi-plus-circle"></i> Add Sensor
+        </a>
+        {% endif %}
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -22,47 +26,59 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% regroup sensors by device.location as location_list %}
-                    {% for location in location_list %}
-                        <tr class="table-primary w-100">
-                            <th colspan="5" class="w-100">
-                                <strong><i class="bi bi-geo-alt"></i> {{ location.grouper.name }}</strong>
-                            </th>
-                        </tr>
-                        {% regroup location.list by device as device_list %}
-                        {% for device in device_list %}
-                            {% if device.grouper.is_active or not hideInactiveSwitch.checked %}
-                                <tr class="table-light {% if not device.grouper.is_active %}text-muted opacity-50 d-none{% endif %}">
-                                    <td>
-                                        <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
-                                    </td>
-                                    <td>
-                                        <span class="badge {% if device.grouper.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                            {% if device.grouper.is_active %}Active{% else %}inactive{% endif %}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <strong>{{ device.grouper.device_type }}</strong> ({{ device.grouper.model }})
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.grouper.id %}" class="btn btn-outline-dark"><i class="bi bi-hdd-rack"></i></a>
-                                            <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.grouper.id %}" class="btn btn-outline-primary"><i class="bi bi-thermometer"></i><i class="bi bi-plus-lg"></i></a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endif %}
-                            {% for sensor in device.list %}
-                                {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
-                            {% endfor %}
+                    {% if device %}
+                        {% for sensor in sensors %}
+                            {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center small py-3">
+                                    No sensors found. Click "Add Sensor" to create one.
+                                </td>
+                            </tr>
                         {% endfor %}
-                    {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center small py-3">
-                                No sensors found. Click "Add Sensor" to create one.
-                            </td>
-                        </tr>
-                    {% endfor %}
+                    {% else %}
+                        {% regroup sensors by device.location as location_list %}
+                        {% for location in location_list %}
+                            <tr class="table-primary w-100">
+                                <th colspan="5" class="w-100">
+                                    <strong><i class="bi bi-geo-alt"></i> {{ location.grouper.name }}</strong>
+                                </th>
+                            </tr>
+                            {% regroup location.list by device as device_list %}
+                            {% for device in device_list %}
+                                {% if device.grouper.is_active or not hideInactiveSwitch.checked %}
+                                    <tr class="table-light {% if not device.grouper.is_active %}text-muted opacity-50 d-none{% endif %}">
+                                        <td>
+                                            <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if device.grouper.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                                {% if device.grouper.is_active %}Active{% else %}inactive{% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ device.grouper.device_type }}</strong> ({{ device.grouper.model }})
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.grouper.id %}" class="btn btn-outline-dark"><i class="bi bi-hdd-rack"></i></a>
+                                                <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.grouper.id %}" class="btn btn-outline-primary"><i class="bi bi-thermometer"></i><i class="bi bi-plus-circle"></i></a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                                {% for sensor in device.list %}
+                                    {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
+                                {% endfor %}
+                            {% endfor %}
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center small py-3">
+                                    No sensors found.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
                 </tbody>
             </table>
         </div>

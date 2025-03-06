@@ -3,7 +3,7 @@ This template expects:
 - location: Location object with active_devices_count and inactive_devices_count annotations
 - place: Place object
 {% endcomment %}
-<tr class="location-row {% if not location.is_active %}opacity-50{% endif %}" 
+<tr class="location-row {% if not location.is_active %}opacity-50 text-muted d-none{% endif %}" 
     data-location-active="{{ location.is_active|lower }}" 
     data-location-id="{{ location.pk }}">
     <td>
@@ -14,9 +14,20 @@ This template expects:
         </a>
     </td>
     <td>
-        <span class="badge {% if location.is_active %}bg-success{% else %}bg-danger{% endif %}">
-            {% if location.is_active %}Active{% else %}inactive{% endif %}
-        </span>
+        <div class="form-check form-switch">
+            <input class="form-check-input location-status-toggle" 
+                   type="checkbox" 
+                   role="switch"
+                   id="toggle-location-active-{{ location.pk }}"
+                   data-location-id="{{ location.pk }}"
+                   data-place-slug="{{ place.slug }}"
+                   {% if location.is_active %}checked{% endif %}>
+            <label class="form-check-label status-label {% if location.is_active %}text-success{% else %}text-danger{% endif %}" 
+                   for="toggle-location-active-{{ location.pk }}"
+                   id="locationStatusLabel_{{ location.pk }}">
+                {% if location.is_active %}Active{% else %}inactive{% endif %}
+            </label>
+        </div>
     </td>
     <td>
         <span class="text-success">{{ location.active_devices_count }}</span>

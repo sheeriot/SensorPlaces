@@ -125,7 +125,7 @@
                         {% crispy form %}
 
                         {% if form.get_warnings.serial_number %}
-                        <div class="alert alert-warning d-flex align-items-center py-2 mb-3" role="alert">
+                        <div class="alert alert-warning static-alert d-flex align-items-center py-2 mb-3" role="alert">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
                             <div>
                                 {% for warning in form.get_warnings.serial_number %}
@@ -136,7 +136,7 @@
                         {% endif %}
 
                         {% if not location.is_active %}
-                        <div class="alert alert-warning d-flex align-items-center py-2 mb-3" role="alert">
+                        <div class="alert alert-warning static-alert d-flex align-items-center py-2 mb-3" role="alert">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
                             <div>
                                 This location is inactive. Any devices created here will also be inactive.

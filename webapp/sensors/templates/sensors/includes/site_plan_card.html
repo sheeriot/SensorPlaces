@@ -2,9 +2,11 @@
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">Site Plan</h5>
+        {% if editable %}
         <button id="editSitePlan" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-grid"></i> Edit Layout
         </button>
+        {% endif %}
     </div>
     <div class="card-body p-0">
         <div class="site-plan-wrapper position-relative">

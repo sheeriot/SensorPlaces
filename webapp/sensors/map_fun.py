@@ -1,0 +1,102 @@
+import folium
+from folium import plugins
+from folium.plugins import BeautifyIcon
+
+def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom_start=13):
+    """Create a map centered on a place or set of places"""
+    try:
+        # Modern map configuration with Street tiles as default
+        map_kwargs = {
+            'prefer_canvas': True,
+            'zoom_control': True,
+            'tiles': 'OpenStreetMap',
+            'tiles_name': 'Street',
+            'zoom_start': zoom_start,
+            'scrollWheelZoom': True,
+            'dragging': True,
+            'control_scale': True,
+            'width': '100%',
+            'height': '100%'
+        }
+        
+        # Single place mode
+        if places is None and latitude is not None and longitude is not None:
+            m = folium.Map(location=[float(latitude), float(longitude)], **map_kwargs)
+            if name:
+                folium.Marker(
+                    [float(latitude), float(longitude)],
+                    popup=name,
+                    icon=folium.Icon(color='blue', icon='info-sign')
+                ).add_to(m)
+            return m.get_root().render()
+        
+        # Default to Austin center if no places provided
+        if not places:
+            m = folium.Map(location=[30.2672, -97.7431], **map_kwargs)
+            return m.get_root().render()
+
+        # Calculate map center from active places
+        active_places = [p for p in places if p.is_active]
+        all_lats = [float(p.latitude) for p in places]
+        all_lons = [float(p.longitude) for p in places]
+        
+        if active_places:
+            active_lats = [float(p.latitude) for p in active_places]
+            active_lons = [float(p.longitude) for p in active_places]
+            center = [sum(active_lats) / len(active_lats), sum(active_lons) / len(active_lons)]
+        else:
+            center = [sum(all_lats) / len(all_lats), sum(all_lons) / len(all_lons)]
+        
+        # Initialize map
+        m = folium.Map(location=center, **map_kwargs)
+        m._name = "places_overview_map"
+        
+        # Tell Folium not to include resources we already have
+        m.default_css = []
+        m.default_js = []
+        
+        # Add markers
+        for place in places:
+            popup_html = f"""
+            <div class="place-popup">
+                <h4>{place.name}</h4>
+                <p>Status: {'Active' if place.is_active else 'Inactive'}</p>
+            </div>
+            """
+            
+            # Define marker options with all necessary data attributes
+            marker_options = {
+                'data-place-slug': place.slug,
+                'data-place-active': str(place.is_active).lower(),
+                'data-place-lat': str(place.latitude),
+                'data-place-lon': str(place.longitude),
+                'data-place-name': place.name,
+                'class': 'place-marker'
+            }
+            
+            # Add status-specific classes for inactive places
+            if not place.is_active:
+                marker_options['class'] += ' opacity-50 text-muted'
+            
+            marker = folium.Marker(
+                location=[float(place.latitude), float(place.longitude)],
+                popup=folium.Popup(popup_html, max_width=300),
+                icon=folium.Icon(
+                    color='blue' if place.is_active else 'red',
+                    icon='info-sign' if place.is_active else 'question-sign',
+                    prefix='fa'
+                ),
+                name=f"place_marker_{place.slug}",
+                options=marker_options
+            )
+            marker.add_to(m)
+        
+        # Fit bounds if multiple active places
+        if len(active_places) > 1:
+            m.fit_bounds([[min(active_lats), min(active_lons)], [max(active_lats), max(active_lons)]])
+        
+        return m.get_root().render()
+    
+    except Exception as e:
+        print(f"Error creating map: {str(e)}")
+        return "" 

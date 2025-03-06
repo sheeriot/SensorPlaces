@@ -23,15 +23,38 @@
 /* Map Preview */
 .preview-map {
     height: 300px;
+}
+
+/* Form Switch Large */
+.form-switch.form-switch-lg {
+    padding-left: 2.5em;
+    min-height: 2em;
+}
+
+.form-switch.form-switch-lg .form-check-input {
+    height: 2em;
+    width: calc(3em + 0.75rem);
+    border-radius: 4em;
+}
+
+/* Map Instructions */
+.map-instructions {
+    font-size: 1.1rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
     border-radius: 0.25rem;
+    border: 1px solid #dee2e6;
+}
+
+.map-instructions i {
+    color: #0d6efd;
 }
 
 /* Place Map Container */
 .place-map-container {
     height: 500px;
-    width: 100%;
-    border-radius: 0.25rem;
-    z-index: 1;
 }
 
 .place-map-container .leaflet-container {
@@ -76,7 +99,7 @@
     position: fixed;
     top: 1rem;
     right: 1rem;
-    z-index: 1050;
+    z-index: 1070; /* Above modal backdrop (1050) but below modal itself (1055) */
     width: var(--toast-width);
     max-width: 100%;
     pointer-events: none;
@@ -87,7 +110,6 @@
     width: 100%;
     min-width: var(--toast-min-width);
     max-width: var(--toast-width);
-    backdrop-filter: blur(10px);
     background-color: var(--bs-body-bg) !important;
     border: 1px solid var(--bs-border-color) !important;
 }
@@ -140,8 +162,7 @@
     position: relative;
     width: 100%;
     overflow: hidden;
-    background-color: var(--bs-tertiary-bg);
-    padding-bottom: 75%; /* 4:3 aspect ratio */
+    padding-bottom: 75%;
 }
 
 #siteMapContainer {
@@ -156,7 +177,6 @@
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
-    transition: transform 0.3s ease-out;
 }
 
 /* Navigation styles */
@@ -171,20 +191,11 @@
     position: absolute;
     cursor: pointer;
     z-index: 10;
-    border-radius: var(--bs-border-radius);
-    transition: transform 0.2s;
-}
-
-.location-marker:hover {
-    transform: scale(1.1);
-    z-index: 11;
 }
 
 .location-marker .marker-content {
     font-size: 0.75rem;
     line-height: 1;
-    color: white;
-    text-align: center;
     white-space: nowrap;
 }
 
@@ -221,9 +232,6 @@
     color: var(--chart-tooltip-text) !important;
     font-family: var(--sensor-font-mono) !important;
     font-size: var(--chart-font-size) !important;
-    padding: 8px 12px !important;
-    border-radius: var(--bs-border-radius) !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Chart axis labels */
@@ -248,4 +256,91 @@
 .chartjs-line {
     stroke: var(--chart-line-color) !important;
     stroke-width: 2px !important;
+}
+
+/* Map Controls */
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2) !important;
+}
+
+.leaflet-control-zoom a {
+    background-color: white !important;
+    color: #666 !important;
+}
+
+.folium-map .legend {
+    background-color: white;
+    border-radius: 3px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+}
+
+.folium-map .d-none {
+    display: none !important;
+}
+
+.leaflet-control-layers {
+    border: none !important;
+    border-radius: 4px !important;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2) !important;
+}
+
+.leaflet-control-layers-toggle {
+    background-color: white !important;
+}
+
+.leaflet-control-layers-expanded {
+    padding: 10px !important;
+    background-color: white !important;
+    border-radius: 4px !important;
+}
+
+/* Essential Folium Map Styles */
+.folium-map {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+}
+
+#places_map_html {
+    width: 100%;
+    height: 500px;
+    position: relative;
+}
+
+/* Hide inactive places when needed */
+.place-marker.d-none {
+    display: none !important;
+}
+
+/* Map Controls */
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2) !important;
+}
+
+/* ... rest of the map CSS ... */
+
+/* Folium map in place details */
+.folium-map-container {
+    min-height: 300px;
+}
+
+/* Popout map */
+.place-map-container {
+    height: 500px;
+}
+
+/* Modal Backdrop Enhancement */
+.modal-backdrop {
+    transition: opacity 0.15s linear;
+}
+
+/* Ensure modals don't cause layout shifts */
+.modal {
+    padding-left: 0 !important;
+}
+
+.modal.fade .modal-dialog {
+    transition: transform 0.2s ease-out !important;
 } 

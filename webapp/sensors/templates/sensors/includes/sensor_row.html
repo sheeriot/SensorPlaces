@@ -1,5 +1,5 @@
 <!-- webapp/sensors/templates/sensors/includes/sensor_row.html -->
-<tr class="sensor-row {% if not sensor.is_active %}opacity-50 text-muted{% endif %}" 
+<tr class="sensor-row {% if not sensor.is_active %}opacity-50 text-muted d-none{% endif %}" 
     data-sensor-active="{{ sensor.is_active|lower }}" 
     data-sensor-id="{{ sensor.pk }}"
     data-device-id="{{ device.pk }}">
@@ -13,14 +13,14 @@
             <input class="form-check-input sensor-status-toggle" 
                    type="checkbox" 
                    role="switch"
-                   id="sensorToggle{{ sensor.pk }}"
+                   id="toggle-sensor-active-{{ sensor.pk }}"
                    data-sensor-id="{{ sensor.pk }}"
                    data-device-id="{{ device.pk }}"
                    data-place-slug="{{ device.location.place.slug }}"
                    {% if sensor.is_active %}checked{% endif %}
                    {% if not device.is_active %}disabled{% endif %}>
             <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
-                   for="sensorToggle{{ sensor.pk }}"
+                   for="toggle-sensor-active-{{ sensor.pk }}"
                    id="sensorStatusLabel_{{ sensor.pk }}">
                 {% if sensor.is_active %}Active{% else %}inactive{% endif %}
             </label>

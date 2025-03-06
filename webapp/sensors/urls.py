@@ -52,6 +52,7 @@ urlpatterns = [
     path('api/<slug:place_slug>/stats/', views.place_stats, name='place_stats'),
     path('api/<slug:place_slug>/update_site_plan_layout/', views.update_site_plan_layout, name='update_site_plan_layout'),
 
+    path('api/<slug:place_slug>/location/<int:pk>/toggle_active/', views.LocationToggleActiveView.as_view(), name='location_toggle_active'),
     path('api/<slug:place_slug>/device/<int:pk>/toggle_active/', views.DeviceToggleActiveView.as_view(), name='device_toggle_active'),
     path('api/<slug:place_slug>/sensor/<int:pk>/toggle_active/', views.SensorToggleActiveView.as_view(), name='sensor_toggle_active'),
 

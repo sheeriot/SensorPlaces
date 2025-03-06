@@ -1,0 +1,38 @@
+<!-- Places List Card -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-3">
+        <h5 class="mb-0">Places</h5>
+        <div class="form-check form-switch">
+            <input class="form-check-input hideInactive-switch" type="checkbox" role="switch" id="hideInactivePlaces" checked>
+            <label class="form-check-label" for="hideInactivePlaces">Hide inactive</label>
+        </div>
+    </div>
+    <div>
+        <a href="{% url 'sensors:place_create' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-house-gear"></i><i class="bi bi-plus-circle"></i> Add Place
+        </a>
+    </div>
+</div>
+<div class="table-responsive mb-4">
+    <table id="placesTable" class="table table-striped table-hover my-1">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Coordinates</th>
+                <th>Status</th>
+                <th>Counts</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for place in places %}
+                {% include "sensors/includes/place_row.html" with place=place %}
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">No places found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div> 

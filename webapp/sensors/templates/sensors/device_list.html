@@ -11,7 +11,9 @@
     <div class="row">
         <div class="col-md-4">
             {% include "sensors/includes/place_nav_card.html" with place=place location=locations locations=locations.all %}
+            {% include "sensors/includes/live_counts_card.html" with place=place %}
         </div>
+
         <!-- right column -->
         <div class="col-md-8">
             {% if location %}
