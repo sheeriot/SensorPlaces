@@ -2,11 +2,10 @@
 <div class="card" id="sensors-card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <h5 class="card-title mb-0"><i class="bi bi-thermometer me-1"></i> Sensors</h5>
-            <div class="form-check form-switch">
-                <input class="form-check-input hideInactive-switch" type="checkbox" role="switch" id="hideInactiveSensors" checked>
-                <label class="form-check-label" for="hideInactiveSensors">Hide inactive</label>
-            </div>
+            <h5 class="card-title mb-0">
+                <i class="bi bi-thermometer me-1"></i> Sensors
+            </h5>
+            {% include "sensors/includes/hide_inactive_switch.html" with model="sensor" %}
         </div>
         {% if device %}
         <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.pk %}" class="btn btn-outline-primary btn-sm">

@@ -14,7 +14,7 @@
 
 // System Configuration
 const toastConfig = {
-    debug: true           // Set to true to enable debug mode
+    debug: false           // Set to true to enable debug mode
 };
 
 // Debug logging helper

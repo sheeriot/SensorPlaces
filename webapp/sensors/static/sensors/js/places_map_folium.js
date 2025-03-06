@@ -5,16 +5,18 @@
  */
 
 const placesMapFoliumSystem = {
-    debug: true,  // Set to true to enable debug logging
+    debug: false,  // Set to true to enable debug logging
 
     initialize() {
-        console.group('Places Map Folium Initialization');
+        if (this.debug) console.group('Places Map Folium Initialization');
         
         // Look for the specific map container
         const mapContainer = document.getElementById('places-map-folium');
         if (!mapContainer) {
-            console.debug('Places map folium container not found on this page');
-            console.groupEnd();
+            if (this.debug) {
+                console.debug('Places map folium container not found on this page');
+                console.groupEnd();
+            }
             return;
         }
 
@@ -22,13 +24,13 @@ const placesMapFoliumSystem = {
             // Find the Leaflet map instance
             const foliumMap = document.querySelector('.folium-map');
             if (foliumMap && foliumMap._leaflet_id) {
-                console.debug('Found initialized Folium map');
+                if (this.debug) console.debug('Found initialized Folium map');
                 this.setupMapEventHandlers(foliumMap);
             }
         } catch (error) {
             console.error('Error in map post-initialization:', error);
         }
-        console.groupEnd();
+        if (this.debug) console.groupEnd();
     },
 
     setupMapEventHandlers(mapElement) {

@@ -7,10 +7,7 @@
                     <i class="bi bi-hdd-rack me-1"></i> 
                     Devices @ {{ location.name }}
                 </h5>
-                <div class="form-check form-switch">
-                    <input class="form-check-input hideInactive-switch" type="checkbox" role="switch" id="hideInactiveDevices" checked>
-                    <label class="form-check-label" for="hideInactiveDevices">Hide inactive</label>
-                </div>
+                {% include "sensors/includes/hide_inactive_switch.html" with model="device" %}
             </div>
             {% include "sensors/includes/device_new_button.html" with place=place location=location %}
         {% else %}
@@ -20,14 +17,11 @@
                     <i class="bi bi-hdd-rack me-1"></i> 
                     Devices - All
                 </h5>
-                <div class="form-check form-switch">
-                    <input class="form-check-input hideInactive-switch" type="checkbox" role="switch" id="hideInactiveDevices" checked>
-                    <label class="form-check-label" for="hideInactiveDevices">Hide inactive</label>
-                </div>
+                {% include "sensors/includes/hide_inactive_switch.html" with model="device" %}
             </div>
         {% endif %}
     </div>
-    <div class="card-body p-0">
+    <div class="card-body toggle-table p-0" id="device-card-table">
         <div class="table-responsive">
             <table class="table table-light table-hover mb-0">
                 <thead>

@@ -1,4 +1,5 @@
 {% load static %}
+
 <tr class="device-row {% if not device.is_active %}opacity-50 text-muted d-none{% endif %}" data-device-active="{{ device.is_active|lower }}" data-device-id="{{ device.pk }}">
     <td>
         <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
@@ -6,21 +7,7 @@
         </a>
     </td>
     <td>
-        <div class="form-check form-switch">
-            <input class="form-check-input device-status-toggle" 
-                   type="checkbox" 
-                   role="switch"
-                   id="deviceStatus_{{ device.pk }}"
-                   data-device-id="{{ device.pk }}"
-                   data-place-slug="{{ place.slug }}"
-                   {% if device.is_active %}checked{% endif %}
-                   {% if not device.location.is_active %}disabled{% endif %}>
-            <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
-                   for="deviceStatus_{{ device.pk }}"
-                   id="deviceStatusLabel_{{ device.pk }}">
-                {% if device.is_active %}Active{% else %}inactive{% endif %}
-            </label>
-        </div>
+        {% include "sensors/includes/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug disabled=is_disabled %}
     </td>
     <td>{{ device.model|default:"-" }}</td>
     <td>{{ device.manufacturer|default:"-" }}</td>
@@ -68,4 +55,4 @@
             </div>
         </div>
     </div>
-</div> 
+</div>

@@ -9,22 +9,7 @@
         </a>
     </td>
     <td>
-        <div class="form-check form-switch">
-            <input class="form-check-input sensor-status-toggle" 
-                   type="checkbox" 
-                   role="switch"
-                   id="toggle-sensor-active-{{ sensor.pk }}"
-                   data-sensor-id="{{ sensor.pk }}"
-                   data-device-id="{{ device.pk }}"
-                   data-place-slug="{{ device.location.place.slug }}"
-                   {% if sensor.is_active %}checked{% endif %}
-                   {% if not device.is_active %}disabled{% endif %}>
-            <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
-                   for="toggle-sensor-active-{{ sensor.pk }}"
-                   id="sensorStatusLabel_{{ sensor.pk }}">
-                {% if sensor.is_active %}Active{% else %}inactive{% endif %}
-            </label>
-        </div>
+        {% include "sensors/includes/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=device.location.place.slug disabled=not device.is_active %}
     </td>
     <td>{{ sensor.sensor_type }}</td>
     <td class="text-end">

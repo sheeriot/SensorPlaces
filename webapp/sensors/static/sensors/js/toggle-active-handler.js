@@ -5,7 +5,7 @@
  * 
  * Configuration:
  * -------------
- * To enable debugging, set debug: true in toggleConfig below
+ * To enable debugging, set debug: true in toggleActiveConfig below
  * Debug mode will:
  * - Show toggle lifecycle events
  * - Log state changes
@@ -13,28 +13,62 @@
  */
 
 // System Configuration
-const toggleConfig = {
-    debug: false           // Set to true to enable debug mode
+const toggleActiveConfig = {
+    debug: true        // Set to true to enable debug mode
 };
 
-// Debug logging helper
-function debugLog(group, message, data = null) {
-    if (!toggleConfig.debug) return;
-    console.group(`Toggle System - ${group}`);
-    console.log(message);
-    if (data) console.log(data);
-    console.groupEnd();
+// Card status reporter
+function reportCardStatus() {
+    if (!toggleActiveConfig.debug) return;
+    
+    document.querySelectorAll('.card-body').forEach((card, index) => {
+        console.debug('Card:', {
+            index: index + 1,
+            id: card.id || 'UnnamedCard',
+            classes: Array.from(card.classList).join(' ')
+        });
+
+        let hasAnyToggles = false;
+        
+        // Check each type of toggle separately
+        ['location', 'device', 'sensor'].forEach(type => {
+            // Look for toggle elements
+            const toggles = card.querySelectorAll(`.toggle-${type}-active`);
+            
+            if (toggles.length === 0) {
+                console.debug(`No ${type} toggles found in card ${card.id || 'unnamed'}`);
+                return;
+            }
+
+            hasAnyToggles = true;
+            const statusData = Array.from(toggles).map(toggle => {
+                const row = toggle.closest('tr');
+                const isButton = toggle.tagName.toLowerCase() === 'button';
+                return {
+                    id: toggle.dataset[`${type}Id`],
+                    type: isButton ? 'button' : 'switch',
+                    active: isButton ? toggle.dataset.currentStatus === 'true' : toggle.checked,
+                    rowClasses: row ? Array.from(row.classList).join(' ') : 'N/A'
+                };
+            });
+
+            console.group(`Card ${card.id || 'unnamed'} - ${type}s:`);
+            console.table(statusData);
+            console.groupEnd();
+        });
+
+        if (!hasAnyToggles) {
+            console.debug(`Card ${card.id || 'unnamed'} has no toggles of any type`);
+        }
+    });
 }
 
 // Status Management System
 const toggleActiveManager = {
     async toggleStatus(type, id, placeSlug, intendedState) {
-        debugLog('Toggle', `Toggling ${type} status`, {
-            type,
-            id,
-            placeSlug,
-            intendedState
-        });
+        if (toggleActiveConfig.debug) {
+            console.debug('Action:', { type, action: 'toggle', id, intendedState });
+        }
 
         try {
             const response = await utils.fetchWithCSRF(
@@ -49,97 +83,63 @@ const toggleActiveManager = {
             const data = await response.json();
             
             if (data.status === 'success') {
-                debugLog('API Response', `${type} status updated successfully`, data);
-
-                // Find the row and update its visibility based on type
-                const row = document.querySelector(`[data-${type}-id="${id}"]`);
+                // Find all rows that match this model type and ID
+                const rows = document.querySelectorAll(`[data-${type}-id="${id}"]`);
                 const hideInactiveSwitch = document.getElementById(`hideInactive${type.charAt(0).toUpperCase() + type.slice(1)}sSwitch`);
                 
-                if (row && hideInactiveSwitch) {
-                    debugLog('UI Update', `Updating ${type} row visibility`, {
-                        rowId: row.id,
-                        isActive: data.is_active,
-                        hideInactive: hideInactiveSwitch.checked
-                    });
-
-                    row.setAttribute(`data-${type}-active`, data.is_active.toString());
-                    row.classList.toggle('opacity-50', !data.is_active);
-                    row.classList.toggle('text-muted', !data.is_active);
-                    
-                    // Only hide if switch is checked and item is now inactive
-                    if (hideInactiveSwitch.checked && !data.is_active) {
-                        row.classList.add('d-none');
-                    } else {
-                        row.classList.remove('d-none');
+                if (!data.is_active && hideInactiveSwitch?.checked) {
+                    if (toggleActiveConfig.debug) {
+                        console.debug('Visibility:', { 
+                            type, 
+                            id, 
+                            action: 'hiding_inactive_row',
+                            switchState: 'checked'
+                        });
                     }
                 }
-
-                // Special handling for locations affecting devices
-                if (type === 'location') {
-                    debugLog('Cascade', 'Updating affected devices', {
-                        locationId: id,
-                        isActive: data.is_active
-                    });
-
-                    const deviceToggles = document.querySelectorAll(`[data-location-id="${id}"] .device-status-toggle`);
-                    deviceToggles.forEach(toggle => {
-                        toggle.disabled = !data.is_active;
-                        if (!data.is_active) {
-                            const deviceRow = toggle.closest('tr');
-                            if (deviceRow) {
-                                deviceRow.classList.add('opacity-50', 'text-muted');
-                            }
-                        }
-                    });
-                }
-
-                // Special handling for devices affecting sensors
-                if (type === 'device') {
-                    debugLog('Cascade', 'Updating affected sensors', {
-                        deviceId: id,
-                        isActive: data.is_active
-                    });
-
-                    const sensorToggles = document.querySelectorAll(`[data-device-id="${id}"] .sensor-status-toggle`);
-                    sensorToggles.forEach(toggle => {
-                        toggle.disabled = !data.is_active;
-                        if (!data.is_active) {
-                            const sensorRow = toggle.closest('tr');
-                            if (sensorRow) {
-                                sensorRow.classList.add('opacity-50', 'text-muted');
-                            }
-                        }
-                    });
-                }
-
-                document.dispatchEvent(new CustomEvent(`${type}StatusChanged`, {
-                    detail: { 
-                        id, 
-                        type,
-                        isActive: data.is_active 
-                    }
-                }));
                 
-                // Use toastSystem consistently with server-provided type
+                rows.forEach(row => {
+                    // Update row attributes
+                    row.setAttribute(`data-${type}-active`, data.is_active.toString());
+                    
+                    // Update classes based on active state
+                    if (data.is_active) {
+                        row.classList.remove('opacity-50', 'text-muted', 'd-none');
+                    } else {
+                        row.classList.add('opacity-50', 'text-muted');
+                        if (hideInactiveSwitch?.checked) {
+                            row.classList.add('d-none');
+                        }
+                    }
+
+                    // Update toggle text
+                    const statusLabel = row.querySelector('.status-label');
+                    if (statusLabel) {
+                        statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
+                        statusLabel.classList.toggle('text-success', data.is_active);
+                        statusLabel.classList.toggle('text-danger', !data.is_active);
+                    }
+                });
+
+                // Show toast notification
                 toastSystem.show(data.message, data.type || 'warning', true);
                 return data;
             } else {
                 throw new Error(data.message || `Failed to update ${type} status`);
             }
         } catch (error) {
-            debugLog('Error', `Failed to toggle ${type} status`, error);
-            console.error(`Error updating ${type} status:`, error);
+            if (toggleActiveConfig.debug) {
+                console.debug('Error:', { type, error: error.message });
+            }
             toastSystem.show(error.message, 'danger', true);
             return null;
         }
     },
 
     async updateDeviceStatus(deviceId, isActive, placeSlug) {
-        debugLog('Device', 'Updating device status', {
-            deviceId,
-            isActive,
-            placeSlug
-        });
+        if (toggleActiveConfig.debug) {
+            console.debug('Action:', { type: 'device', action: 'update', deviceId, isActive });
+        }
 
         try {
             const response = await utils.fetchWithCSRF(
@@ -154,18 +154,10 @@ const toggleActiveManager = {
             const data = await response.json();
             
             if (data.status === 'success') {
-                debugLog('API Response', 'Device status updated successfully', data);
-
                 const device = data.device;
                 const row = document.querySelector(`tr[data-device-id="${device.id}"]`);
                 const toggle = row.querySelector('.device-status-toggle');
                 
-                // Update toggle state
-                debugLog('UI Update', 'Updating device toggle state', {
-                    deviceId: device.id,
-                    isActive: device.is_active
-                });
-
                 toggle.checked = device.is_active;
                 const label = document.getElementById(`deviceStatusLabel_${device.id}`);
                 if (label) {
@@ -178,6 +170,13 @@ const toggleActiveManager = {
                 if (!device.is_active) {
                     row.classList.add('text-muted', 'opacity-50');
                     if (document.getElementById('hideInactiveDevices')?.checked) {
+                        if (toggleActiveConfig.debug) {
+                            console.debug('Visibility:', { 
+                                type: 'device', 
+                                id: device.id, 
+                                action: 'hiding_inactive_row' 
+                            });
+                        }
                         row.classList.add('d-none');
                     }
                 } else {
@@ -187,11 +186,6 @@ const toggleActiveManager = {
                 // Show toast with affected sensors if any
                 let message = data.message;
                 if (device.affected_sensors && device.affected_sensors.length > 0) {
-                    debugLog('Cascade', 'Processing affected sensors', {
-                        count: device.affected_sensors.length,
-                        sensors: device.affected_sensors
-                    });
-
                     message += '<br><br>Affected sensors:<ul class="mb-0">';
                     device.affected_sensors.forEach(sensor => {
                         message += `<li>${sensor}</li>`;
@@ -199,23 +193,21 @@ const toggleActiveManager = {
                     message += '</ul>';
                 }
                 
-                // Use toastSystem consistently
                 toastSystem.show(message, 'success');
                 return data;
             } else {
                 throw new Error(data.message || 'Failed to update device status');
             }
         } catch (error) {
-            debugLog('Error', 'Failed to update device status', error);
-            console.error('Error updating device status:', error);
+            if (toggleActiveConfig.debug) {
+                console.debug('Error:', { type: 'device', error: error.message });
+            }
             toastSystem.show(error.message, 'danger');
             return null;
         }
     },
 
     createToggleModal(type) {
-        debugLog('Modal', `Creating toggle modal for ${type}`);
-
         const modalId = `${type}ToggleModal`;
         if (!document.getElementById(modalId)) {
             const modalHTML = `
@@ -240,7 +232,6 @@ const toggleActiveManager = {
                     </div>
                 </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHTML);
-            debugLog('Modal', `Created new modal: ${modalId}`);
         }
         return {
             modal: new bootstrap.Modal(document.getElementById(modalId)),
@@ -252,11 +243,11 @@ const toggleActiveManager = {
     },
 
     initializeLocationToggles() {
-        debugLog('Initialize', 'Setting up location toggle handlers');
-
         const modalComponents = this.createToggleModal('location');
         
-        document.querySelectorAll('.location-status-toggle').forEach(toggle => {
+        document.querySelectorAll('.toggle-location-active').forEach(toggle => {
+            if (toggle.tagName.toLowerCase() === 'button') return; // Skip buttons, they're handled separately
+            
             const oldHandler = toggle._changeHandler;
             if (oldHandler) toggle.removeEventListener('change', oldHandler);
 
@@ -267,12 +258,6 @@ const toggleActiveManager = {
                 const placeSlug = this.dataset.placeSlug;
                 const newStatus = this.checked;
                 const toggleElement = this;
-                
-                debugLog('Location', 'Location toggle clicked', {
-                    locationId,
-                    placeSlug,
-                    newStatus
-                });
 
                 this.checked = !newStatus;
                 
@@ -311,11 +296,11 @@ const toggleActiveManager = {
     },
 
     initializeDeviceToggles() {
-        debugLog('Initialize', 'Setting up device toggle handlers');
-
         const modalComponents = this.createToggleModal('device');
         
-        document.querySelectorAll('.device-status-toggle').forEach(toggle => {
+        document.querySelectorAll('.toggle-device-active').forEach(toggle => {
+            if (toggle.tagName.toLowerCase() === 'button') return; // Skip buttons, they're handled separately
+            
             const oldHandler = toggle._changeHandler;
             if (oldHandler) toggle.removeEventListener('change', oldHandler);
 
@@ -326,12 +311,6 @@ const toggleActiveManager = {
                 const placeSlug = this.dataset.placeSlug;
                 const newStatus = this.checked;
                 const toggleElement = this;
-                
-                debugLog('Device', 'Device toggle clicked', {
-                    deviceId,
-                    placeSlug,
-                    newStatus
-                });
 
                 this.checked = !newStatus;
                 
@@ -370,11 +349,11 @@ const toggleActiveManager = {
     },
 
     initializeSensorToggles() {
-        debugLog('Initialize', 'Setting up sensor toggle handlers');
-
         const modalComponents = this.createToggleModal('sensor');
         
-        document.querySelectorAll('.sensor-status-toggle').forEach(toggle => {
+        document.querySelectorAll('.toggle-sensor-active').forEach(toggle => {
+            if (toggle.tagName.toLowerCase() === 'button') return; // Skip buttons, they're handled separately
+            
             const oldHandler = toggle._changeHandler;
             if (oldHandler) toggle.removeEventListener('change', oldHandler);
 
@@ -385,12 +364,6 @@ const toggleActiveManager = {
                 const placeSlug = this.dataset.placeSlug;
                 const newStatus = this.checked;
                 const toggleElement = this;
-                
-                debugLog('Sensor', 'Sensor toggle clicked', {
-                    sensorId,
-                    placeSlug,
-                    newStatus
-                });
 
                 this.checked = !newStatus;
                 
@@ -429,7 +402,9 @@ const toggleActiveManager = {
     },
 
     initializeDeviceStatusButtons() {
-        document.querySelectorAll('.toggle-device-status').forEach(button => {
+        document.querySelectorAll('.toggle-device-active').forEach(button => {
+            if (button.tagName.toLowerCase() !== 'button') return; // Only handle buttons
+            
             button.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const deviceId = button.dataset.deviceId;
@@ -464,77 +439,20 @@ const toggleActiveManager = {
     }
 };
 
-// Visibility Toggle System
-const visibilityToggleManager = {
-    // Generic handler that can be used for any model type
-    initializeVisibilityToggle(model) {
-        debugLog('Initialize', `Setting up ${model} visibility`);
-
-        const switchId = `hideInactive${model.charAt(0).toUpperCase() + model.slice(1)}s`;
-        const hideInactiveSwitch = document.getElementById(switchId);
-        if (!hideInactiveSwitch) return;
-
-        // Find the closest container (card or nav) and get all elements with data-{model}-active
-        const container = hideInactiveSwitch.closest('.card, .nav');
-        const elements = container.querySelectorAll(`[data-${model}-active]`);
-
-        const filterElements = () => {
-            const hideInactive = hideInactiveSwitch.checked;
-            debugLog('Visibility', `Filtering ${model}s`, {
-                hideInactive,
-                elementCount: elements.length
-            });
-
-            elements.forEach(el => {
-                const isActive = el.getAttribute(`data-${model}-active`) === 'true';
-                el.classList.toggle('d-none', hideInactive && !isActive);
-            });
-        };
-
-        // Initial filter
-        filterElements();
-        // Filter on toggle change
-        hideInactiveSwitch.addEventListener('change', filterElements);
-    },
-
-    // Simplified initialization methods using the generic handler
-    initializeLocationNav() {
-        this.initializeVisibilityToggle('location');
-    },
-
-    initializePlacesList() {
-        if (typeof placesVisibilitySystem !== 'undefined' && placesVisibilitySystem.initialize) {
-            placesVisibilitySystem.initialize();
-        }
-    },
-
-    initializeDeviceList() {
-        this.initializeVisibilityToggle('device');
-    },
-
-    initializeSensorList() {
-        this.initializeVisibilityToggle('sensor');
-    }
-};
-
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    debugLog('Initialize', 'Toggle Active Handler - Initializing');
-
-    // Initialize active state toggle functionality
     toggleActiveManager.initializeLocationToggles();
     toggleActiveManager.initializeDeviceToggles();
     toggleActiveManager.initializeSensorToggles();
     
-    // Initialize visibility switch functionality
-    visibilityToggleManager.initializeLocationNav();
-    visibilityToggleManager.initializePlacesList();
-    visibilityToggleManager.initializeDeviceList();
-    visibilityToggleManager.initializeSensorList();
+    // Initialize hide inactive system
+    if (window.hideInactiveManager) {
+        hideInactiveManager.initialize();
+    }
 
-    debugLog('Initialize', 'Toggle Active Handler - Initialized');
+    // Report initial card status
+    reportCardStatus();
 });
 
 // Export for use in other modules
-window.toggleActiveManager = toggleActiveManager;
-window.visibilityToggleManager = visibilityToggleManager; 
+window.toggleActiveManager = toggleActiveManager; 

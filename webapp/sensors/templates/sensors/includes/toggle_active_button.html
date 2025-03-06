@@ -1,0 +1,23 @@
+{% comment %}
+This template expects:
+- type: The type of object (sensor, device)
+- id: The object's ID
+- is_active: Boolean indicating if object is active
+- place_slug: The place's slug
+- disabled: Boolean indicating if the toggle should be disabled
+{% endcomment %}
+<div class="form-check form-switch">
+    <input class="form-check-input toggle-{{ type }}-active" 
+           type="checkbox" 
+           role="switch"
+           id="toggle-{{ type }}-active-{{ id }}"
+           data-{{ type }}-id="{{ id }}"
+           data-place-slug="{{ place_slug }}"
+           {% if is_active %}checked{% endif %}
+           {% if disabled %}disabled{% endif %}>
+    <label class="form-check-label status-label {% if is_active %}text-success{% else %}text-danger{% endif %}" 
+           for="toggle-{{ type }}-active-{{ id }}"
+           id="{{ type }}StatusLabel_{{ id }}">
+        {% if is_active %}Active{% else %}inactive{% endif %}
+    </label>
+</div> 

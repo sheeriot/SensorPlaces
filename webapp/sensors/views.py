@@ -369,16 +369,28 @@ class LocationDetailView(LocationAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         
-        # Add annotated devices to context
+        # Add annotated devices to context with proper prefetching
         context['devices'] = Device.objects.filter(
             location=self.object
         ).select_related(
-            'location', 
             'device_type'
+        ).prefetch_related(
+            'sensors'
+        ).annotate(
+            active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+            inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
         ).order_by(
             '-is_active', 
             Lower('name')
         )
+        
+        # Add device and sensor counts
+        context.update({
+            'devices_active': Device.objects.filter(location=self.object, is_active=True).count(),
+            'devices_inactive': Device.objects.filter(location=self.object, is_active=False).count(),
+            'sensors_active': Sensor.objects.filter(device__location=self.object, is_active=True).count(),
+            'sensors_inactive': Sensor.objects.filter(device__location=self.object, is_active=False).count(),
+        })
         
         ic("Location Detail Device Query Executed")
         return context

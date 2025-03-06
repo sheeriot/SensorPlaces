@@ -14,20 +14,7 @@ This template expects:
         </a>
     </td>
     <td>
-        <div class="form-check form-switch">
-            <input class="form-check-input location-status-toggle" 
-                   type="checkbox" 
-                   role="switch"
-                   id="toggle-location-active-{{ location.pk }}"
-                   data-location-id="{{ location.pk }}"
-                   data-place-slug="{{ place.slug }}"
-                   {% if location.is_active %}checked{% endif %}>
-            <label class="form-check-label status-label {% if location.is_active %}text-success{% else %}text-danger{% endif %}" 
-                   for="toggle-location-active-{{ location.pk }}"
-                   id="locationStatusLabel_{{ location.pk }}">
-                {% if location.is_active %}Active{% else %}inactive{% endif %}
-            </label>
-        </div>
+        {% include "sensors/includes/toggle_active_button.html" with type="location" id=location.pk is_active=location.is_active place_slug=place.slug %}
     </td>
     <td>
         <span class="text-success">{{ location.active_devices_count }}</span>
