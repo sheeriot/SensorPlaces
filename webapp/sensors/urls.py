@@ -23,6 +23,9 @@ urlpatterns = [
     # Device URLs - nested under places and locations
     path('<slug:place_slug>/location/<int:location_pk>/device/create/', views.DeviceCreateView.as_view(), name='device_create'),
     
+    # New URL pattern for when location needs to be selected
+    path('<slug:place_slug>/device/create/', views.DeviceCreateView.as_view(), name='device_create_choose_location'),
+    
     # Device URLs - nested under device
     path('<slug:place_slug>/devices/', views.DeviceListView.as_view(), name='place_devices'),
     path('<slug:place_slug>/location/<int:location_pk>/devices/', views.DeviceListView.as_view(), name='location_devices'),

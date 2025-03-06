@@ -20,23 +20,13 @@
     </div>
 
     <div class="col-md-4">
-        {% include "sensors/includes/sensor_detail_card.html" with sensor=sensor %}
+        {% include "sensors/includes/place_nav_card.html" with place_slug=sensor.device.location.place.slug %}
+        {% include "sensors/includes/device_details_card.html" with device=sensor.device %}
     </div>
 
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Recent Readings</h5>
-            </div>
-            <div class="card-body">
-                <div class="readings-chart-container" 
-                     data-sensor-id="{{ sensor.pk }}"
-                     data-unit="{{ sensor.get_unit_display }}"
-                     data-name="{{ sensor.name }}">
-                    <canvas id="readingsChart"></canvas>
-                </div>
-            </div>
-        </div>
+        {% include "sensors/includes/sensor_detail_card.html" with sensor=sensor %}
+        {% include "sensors/includes/sensor_readings_card.html" with sensor=sensor %}
     </div>
 </div>
 {% endblock %} 

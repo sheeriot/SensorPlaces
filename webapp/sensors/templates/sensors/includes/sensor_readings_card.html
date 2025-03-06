@@ -1,0 +1,13 @@
+<div class="card sensor_readings my-2" id="sensor_readings_{{ sensor.pk }}">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Recent Readings</h5>
+    </div>
+    <div class="card-body">
+        <div class="readings-chart-container" 
+             data-sensor-id="{{ sensor.pk }}"
+             data-unit="{{ sensor.get_unit_display }}"
+             data-name="{{ sensor.name }}">
+            <canvas id="readingsChart"></canvas>
+        </div>
+    </div>
+</div>

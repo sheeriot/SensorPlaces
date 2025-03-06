@@ -343,4 +343,38 @@
 
 .modal.fade .modal-dialog {
     transition: transform 0.2s ease-out !important;
+}
+
+/* Auth Card Decorations */
+.auth-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.corner-icon {
+    position: absolute;
+    font-size: 1.5rem;
+    opacity: 0.15;
+    color: var(--bs-dark);
+    padding: 1rem;
+}
+
+.corner-icon.top-left {
+    top: 0;
+    left: 0;
+}
+
+.corner-icon.top-right {
+    top: 0;
+    right: 0;
+}
+
+.corner-icon.bottom-left {
+    bottom: 0;
+    left: 0;
+}
+
+.corner-icon.bottom-right {
+    bottom: 0;
+    right: 0;
 } 

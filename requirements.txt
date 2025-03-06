@@ -7,3 +7,5 @@ icecream
 django-crispy-forms
 crispy-bootstrap5
 geopy
+django-allauth >= 65.4
+jwt

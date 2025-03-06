@@ -4,7 +4,8 @@ from PIL import Image
 from decimal import Decimal, ROUND_HALF_UP
 from django.utils.text import slugify
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div
+from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
+from crispy_forms.bootstrap import PrependedText
 from django.db import models
 
 from icecream import ic
@@ -276,14 +277,135 @@ class PlaceForm(forms.ModelForm):
                 raise forms.ValidationError("Longitude must be between -180 and 180 degrees")
         return lon
 
-class DeviceForm(forms.ModelForm):
-    place_slug = forms.CharField(widget=forms.HiddenInput(), required=False)
-    location_pk = forms.IntegerField(widget=forms.HiddenInput(), required=False)
-    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+class ReadOnlyLocationWidget(forms.MultiWidget):
+    def __init__(self, attrs=None):
+        widgets = [
+            forms.Select(attrs={'class': 'form-control', 'readonly': True, 'disabled': True}),
+            forms.HiddenInput()
+        ]
+        super().__init__(widgets, attrs)
 
+    def decompress(self, value):
+        if value:
+            return [value, value]  # Same value for both select and hidden
+        return [None, None]
+
+class DeviceForm(forms.ModelForm):
     class Meta:
         model = Device
-        fields = ['name', 'device_type', 'manufacturer', 'model', 'serial_number', 'is_active']
+        fields = ['name', 'location', 'device_type', 'manufacturer', 'model', 'serial_number', 'is_active']
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Enter device name'}),
+            'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
+            'manufacturer': forms.TextInput(attrs={'placeholder': 'Enter manufacturer'}),
+            'model': forms.TextInput(attrs={'placeholder': 'Enter model'})
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Get place and location from initial data
+        initial = kwargs.get('initial', {})
+        place = initial.get('place')
+        initial_location = initial.get('location')
+
+        self.helper = FormHelper()
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
+        self.helper.form_class = 'mb-0'
+
+        # Configure location field based on context
+        if initial_location:
+            self.fields['location'].queryset = Location.objects.filter(pk=initial_location.pk)
+            self.fields['location'].initial = initial_location
+            self.fields['location'].widget = forms.HiddenInput()
+        elif place:
+            self.fields['location'].queryset = Location.objects.filter(
+                place=place,
+                is_active=True
+            ).order_by('name')
+            self.fields['location'].widget.attrs['class'] = 'form-select'
+
+        # Configure field labels and help text
+        self.fields['is_active'].label = "Active"
+        self.fields['is_active'].help_text = None
+        self.fields['device_type'].label = "Device Type"
+        
+        # Custom layout with Bootstrap grid
+        self.helper.layout = Layout(
+            # Hidden location field if provided
+            'location' if initial_location else None,
+            
+            # Name and Device Type row
+            Row(
+                Column('name', css_class='col-md-6'),
+                Column('device_type', css_class='col-md-6'),
+                css_class='mb-3'
+            ),
+            
+            # Manufacturer and Model row
+            Row(
+                Column('manufacturer', css_class='col-md-6'),
+                Column('model', css_class='col-md-6'),
+                css_class='mb-3'
+            ),
+            
+            # Serial Number row
+            Row(
+                Column('serial_number', css_class='col-12'),
+                css_class='mb-3'
+            ),
+            
+            # Footer with Active switch and buttons
+            Div(
+                HTML('<hr>'),
+                Div(
+                    # Left side - Active switch
+                    Div(
+                        Field(
+                            'is_active',
+                            wrapper_class='form-check form-switch',
+                            css_class='form-check-input'
+                        ),
+                        css_class='d-flex align-items-center'
+                    ),
+                    # Right side - Buttons
+                    Div(
+                        HTML("""
+                            <a href="{% if location %}
+                                      {% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}
+                                    {% else %}
+                                      {% url 'sensors:place_detail' place_slug=place.slug %}
+                                    {% endif %}"
+                               class="btn btn-outline-secondary me-2">
+                                <i class="bi bi-x-lg me-1"></i>Cancel
+                            </a>
+                        """),
+                        Submit(
+                            'submit',
+                            'Create Device',
+                            css_class='btn btn-primary',
+                            prepend='<i class="bi bi-hdd-rack me-1"></i>'
+                        ),
+                        css_class='d-flex gap-2'
+                    ),
+                    css_class='d-flex justify-content-between align-items-center'
+                ),
+                css_class='mt-4'
+            )
+        )
+
+        # Add Bootstrap classes to all fields
+        for field_name, field in self.fields.items():
+            if not isinstance(field.widget, (forms.HiddenInput, forms.CheckboxInput)):
+                field.widget.attrs['class'] = 'form-control'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Ensure the location value from the hidden input is used
+        if 'location' in cleaned_data and isinstance(cleaned_data['location'], list):
+            cleaned_data['location'] = cleaned_data['location'][1]  # Use the hidden input value
+        return cleaned_data
 
     def clean_serial_number(self):
         serial_number = self.cleaned_data.get('serial_number')
@@ -327,78 +449,6 @@ class DeviceForm(forms.ModelForm):
     def get_warnings(self):
         """Return all warning messages"""
         return getattr(self, '_warnings', {})
-
-    def __init__(self, *args, **kwargs):
-        referrer = kwargs.pop('referrer', None)
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_tag = True
-        self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
-        
-        if referrer:
-            self.fields['referrer'].initial = referrer
-
-        # Configure field properties
-        self.fields['is_active'].label = "Active"
-        self.fields['is_active'].help_text = None
-        
-        # Add Bootstrap classes to all fields
-        for field in self.fields.values():
-            if not isinstance(field.widget, forms.HiddenInput):
-                field.widget.attrs['class'] = 'form-control'
-
-        # Determine if this is a new device or editing existing
-        is_new = not bool(kwargs.get('instance'))
-        submit_text = "New" if is_new else "Save"
-
-        # Custom layout with Bootstrap grid
-        self.helper.layout = Layout(
-            Row(
-                Column('name', css_class='col-md-8'),
-                Column(
-                    Div(
-                        Field('is_active', wrapper_class='form-check form-switch'),
-                        css_class='d-flex align-items-center h-100'
-                    ),
-                    css_class='col-md-4'
-                ),
-                css_class='mb-3'
-            ),
-            Row(
-                Column('device_type', css_class='col-12'),
-                css_class='mb-3'
-            ),
-            Row(
-                Column('manufacturer', css_class='col-md-6'),
-                Column('model', css_class='col-md-6'),
-                css_class='mb-3'
-            ),
-            Row(
-                Column('serial_number', css_class='col-12'),
-                css_class='mb-3'
-            ),
-            'place_slug',
-            'location_pk',
-            Div(
-                HTML('<hr class="mt-4">'),
-                Div(
-                    HTML("""
-                        <a href="{% url 'sensors:location_detail' place_slug=location.place.slug pk=location.pk %}" 
-                           class="btn btn-outline-secondary">
-                            <i class="bi bi-x-lg me-1"></i>Cancel
-                        </a>
-                    """),
-                    HTML(f"""
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-hdd-rack me-1"></i>{submit_text}
-                        </button>
-                    """),
-                    css_class='d-flex justify-content-between align-items-center'
-                ),
-                css_class='mt-3'
-            )
-        ) 
 
 class LocationForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)

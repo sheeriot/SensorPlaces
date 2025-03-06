@@ -1,0 +1,15 @@
+{% comment %}
+Usage: {% include "sensors/includes/hide_inactive_switch.html" with model="place" %}
+Supported models: place, location, device, sensor
+{% endcomment %}
+
+<div class="form-check form-switch">
+    <input type="checkbox" 
+           class="form-check-input hideInactive-switch" 
+           id="hideInactive{{ model|title }}s"
+           aria-label="Hide inactive {{ model }}s"
+           checked>
+    <label class="form-check-label" for="hideInactive{{ model|title }}s">
+        Hide inactive
+    </label>
+</div> 

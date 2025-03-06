@@ -1,5 +1,5 @@
 <!-- Map Card -->
-<div class="card map-card" {% if place_map_html %}data-places-map-folium="true"{% endif %}>
+<div class="card map-card">
     <div class="card-header">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">
@@ -9,7 +9,7 @@
     </div>
     <div class="card-body p-0">
         {% if place_map_html %}
-            <div id="places-map">
+            <div id="places-map-folium">
                 {{ place_map_html|safe }}
             </div>
         {% else %}

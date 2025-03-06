@@ -466,96 +466,54 @@ const toggleActiveManager = {
 
 // Visibility Toggle System
 const visibilityToggleManager = {
-    initializeLocationNav() {
-        debugLog('Initialize', 'Setting up location navigation visibility');
+    // Generic handler that can be used for any model type
+    initializeVisibilityToggle(model) {
+        debugLog('Initialize', `Setting up ${model} visibility`);
 
-        const hideInactiveSwitch = document.getElementById('hideInactiveLocations');
+        const switchId = `hideInactive${model.charAt(0).toUpperCase() + model.slice(1)}s`;
+        const hideInactiveSwitch = document.getElementById(switchId);
         if (!hideInactiveSwitch) return;
 
-        const locationRows = document.querySelectorAll('[data-location-active]');
-        const locationMarkers = document.querySelectorAll('[data-location-active]');
+        // Find the closest container (card or nav) and get all elements with data-{model}-active
+        const container = hideInactiveSwitch.closest('.card, .nav');
+        const elements = container.querySelectorAll(`[data-${model}-active]`);
 
-        const filterLocations = () => {
+        const filterElements = () => {
             const hideInactive = hideInactiveSwitch.checked;
-            debugLog('Visibility', 'Filtering locations', {
+            debugLog('Visibility', `Filtering ${model}s`, {
                 hideInactive,
-                locationCount: locationRows.length + locationMarkers.length
+                elementCount: elements.length
             });
-            
-            // Filter all elements with data-location-active attribute
-            [...locationRows, ...locationMarkers].forEach(el => {
-                const isActive = el.getAttribute('data-location-active') === 'true';
+
+            elements.forEach(el => {
+                const isActive = el.getAttribute(`data-${model}-active`) === 'true';
                 el.classList.toggle('d-none', hideInactive && !isActive);
             });
         };
 
         // Initial filter
-        filterLocations();
+        filterElements();
         // Filter on toggle change
-        hideInactiveSwitch.addEventListener('change', filterLocations);
+        hideInactiveSwitch.addEventListener('change', filterElements);
+    },
+
+    // Simplified initialization methods using the generic handler
+    initializeLocationNav() {
+        this.initializeVisibilityToggle('location');
     },
 
     initializePlacesList() {
-        // This will be provided by common.js
         if (typeof placesVisibilitySystem !== 'undefined' && placesVisibilitySystem.initialize) {
             placesVisibilitySystem.initialize();
         }
     },
 
     initializeDeviceList() {
-        debugLog('Initialize', 'Setting up device list visibility');
-
-        const hideInactiveSwitch = document.getElementById('hideInactiveDevices');
-        if (!hideInactiveSwitch) return;
-
-        const deviceCard = hideInactiveSwitch.closest('.card');
-        const deviceElements = deviceCard.querySelectorAll('[data-device-active]');
-
-        const filterDevices = () => {
-            const hideInactive = hideInactiveSwitch.checked;
-            debugLog('Visibility', 'Filtering devices', {
-                hideInactive,
-                deviceCount: deviceElements.length
-            });
-
-            deviceElements.forEach(el => {
-                const isActive = el.getAttribute('data-device-active') === 'true';
-                el.classList.toggle('d-none', hideInactive && !isActive);
-            });
-        };
-
-        // Initial filter
-        filterDevices();
-        // Filter on toggle change
-        hideInactiveSwitch.addEventListener('change', filterDevices);
+        this.initializeVisibilityToggle('device');
     },
 
     initializeSensorList() {
-        debugLog('Initialize', 'Setting up sensor list visibility');
-
-        const hideInactiveSwitch = document.getElementById('hideInactiveSensors');
-        if (!hideInactiveSwitch) return;
-
-        const sensorCard = hideInactiveSwitch.closest('.card');
-        const sensorElements = sensorCard.querySelectorAll('[data-sensor-active]');
-
-        const filterSensors = () => {
-            const hideInactive = hideInactiveSwitch.checked;
-            debugLog('Visibility', 'Filtering sensors', {
-                hideInactive,
-                sensorCount: sensorElements.length
-            });
-
-            sensorElements.forEach(el => {
-                const isActive = el.getAttribute('data-sensor-active') === 'true';
-                el.classList.toggle('d-none', hideInactive && !isActive);
-            });
-        };
-
-        // Initial filter
-        filterSensors();
-        // Filter on toggle change
-        hideInactiveSwitch.addEventListener('change', filterSensors);
+        this.initializeVisibilityToggle('sensor');
     }
 };
 

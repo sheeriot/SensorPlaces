@@ -4,18 +4,19 @@
 {% load static %}
 
 {% block title %}
-    {% if object %}Edit Location{% else %}New Location{% endif %}
+    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Place Title Card -->
-    <div class="col-12">
-        {% include "sensors/includes/place_title_card.html" with place=place %}
-    </div>
+<div class="row g-4">
+    {% include 'sensors/includes/place_title_card.html' with place=place %}
 
     <div class="col-md-4">
-        {% include "sensors/includes/place_nav_card.html" with place=place locations=locations.all %}
+        {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations current_location=location %}
+
+        {% if locations %}
+            {% include 'sensors/includes/locations_list_card.html' with place=place locations=locations %}
+        {% endif %}
     </div>
 
     <div class="col-md-8">
@@ -23,14 +24,25 @@
             <div class="card-header bg-white py-2">
                 <h5 class="card-title mb-0">
                     <i class="bi bi-geo-alt me-2"></i>
-                    {% if object %}Edit Location{% else %}New Location{% endif %}
+                    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
+                    {% if place %}
+                    <small class="text-body-secondary ms-2">
+                        @ <i class="bi bi-house-gear"></i> {{ place.name }}
+                    </small>
+                    {% endif %}
                 </h5>
             </div>
             <div class="card-body">
-                <form method="post" id="locationForm" data-place-slug="{{ place.slug }}" novalidate>
-                    {% csrf_token %}
-                    {% crispy form %}
-                </form>
+                {% crispy form %}
+
+                {% if place and not place.is_active %}
+                    <div class="alert alert-warning static-alert d-flex align-items-center py-2 mt-3" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <div>
+                            This place is inactive. Any {{ model_name }}s created here will also be inactive.
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>

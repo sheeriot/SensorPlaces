@@ -4,7 +4,7 @@
 {% load static %}
 
 {% block title %}
-    {% if object %}Edit Sensor{% else %}New Sensor{% endif %}
+    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
 {% endblock %}
 
 <!-- Place Title Card -->
@@ -27,7 +27,12 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">
                             <i class="bi bi-thermometer me-2"></i>
-                            {% if object %}Edit Sensor{% else %}New Sensor{% endif %}
+                            {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
+                            {% if device %}
+                            <small class="text-body-secondary ms-2">
+                                @ <i class="bi bi-hdd-rack"></i> {{ device.name }}
+                            </small>
+                            {% endif %}
                         </h5>
                         <div class="d-flex align-items-center">
                             <i class="bi bi-hdd-rack small text-muted me-1"></i>
@@ -48,11 +53,11 @@
                 <div class="card-body">
                     {% crispy form %}
 
-                    {% if not device.is_active %}
+                    {% if device and not device.is_active %}
                     <div class="alert alert-warning d-flex align-items-center py-2 my-2" role="alert">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         <div>
-                            This device is inactive. Any sensors created here will also be inactive.
+                            This device is inactive. Any {{ model_name }}s created here will also be inactive.
                         </div>
                     </div>
                     {% endif %}

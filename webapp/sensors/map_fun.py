@@ -1,6 +1,7 @@
 import folium
 from folium import plugins
 from folium.plugins import BeautifyIcon
+from icecream import ic
 
 def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom_start=13):
     """Create a map centered on a place or set of places"""
@@ -28,12 +29,15 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
                     popup=name,
                     icon=folium.Icon(color='blue', icon='info-sign')
                 ).add_to(m)
-            return m.get_root().render()
+            map_html = m.get_root().render()
+            return map_html
         
         # Default to Austin center if no places provided
         if not places:
+            ic("Places Map: No places provided, using Austin center")
             m = folium.Map(location=[30.2672, -97.7431], **map_kwargs)
-            return m.get_root().render()
+            map_html = m.get_root().render()
+            return map_html
 
         # Calculate map center from active places
         active_places = [p for p in places if p.is_active]
@@ -95,8 +99,10 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
         if len(active_places) > 1:
             m.fit_bounds([[min(active_lats), min(active_lons)], [max(active_lats), max(active_lons)]])
         
-        return m.get_root().render()
+        map_html = m.get_root().render()
+        ic("Generated map HTML length:", len(map_html))
+        return map_html
     
     except Exception as e:
-        print(f"Error creating map: {str(e)}")
+        ic("Error creating map:", str(e))
         return "" 

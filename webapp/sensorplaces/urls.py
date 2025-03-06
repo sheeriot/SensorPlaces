@@ -22,6 +22,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('sensors.urls')),
+    path('accounts/', include('allauth.urls')),  # This should be before your other URLs
+    path('', include('sensors.urls')),  # Your app URLs
     # path('', HomeView.as_view(), name='home'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

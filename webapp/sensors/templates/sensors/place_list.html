@@ -3,27 +3,10 @@
 {% block title %}Places{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-1">
-    <div class="d-flex align-items-center gap-3">
-        <h1 class="mb-0">Places</h1>
-        <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="hideInactivePlacesSwitch" checked>
-            <label class="form-check-label small text-body-secondary" for="hideInactivePlacesSwitch">
-                Hide inactive
-            </label>
-        </div>
-    </div>
-    <div class="d-flex align-items-center gap-2">
-        {% include "sensors/includes/toast_history_button.html" %}
-        <a href="{% url 'sensors:place_create' %}" class="btn btn-outline-primary">
-            <i class="bi bi-house-gear"> </i><i class="bi bi-plus-circle"></i> Add Place
-        </a>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="m-0">Places List</h2>
+    {% include "sensors/includes/toast_history_button.html" %}
 </div>
-
 {% include "sensors/includes/places_list_card.html" %}
 {% include "sensors/includes/places_map_card.html" %}
-
-{% include "sensors/includes/toast_history_modal.html" %}
-
 {% endblock %}

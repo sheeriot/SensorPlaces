@@ -25,7 +25,7 @@
             {% include 'sensors/includes/device_details_card.html' with place_slug=place.slug pk=device.pk %}
 
             <!-- Sensors Card -->
-            {% include 'sensors/includes/sensor_list_card.html' with place_slug=place.slug location=location device=device sensors=sensors %}
+            {% include 'sensors/includes/sensor_list_card.html' with place_slug=place.slug location=location device=device sensors=device.sensors.all %}
         </div>
     </div>
 </div>
