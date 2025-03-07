@@ -451,36 +451,25 @@ class DeviceForm(forms.ModelForm):
         return getattr(self, '_warnings', {})
 
 class LocationForm(forms.ModelForm):
-    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
-
     class Meta:
         model = Location
         fields = ['name', 'is_active']
 
     def __init__(self, *args, **kwargs):
-        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
-
-        if referrer:
-            self.fields['referrer'].initial = referrer
-
+        self.helper.form_class = 'mb-0'
+        
         # Configure field properties
         self.fields['is_active'].label = "Active"
         self.fields['is_active'].help_text = None
-
-        # Add Bootstrap classes to all fields
-        for field in self.fields.values():
-            if not isinstance(field.widget, forms.HiddenInput):
-                field.widget.attrs['class'] = 'form-control'
-
+        
         # Determine if this is a new location or editing existing
         is_new = not bool(kwargs.get('instance'))
         submit_text = "Create Location" if is_new else "Update Location"
-
+        
         # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
             Row(
@@ -489,9 +478,7 @@ class LocationForm(forms.ModelForm):
                     Div(
                         Field(
                             'is_active', 
-                            wrapper_class='form-check form-switch form-switch-lg',
-                            data_location_id='{{ location.pk }}' if not is_new else '',
-                            css_class='location-status-toggle'
+                            wrapper_class='form-check form-switch form-switch-lg'
                         ),
                         css_class='d-flex align-items-center h-100'
                     ),
@@ -508,11 +495,12 @@ class LocationForm(forms.ModelForm):
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
-                    HTML(f"""
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save me-1"></i>{submit_text}
-                        </button>
-                    """),
+                    Submit(
+                        'submit',
+                        submit_text,
+                        css_class='btn btn-primary',
+                        prepend='<i class="bi bi-save me-1"></i>'
+                    ),
                     css_class='d-flex justify-content-between align-items-center'
                 ),
                 css_class='mt-3'

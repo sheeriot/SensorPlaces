@@ -13,6 +13,7 @@ from django.urls import reverse
 from datetime import datetime
 from decimal import Decimal
 from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
+from django.contrib.auth import get_user_model
 
 def validate_image_size(image):
     filesize = image.size
@@ -280,3 +281,38 @@ class SensorReading(models.Model):
 
     class Meta:
         verbose_name_plural = '5. Sensor Readings'
+
+class ToastMessage(models.Model):
+    """Persistent storage for toast notifications"""
+    TOAST_TYPES = [
+        ('success', 'Success'),
+        ('warning', 'Warning'),
+        ('error', 'Error'),
+        ('info', 'Info'),
+        ('danger', 'Danger')
+    ]
+
+    user = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name='toast_messages'
+    )
+    username = models.CharField(max_length=150)  # Match User model username max_length
+    message = models.TextField()
+    type = models.CharField(max_length=10, choices=TOAST_TYPES)
+    tags = models.CharField(max_length=50)  # For additional styling/behavior flags
+    timestamp = models.DateTimeField(auto_now_add=True)
+    read = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp']),
+            models.Index(fields=['user', '-timestamp']),
+            models.Index(fields=['username', '-timestamp']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.username and self.user:
+            self.username = self.user.username
+        super().save(*args, **kwargs)

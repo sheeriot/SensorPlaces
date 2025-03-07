@@ -18,12 +18,13 @@ const toastConfig = {
 };
 
 // Debug logging helper
-function debugLog(group, message, data = null) {
+function debugLog(message, data = null) {
     if (!toastConfig.debug) return;
-    console.group(`Toast System - ${group}`);
-    console.log(message);
-    if (data) console.log(data);
-    console.groupEnd();
+    if (data) {
+        console.debug(message, data);
+    } else {
+        console.debug(message);
+    }
 }
 
 // Toast System
@@ -32,7 +33,6 @@ const toastSystem = {
     MAX_HISTORY: 50,
 
     async loadHistory() {
-        debugLog('History', 'Loading toast history');
         try {
             const response = await utils.fetchWithCSRF('/api/toast-history/');
             const data = await response.json();
@@ -42,45 +42,28 @@ const toastSystem = {
                     timestamp: new Date(item.timestamp)
                 }));
                 if (toastConfig.debug) {
-                    console.group('Toast System - History Loaded');
-                    console.log('History items:', this.history.length);
                     console.table(this.history);
-                    console.groupEnd();
                 }
                 this.updateHistoryBadge();
             }
         } catch (error) {
-            debugLog('Error', 'Failed to load toast history', error);
-            console.error('Error loading toast history:', error);
+            console.error('Failed to load toast history:', error);
         }
     },
 
     async saveHistory() {
-        debugLog('History', 'Saving toast history', {
-            itemCount: this.history.length
-        });
         try {
             await utils.fetchWithCSRF('/api/toast-history/', {
                 method: 'POST',
                 body: JSON.stringify({ history: this.history })
             });
-            if (toastConfig.debug) {
-                console.log('Toast history saved successfully');
-            }
         } catch (error) {
-            debugLog('Error', 'Failed to save toast history', error);
-            console.error('Error saving toast history:', error);
+            console.error('Failed to save toast history:', error);
         }
     },
 
     show(message, type = 'success', addToHistory = true) {
-        debugLog('Show', 'Creating new toast', {
-            message,
-            type,
-            addToHistory
-        });
-
-        // Create toast data with consistent structure
+        // Create toast data
         const toastData = {
             id: `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             message: typeof message === 'object' ? message.message : message,
@@ -90,34 +73,26 @@ const toastSystem = {
         };
 
         if (toastConfig.debug) {
-            console.group('Toast System - New Toast');
-            console.log('Toast data:', toastData);
+            debugLog('New Toast:', toastData);
         }
 
-        // Only add to history if addToHistory is true
         if (toastData.addToHistory) {
-            debugLog('History', 'Adding toast to history');
-            // Add to history
             this.history.unshift({
                 ...toastData,
                 timestamp: new Date(toastData.timestamp)
             });
             
-            // Keep history within limit
             if (this.history.length > this.MAX_HISTORY) {
-                const removed = this.history.splice(this.MAX_HISTORY);
-                debugLog('History', `Removed ${removed.length} old items from history`);
+                this.history.splice(this.MAX_HISTORY);
             }
             
-            // Save to server and update badge
             this.saveHistory();
             this.updateHistoryBadge();
         }
         
-        // Create toast container if it doesn't exist
+        // Create toast container if needed
         let toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) {
-            debugLog('Container', 'Creating new toast container');
             toastContainer = document.createElement('div');
             toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
             document.body.appendChild(toastContainer);
@@ -125,7 +100,7 @@ const toastSystem = {
 
         // Create and show toast
         const toastHtml = `
-            <div class="toast showing bg-${toastData.type} text-dark" id="${toastData.id}">
+            <div class="toast showing text-${toastData.type}" id="${toastData.id}">
                 <div class="d-flex align-items-center">
                     <div class="toast-body d-flex align-items-center flex-grow-1">
                         <i class="bi bi-${
@@ -176,10 +151,8 @@ const toastSystem = {
         const badge = document.getElementById('toastHistoryBadge');
         if (badge) {
             const count = this.history.length;
-            debugLog('Badge', 'Updating history badge', { count });
             badge.textContent = count || '';
             badge.classList.toggle('d-none', count === 0);
-            // Also update the aria-label for accessibility
             const btn = document.getElementById('toastHistoryBtn');
             if (btn) {
                 btn.setAttribute('aria-label', `Notification History (${count} notifications)`);
@@ -230,7 +203,7 @@ const toastSystem = {
                                             <div class="toast-history-time font-monospace text-muted mb-1" style="font-size: 0.75em;">
                                                 ${dateStr} ${timeStr} ${shortTZ} UTC${offsetString}
                                             </div>
-                                            <div class="bg-${toast.type} text-dark p-2 rounded shadow-sm border">
+                                            <div class="text-${toast.type} p-2 rounded shadow-sm">
                                                 <div class="d-flex align-items-center">
                                                     <i class="bi bi-${
                                                         toast.type === 'success' ? 'check-circle' : 
@@ -279,7 +252,6 @@ const toastSystem = {
             bootstrap.Modal.getInstance(document.getElementById('toastHistoryModal'))?.hide();
             debugLog('History', 'History cleared successfully');
         } catch (error) {
-            debugLog('Error', 'Failed to clear history', error);
             console.error('Error clearing toast history:', error);
         }
     }
@@ -287,33 +259,26 @@ const toastSystem = {
 
 // Initialize toast system when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    debugLog('Initialize', 'Toast System Initializing');
-    // Initialize toast system
     toastSystem.loadHistory();
     
-    // Set up toast history button click handler
     const toastHistoryBtn = document.getElementById('toastHistoryBtn');
     if (toastHistoryBtn) {
         toastHistoryBtn.addEventListener('click', () => toastSystem.showHistory());
     }
 
-    // Process any toast message from Django context
+    // Process Django messages
     const toastMessageEl = document.getElementById('toast-message');
     if (toastMessageEl) {
         try {
             const toastMessage = JSON.parse(toastMessageEl.textContent);
-            debugLog('Django Message', 'Processing Django toast message', toastMessage);
             toastSystem.show(toastMessage);
         } catch (e) {
-            debugLog('Error', 'Error processing Django toast message', e);
             console.error('Error processing toast message:', e);
         }
     }
 
-    // Convert any Django messages to toasts
+    // Convert Django alerts to toasts
     const messages = document.querySelectorAll('.alert:not(.processed):not(.static-alert)');
-    debugLog('Django Messages', `Processing ${messages.length} Django messages`);
-    
     messages.forEach(message => {
         const type = message.classList.contains('alert-success') ? 'success' :
                     message.classList.contains('alert-warning') ? 'warning' :
@@ -325,24 +290,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (messageText) {
             message.classList.add('processed');
             message.remove();
-            debugLog('Django Message', 'Converting Django message to toast', {
-                type,
-                message: messageText
-            });
             toastSystem.show(messageText, type);
         }
     });
-
-    debugLog('Initialize', 'Toast System Initialized');
 });
 
 // Export for use in other modules
 window.toastSystem = toastSystem;
 window.showToast = function(message, type = 'info') {
-    debugLog('External', 'Show toast called from external source', {
-        message,
-        type
-    });
     toastSystem.show({
         message: message,
         type: type,

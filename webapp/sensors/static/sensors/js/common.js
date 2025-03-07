@@ -43,9 +43,6 @@ function initializeLocationMap(options = {}) {
         title: 'Drag me or click anywhere on the map!'
     }).addTo(map);
 
-    marker.bindPopup('Drag me or click anywhere to set location!');
-    marker.openPopup();
-
     if (latInputId && lonInputId) {
         const latInput = document.getElementById(latInputId);
         const lonInput = document.getElementById(lonInputId);
@@ -283,17 +280,17 @@ const placeFormMapSystem = {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     if (commonConfig.debug) {
-        console.group('=== Application Startup ===');
+        console.group('=== Map System Startup ===');
     }
     
     // Initialize core systems
     foliumMarkerSystem.initialize();
     
-    // Initialize optional components
+    // Initialize preview map if it exists
     const previewMap = document.getElementById('preview-map');
     if (previewMap && commonConfig.debug) {
         console.log('Initializing preview map');
-        placeFormMapSystem.initialize({
+        initializeLocationMap({
             latInputId: 'id_latitude',
             lonInputId: 'id_longitude'
         });

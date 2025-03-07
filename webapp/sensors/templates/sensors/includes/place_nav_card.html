@@ -23,20 +23,26 @@
     <div class="card-body p-0" id="place-nav-card">
         <div class="list-group list-group-flush rounded-bottom">
             {% for location in locations %}
-            {% if location.is_active %}
+            {% if location.is_active or show_hidden %}
             <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-1 px-2
-                      {% if location.pk == current_location.pk %}current-location{% endif %}"
-               data-active="true"
+                      {% if location.pk == current_location.pk %}current-location{% endif %}
+                      {% if not location.is_active %}opacity-50 text-dim{% endif %}"
+               data-location-active="{{ location.is_active|lower }}"
                data-location-id="{{ location.pk }}">
                 <div>
                     {{ location.name }}
+                    {% if not location.is_active %}
+                    <span class="badge text-bg-secondary ms-2">inactive</span>
+                    {% endif %}
                 </div>
                 <div class="d-flex align-items-center">
+                    {% if location.is_active %}
                     <span class="device-counts me-2">
                         <span class="text-success font-monospace fw-bold active-count" id="location-{{ location.pk }}-active">{{ location.active_devices_count }}</span>
                         (<span class="text-body-secondary font-monospace" id="location-{{ location.pk }}-inactive">{{ location.inactive_devices_count|default:0 }}</span>)
                     </span>
+                    {% endif %}
                     <i class="bi bi-hdd-rack"></i>
                 </div>
             </a>

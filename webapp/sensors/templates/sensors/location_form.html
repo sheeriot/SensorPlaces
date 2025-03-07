@@ -12,68 +12,11 @@
     {% include 'sensors/includes/place_title_card.html' with place=place %}
 
     <div class="col-md-4">
-        {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations current_location=location %}
-
-        {% if locations %}
-            {% include 'sensors/includes/locations_list_card.html' with place=place locations=locations %}
-        {% endif %}
+        {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations current_location=location show_hidden=True %}
     </div>
 
     <div class="col-md-8">
-        <div class="card rounded-3 shadow-sm border-0">
-            <div class="card-header bg-white py-2">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-geo-alt me-2"></i>
-                    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
-                    {% if place %}
-                    <small class="text-body-secondary ms-2">
-                        @ <i class="bi bi-house-gear"></i> {{ place.name }}
-                    </small>
-                    {% endif %}
-                </h5>
-            </div>
-            <div class="card-body">
-                {% crispy form %}
-
-                {% if place and not place.is_active %}
-                    <div class="alert alert-warning static-alert d-flex align-items-center py-2 mt-3" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        <div>
-                            This place is inactive. Any {{ model_name }}s created here will also be inactive.
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Confirmation Modal -->
-<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="confirmationModalLabel">
-                    {% if object %}Update Location{% else %}Create Location{% endif %}
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to {% if object %}update{% else %}create{% endif %} this location?</p>
-                <dl class="row mb-0">
-                    <dt class="col-sm-3">Name:</dt>
-                    <dd class="col-sm-9" id="confirmName"></dd>
-                    <dt class="col-sm-3">Status:</dt>
-                    <dd class="col-sm-9" id="confirmStatus"></dd>
-                </dl>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirmSubmit">
-                    {% if object %}Update{% else %}Create{% endif %}
-                </button>
-            </div>
-        </div>
+        {% include 'sensors/includes/location_form_card.html' with place=place form=form model_name=model_name %}
     </div>
 </div>
 {% endblock %}

@@ -99,7 +99,7 @@
     position: fixed;
     top: 1rem;
     right: 1rem;
-    z-index: 1070; /* Above modal backdrop (1050) but below modal itself (1055) */
+    z-index: 1070;
     width: var(--toast-width);
     max-width: 100%;
     pointer-events: none;
@@ -110,34 +110,43 @@
     width: 100%;
     min-width: var(--toast-min-width);
     max-width: var(--toast-width);
-    background-color: var(--bs-body-bg) !important;
-    border: 1px solid var(--bs-border-color) !important;
 }
 
-/* Custom Toast Colors with Bootstrap theme colors */
-.toast.text-success {
-    color: var(--bs-success) !important;
+/* Toast Colors - Used by both toasts and history items */
+.toast.text-success,
+.toast-history-item .text-success {
+    color: var(--bs-success-text) !important;
     background-color: var(--bs-success-bg-subtle) !important;
-    border-color: var(--bs-success-border-subtle) !important;
+    border: 1px solid var(--bs-success-border-subtle) !important;
 }
 
-.toast.text-danger {
-    color: var(--bs-danger) !important;
+.toast.text-danger,
+.toast-history-item .text-danger {
+    color: var(--bs-danger-text) !important;
     background-color: var(--bs-danger-bg-subtle) !important;
-    border-color: var(--bs-danger-border-subtle) !important;
+    border: 1px solid var(--bs-danger-border-subtle) !important;
 }
 
-.toast.text-warning {
+.toast.text-warning,
+.toast-history-item .text-warning {
     color: var(--toast-warning-text) !important;
     background-color: var(--toast-warning-bg) !important;
-    border-color: #ffb700 !important;
-    font-weight: 600 !important;
+    border: 1px solid #ffb700 !important;
 }
 
-.toast.text-info {
-    color: var(--bs-info) !important;
+.toast.text-info,
+.toast-history-item .text-info {
+    color: var(--bs-info-text) !important;
     background-color: var(--bs-info-bg-subtle) !important;
-    border-color: var(--bs-info-border-subtle) !important;
+    border: 1px solid var(--bs-info-border-subtle) !important;
+}
+
+.toast .btn-close {
+    opacity: 0.75;
+}
+
+.toast .toast-body {
+    padding: 0.75rem 0;
 }
 
 /* Toast History */

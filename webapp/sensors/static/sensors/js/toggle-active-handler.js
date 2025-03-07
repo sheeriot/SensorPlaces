@@ -14,7 +14,7 @@
 
 // System Configuration
 const toggleActiveConfig = {
-    debug: true        // Set to true to enable debug mode
+    debug: false        // Set to true to enable debug mode
 };
 
 // Card status reporter
@@ -22,43 +22,39 @@ function reportCardStatus() {
     if (!toggleActiveConfig.debug) return;
     
     document.querySelectorAll('.card-body').forEach((card, index) => {
-        console.debug('Card:', {
+        const cardInfo = {
             index: index + 1,
             id: card.id || 'UnnamedCard',
             classes: Array.from(card.classList).join(' ')
-        });
+        };
+        console.debug('Card:', cardInfo);
 
-        let hasAnyToggles = false;
-        
-        // Check each type of toggle separately
+        // Check all toggle types at once
+        const toggleCounts = {};
         ['location', 'device', 'sensor'].forEach(type => {
-            // Look for toggle elements
             const toggles = card.querySelectorAll(`.toggle-${type}-active`);
-            
-            if (toggles.length === 0) {
-                console.debug(`No ${type} toggles found in card ${card.id || 'unnamed'}`);
-                return;
+            if (toggles.length > 0) {
+                toggleCounts[type] = toggles.length;
+                const statusData = Array.from(toggles).map(toggle => {
+                    const row = toggle.closest('tr');
+                    const isButton = toggle.tagName.toLowerCase() === 'button';
+                    return {
+                        id: toggle.dataset[`${type}Id`],
+                        type: isButton ? 'button' : 'switch',
+                        active: isButton ? toggle.dataset.currentStatus === 'true' : toggle.checked,
+                        rowClasses: row ? Array.from(row.classList).join(' ') : 'N/A'
+                    };
+                });
+
+                console.group(`Card ${card.id || 'unnamed'} - ${type}s:`);
+                console.table(statusData);
+                console.groupEnd();
             }
-
-            hasAnyToggles = true;
-            const statusData = Array.from(toggles).map(toggle => {
-                const row = toggle.closest('tr');
-                const isButton = toggle.tagName.toLowerCase() === 'button';
-                return {
-                    id: toggle.dataset[`${type}Id`],
-                    type: isButton ? 'button' : 'switch',
-                    active: isButton ? toggle.dataset.currentStatus === 'true' : toggle.checked,
-                    rowClasses: row ? Array.from(row.classList).join(' ') : 'N/A'
-                };
-            });
-
-            console.group(`Card ${card.id || 'unnamed'} - ${type}s:`);
-            console.table(statusData);
-            console.groupEnd();
         });
 
-        if (!hasAnyToggles) {
-            console.debug(`Card ${card.id || 'unnamed'} has no toggles of any type`);
+        // Single summary message for cards with no toggles
+        if (Object.keys(toggleCounts).length === 0) {
+            console.debug(`Card ${cardInfo.id} has no toggles`);
         }
     });
 }
@@ -85,21 +81,17 @@ const toggleActiveManager = {
             if (data.status === 'success') {
                 // Find all rows that match this model type and ID
                 const rows = document.querySelectorAll(`[data-${type}-id="${id}"]`);
-                const hideInactiveSwitch = document.getElementById(`hideInactive${type.charAt(0).toUpperCase() + type.slice(1)}sSwitch`);
                 
-                if (!data.is_active && hideInactiveSwitch?.checked) {
-                    if (toggleActiveConfig.debug) {
-                        console.debug('Visibility:', { 
-                            type, 
-                            id, 
-                            action: 'hiding_inactive_row',
-                            switchState: 'checked'
-                        });
-                    }
+                // Find the hideInactive switch for this model type
+                const hideInactiveSwitch = document.querySelector(`.hideInactive-${type}-switch`);
+                const shouldHide = hideInactiveSwitch?.checked ?? false;
+                
+                if (toggleActiveConfig.debug) {
+                    console.debug('Response:', data);
                 }
                 
                 rows.forEach(row => {
-                    // Update row attributes
+                    // Update row attributes to match server state
                     row.setAttribute(`data-${type}-active`, data.is_active.toString());
                     
                     // Update classes based on active state
@@ -107,7 +99,8 @@ const toggleActiveManager = {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
                     } else {
                         row.classList.add('opacity-50', 'text-muted');
-                        if (hideInactiveSwitch?.checked) {
+                        // If hideInactive switch is checked, also hide the row
+                        if (shouldHide) {
                             row.classList.add('d-none');
                         }
                     }
@@ -121,8 +114,29 @@ const toggleActiveManager = {
                     }
                 });
 
-                // Show toast notification
-                toastSystem.show(data.message, data.type || 'warning', true);
+                // Find and update all toggle switches for this type/id
+                const toggles = document.querySelectorAll(`.toggle-${type}-active[data-${type}-id="${id}"]`);
+                toggles.forEach(toggle => {
+                    if (toggle.tagName.toLowerCase() === 'input') {
+                        toggle.checked = data.is_active;
+                    }
+                });
+
+                // Show toast notification with HTML content
+                let message = data.message;
+                if (data.affected_sensors?.length > 0) {
+                    message += '<br><br>Affected sensors:<ul class="mb-0">';
+                    data.affected_sensors.forEach(sensor => {
+                        message += `<li>${sensor}</li>`;
+                    });
+                    message += '</ul>';
+                }
+
+                toastSystem.show({
+                    message: message,
+                    type: data.type || 'warning',
+                    addToHistory: true
+                });
                 return data;
             } else {
                 throw new Error(data.message || `Failed to update ${type} status`);
@@ -131,7 +145,11 @@ const toggleActiveManager = {
             if (toggleActiveConfig.debug) {
                 console.debug('Error:', { type, error: error.message });
             }
-            toastSystem.show(error.message, 'danger', true);
+            toastSystem.show({
+                message: error.message,
+                type: 'danger',
+                addToHistory: true
+            });
             return null;
         }
     },
@@ -156,29 +174,10 @@ const toggleActiveManager = {
             if (data.status === 'success') {
                 const device = data.device;
                 const row = document.querySelector(`tr[data-device-id="${device.id}"]`);
-                const toggle = row.querySelector('.device-status-toggle');
-                
-                toggle.checked = device.is_active;
-                const label = document.getElementById(`deviceStatusLabel_${device.id}`);
-                if (label) {
-                    label.textContent = device.is_active ? 'Active' : 'inactive';
-                    label.classList.toggle('text-success', device.is_active);
-                    label.classList.toggle('text-danger', !device.is_active);
-                }
                 
                 // Update row styling
                 if (!device.is_active) {
                     row.classList.add('text-muted', 'opacity-50');
-                    if (document.getElementById('hideInactiveDevices')?.checked) {
-                        if (toggleActiveConfig.debug) {
-                            console.debug('Visibility:', { 
-                                type: 'device', 
-                                id: device.id, 
-                                action: 'hiding_inactive_row' 
-                            });
-                        }
-                        row.classList.add('d-none');
-                    }
                 } else {
                     row.classList.remove('text-muted', 'opacity-50', 'd-none');
                 }
@@ -193,7 +192,11 @@ const toggleActiveManager = {
                     message += '</ul>';
                 }
                 
-                toastSystem.show(message, 'success');
+                toastSystem.show({
+                    message: message,
+                    type: 'success',
+                    addToHistory: true
+                });
                 return data;
             } else {
                 throw new Error(data.message || 'Failed to update device status');
@@ -202,7 +205,11 @@ const toggleActiveManager = {
             if (toggleActiveConfig.debug) {
                 console.debug('Error:', { type: 'device', error: error.message });
             }
-            toastSystem.show(error.message, 'danger');
+            toastSystem.show({
+                message: error.message,
+                type: 'danger',
+                addToHistory: true
+            });
             return null;
         }
     },
@@ -445,11 +452,6 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleActiveManager.initializeDeviceToggles();
     toggleActiveManager.initializeSensorToggles();
     
-    // Initialize hide inactive system
-    if (window.hideInactiveManager) {
-        hideInactiveManager.initialize();
-    }
-
     // Report initial card status
     reportCardStatus();
 });
