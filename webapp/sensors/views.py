@@ -832,19 +832,146 @@ def update_site_plan_layout(request, place_slug):
     """Update the site plan layout settings for a place"""
     if not request.user.has_perm('sensors.change_place'):
         return JsonResponse({'error': 'Permission denied'}, status=403)
-        
-    place = get_object_or_404(Place, slug=place_slug)
+    
     try:
+        place = get_object_or_404(Place, slug=place_slug)
+        ic("Processing update for place:", place.name)
+        
         data = json.loads(request.body)
-        place.site_plan_scale = float(data.get('site_plan_scale', 1.0))
-        place.site_plan_x = float(data.get('site_plan_x', 0))
-        place.site_plan_y = float(data.get('site_plan_y', 0))
-        place.save(update_fields=['site_plan_scale', 'site_plan_x', 'site_plan_y'])
-        return JsonResponse({'status': 'success'})
+        ic("Received data:", data)
+        
+        # Track site plan changes
+        site_plan_changes = []
+        
+        # Check and update site plan transform
+        if 'site_plan_scale' in data:
+            old_scale = place.site_plan_scale
+            place.site_plan_scale = float(data['site_plan_scale'])
+            if old_scale != place.site_plan_scale:
+                site_plan_changes.append(f"scale: {old_scale:.2f} → {place.site_plan_scale:.2f}")
+        
+        if 'site_plan_x' in data:
+            old_x = place.site_plan_x
+            place.site_plan_x = float(data['site_plan_x'])
+            if old_x != place.site_plan_x:
+                site_plan_changes.append(f"x offset: {old_x:.1f} → {place.site_plan_x:.1f}")
+        
+        if 'site_plan_y' in data:
+            old_y = place.site_plan_y
+            place.site_plan_y = float(data['site_plan_y'])
+            if old_y != place.site_plan_y:
+                site_plan_changes.append(f"y offset: {old_y:.1f} → {place.site_plan_y:.1f}")
+        
+        if site_plan_changes:
+            place.save(update_fields=['site_plan_scale', 'site_plan_x', 'site_plan_y'])
+        
+        # Track location updates
+        location_updates = []
+        location_changes = data.get('locations', [])
+        ic("Location updates to process:", len(location_changes))
+        
+        for update in location_changes:
+            location_id = update.get('id')
+            new_x = update.get('x')
+            new_y = update.get('y')
+            
+            ic("Processing location update:", {
+                'id': location_id,
+                'new_x': new_x,
+                'new_y': new_y
+            })
+            
+            if location_id and new_x is not None and new_y is not None:
+                location = Location.objects.filter(id=location_id, place=place).first()
+                if location:
+                    ic("Found location:", location.name)
+                    old_x = float(location.x_coord) if location.x_coord is not None else 0
+                    old_y = float(location.y_coord) if location.y_coord is not None else 0
+                    new_x = float(new_x)
+                    new_y = float(new_y)
+                    
+                    if old_x != new_x or old_y != new_y:
+                        location_updates.append({
+                            'name': location.name,
+                            'old_pos': {'x': old_x, 'y': old_y},
+                            'new_pos': {'x': new_x, 'y': new_y}
+                        })
+                        location.x_coord = new_x
+                        location.y_coord = new_y
+                        location.save(update_fields=['x_coord', 'y_coord'])
+                        ic(f"Updated location {location.name} position")
+                else:
+                    ic(f"Location not found for ID: {location_id}")
+        
+        # Construct response message
+        message = [f"Updated site plan layout for <strong>{place.name}</strong>"]
+        
+        if site_plan_changes:
+            message.append("<br><small class='text-muted'>Site Plan Changes:")
+            changes_with_icon = [f"<i class='bi bi-house-gear'></i> {change}" for change in site_plan_changes]
+            message.append(", ".join(changes_with_icon))
+            message.append("</small>")
+        
+        if location_updates:
+            message.append("<br><small class='text-muted'>Location Changes:")
+            for update in location_updates:
+                message.append(
+                    f"<br><i class='bi bi-geo-alt'></i> {update['name']}: "
+                    f"({update['old_pos']['x']:.1f}, {update['old_pos']['y']:.1f}) → "
+                    f"({update['new_pos']['x']:.1f}, {update['new_pos']['y']:.1f})"
+                )
+            message.append("</small>")
+        
+        final_message = "".join(message)
+        
+        response_data = {
+            'status': 'success',
+            'message': final_message,
+            'type': 'warning',
+            'messages': [{                       # Add messages array for toast history
+                'message': final_message,
+                'tags': 'warning safe',          # Include both warning and safe tags
+                'level': messages.WARNING
+            }],
+            'changes': {
+                'site_plan': {
+                    'scale': place.site_plan_scale,
+                    'x': place.site_plan_x,
+                    'y': place.site_plan_y,
+                    'changed': bool(site_plan_changes)
+                },
+                'locations': location_updates
+            }
+        }
+        
+        ic("Sending response:", response_data)
+        return JsonResponse(response_data)
+        
     except (ValueError, json.JSONDecodeError) as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        error_message = f'Invalid data format: {str(e)}'
+        return JsonResponse({
+            'error': error_message,
+            'type': 'danger',
+            'messages': [{                       # Add error message to history
+                'message': error_message,
+                'tags': 'error',
+                'level': messages.ERROR
+            }]
+        }, status=400)
     except Exception as e:
-        return JsonResponse({'error': 'Server error'}, status=500)
+        ic("Server error:", str(e))
+        ic("Exception type:", type(e))
+        ic("Exception traceback:", e.__traceback__)
+        error_message = f'Server error: {str(e)}'
+        return JsonResponse({
+            'error': error_message,
+            'type': 'danger',
+            'messages': [{                       # Add error message to history
+                'message': error_message,
+                'tags': 'error',
+                'level': messages.ERROR
+            }]
+        }, status=500)
 
 @require_POST
 def test_sensor_readings(request, place_slug, sensor_pk):
