@@ -407,4 +407,9 @@
 
 .grouped-list-header.opacity-50:hover {
     background-color: var(--grouped-header-inactive-hover-bg) !important;
+}
+
+/* Form error handling */
+.alert.static-alert {
+    display: block !important;  /* Ensures alerts aren't hidden by toast system */
 } 

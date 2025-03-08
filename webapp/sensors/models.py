@@ -1,19 +1,20 @@
 from django.db import models
-from django.conf import settings
-from django.core.validators import FileExtensionValidator
+# from django.conf import settings
+# from django.core.validators import FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
-from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-import uuid
+# from django.core.validators import MinValueValidator, MaxValueValidator
+# from django.db.models.signals import post_save
+# from django.dispatch import receiver
+# import uuid
 from django.db.models.functions import Lower
 from typing import Any, Optional, Union, cast
-from django.urls import reverse
+# from django.urls import reverse
 from datetime import datetime
-from decimal import Decimal
+# from decimal import Decimal
 from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
 from django.contrib.auth import get_user_model
+from icecream import ic
 
 def validate_image_size(image):
     filesize = image.size
@@ -37,6 +38,10 @@ class Place(models.Model):
     site_plan_scale = models.FloatField(default=1.0)
     site_plan_x: FloatField = models.FloatField(default=0)
     site_plan_y: FloatField = models.FloatField(default=0)
+    site_plan_aspect_ratio: FloatField = models.FloatField(
+        default=1.333,  # 4:3 aspect ratio (1024/768)
+        help_text="Aspect ratio of the site plan (width/height)"
+    )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -44,9 +49,30 @@ class Place(models.Model):
         return str(self.name)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
+        ic("=== Place.save starting ===")
+        if self.site_plan:
+            ic("Site plan before save:", {
+                'name': self.site_plan.name,
+                'size': getattr(self.site_plan, 'size', None),
+                'position': getattr(self.site_plan, 'tell', lambda: None)(),
+                'closed': getattr(getattr(self.site_plan, 'file', None), 'closed', None)
+            })
+        
         if not self.slug:
             self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
+        try:
+            result = super().save(*args, **kwargs)
+            
+            if self.site_plan:
+                ic("Site plan after save:", {
+                    'name': self.site_plan.name,
+                    'url': self.site_plan.url if self.site_plan else None
+                })
+            
+            return result
+        except Exception as e:
+            ic("Error in Place.save:", str(e))
+            raise
 
     @property
     def name_str(self) -> str:

@@ -8,6 +8,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
 from crispy_forms.bootstrap import PrependedText, FormActions
 from django.db import models
+from icecream import ic
 
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
@@ -27,6 +28,9 @@ class SensorForm(forms.ModelForm):
         self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
         self.helper.form_action = ''  # Empty string means submit to same URL
         self.helper.form_id = 'sensor-form'
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = False
+        self.helper.help_text_inline = False
 
         if device:
             self.fields['device'].initial = device
@@ -132,10 +136,20 @@ class SensorForm(forms.ModelForm):
 class PlaceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
     slug = forms.CharField(widget=forms.HiddenInput(), required=False)
+    site_plan = forms.ImageField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/*',
+            'data-bs-toggle': 'tooltip',
+            'title': 'Upload a site plan image (minimum 200x200)',
+        }),
+        help_text='Upload a site plan image (minimum 200x200 pixels)'
+    )
 
     class Meta:
         model = Place
-        fields = ['name', 'is_active', 'latitude', 'longitude', 'slug']
+        fields = ['name', 'is_active', 'latitude', 'longitude', 'slug', 'site_plan']
         widgets = {
             'latitude': forms.NumberInput(attrs={
                 'step': '0.00001',
@@ -143,7 +157,7 @@ class PlaceForm(forms.ModelForm):
                 'style': 'width: 140px;',
                 'min': -90,
                 'max': 90,
-                'pattern': '-?\d+\.\d{0,5}'
+                'pattern': r'-?\d+\.\d{0,5}'
             }),
             'longitude': forms.NumberInput(attrs={
                 'step': '0.00001',
@@ -151,18 +165,20 @@ class PlaceForm(forms.ModelForm):
                 'style': 'width: 140px;',
                 'min': -180,
                 'max': 180,
-                'pattern': '-?\d+\.\d{0,5}'
+                'pattern': r'-?\d+\.\d{0,5}'
             })
         }
 
     def __init__(self, *args, **kwargs):
         referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
-        
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = True
+        self.helper.help_text_inline = True
         
         if referrer:
             self.fields['referrer'].initial = referrer
@@ -185,6 +201,34 @@ class PlaceForm(forms.ModelForm):
 
         # Determine if new or existing
         is_new = not bool(kwargs.get('instance'))
+
+        # Add site plan preview if it exists
+        site_plan_layout = []
+        if self.instance and self.instance.site_plan:
+            site_plan_layout = [
+                Div(
+                    HTML("""
+                        <div class="card mb-3">
+                            <div class="card-body text-center">
+                                <img src="{{ object.site_plan.url }}" 
+                                     alt="Site Plan" 
+                                     class="img-fluid mb-2" 
+                                     style="max-height: 300px;">
+                            </div>
+                        </div>
+                    """)
+                )
+            ]
+
+        # Update the site plan field in the form
+        self.fields['site_plan'].widget.attrs.update({
+            'class': 'form-control',
+            'accept': 'image/*'
+        })
+        if self.instance and self.instance.site_plan:
+            self.fields['site_plan'].help_text = f'Upload a new site plan image to replace the current one (minimum 200x200 pixels)'
+        else:
+            self.fields['site_plan'].help_text = 'Upload a site plan image (minimum 200x200 pixels)'
 
         self.helper.layout = Layout(
             Field('slug', type='hidden'),
@@ -253,6 +297,25 @@ class PlaceForm(forms.ModelForm):
                 css_class='mb-3'
             ),
             Div(
+                HTML("""
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">Site Plan</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-12">
+                                    {{ form.site_plan }}
+                                    <div class="form-text">{{ form.site_plan.help_text }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                """),
+                *site_plan_layout,  # Include current site plan preview if it exists
+                css_class='mb-3'
+            ),
+            Div(
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML("""
@@ -273,48 +336,82 @@ class PlaceForm(forms.ModelForm):
         )
 
     def clean(self):
+        ic("=== Starting PlaceForm.clean ===")
         cleaned_data = super().clean()
-        name = cleaned_data.get('name')
-        current_slug = cleaned_data.get('slug')
         
-        if name:
-            # Only generate new slug if this is a new place or slug is missing
-            if not current_slug:
-                base_slug = slugify(name)
-                slug = base_slug
-                # Ensure unique slug
-                counter = 1
-                # Don't check against self when verifying uniqueness
-                slug_qs = Place.objects.filter(slug=slug)
-                if self.instance and self.instance.pk:
-                    slug_qs = slug_qs.exclude(pk=self.instance.pk)
-                
-                while slug_qs.exists():
-                    slug = f"{base_slug}-{counter}"
-                    counter += 1
-                    slug_qs = Place.objects.filter(slug=slug)
-                    if self.instance and self.instance.pk:
-                        slug_qs = slug_qs.exclude(pk=self.instance.pk)
-                
-                cleaned_data['slug'] = slug
-            else:
-                # Keep existing slug
-                cleaned_data['slug'] = current_slug
+        if 'site_plan' in self.files:
+            file = self.files['site_plan']
+            ic("File in clean method:", {
+                'name': file.name,
+                'size': file.size,
+                'position': file.tell(),
+                'content_type': file.content_type
+            })
         
         return cleaned_data
 
     def clean_site_plan(self):
+        ic("=== Starting clean_site_plan ===")
         site_plan = self.cleaned_data.get('site_plan')
+        
         if site_plan:
-            # Check image dimensions
-            img = Image.open(site_plan)
-            min_width, min_height = 1024, 768
+            ic("Initial file state:", {
+                'name': site_plan.name,
+                'size': site_plan.size,
+                'position': site_plan.tell(),
+                'content_type': site_plan.content_type
+            })
             
-            if img.width < min_width or img.height < min_height:
-                raise forms.ValidationError(
-                    f'Image dimensions must be at least {min_width}x{min_height} pixels. '
-                    f'Uploaded image is {img.width}x{img.height} pixels.'
-                )
+            try:
+                # Always reset to beginning
+                site_plan.seek(0)
+                ic("After seek(0), position:", site_plan.tell())
+                
+                # Try to read first few bytes to verify it's an image
+                header = site_plan.read(16)
+                ic("File header (hex):", header.hex())
+                
+                # Reset again for PIL
+                site_plan.seek(0)
+                
+                try:
+                    img = Image.open(site_plan)
+                    ic("PIL opened image:", {
+                        'format': img.format,
+                        'mode': img.mode,
+                        'size': img.size,
+                        'file_position': site_plan.tell()
+                    })
+                    
+                    # Basic dimension check
+                    if img.width < 200 or img.height < 200:
+                        raise forms.ValidationError(
+                            f'Image must be at least 200x200 pixels. '
+                            f'Uploaded image is {img.width}x{img.height} pixels.'
+                        )
+                    
+                    # Reset file pointer one final time
+                    site_plan.seek(0)
+                    ic("Final position:", site_plan.tell())
+                    
+                    return site_plan
+                    
+                except Exception as e:
+                    ic("PIL Error:", {
+                        'error_type': type(e).__name__,
+                        'error_msg': str(e),
+                        'file_position': site_plan.tell()
+                    })
+                    raise forms.ValidationError(f"Image validation failed: {str(e)}")
+                    
+            except Exception as e:
+                ic("File handling error:", {
+                    'error_type': type(e).__name__,
+                    'error_msg': str(e),
+                    'file_position': getattr(site_plan, 'tell', lambda: None)()
+                })
+                raise forms.ValidationError(f"File handling error: {str(e)}")
+        
         return site_plan
 
     def clean_latitude(self):
@@ -361,6 +458,9 @@ class DeviceForm(forms.ModelForm):
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = False
+        self.helper.help_text_inline = False
         
         # Configure location field
         if self.place:
@@ -572,6 +672,9 @@ class LocationForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
         self.helper.form_id = 'locationForm'
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = False
+        self.helper.help_text_inline = False
         
         if referrer:
             self.fields['referrer'].initial = referrer
@@ -664,12 +767,15 @@ class PlaceDeleteForm(forms.Form):
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = False
+        self.helper.help_text_inline = False
         
         # Custom layout
         self.helper.layout = Layout(
-            # Warning about locations
+            # Warning about locations - add static-alert class
             HTML("""
-                <div class="alert alert-warning mb-3">
+                <div class="alert alert-warning mb-3 static-alert">
                     <i class="bi bi-exclamation-triangle"></i>
                     <strong>Warning:</strong> This will delete the following locations:
                     <div class="mt-2">
@@ -686,7 +792,7 @@ class PlaceDeleteForm(forms.Form):
                     </div>
                 </div>
             """),
-            # Confirmation input
+            # Confirmation input - add static-alert class
             Div(
                 HTML("""
                     <p class="mb-2">
@@ -695,7 +801,7 @@ class PlaceDeleteForm(forms.Form):
                     </p>
                 """),
                 Field('confirm_name'),
-                css_class='alert alert-danger'
+                css_class='alert alert-danger static-alert'
             ),
             # Buttons
             Div(
@@ -707,12 +813,12 @@ class PlaceDeleteForm(forms.Form):
                             <i class="bi bi-arrow-left"></i> Cancel
                         </a>
                     """),
-                    Submit(
-                        'submit',
-                        mark_safe('<i class="bi bi-trash"></i> Delete'),
-                        css_class='btn btn-danger'
-                    ),
-                    css_class='d-flex justify-content-between'
+                    HTML("""
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    """),
+                    css_class='d-flex justify-content-between align-items-center'
                 ),
                 css_class='mt-3'
             )

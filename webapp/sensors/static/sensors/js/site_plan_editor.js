@@ -28,12 +28,21 @@ const sitePlanSystem = {
         isDragging: false,
         dragTarget: null,
         originalX: 0,
-        originalY: 0
+        originalY: 0,
+        aspectRatio: 1.333
+    },
+
+    // Add aspect ratio constants
+    ASPECT_RATIOS: {
+        '4:3': 1.333,
+        '16:9': 1.778,
+        '1:1': 1.0,
+        'custom': null
     },
 
     // DOM element getters
     get mainContainer() {
-        return document.getElementById('siteMapContainer');
+        return document.getElementById('site-plan-layout');
     },
 
     get editorContainer() {
@@ -41,7 +50,7 @@ const sitePlanSystem = {
     },
 
     get editorClone() {
-        return document.getElementById('siteMapEditorClone');
+        return document.getElementById('site-plan-layout-clone');
     },
 
     get modal() {
@@ -216,7 +225,7 @@ const sitePlanSystem = {
         editorContainer.innerHTML = '';
         
         const clone = this.mainContainer.cloneNode(true);
-        clone.id = 'siteMapEditorClone';
+        clone.id = 'site-plan-layout-clone';
         
         // Process all location markers in the editor
         const markers = clone.querySelectorAll('.location-marker');
@@ -307,6 +316,26 @@ const sitePlanSystem = {
         
         // Save changes
         document.getElementById('savePositions').onclick = () => this.saveChanges();
+
+        // Add aspect ratio controls
+        document.getElementById('aspectRatioSelect').onchange = (e) => {
+            const ratio = e.target.value;
+            if (ratio === 'custom') {
+                document.getElementById('customAspectRatio').style.display = 'block';
+            } else {
+                document.getElementById('customAspectRatio').style.display = 'none';
+                this.updateAspectRatio(this.ASPECT_RATIOS[ratio]);
+            }
+        };
+
+        document.getElementById('customAspectRatioForm').onsubmit = (e) => {
+            e.preventDefault();
+            const width = parseFloat(document.getElementById('aspectWidth').value);
+            const height = parseFloat(document.getElementById('aspectHeight').value);
+            if (width && height) {
+                this.updateAspectRatio(width / height);
+            }
+        };
     },
 
     updateContainerTransform(container = null) {
@@ -326,13 +355,44 @@ const sitePlanSystem = {
         }
     },
 
+    updateAspectRatio(ratio) {
+        if (!ratio || ratio <= 0) return;
+
+        const container = this.editorClone || this.mainContainer;
+        if (!container) return;
+
+        const img = container.querySelector('img');
+        if (!img) return;
+
+        // Store the new ratio
+        this.state.aspectRatio = ratio;
+
+        // Calculate new dimensions
+        const containerWidth = container.offsetWidth;
+        const containerHeight = containerWidth / ratio;
+
+        // Update container style
+        container.style.height = `${containerHeight}px`;
+
+        if (sitePlanConfig.logTransforms) {
+            this.logDebug('Aspect ratio updated:', {
+                ratio,
+                containerWidth,
+                containerHeight
+            });
+        }
+
+        // Update transform to maintain position
+        this.updateContainerTransform(container);
+    },
+
     async saveChanges() {
         if (sitePlanConfig.debug && sitePlanConfig.logSaveOperations) {
             console.group('Saving Site Plan Changes');
         }
 
-        const container = document.getElementById('siteMapEditorClone');
-        const mainContainer = document.getElementById('siteMapContainer');
+        const container = document.getElementById('site-plan-layout-clone');
+        const mainContainer = document.getElementById('site-plan-layout');
         const markers = container.querySelectorAll('.location-marker');
         
         // Check for site plan transform changes
@@ -416,6 +476,7 @@ const sitePlanSystem = {
         try {
             const payload = {
                 ...sitePlanUpdates,
+                site_plan_aspect_ratio: this.state.aspectRatio,
                 locations: locationUpdates
             };
             

@@ -25,40 +25,7 @@
     </div>
 
     <div class="col-md-8">
-        <div class="card rounded-3 shadow-sm border-0">
-            <div class="card-header bg-white py-2">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-hdd-rack me-2"></i>
-                    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
-                    {% if location %}
-                    <small class="text-body-secondary ms-2">
-                        @ <i class="bi bi-geo-alt"></i> {{ location.name }}
-                    </small>
-                    {% endif %}
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if not location and locations %}
-                    <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <div>Please select a location for the new {{ model_name }}</div>
-                    </div>
-                {% endif %}
-
-                {% crispy form %}
-
-                {% if form.get_warnings.serial_number %}
-                    <div class="alert alert-warning d-flex align-items-center mt-3" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        <div>
-                            {% for warning in form.get_warnings.serial_number %}
-                                {{ warning }}
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
+        {% include "sensors/includes/device_form_card.html" %}
     </div>
 </div>
 {% endblock %} 

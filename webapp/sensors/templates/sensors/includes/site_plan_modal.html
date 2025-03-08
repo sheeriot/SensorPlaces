@@ -1,0 +1,37 @@
+<div class="modal-body">
+    <!-- Existing controls -->
+    
+    <!-- Aspect Ratio Controls -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h6 class="mb-0">Aspect Ratio</h6>
+        </div>
+        <div class="card-body">
+            <select id="aspectRatioSelect" class="form-select mb-2">
+                <option value="4:3">4:3 (Standard)</option>
+                <option value="16:9">16:9 (Widescreen)</option>
+                <option value="1:1">1:1 (Square)</option>
+                <option value="custom">Custom</option>
+            </select>
+            
+            <div id="customAspectRatio" style="display: none;">
+                <form id="customAspectRatioForm" class="row g-2">
+                    <div class="col-5">
+                        <input type="number" id="aspectWidth" class="form-control" placeholder="Width" min="1" step="1">
+                    </div>
+                    <div class="col-1 text-center">:</div>
+                    <div class="col-5">
+                        <input type="number" id="aspectHeight" class="form-control" placeholder="Height" min="1" step="1">
+                    </div>
+                    <div class="col-1">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="bi bi-check"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Existing content -->
+</div> 

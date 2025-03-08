@@ -1,11 +1,86 @@
 <div class="text-center">
     <small class="text-{{ color|default:'warning' }} d-flex align-items-center justify-content-center gap-1">
-        <i class="bi bi-house-gear"></i>Places
+        {% if links %}
+            <a href="{% url 'sensors:place_list' %}" class="text-decoration-none d-flex align-items-center text-warning">
+                <i class="bi bi-house-gear"></i>Places
+            </a>
+        {% else %}
+            <span class="d-flex align-items-center">
+                <i class="bi bi-house-gear"></i>Places
+            </span>
+        {% endif %}
+
         <i class="bi bi-link text-success fs-6"></i>
-        <i class="bi bi-geo-alt"></i>Locations
-        <i class="bi bi-link text-success fs-6"></i>
-        <i class="bi bi-hdd-rack"></i>Devices
-        <i class="bi bi-link text-success fs-6"></i>
-        <i class="bi bi-thermometer"></i>Sensors
+
+        {% if place and links %}
+            <a href="{% url 'sensors:place_locations' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-warning">
+                <i class="bi bi-geo-alt"></i>Locations
+            </a>
+            <i class="bi bi-link text-success fs-6"></i>
+            <a href="{% url 'sensors:place_devices' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-warning">
+                <i class="bi bi-hdd-rack"></i>Devices
+            </a>
+            <i class="bi bi-link text-success fs-6"></i>
+            <a href="{% url 'sensors:place_sensors' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-warning">
+                <i class="bi bi-thermometer"></i>Sensors
+            </a>
+        {% elif links %}
+            <a href="#" class="text-decoration-none d-flex align-items-center text-warning" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
+                <i class="bi bi-geo-alt"></i>Locations
+            </a>
+            <i class="bi bi-link text-success fs-6"></i>
+            <a href="#" class="text-decoration-none d-flex align-items-center text-warning" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
+                <i class="bi bi-hdd-rack"></i>Devices
+            </a>
+            <i class="bi bi-link text-success fs-6"></i>
+            <a href="#" class="text-decoration-none d-flex align-items-center text-warning" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
+                <i class="bi bi-thermometer"></i>Sensors
+            </a>
+        {% else %}
+            <span class="d-flex align-items-center">
+                <i class="bi bi-geo-alt"></i>Locations
+            </span>
+            <i class="bi bi-link text-success fs-6"></i>
+            <span class="d-flex align-items-center">
+                <i class="bi bi-hdd-rack"></i>Devices
+            </span>
+            <i class="bi bi-link text-success fs-6"></i>
+            <span class="d-flex align-items-center">
+                <i class="bi bi-thermometer"></i>Sensors
+            </span>
+        {% endif %}
     </small>
-</div> 
+</div>
+
+{% if links and not place %}
+    <!-- Select Place Modal -->
+    <div class="modal fade" id="selectPlaceModal" tabindex="-1" aria-labelledby="selectPlaceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="selectPlaceModalLabel">Select a Place</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="my-4">
+                        <p class="text-center mb-3">Please select a place to continue:</p>
+                        <div class="list-group">
+                            {% for place in places %}
+                                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" 
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    {{ place.name }}
+                                    <span class="badge bg-primary rounded-pill">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </span>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %} 

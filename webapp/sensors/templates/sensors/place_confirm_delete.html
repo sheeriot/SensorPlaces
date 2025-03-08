@@ -23,8 +23,12 @@
                 </h5>
             </div>
             <div class="card-body">
-                <p>Are you sure you want to delete the {{ model_name }} "{{ object.name }}"?</p>
-                {% crispy form %}
+                <!-- For debugging - let's see what's in the context -->
+                {% if form %}
+                    {% crispy form %}
+                {% else %}
+                    <p class="text-danger">Debug: Form not found in context</p>
+                {% endif %}
             </div>
         </div>
     </div>

@@ -25,6 +25,11 @@ from django.utils import timezone
 # import math
 # from geopy.distance import geodesic
 from django.db.models.query import Prefetch
+from icecream import ic
+import logging
+from django.core.files.uploadedfile import UploadedFile
+
+logger = logging.getLogger(__name__)
 
 # Add the mixin first, before any classes that use it
 class LocationAnnotationMixin:
@@ -208,67 +213,68 @@ class PlaceCreateView(SuccessMessageMixin, CreateView):
         return response
 
 class PlaceUpdateView(SuccessMessageMixin, UpdateView):
-    model: Type[Place] = Place
+    model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
     slug_url_kwarg = 'place_slug'
-    slug_field = 'slug'
+    success_message = "Place updated successfully."
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        # Add referrer to form kwargs
-        referrer = self.request.META.get('HTTP_REFERER')
-        if referrer:
-            kwargs['referrer'] = referrer
-        return kwargs
+    def setup(self, request, *args, **kwargs):
+        """Store original values when the view is initialized"""
+        super().setup(request, *args, **kwargs)
+        self._original_values = {}
+        if hasattr(self, 'object'):
+            # Get the object if not already loaded
+            obj = self.get_object() if not self.object else self.object
+            self._original_values = {
+                'site_plan': obj.site_plan.name if obj.site_plan else None,
+                'is_active': obj.is_active,
+                # Add other fields you want to track
+            }
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['model_name'] = 'place'
-        return context
+    def form_invalid(self, form):
+        ic("=== Form Invalid in PlaceUpdateView ===")
+        ic("Form errors:", form.errors)
+        ic("Files present:", {
+            'files': dict(form.files),
+            'cleaned_data': getattr(form, 'cleaned_data', None)
+        })
+        return super().form_invalid(form)
 
     def form_valid(self, form):
-        # Store original values before save
-        self._original_values = {
-            'name': self.get_object().name,
-            'is_active': self.get_object().is_active,
-            'latitude': self.get_object().latitude,
-            'longitude': self.get_object().longitude,
-            'slug': self.get_object().slug
-        }
-        response = super().form_valid(form)
-        success_message = self.get_success_message(form.cleaned_data)
+        ic("=== Form Valid in PlaceUpdateView ===")
+        ic("Before save:", {
+            'has_site_plan': 'site_plan' in form.cleaned_data,
+            'site_plan_type': type(form.cleaned_data.get('site_plan')).__name__ if 'site_plan' in form.cleaned_data else None,
+            'files_present': bool(form.files)
+        })
         
-        # Add to toast history first
-        if hasattr(self.request, 'session'):
-            toast_history = self.request.session.get('toast_history', [])
-            toast_history.append({
-                'message': success_message,
-                'type': 'warning',  # Always use warning type for updates
-                'timestamp': timezone.now().isoformat()
+        try:
+            response = super().form_valid(form)
+            ic("After save - success")
+            return response
+        except Exception as e:
+            ic("Error saving form:", {
+                'error_type': type(e).__name__,
+                'error_message': str(e)
             })
-            self.request.session['toast_history'] = toast_history
-            self.request.session.modified = True
-
-        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'status': 'success',
-                'message': success_message,
-                'type': 'warning',
-                'redirect_url': self.get_success_url()
-            })
-        
-        return response
+            raise
 
     def get_success_message(self, cleaned_data):
         place = self.object
-        return (
-            f"Updated place <strong>{place.name}</strong><br>"
-            f"<small class='text-muted'>"
-            f"Location: ({place.latitude}, {place.longitude})<br>"
-            f"Status: {'Active' if place.is_active else 'Inactive'}"
-            f"</small>"
-        )
+        messages = []
+
+        # Now we can safely compare the values
+        if self._original_values.get('site_plan') != (place.site_plan.name if place.site_plan else None):
+            if place.site_plan:
+                messages.append("Site plan was updated")
+            else:
+                messages.append("Site plan was removed")
+
+        if not messages:
+            messages.append("Place updated successfully")
+
+        return " | ".join(messages)
 
     def get_success_url(self):
         # Try to get the referrer from the form data
@@ -306,8 +312,17 @@ class PlaceDeleteView(DeleteView):
         context['place'] = place
         return context
 
-    def form_valid(self, form):
+    def form_invalid(self, form):
+        """Handle form validation errors with regular form messages"""
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def delete(self, request, *args, **kwargs):
+        """Only add toast notification after successful deletion"""
         place = self.get_object()
+        success_url = self.get_success_url()
+        message_type = 'danger'
+        
+        # Create success message
         success_message = (
             f"Deleted place <strong>{place.name}</strong><br>"
             f"<small class='text-muted'>"
@@ -316,19 +331,25 @@ class PlaceDeleteView(DeleteView):
             f"</small>"
         )
         
-        response = super().form_valid(form)
+        # Delete the place
+        place.delete()
         
-        # Add success message to toast history
-        if hasattr(self.request, 'session'):
-            toast_history = self.request.session.get('toast_history', [])
+        # Only add toast notification after successful deletion
+        if hasattr(request, 'session'):
+            toast_history = request.session.get('toast_history', [])
             toast_history.append({
                 'message': success_message,
-                'type': 'danger',
+                'type': message_type,
                 'timestamp': timezone.now().isoformat()
             })
-            self.request.session['toast_history'] = toast_history
+            request.session['toast_history'] = toast_history
+            request.session.modified = True
             
-        return response
+        return HttpResponseRedirect(success_url)
+
+    def form_valid(self, form):
+        """Validate form before deletion"""
+        return self.delete(self.request)
 
 # Location Views
 class LocationListView(LocationAnnotationMixin, ListView):
@@ -1527,7 +1548,7 @@ class SensorDetailView(LocationAnnotationMixin, DetailView):
                 last_reading_time=Subquery(
                     last_reading.values('timestamp')[:1]
                 )
-            )  # Remove the extra closing parenthesis here
+            )
             
         return self._queryset
 
@@ -1921,3 +1942,8 @@ def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
         'sensors_inactive': sensors_inactive.count(),
         'locations': list(locations)
     })
+
+def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context['places'] = Place.objects.all()
+    return context

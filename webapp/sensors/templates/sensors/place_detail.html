@@ -31,16 +31,13 @@
         {% if place.site_plan %}
             {% include "sensors/includes/site_plan_card.html" with place=place locations=locations editable=True %}
         {% else %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Location Map</h5>
-                </div>
-                <div class="card-body p-0">
-                    {% if place_map_html %}
-                        <div class="map-container">
-                            {{ place_map_html|safe }}
-                        </div>
-                    {% endif %}
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">No Site Plan Available</h5>
+                    <p class="card-text">Upload a site plan to visualize your sensor locations.</p>
+                    <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Upload Site Plan
+                    </a>
                 </div>
             </div>
         {% endif %}
