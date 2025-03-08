@@ -68,14 +68,31 @@ const placeMapPopout = {
     },
 
     setupMap(container) {
+        if (mapPopoutConfig.debug) {
+            console.group('Setting up popout map');
+        }
+
         // Get place data from container
         const lat = parseFloat(container.dataset.placeLat);
         const lon = parseFloat(container.dataset.placeLon);
         const name = container.dataset.placeName;
+        const placeId = container.dataset.placeId;
+        const isActive = container.dataset.placeActive === 'true';
 
         if (!lat || !lon) {
             console.error("Invalid coordinates for map");
+            if (mapPopoutConfig.debug) console.groupEnd();
             return;
+        }
+
+        if (mapPopoutConfig.debug) {
+            console.debug('Place data:', {
+                name,
+                placeId,
+                lat,
+                lon,
+                isActive
+            });
         }
 
         // Initialize the map
@@ -86,14 +103,49 @@ const placeMapPopout = {
             attribution: '© OpenStreetMap contributors'
         }).addTo(this.map);
 
-        // Add marker for the place
-        L.marker([lat, lon])
-            .addTo(this.map)
-            .bindPopup(name);
+        // Create marker with custom options
+        const marker = L.marker([lat, lon], {
+            opacity: isActive ? 1 : 0.5,
+            title: name
+        });
+
+        // Add data attributes to marker element after it's added to map
+        marker.on('add', function(e) {
+            const markerElement = e.target.getElement();
+            if (markerElement) {
+                markerElement.dataset.placeId = placeId;
+                markerElement.dataset.placeActive = isActive.toString();
+                if (!isActive) {
+                    markerElement.style.opacity = '0.5';
+                }
+            }
+        });
+
+        // Add marker to map
+        marker.addTo(this.map)
+            .bindPopup(`
+                <div class="marker-popup">
+                    <h6 class="mb-1">${name}</h6>
+                    <div class="text-muted small">
+                        <div>Lat: ${lat}</div>
+                        <div>Lon: ${lon}</div>
+                        <div class="mt-1">
+                            Status: <span class="badge ${isActive ? 'bg-success' : 'bg-danger'}">
+                                ${isActive ? 'Active' : 'Inactive'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `);
 
         // Store initial view
         this.metadata.center_active = [lat, lon];
         this.metadata.zoom_active = 13;
+
+        if (mapPopoutConfig.debug) {
+            console.debug('Map setup complete');
+            console.groupEnd();
+        }
     },
 
     setupEventListeners(trigger) {

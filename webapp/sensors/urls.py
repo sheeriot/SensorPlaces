@@ -55,9 +55,8 @@ urlpatterns = [
     path('api/<slug:place_slug>/stats/', views.place_stats, name='place_stats'),
     path('api/<slug:place_slug>/update_site_plan_layout/', views.update_site_plan_layout, name='update_site_plan_layout'),
 
-    path('api/<slug:place_slug>/location/<int:pk>/toggle_active/', views.LocationToggleActiveView.as_view(), name='location_toggle_active'),
-    path('api/<slug:place_slug>/device/<int:pk>/toggle_active/', views.DeviceToggleActiveView.as_view(), name='device_toggle_active'),
-    path('api/<slug:place_slug>/sensor/<int:pk>/toggle_active/', views.SensorToggleActiveView.as_view(), name='sensor_toggle_active'),
+    # New consolidated toggle active endpoint
+    path('api/<slug:place_slug>/toggle_active/<str:model>/<int:pk>/', views.ToggleActiveView.as_view(), name='toggle_active'),
 
     path('api/<slug:place_slug>/device/<int:pk>/active_sensors/', views.DeviceActiveSensorsView.as_view(), name='device_active_sensors'),
     path('api/<slug:place_slug>/device/<int:pk>/move_location/', views.DeviceMoveLocationView.as_view(), name='device_move_location'),

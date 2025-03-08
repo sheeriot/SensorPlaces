@@ -3,9 +3,10 @@ from .models import Sensor, InfluxSource, Place, Device, Location
 from PIL import Image
 from decimal import Decimal, ROUND_HALF_UP
 from django.utils.text import slugify
+from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
-from crispy_forms.bootstrap import PrependedText
+from crispy_forms.bootstrap import PrependedText, FormActions
 from django.db import models
 
 from icecream import ic
@@ -55,7 +56,6 @@ class SensorForm(forms.ModelForm):
 
         # Determine if this is a new sensor or editing existing
         is_new = not bool(kwargs.get('instance'))
-        submit_text = "Create New" if is_new else "Update"
 
         # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
@@ -102,11 +102,11 @@ class SensorForm(forms.ModelForm):
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
-                    HTML(f"""
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-thermometer me-1"></i>{submit_text}
-                        </button>
-                    """),
+                    Submit(
+                        'submit',
+                        mark_safe('<i class="bi bi-thermometer me-1"></i>' + ('Create' if is_new else 'Save')),
+                        css_class='btn btn-success'
+                    ),
                     css_class='d-flex justify-content-between align-items-center'
                 ),
                 css_class='mt-3'
@@ -138,37 +138,56 @@ class PlaceForm(forms.ModelForm):
     class Meta:
         model = Place
         fields = ['name', 'is_active', 'latitude', 'longitude', 'slug']
+        widgets = {
+            'latitude': forms.NumberInput(attrs={
+                'step': '0.00001',
+                'class': 'form-control',
+                'style': 'width: 140px;',
+                'min': -90,
+                'max': 90,
+                'pattern': '-?\d+\.\d{0,5}'
+            }),
+            'longitude': forms.NumberInput(attrs={
+                'step': '0.00001',
+                'class': 'form-control',
+                'style': 'width: 140px;',
+                'min': -180,
+                'max': 180,
+                'pattern': '-?\d+\.\d{0,5}'
+            })
+        }
 
     def __init__(self, *args, **kwargs):
         referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
+        
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
+        self.helper.form_class = 'mb-0'
         
-        # Add referrer to form if provided
         if referrer:
             self.fields['referrer'].initial = referrer
 
-        # Configure field properties
-        self.fields['is_active'].label = "Active"
-        self.fields['is_active'].help_text = None
-        
         # If this is an existing Place, preserve its slug
         if self.instance and self.instance.pk:
             self.fields['slug'].initial = self.instance.slug
         
-        # Add Bootstrap classes and configure fields
+        # Configure field properties
+        self.fields['is_active'].label = "Active"
+        self.fields['is_active'].help_text = None
+        
+        self.fields['latitude'].label = None
+        self.fields['longitude'].label = None
+
+        # Add Bootstrap classes
         for field in self.fields.values():
             if not isinstance(field.widget, (forms.HiddenInput, forms.CheckboxInput)):
                 field.widget.attrs['class'] = 'form-control'
 
-        # Determine if this is a new place or editing existing
+        # Determine if new or existing
         is_new = not bool(kwargs.get('instance'))
-        submit_text = "Create Place" if is_new else "Update Place"
 
-        # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
             Field('slug', type='hidden'),
             Field('referrer', type='hidden'),
@@ -184,12 +203,51 @@ class PlaceForm(forms.ModelForm):
                 css_class='mb-3'
             ),
             Row(
-                Column('latitude', css_class='col-md-6'),
-                Column('longitude', css_class='col-md-6'),
-                css_class='mb-3'
+                Div(
+                    HTML("""
+                        <div class="text-center mb-2">
+                            <i class="bi bi-globe2 mx-1"></i>
+                            <i class="bi bi-compass mx-1"></i>
+                            <i class="bi bi-geo-alt mx-1"></i>
+                            <i class="bi bi-map mx-1"></i>
+                            <i class="bi bi-pin-map mx-1"></i>
+                        </div>
+                    """),
+                    Div(
+                        HTML("""
+                            <div class="input-group" style="width: fit-content;">
+                                <span class="input-group-text">Latitude</span>
+                                {{ form.latitude }}
+                            </div>
+                        """),
+                        HTML("""
+                            <div class="input-group ms-2" style="width: fit-content;">
+                                <span class="input-group-text">Longitude</span>
+                                {{ form.longitude }}
+                            </div>
+                        """),
+                        css_class='d-flex align-items-center'
+                    ),
+                    HTML("""
+                        <div class="text-center mt-2">
+                            <i class="fas fa-map-marked-alt mx-1"></i>
+                            <i class="fas fa-location-dot mx-1"></i>
+                            <i class="fas fa-earth-americas mx-1"></i>
+                            <i class="fas fa-map-location-dot mx-1"></i>
+                            <i class="fas fa-compass mx-1"></i>
+                        </div>
+                    """),
+                    css_class='col-auto'
+                ),
+                css_class='mb-3 justify-content-center'
             ),
             Div(
-                HTML('<div id="preview-map" class="preview-map mb-3"></div>'),
+                HTML("""
+                    <div id="place-form-map" 
+                         class="map-container mb-3" 
+                         style="height: 400px;">
+                    </div>
+                """),
                 css_class='mb-3'
             ),
             Div(
@@ -201,9 +259,9 @@ class PlaceForm(forms.ModelForm):
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
-                    HTML(f"""
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-house-gear me-1"></i>{submit_text}
+                    HTML("""
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-house-gear me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
                         </button>
                     """),
                     css_class='d-flex justify-content-between align-items-center'
@@ -306,93 +364,138 @@ class DeviceForm(forms.ModelForm):
         
         # Get place and location from initial data
         initial = kwargs.get('initial', {})
-        place = initial.get('place')
-        initial_location = initial.get('location')
+        self.place = initial.get('place')
+        self.initial_location = initial.get('location')
 
+        # Configure crispy form
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
-
-        # Configure location field based on context
-        if initial_location:
-            self.fields['location'].queryset = Location.objects.filter(pk=initial_location.pk)
-            self.fields['location'].initial = initial_location
-            self.fields['location'].widget = forms.HiddenInput()
-        elif place:
-            self.fields['location'].queryset = Location.objects.filter(
-                place=place,
-                is_active=True
-            ).order_by('name')
-            self.fields['location'].widget.attrs['class'] = 'form-select'
+        
+        # Configure location field
+        if self.place:
+            locations = Location.objects.filter(place=self.place).order_by('name')
+            self.fields['location'].queryset = locations
+            
+            # Create standard choices tuple while adding data attributes to the widget
+            choices = [(None, '---------')]
+            attrs = {
+                'class': 'form-select',
+                'onchange': 'handleLocationChange(this)'
+            }
+            
+            # Add data attributes to each option
+            for location in locations:
+                choices.append((location.pk, location.name))
+                attrs[f'data-is-active-{location.pk}'] = str(location.is_active).lower()
+            
+            self.fields['location'].widget = forms.Select(attrs=attrs, choices=choices)
+            
+            if self.initial_location:
+                self.fields['location'].initial = self.initial_location
+                # If location is inactive, set device to inactive by default
+                if not self.initial_location.is_active:
+                    self.fields['is_active'].initial = False
 
         # Configure field labels and help text
         self.fields['is_active'].label = "Active"
-        self.fields['is_active'].help_text = None
         self.fields['device_type'].label = "Device Type"
+        self.fields['location'].label = "Location"
         
-        # Custom layout with Bootstrap grid
+        # Determine if new or existing
+        is_new = not bool(kwargs.get('instance'))
+        
+        # Simple crispy layout using Bootstrap 5 grid
         self.helper.layout = Layout(
-            # Hidden location field if provided
-            'location' if initial_location else None,
-            
-            # Name and Device Type row
             Row(
                 Column('name', css_class='col-md-6'),
                 Column('device_type', css_class='col-md-6'),
                 css_class='mb-3'
             ),
-            
-            # Manufacturer and Model row
+            Row(
+                Column('location', css_class='col-12'),
+                css_class='mb-3'
+            ),
             Row(
                 Column('manufacturer', css_class='col-md-6'),
                 Column('model', css_class='col-md-6'),
                 css_class='mb-3'
             ),
-            
-            # Serial Number row
             Row(
                 Column('serial_number', css_class='col-12'),
                 css_class='mb-3'
             ),
-            
-            # Footer with Active switch and buttons
             Div(
-                HTML('<hr>'),
-                Div(
-                    # Left side - Active switch
-                    Div(
-                        Field(
-                            'is_active',
-                            wrapper_class='form-check form-switch',
-                            css_class='form-check-input'
+                Row(
+                    Column(
+                        Div(
+                            Field('is_active', wrapper_class='form-check'),
+                            css_class='mb-1'
                         ),
-                        css_class='d-flex align-items-center'
-                    ),
-                    # Right side - Buttons
-                    Div(
-                        HTML("""
-                            <a href="{% if location %}
-                                      {% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}
-                                    {% else %}
-                                      {% url 'sensors:place_detail' place_slug=place.slug %}
-                                    {% endif %}"
-                               class="btn btn-outline-secondary me-2">
-                                <i class="bi bi-x-lg me-1"></i>Cancel
-                            </a>
-                        """),
-                        Submit(
-                            'submit',
-                            'Create Device',
-                            css_class='btn btn-primary',
-                            prepend='<i class="bi bi-hdd-rack me-1"></i>'
+                        Div(
+                            HTML("""
+                                <div id="device-status-warning" class="form-text text-warning" style="display: none;">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                    Device will be inactive as <i class="bi bi-geo-alt"></i> <span id="inactive-location-name"></span> is inactive
+                                </div>
+                            """),
+                            css_class='small'
                         ),
-                        css_class='d-flex gap-2'
+                        css_class='col-auto'
                     ),
-                    css_class='d-flex justify-content-between align-items-center'
+                    Column(
+                        Div(
+                            HTML("""
+                                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}"
+                                   class="btn btn-outline-secondary">
+                                    <i class="bi bi-x-lg me-1"></i>Cancel
+                                </a>
+                            """),
+                            Submit(
+                                'submit',
+                                mark_safe('<i class="bi bi-hdd-rack me-1"></i>' + ('Create' if is_new else 'Save')),
+                                css_class='btn btn-success ms-2'
+                            ),
+                            css_class='btn-group'
+                        ),
+                        css_class='col text-end'
+                    ),
+                    css_class='align-items-start'
                 ),
                 css_class='mt-4'
-            )
+            ),
+            HTML("""
+                <script>
+                function handleLocationChange(select) {
+                    const selectedId = select.value;
+                    const isActive = select.getAttribute(`data-is-active-${selectedId}`) === 'true';
+                    const locationName = select.options[select.selectedIndex].text;
+                    const checkbox = document.querySelector('#id_is_active');
+                    const warning = document.querySelector('#device-status-warning');
+                    const locationNameSpan = document.querySelector('#inactive-location-name');
+                    
+                    if (!isActive && selectedId) {
+                        checkbox.checked = false;
+                        checkbox.disabled = true;
+                        warning.style.display = 'block';
+                        locationNameSpan.textContent = locationName;
+                    } else {
+                        checkbox.disabled = false;
+                        checkbox.checked = true;
+                        warning.style.display = 'none';
+                    }
+                }
+                
+                // Initialize on page load
+                document.addEventListener('DOMContentLoaded', function() {
+                    const select = document.querySelector('#id_location');
+                    if (select.value) {
+                        handleLocationChange(select);
+                    }
+                });
+                </script>
+            """)
         )
 
         # Add Bootstrap classes to all fields
@@ -402,9 +505,13 @@ class DeviceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        # Ensure the location value from the hidden input is used
-        if 'location' in cleaned_data and isinstance(cleaned_data['location'], list):
-            cleaned_data['location'] = cleaned_data['location'][1]  # Use the hidden input value
+        location = cleaned_data.get('location')
+        is_active = cleaned_data.get('is_active')
+
+        if location and not location.is_active and is_active:
+            raise forms.ValidationError({
+                'is_active': 'Device cannot be active when its location is inactive.'
+            })
         return cleaned_data
 
     def clean_serial_number(self):
@@ -425,12 +532,10 @@ class DeviceForm(forms.ModelForm):
                 )
 
                 if matching_devices.exists():
-                    # If manufacturer or model matches, raise validation error
                     raise forms.ValidationError(
                         "A device with this serial number already exists with the same manufacturer or model."
                     )
                 else:
-                    # If no manufacturer/model match, just add a warning
                     self.add_warning(
                         'serial_number',
                         'This serial number is already in use by another device.'
@@ -439,7 +544,6 @@ class DeviceForm(forms.ModelForm):
         return serial_number
 
     def add_warning(self, field, message):
-        """Add a warning message to a field without preventing form submission"""
         if not hasattr(self, '_warnings'):
             self._warnings = {}
         if field not in self._warnings:
@@ -447,7 +551,6 @@ class DeviceForm(forms.ModelForm):
         self._warnings[field].append(message)
 
     def get_warnings(self):
-        """Return all warning messages"""
         return getattr(self, '_warnings', {})
 
 class LocationForm(forms.ModelForm):
@@ -497,9 +600,8 @@ class LocationForm(forms.ModelForm):
                     """),
                     Submit(
                         'submit',
-                        submit_text,
-                        css_class='btn btn-primary',
-                        prepend='<i class="bi bi-save me-1"></i>'
+                        mark_safe('<i class="bi bi-geo-alt me-1"></i>' + ('Create' if is_new else 'Save')),
+                        css_class='btn btn-success'
                     ),
                     css_class='d-flex justify-content-between align-items-center'
                 ),

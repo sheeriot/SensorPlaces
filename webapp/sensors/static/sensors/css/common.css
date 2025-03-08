@@ -12,6 +12,10 @@
     --chart-tooltip-bg: rgba(0, 0, 0, 0.8);
     --chart-tooltip-text: #ffffff;
     --chart-font-size: 12px;
+    --grouped-header-bg: rgba(var(--bs-primary-rgb), 0.05);
+    --grouped-header-hover-bg: rgba(var(--bs-primary-rgb), 0.1);
+    --grouped-header-inactive-bg: rgba(var(--bs-secondary-rgb), 0.05);
+    --grouped-header-inactive-hover-bg: rgba(var(--bs-secondary-rgb), 0.1);
 }
 
 /* Essential custom styles that Bootstrap doesn't provide */
@@ -386,4 +390,21 @@
 .corner-icon.bottom-right {
     bottom: 0;
     right: 0;
+}
+
+/* Grouped List Headers - only custom properties that Bootstrap can't handle */
+.grouped-list-header {
+    background-color: var(--grouped-header-bg) !important;
+}
+
+.grouped-list-header:hover {
+    background-color: var(--grouped-header-hover-bg) !important;
+}
+
+.grouped-list-header.opacity-50 {
+    background-color: var(--grouped-header-inactive-bg) !important;
+}
+
+.grouped-list-header.opacity-50:hover {
+    background-color: var(--grouped-header-inactive-hover-bg) !important;
 } 

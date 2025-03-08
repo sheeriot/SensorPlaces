@@ -1,5 +1,5 @@
 <tr class="place-row {% if not place.is_active %}opacity-50 text-muted d-none{% endif %}" data-place-active="{{ place.is_active|lower }}">
-    <td>
+    <td class="text-nowrap">
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-house-gear"></i>
             <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-decoration-none">
@@ -7,24 +7,17 @@
             </a>
         </div>
     </td>
-    <td>{{ place.address }}</td>
-    <td>{{ place.latitude }}, {{ place.longitude }}</td>
-    <td>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge rounded-pill {% if place.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                {% if place.is_active %}Active{% else %}Inactive{% endif %}
-            </span>
-        </div>
+    <td class="text-wrap text-break">{{ place.address|default:"&nbsp;" }}</td>
+    <td class="d-none d-lg-table-cell text-nowrap">{{ place.latitude }},{{ place.longitude }}</td>
+    <td class="text-center">
+        {% include "sensors/includes/status_active_badge.html" with object=place %}
     </td>
-    <td>
-        <div class="d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#placeMapModal" data-place-lat="{{ place.latitude }}" data-place-lon="{{ place.longitude }}" data-place-name="{{ place.name }}">
-                <i class="bi bi-map"></i>
-            </button>
-            <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-sm btn-outline-primary">
+    <td class="text-end">
+        <div class="btn-group">
+            <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-sm btn-warning">
                 <i class="bi bi-pencil"></i>
             </a>
-            <a href="{% url 'sensors:place_delete' place_slug=place.slug %}" class="btn btn-sm btn-outline-danger">
+            <a href="{% url 'sensors:place_delete' place_slug=place.slug %}" class="btn btn-sm btn-danger">
                 <i class="bi bi-trash"></i>
             </a>
         </div>

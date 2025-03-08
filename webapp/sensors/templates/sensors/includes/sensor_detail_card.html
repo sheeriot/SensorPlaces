@@ -3,7 +3,8 @@
 <div class="card rounded-3 shadow-sm border-0">
     <div class="card-header bg-white py-2">
         <h5 class="card-title mb-0">
-            <i class="bi bi-thermometer me-2"></i>Sensor Details
+            <i class="bi bi-thermometer me-2"></i>
+            Sensor Details
         </h5>
     </div>
     <div class="card-body py-2">
@@ -19,21 +20,26 @@
 
             <dt class="col-sm-4 text-body-secondary small text-uppercase">Status</dt>
             <dd class="col-sm-8">
-                <div class="form-check form-switch">
-                    <input class="form-check-input sensor-status-toggle" 
-                           type="checkbox" 
-                           role="switch"
-                           id="sensorToggle{{ sensor.pk }}"
-                           data-sensor-id="{{ sensor.pk }}"
-                           data-device-id="{{ sensor.device.pk }}"
-                           data-place-slug="{{ sensor.device.location.place.slug }}"
-                           {% if sensor.is_active %}checked{% endif %}
-                           {% if not sensor.device.is_active %}disabled{% endif %}>
-                    <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
-                           for="sensorToggle{{ sensor.pk }}"
-                           id="sensorStatusLabel_{{ sensor.pk }}">
-                        {% if sensor.is_active %}Active{% else %}inactive{% endif %}
-                    </label>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch {% if not sensor.device.is_active %}d-none{% endif %}">
+                        <input class="form-check-input sensor-status-toggle" 
+                               type="checkbox" 
+                               role="switch"
+                               id="sensorToggle{{ sensor.pk }}"
+                               data-sensor-id="{{ sensor.pk }}"
+                               data-device-id="{{ sensor.device.pk }}"
+                               data-place-slug="{{ sensor.device.location.place.slug }}"
+                               {% if sensor.is_active %}checked{% endif %}
+                               {% if not sensor.device.is_active %}disabled{% endif %}>
+                        <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
+                               for="sensorToggle{{ sensor.pk }}"
+                               id="sensorStatusLabel_{{ sensor.pk }}">
+                            {% if sensor.is_active %}Active{% else %}Inactive{% endif %}
+                        </label>
+                    </div>
+                    {% if not sensor.device.is_active %}
+                        {% include "sensors/includes/status_active_badge.html" with object=sensor show_active=true %}
+                    {% endif %}
                 </div>
             </dd>
 

@@ -14,48 +14,150 @@
 
 // System Configuration
 const toggleActiveConfig = {
-    debug: false        // Set to true to enable debug mode
+    debug: false,            // Set to true to enable debug mode
+    logMarkerChanges: true, // Log marker additions and changes
+    logMapEvents: true      // Log map initialization and updates
 };
+
+// Card structure validator
+function validateCardStructure(card, index) {
+    const issues = [];
+    
+    // Check for required class and ID
+    if (!card.classList.contains('card')) {
+        issues.push('Missing required class="card"');
+    }
+    if (!card.id) {
+        issues.push('Missing required unique ID');
+    }
+
+    // Check direct children
+    const children = Array.from(card.children);
+    const header = children.find(child => child.classList.contains('card-header'));
+    const body = children.find(child => child.classList.contains('card-body'));
+    const footer = children.find(child => child.classList.contains('card-footer'));
+    const unexpectedChildren = children.filter(child => 
+        !child.classList.contains('card-header') && 
+        !child.classList.contains('card-body') && 
+        !child.classList.contains('card-footer')
+    );
+
+    if (!header) {
+        issues.push('Missing required .card-header');
+    }
+    if (!body) {
+        issues.push('Missing required .card-body');
+    }
+    if (unexpectedChildren.length > 0) {
+        issues.push(`Found ${unexpectedChildren.length} unexpected direct children (only .card-header, .card-body, and .card-footer allowed)`);
+    }
+
+    // Check card title location
+    if (header) {
+        const cardTitles = header.querySelectorAll('.card-title');
+        if (cardTitles.length === 0) {
+            issues.push('Missing .card-title in .card-header');
+        } else if (cardTitles.length > 1) {
+            issues.push(`Found ${cardTitles.length} .card-title elements (should be exactly 1)`);
+        }
+        
+        // Check for old ID-based card titles
+        const idBasedTitles = header.querySelectorAll('#card-title');
+        if (idBasedTitles.length > 0) {
+            issues.push('Found #card-title (should use class="card-title" instead)');
+        }
+    }
+
+    if (issues.length > 0) {
+        console.warn(`Card ${index + 1} (${card.id || 'no-id'}) structure issues:`, issues);
+        console.debug('Problematic card HTML:', card.outerHTML);
+    }
+
+    return {
+        header,
+        body,
+        footer,
+        issues
+    };
+}
 
 // Card status reporter
 function reportCardStatus() {
     if (!toggleActiveConfig.debug) return;
     
-    document.querySelectorAll('.card-body').forEach((card, index) => {
-        const cardInfo = {
-            index: index + 1,
+    document.querySelectorAll('.card-body').forEach((cardBody, index) => {
+        const card = cardBody.closest('.card');
+        if (!card) {
+            console.error(`Card body ${index + 1} is not within a .card element`);
+            return;
+        }
+
+        // Start card report group first
+        console.group(`Card ${index + 1}: ${card.querySelector('.card-title, #card-title')?.textContent?.trim() || 'Untitled'} (${card.id || 'no-id'})`);
+        
+        // Validate card structure (now inside the group)
+        const { header: cardHeader, issues } = validateCardStructure(card, index);
+        const cardTitle = cardHeader?.querySelector('.card-title, #card-title')?.textContent?.trim();
+        
+        // 1. Card Structure Info
+        console.debug('Card Structure:', {
             id: card.id || 'UnnamedCard',
-            classes: Array.from(card.classList).join(' ')
-        };
-        console.debug('Card:', cardInfo);
-
-        // Check all toggle types at once
-        const toggleCounts = {};
-        ['location', 'device', 'sensor'].forEach(type => {
-            const toggles = card.querySelectorAll(`.toggle-${type}-active`);
-            if (toggles.length > 0) {
-                toggleCounts[type] = toggles.length;
-                const statusData = Array.from(toggles).map(toggle => {
-                    const row = toggle.closest('tr');
-                    const isButton = toggle.tagName.toLowerCase() === 'button';
-                    return {
-                        id: toggle.dataset[`${type}Id`],
-                        type: isButton ? 'button' : 'switch',
-                        active: isButton ? toggle.dataset.currentStatus === 'true' : toggle.checked,
-                        rowClasses: row ? Array.from(row.classList).join(' ') : 'N/A'
-                    };
-                });
-
-                console.group(`Card ${card.id || 'unnamed'} - ${type}s:`);
-                console.table(statusData);
-                console.groupEnd();
-            }
+            title: cardTitle || 'No Title',
+            structureIssues: issues.length > 0 ? issues : 'None'
         });
 
-        // Single summary message for cards with no toggles
-        if (Object.keys(toggleCounts).length === 0) {
-            console.debug(`Card ${cardInfo.id} has no toggles`);
+        // Log validation issues inside the card group
+        if (issues.length > 0) {
+            console.warn(`Structure issues:`, issues);
+            console.debug('Card HTML:', card.outerHTML);
         }
+
+        // 2. Header Toggles Report
+        if (cardHeader) {
+            console.group('Header Toggles');
+            const headerToggles = ['location', 'device', 'sensor'].map(type => ({
+                type,
+                elements: Array.from(cardHeader.querySelectorAll(`.toggle-${type}-active`))
+            })).filter(t => t.elements.length > 0);
+
+            if (headerToggles.length > 0) {
+                headerToggles.forEach(({ type, elements }) => {
+                    console.table(elements.map(toggle => ({
+                        type,
+                        id: toggle.dataset[`${type}Id`] || 'no-id',
+                        element: toggle.tagName.toLowerCase(),
+                        active: toggle.checked || false
+                    })));
+                });
+            } else {
+                console.debug('No toggles found in header');
+            }
+            console.groupEnd(); // End Header Toggles group
+        }
+
+        // 3. Body Toggles Report
+        console.group('Body Toggles');
+        const bodyToggles = ['location', 'device', 'sensor'].map(type => ({
+            type,
+            elements: Array.from(cardBody.querySelectorAll(`.toggle-${type}-active`))
+        })).filter(t => t.elements.length > 0);
+
+        if (bodyToggles.length > 0) {
+            bodyToggles.forEach(({ type, elements }) => {
+                console.table(elements.map(toggle => ({
+                    type,
+                    id: toggle.dataset[`${type}Id`] || 'no-id',
+                    element: toggle.tagName.toLowerCase(),
+                    active: toggle.checked || false,
+                    location: toggle.closest('tr') ? 'table-row' : 'other'
+                })));
+            });
+        } else {
+            console.debug('No toggles found in body');
+        }
+        console.groupEnd(); // End Body Toggles group
+
+        console.groupEnd(); // End Card group
     });
 }
 
@@ -63,12 +165,13 @@ function reportCardStatus() {
 const toggleActiveManager = {
     async toggleStatus(type, id, placeSlug, intendedState) {
         if (toggleActiveConfig.debug) {
-            console.debug('Action:', { type, action: 'toggle', id, intendedState });
+            console.group('Toggle Status Request');
+            console.debug('Parameters:', { type, id, placeSlug, intendedState });
         }
 
         try {
             const response = await utils.fetchWithCSRF(
-                `/api/${placeSlug}/${type}/${id}/toggle_active/`,
+                `/api/${placeSlug}/toggle_active/${type}/${id}/`,
                 {
                     method: 'POST',
                     body: JSON.stringify({ is_active: intendedState })
@@ -78,16 +181,23 @@ const toggleActiveManager = {
             if (!response.ok) throw new Error('Network response was not ok');
             const data = await response.json();
             
+            if (toggleActiveConfig.debug) {
+                console.debug('Response:', data);
+            }
+            
             if (data.status === 'success') {
                 // Find all rows that match this model type and ID
                 const rows = document.querySelectorAll(`[data-${type}-id="${id}"]`);
                 
-                // Find the hideInactive switch for this model type
-                const hideInactiveSwitch = document.querySelector(`.hideInactive-${type}-switch`);
-                const shouldHide = hideInactiveSwitch?.checked ?? false;
+                // Find the hideInactive state for this model type
+                const hideInactiveState = window.hideInactiveManager?.getSwitchStateByModel(type) ?? false;
                 
                 if (toggleActiveConfig.debug) {
-                    console.debug('Response:', data);
+                    console.debug('Updating UI elements:', {
+                        rowsFound: rows.length,
+                        hideInactiveState,
+                        type
+                    });
                 }
                 
                 rows.forEach(row => {
@@ -99,8 +209,8 @@ const toggleActiveManager = {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
                     } else {
                         row.classList.add('opacity-50', 'text-muted');
-                        // If hideInactive switch is checked, also hide the row
-                        if (shouldHide) {
+                        // If hideInactive is enabled for this type, also hide the row
+                        if (hideInactiveState) {
                             row.classList.add('d-none');
                         }
                     }
@@ -112,6 +222,64 @@ const toggleActiveManager = {
                         statusLabel.classList.toggle('text-success', data.is_active);
                         statusLabel.classList.toggle('text-danger', !data.is_active);
                     }
+
+                    // Handle child toggles based on parent type
+                    if (type === 'location') {
+                        // Find all device toggles within this location
+                        const deviceToggles = document.querySelectorAll(`.toggle-device-active[data-location-id="${id}"]`);
+                        deviceToggles.forEach(toggle => {
+                            const toggleContainer = toggle.closest('.form-check');
+                            if (toggleContainer) {
+                                if (data.is_active) {
+                                    toggleContainer.classList.remove('d-none');
+                                    toggle.disabled = false;
+                                } else {
+                                    toggleContainer.classList.add('d-none');
+                                    toggle.disabled = true;
+                                }
+                            }
+                        });
+
+                        // Update status badges visibility
+                        const deviceStatusBadges = document.querySelectorAll(`[data-location-id="${id}"] .status-active-badge`);
+                        deviceStatusBadges.forEach(badge => {
+                            if (data.is_active) {
+                                badge.classList.add('d-none');
+                            } else {
+                                badge.classList.remove('d-none');
+                            }
+                        });
+                    } else if (type === 'device') {
+                        // Find all sensor toggles within this device
+                        const sensorToggles = document.querySelectorAll(`.toggle-sensor-active[data-device-id="${id}"]`);
+                        sensorToggles.forEach(toggle => {
+                            const toggleContainer = toggle.closest('.form-check');
+                            if (toggleContainer) {
+                                if (data.is_active) {
+                                    toggleContainer.classList.remove('d-none');
+                                    toggle.disabled = false;
+                                } else {
+                                    toggleContainer.classList.add('d-none');
+                                    toggle.disabled = true;
+                                }
+                            }
+                        });
+
+                        // Update status badges visibility
+                        const sensorStatusBadges = document.querySelectorAll(`[data-device-id="${id}"] .status-active-badge`);
+                        sensorStatusBadges.forEach(badge => {
+                            if (data.is_active) {
+                                badge.classList.add('d-none');
+                            } else {
+                                badge.classList.remove('d-none');
+                            }
+                        });
+                    }
+
+                    // Handle map markers if this is a place toggle
+                    if (type === 'place') {
+                        this.updateMapMarkers(id, data.is_active, hideInactiveState);
+                    }
                 });
 
                 // Find and update all toggle switches for this type/id
@@ -122,28 +290,38 @@ const toggleActiveManager = {
                     }
                 });
 
-                // Show toast notification with HTML content
-                let message = data.message;
-                if (data.affected_sensors?.length > 0) {
-                    message += '<br><br>Affected sensors:<ul class="mb-0">';
-                    data.affected_sensors.forEach(sensor => {
-                        message += `<li>${sensor}</li>`;
+                if (data.toast) {
+                    toastSystem.show({
+                        message: data.toast.message,
+                        type: data.toast.type,
+                        addToHistory: true
                     });
-                    message += '</ul>';
                 }
 
-                toastSystem.show({
-                    message: message,
-                    type: data.type || 'warning',
-                    addToHistory: true
-                });
+                if (toggleActiveConfig.debug) {
+                    console.debug('UI Update Complete');
+                }
+
+                return data;
+            } else if (data.status === 'warning') {
+                // Handle warning status without throwing an error
+                if (toggleActiveConfig.debug) {
+                    console.warn('Toggle Status Warning:', data.message);
+                }
+                if (data.toast) {
+                    toastSystem.show({
+                        message: data.toast.message,
+                        type: data.toast.type,
+                        addToHistory: true
+                    });
+                }
                 return data;
             } else {
                 throw new Error(data.message || `Failed to update ${type} status`);
             }
         } catch (error) {
             if (toggleActiveConfig.debug) {
-                console.debug('Error:', { type, error: error.message });
+                console.error('Toggle Status Error:', error);
             }
             toastSystem.show({
                 message: error.message,
@@ -151,6 +329,69 @@ const toggleActiveManager = {
                 addToHistory: true
             });
             return null;
+        } finally {
+            if (toggleActiveConfig.debug) {
+                console.groupEnd();
+            }
+        }
+    },
+
+    updateMapMarkers(placeId, isActive, hideInactive) {
+        if (toggleActiveConfig.debug) {
+            console.group('Updating Map Markers');
+            console.debug('Parameters:', { placeId, isActive, hideInactive });
+        }
+
+        try {
+            // Update Folium markers
+            const foliumMarkers = document.querySelectorAll(`.place-marker[data-place-id="${placeId}"]`);
+            if (toggleActiveConfig.debug) {
+                console.debug('Found Folium markers:', foliumMarkers.length);
+            }
+
+            foliumMarkers.forEach(marker => {
+                marker.dataset.placeActive = isActive.toString();
+                if (isActive) {
+                    marker.classList.remove('opacity-50', 'text-muted', 'd-none');
+                } else {
+                    marker.classList.add('opacity-50', 'text-muted');
+                    if (hideInactive) {
+                        marker.classList.add('d-none');
+                    }
+                }
+            });
+
+            // Update Leaflet markers
+            const leafletMaps = document.querySelectorAll('.leaflet-map-pane');
+            leafletMaps.forEach(mapPane => {
+                const markerPane = mapPane.querySelector('.leaflet-marker-pane');
+                if (!markerPane) return;
+
+                const leafletMarkers = markerPane.querySelectorAll(`.leaflet-marker-icon[data-place-id="${placeId}"]`);
+                if (toggleActiveConfig.debug) {
+                    console.debug('Found Leaflet markers:', leafletMarkers.length);
+                }
+
+                leafletMarkers.forEach(marker => {
+                    marker.dataset.placeActive = isActive.toString();
+                    if (isActive) {
+                        marker.style.display = '';
+                        marker.style.opacity = '1';
+                    } else {
+                        if (hideInactive) {
+                            marker.style.display = 'none';
+                        }
+                        marker.style.opacity = '0.5';
+                    }
+                });
+            });
+
+        } catch (error) {
+            console.error('Error updating map markers:', error);
+        }
+
+        if (toggleActiveConfig.debug) {
+            console.groupEnd();
         }
     },
 
@@ -218,7 +459,7 @@ const toggleActiveManager = {
         const modalId = `${type}ToggleModal`;
         if (!document.getElementById(modalId)) {
             const modalHTML = `
-                <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true">
+                <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true" data-bs-backdrop="static">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
@@ -240,9 +481,19 @@ const toggleActiveManager = {
                 </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHTML);
         }
+
+        const modalElement = document.getElementById(modalId);
+        let modal = bootstrap.Modal.getInstance(modalElement);
+        if (!modal) {
+            modal = new bootstrap.Modal(modalElement, {
+                backdrop: 'static',
+                keyboard: false
+            });
+        }
+
         return {
-            modal: new bootstrap.Modal(document.getElementById(modalId)),
-            element: document.getElementById(modalId),
+            modal: modal,
+            element: modalElement,
             messageEl: document.getElementById(`${type}ToggleMessage`),
             confirmBtn: document.getElementById(`confirm${type.charAt(0).toUpperCase() + type.slice(1)}Toggle`),
             spinner: document.getElementById(`confirm${type.charAt(0).toUpperCase() + type.slice(1)}Toggle`).querySelector('.spinner-border')
@@ -266,11 +517,16 @@ const toggleActiveManager = {
                 const newStatus = this.checked;
                 const toggleElement = this;
 
+                // Find the parent row to get the names
+                const row = document.querySelector(`tr[data-location-id="${locationId}"]`);
+                const locationName = row.dataset.locationName;
+                const placeName = row.dataset.placeName;
+
                 this.checked = !newStatus;
                 
-                modalComponents.messageEl.textContent = newStatus ? 
-                    'Are you sure you want to activate this location? This will allow its devices to be activated.' : 
-                    'Are you sure you want to deactivate this location? This will disable all its devices.';
+                modalComponents.messageEl.innerHTML = newStatus ? 
+                    `Are you sure you want to Activate <i class='bi bi-geo-alt'></i> ${locationName} at <i class='bi bi-house-gear'></i> ${placeName}?` : 
+                    `Are you sure you want to Deactivate <i class='bi bi-geo-alt'></i> ${locationName} at <i class='bi bi-house-gear'></i> ${placeName}?`;
 
                 modalComponents.confirmBtn.disabled = false;
                 modalComponents.spinner.classList.add('d-none');

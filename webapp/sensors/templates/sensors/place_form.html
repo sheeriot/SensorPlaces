@@ -1,42 +1,13 @@
 {% extends "sensors/base.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}
     {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
 {% endblock %}
 
 {% block extra_css %}
-<style>
-.preview-map {
-    height: 300px;
-    border-radius: 0.25rem;
-    margin-bottom: 1rem;
-}
-.form-switch.form-switch-lg {
-    padding-left: 2.5em;
-    min-height: 2em;
-}
-.form-switch.form-switch-lg .form-check-input {
-    height: 2em;
-    width: calc(3em + 0.75rem);
-    border-radius: 4em;
-}
-.map-instructions {
-    font-size: 1.1rem;
-    color: #6c757d;
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-    background-color: #f8f9fa;
-    border-radius: 0.25rem;
-    border: 1px solid #dee2e6;
-}
-.map-instructions i {
-    color: #0d6efd;
-}
-.place-map-container {
-    height: 400px;
-}
-</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 {% endblock %}
 
 {% block content %}
@@ -63,87 +34,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize map
-    const mapDiv = document.getElementById('preview-map');
-    const latInput = document.getElementById('{{ form.latitude.id_for_label }}');
-    const lonInput = document.getElementById('{{ form.longitude.id_for_label }}');
-    
-    // Add instructions above map
-    const instructions = document.createElement('div');
-    instructions.className = 'map-instructions';
-    instructions.innerHTML = '<i class="bi bi-info-circle me-2"></i>Click anywhere on the map or drag the marker to set the location coordinates';
-    mapDiv.parentNode.insertBefore(instructions, mapDiv);
-    
-    let map = L.map(mapDiv);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Initialize marker
-    let lat = latInput.value || 30.2672;
-    let lon = lonInput.value || -97.7431;
-    let marker = L.marker([lat, lon], {
-        draggable: true
-    }).addTo(map);
-
-    // Set initial view
-    map.setView([lat, lon], 13);
-
-    // Update marker and inputs on map click
-    map.on('click', function(e) {
-        marker.setLatLng(e.latlng);
-        updateInputs(e.latlng);
-    });
-
-    // Update inputs on marker drag
-    marker.on('dragend', function(e) {
-        updateInputs(marker.getLatLng());
-    });
-
-    // Update marker when inputs change
-    latInput.addEventListener('change', updateMarkerFromInputs);
-    lonInput.addEventListener('change', updateMarkerFromInputs);
-
-    function updateInputs(latlng) {
-        latInput.value = latlng.lat.toFixed(5);
-        lonInput.value = latlng.lng.toFixed(5);
-    }
-
-    function updateMarkerFromInputs() {
-        let lat = parseFloat(latInput.value);
-        let lon = parseFloat(lonInput.value);
-        if (!isNaN(lat) && !isNaN(lon)) {
-            marker.setLatLng([lat, lon]);
-            map.setView([lat, lon]);
-        }
-    }
-
-    // Initialize place map modal if it exists
-    const placeMapModal = document.getElementById('placeMapModal');
-    if (placeMapModal) {
-        const placeMapContainer = document.getElementById('placeMapContainer');
-        let modalMap = null;
-        
-        placeMapModal.addEventListener('shown.bs.modal', function () {
-            if (!modalMap) {
-                modalMap = L.map(placeMapContainer);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(modalMap);
-                
-                const modalLat = parseFloat(latInput.value);
-                const modalLon = parseFloat(lonInput.value);
-                
-                if (!isNaN(modalLat) && !isNaN(modalLon)) {
-                    L.marker([modalLat, modalLon]).addTo(modalMap);
-                    modalMap.setView([modalLat, modalLon], 13);
-                }
-            }
-            modalMap.invalidateSize();
-        });
-    }
-});
-</script>
+<script src="{% static 'sensors/js/place_map_location_picker.js' %}"></script>
 {% endblock %} 

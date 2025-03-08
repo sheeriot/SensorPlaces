@@ -1069,73 +1069,162 @@ class ToastHistoryView(View):
             'message': 'Toast history cleared successfully'
         })
 
-class LocationToggleActiveView(View):
-    def post(self, request: HttpRequest, place_slug: str, pk: int) -> JsonResponse:
+class ToggleActiveView(View):
+    """Consolidated view for toggling active status of locations, devices, and sensors."""
+    
+    def post(self, request: HttpRequest, place_slug: str, model: str, pk: int) -> JsonResponse:
+        """Handle POST request to toggle active status.
+        
+        Args:
+            request: The HTTP request
+            place_slug: The slug of the place
+            model: The type of model to toggle (location, device, or sensor)
+            pk: The primary key of the model instance
+        """
         try:
-            # Get the location and validate it exists
-            location = get_object_or_404(Location.objects.select_related('place'), pk=pk)
-            
-            # Parse the intended state from request body
+            # Validate model type
+            if model not in ['location', 'device', 'sensor']:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Invalid model type: {model}'
+                }, status=400)
+
+            # Get request data
             data = json.loads(request.body)
-            is_active = data.get('is_active', False)
+            intended_state = data.get('is_active', False)
             
-            # Get affected devices before making any changes
-            affected_devices = []
-            if not is_active:
-                affected_devices = list(location.devices.filter(is_active=True).values('name', 'model'))
+            print(f"[ToggleActive] Request: model={model}, pk={pk}, intended_state={intended_state}")
+
+            # Get the place
+            place = get_object_or_404(Place, slug=place_slug)
             
-            # Update location status
-            location.is_active = is_active
-            location.save()
+            # Get and validate the object based on model type
+            if model == 'location':
+                obj = get_object_or_404(Location, pk=pk, place=place)
+            elif model == 'device':
+                obj = get_object_or_404(Device, pk=pk, location__place=place)
+                # Check if trying to activate device with inactive location
+                if intended_state and not obj.location.is_active:
+                    return JsonResponse({
+                        'status': 'warning',
+                        'message': (
+                            f"Cannot activate device <strong>{obj.name}</strong> because its location "
+                            f"<strong>{obj.location.name}</strong> is inactive.<br>"
+                            f"<small class='text-muted'>Please activate the location first.</small>"
+                        ),
+                        'is_active': False,
+                        'type': 'warning',
+                        'toast': {
+                            'message': (
+                                f"Cannot activate device <strong>{obj.name}</strong> because its location "
+                                f"<strong>{obj.location.name}</strong> is inactive.<br>"
+                                f"<small class='text-muted'>Please activate the location first.</small>"
+                            ),
+                            'type': 'warning',
+                            'addToHistory': True
+                        }
+                    })
+            elif model == 'sensor':
+                obj = get_object_or_404(Sensor, pk=pk, device__location__place=place)
             
-            # If location is set to inactive, cascade to all devices and their sensors
-            if not is_active:
-                # Update all devices to inactive, which will cascade to sensors through device save method
-                location.devices.all().update(is_active=False)
+            print(f"[ToggleActive] Before save: {model}.pk={pk} is_active={obj.is_active}")
             
-            # Get updated statistics
-            active_devices = location.devices.filter(is_active=True).count()
-            total_devices = location.devices.count()
+            # Store affected items before the change
+            affected_items = []
+            if model == 'location':
+                affected_items = [
+                    f"{device.name} ({len(device.sensors.all())} sensors)"
+                    for device in obj.devices.all()
+                ]
+            elif model == 'device':
+                affected_items = [sensor.name for sensor in obj.sensors.all()]
+
+            # Update the active status
+            obj.is_active = intended_state
+            obj.save()
             
-            # Create descriptive message with full path and icons
-            message = (
-                f"{'Activated' if is_active else 'Deactivated'} location "
-                f"<strong>{location.name}</strong> in "
-                f"<i class='bi bi-house-gear'></i> {location.place.name}"
-            )
+            print(f"[ToggleActive] After save: {model}.pk={pk} is_active={obj.is_active}")
+
+            # If deactivating, cascade the change
+            if not intended_state:
+                if model == 'location':
+                    Device.objects.filter(location=obj).update(is_active=False)
+                    Sensor.objects.filter(device__location=obj).update(is_active=False)
+                elif model == 'device':
+                    Sensor.objects.filter(device=obj).update(is_active=False)
             
-            # Add affected devices to message if any
-            if affected_devices:
-                message += "<br><br>Affected devices:<ul class='mb-0'>"
-                for device in affected_devices:
-                    message += f"<li>{device['name']} ({device['model']})</li>"
-                message += "</ul>"
+            # Build status message
+            message = self._build_status_message(obj, model, intended_state, affected_items)
             
-            # Return success response with updated data
-            return JsonResponse({
+            # Prepare response data
+            # Determine message type based on state transition
+            message_type = 'success' if intended_state else 'danger'  # success for activation, danger for deactivation
+            
+            response_data = {
                 'status': 'success',
                 'message': message,
-                'is_active': location.is_active,
-                'affected_devices': affected_devices,
-                'active_devices': active_devices,
-                'total_devices': total_devices
-            })
+                'is_active': obj.is_active,
+                'type': message_type,
+                'toast': {
+                    'message': message,
+                    'type': message_type,  # Use same type for toast
+                    'addToHistory': True
+                }
+            }
             
-        except Location.DoesNotExist:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Location not found'
-            }, status=404)
+            print(f"[ToggleActive] Response: {json.dumps(response_data, indent=2)}")
+            
+            return JsonResponse(response_data)
+
         except json.JSONDecodeError:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid JSON in request body'
+                'message': 'Invalid JSON data'
             }, status=400)
         except Exception as e:
+            print(f"[ToggleActive] Error: {str(e)}")
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
             }, status=500)
+
+    def _build_status_message(self, obj, model: str, is_active: bool, affected_items: list) -> str:
+        """Build a descriptive status message with icons and affected items."""
+        
+        action = 'Activated' if is_active else 'Deactivated'
+        
+        if model == 'location':
+            message = (
+                f"{action} <i class='bi bi-geo-alt'></i> {obj.name} in "
+                f"<i class='bi bi-house-gear'></i> {obj.place.name}"
+            )
+            if not is_active and affected_items:  # Only show affected items when deactivating
+                message += "<br><br>Affected devices:<ul class='mb-0'>"
+                for device in affected_items:
+                    message += f"<li><i class='bi bi-hdd-rack'></i> {device}</li>"
+                message += "</ul>"
+                
+        elif model == 'device':
+            message = (
+                f"{action} <i class='bi bi-hdd-rack'></i> {obj.name} in "
+                f"<i class='bi bi-house-gear'></i> {obj.location.place.name} > "
+                f"<i class='bi bi-geo-alt'></i> {obj.location.name}"
+            )
+            if not is_active and affected_items:  # Only show affected items when deactivating
+                message += "<br><br>Affected sensors:<ul class='mb-0'>"
+                for sensor in affected_items:
+                    message += f"<li><i class='bi bi-thermometer'></i> {sensor}</li>"
+                message += "</ul>"
+                
+        else:  # sensor
+            message = (
+                f"{action} <i class='bi bi-thermometer'></i> {obj.name} in "
+                f"<i class='bi bi-house-gear'></i> {obj.device.location.place.name} > "
+                f"<i class='bi bi-geo-alt'></i> {obj.device.location.name} > "
+                f"<i class='bi bi-hdd-rack'></i> {obj.device.name}"
+            )
+            
+        return message
 
 class DeviceUpdateView(LocationAnnotationMixin, SuccessMessageMixin, UpdateView):
     model = Device
@@ -1237,101 +1326,40 @@ class DeviceDeleteView(DeleteView):
             f"</small>"
         )
         
+        # Delete the device
         device.delete()
         
-        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'status': 'success',
-                'message': success_message,
-                'type': 'danger',  # Always use danger type for deletion
-                'redirect_url': success_url
-            })
-            
-        # Add to toast history
-        if hasattr(self.request, 'session'):
-            toast_history = self.request.session.get('toast_history', [])
-            toast_history.append({
-                'message': success_message,
-                'type': 'danger',
-                'timestamp': timezone.now().isoformat()
-            })
-            self.request.session['toast_history'] = toast_history
-            
+        # Add success message to session
+        messages.success(request, success_message)
+        
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):
         return reverse('sensors:place_devices', kwargs={'place_slug': self.object.location.place.slug})
 
-
-class DeviceToggleActiveView(View):
-    def post(self, request, place_slug, pk):
+class DeviceActiveSensorsView(View):
+    def get(self, request, place_slug, pk):
         device = get_object_or_404(Device, pk=pk)
         
         try:
-            data = json.loads(request.body)
-            is_active = data.get('is_active', False)
+            active_sensors = device.sensors.filter(is_active=True)
             
-            # If deactivating, get list of active sensors first
-            affected_sensors = []
-            if not is_active:
-                affected_sensors = list(device.sensors.filter(is_active=True).values('name', 'sensor_type'))
-            
-            # Update device status
-            device.is_active = is_active
-            device.save()
-            
-            # If device is set to inactive, cascade to all sensors
-            if not is_active:
-                device.sensors.all().update(is_active=False)
-            
-            # Get updated statistics for the location
-            location = device.location
-            active_devices_count = location.devices.filter(is_active=True).count()
-            inactive_devices_count = location.devices.filter(is_active=False).count()
-            
-            # Create descriptive message with full path and icons
-            message = (
-                f'<i class="bi bi-house-gear"></i> {location.place.name} &gt; '
-                f'<i class="bi bi-geo-alt"></i> {location.name} &gt; '
-                f'<i class="bi bi-hdd-rack"></i> {device.name} '
-                f'{is_active and "activated" or "deactivated"}'
-            )
-            
-            # If sensors were affected, add them to the message
-            if affected_sensors:
-                message += '<br><br>The following sensors were deactivated:'
-                message += '<ul class="mb-0">'
-                for sensor in affected_sensors:
-                    message += f'<li><i class="bi bi-thermometer"></i> {sensor["name"]} ({sensor["sensor_type"]})</li>'
-                message += '</ul>'
-            
-            # Add to toast history first
-            if hasattr(request, 'session'):
-                toast_history = request.session.get('toast_history', [])
-                toast_history.append({
-                    'message': message,
-                    'type': 'warning',  # Always use warning type for device status changes
-                    'timestamp': timezone.now().isoformat()
-                })
-                request.session['toast_history'] = toast_history
-                request.session.modified = True
+            sensors_data = [{
+                'name': sensor.name,
+                'type': sensor.sensor_type,
+                'unit': sensor.unit,
+                'id': sensor.pk
+            } for sensor in active_sensors]
             
             return JsonResponse({
                 'status': 'success',
-                'message': message,
-                'is_active': device.is_active,
-                'active_devices_count': active_devices_count,
-                'inactive_devices_count': inactive_devices_count,
-                'active_devices_count': active_devices_count,
-                'location_id': location.pk,
-                'affected_sensors': affected_sensors,
-                'type': 'warning'  # Ensure consistent warning type
+                'sensors': sensors_data
             })
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=500)
 
 class SensorCreateView(LocationAnnotationMixin, SuccessMessageMixin, CreateView):
     model = Sensor
@@ -1890,78 +1918,6 @@ class SensorReadingCreateView(LocationAnnotationMixin, SuccessMessageMixin, Crea
             'sensor_pk': self.sensor.pk,
             'pk': self.object.pk
         })
-
-class SensorToggleActiveView(View):
-    def post(self, request: HttpRequest, place_slug: str, pk: int) -> JsonResponse:
-        try:
-            # Get the sensor and validate it exists
-            sensor = get_object_or_404(Sensor.objects.select_related('device', 'device__location', 'device__location__place'), pk=pk)
-            
-            # Parse the intended state from request body
-            data = json.loads(request.body)
-            is_active = data.get('is_active', False)
-            
-            # Update sensor status
-            sensor.is_active = is_active
-            sensor.save()
-            
-            # Get updated statistics
-            active_sensors = sensor.device.sensors.filter(is_active=True).count()
-            inactive_sensors = sensor.device.sensors.filter(is_active=False).count()
-            active_sensors_place = Sensor.objects.filter(device__location__place__slug=place_slug, is_active=True).count()
-            
-            # Create descriptive message with full path and icons
-            message = (
-                f"{'Activated' if is_active else 'Deactivated'} sensor "
-                f"<strong>{sensor.name}</strong> in "
-                f"<i class='bi bi-house-gear'></i> {sensor.device.location.place.name} > "
-                f"<i class='bi bi-geo-alt'></i> {sensor.device.location.name} > "
-                f"<i class='bi bi-hdd-rack'></i> {sensor.device.name}"
-                f'<i class="bi bi-house-gear"></i> {sensor.device.location.place.name} &gt; '
-                f'<i class="bi bi-geo-alt"></i> {sensor.device.location.name} &gt; '
-                f'<i class="bi bi-hdd-rack"></i> {sensor.device.name} &gt; '
-                f'<i class="bi bi-thermometer"></i> {sensor.name} '
-                f'{is_active and "activated" or "deactivated"}'
-            )
-            
-            return JsonResponse({
-                'status': 'success',
-                'message': message,
-                'is_active': sensor.is_active,
-                'total_sensors': total_sensors,
-                'active_sensors': active_sensors,
-                'device_id': device.pk,
-                'type': 'success' if is_active else 'danger'  # Set toast type based on activation status
-            })
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-
-
-class DeviceActiveSensorsView(View):
-    def get(self, request, place_slug, pk):
-        device = get_object_or_404(Device, pk=pk)
-        ic(place_slug, device)
-        try:
-
-            active_sensors = device.sensors.filter(is_active=True)
-            
-            sensors_data = [{
-                'name': sensor.name,
-                'type': sensor.sensor_type if sensor.sensor_type else 'Unknown',
-                'id': sensor.pk
-            } for sensor in active_sensors]
-            
-            return JsonResponse({
-                'status': 'success',
-                'sensors': sensors_data
-            })
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            }, status=400)
 
 def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
     place = get_object_or_404(Place, slug=place_slug)

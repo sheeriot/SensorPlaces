@@ -2,24 +2,19 @@
 
 <div class="card mb-2">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center gap-3">
-            <div>
-                <div class="ms-2">
-                    <i class="bi bi-hdd-rack"></i>
-                    {{ device.name }}
-                </div>
-                <hr class="my-0">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-geo-alt-fill"></i> 
-                    <span class="ms-2">{{ location.name }}</span>
-                </div>
-            </div>
-            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                <input class="form-check-input" type="checkbox" id="hideInactiveDevicesNav" checked>
-                <label class="form-check-label small-label" for="hideInactiveDevicesNav">
-                    Hide<br>inactive
-                </label>
-            </div>
+        <h5 class="card-title mb-0">
+            <i class="bi bi-hdd-rack me-2"></i>
+            {{ device.name }}
+            <small class="text-muted ms-2">
+                <i class="bi bi-geo-alt-fill me-1"></i>
+                {{ location.name }}
+            </small>
+        </h5>
+        <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+            <input class="form-check-input" type="checkbox" id="hideInactiveDevicesNav" checked>
+            <label class="form-check-label small-label" for="hideInactiveDevicesNav">
+                Hide<br>inactive
+            </label>
         </div>
     </div>
     <div class="card-body p-0">

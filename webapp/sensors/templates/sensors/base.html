@@ -36,7 +36,7 @@
                          alt="AVD Logo" 
                          class="me-3" 
                          style="height: 40px; width: auto;">
-                    <span>Austin Voice Data</span>
+                    <span>SensorPlaces</span>
                 </a>
                 
                 <!-- Hamburger button -->
@@ -81,6 +81,11 @@
                 </div>
             </div>
 
+            <!-- Sensor Places Icons -->
+            <div class="d-none d-md-block me-3">
+                {% include "sensors/includes/sensorsplaces_icons.html" %}
+            </div>
+
             <!-- Auth section - always visible and right-aligned -->
             <div class="ms-auto">
                 {% if user.is_authenticated %}
@@ -118,17 +123,11 @@
     </nav>
 
     <div class="container my-2">
-        <!-- Hidden container for Django messages that will be converted to toasts -->
-        <div class="d-none">
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        </div>
+        <!-- Toast System Components -->
+        {% include "sensors/includes/toast_history_modal.html" %}
+        {% if toast_message %}
+            {{ toast_message|json_script:"toast-message" }}
+        {% endif %}
 
         <!-- Breadcrumb and Toast Section -->
         <div class="page-header d-flex justify-content-between align-items-start">
@@ -146,23 +145,21 @@
                           data-bs-toggle="tooltip" title="Click to copy timestamp"
                           style="cursor: pointer"></span>
                 </div>
-                <div class="col-md-3 text-center">
+                <div class="col-md-5 text-center">
+                    <img src="{% static 'sensors/graphics/AVD_Logo7_700x164.jpg' %}" 
+                         alt="AVD Logo" 
+                         class="me-2" 
+                         style="height: 20px; width: auto;">
                     <span class="text-dark">Austin Voice Data</span>
                 </div>
-                <div class="col-md-3 text-end">
+                <div class="col-md-2 text-end">
                     <a href="{% url 'admin:index' %}" class="btn btn-outline-dark btn-sm">
-                        <i class="bi bi-gear-fill"></i> Admin
+                        <i class="bi bi-gear-fill"></i> admin
                     </a>
                 </div>
             </div>
         </div>
     </footer>
-
-    <!-- Toast System Components -->
-    {% include "sensors/includes/toast_history_modal.html" %}
-    {% if toast_message %}
-        {{ toast_message|json_script:"toast-message" }}
-    {% endif %}
 
     <!-- Third-party Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -178,21 +175,16 @@
     </script>
     
     <!-- Application JavaScript -->
-
     <script src="{% static 'sensors/js/utils.js' %}"></script>
     <script src="{% static 'sensors/js/toast-handler.js' %}"></script>
-
     <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
     <script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
-
     <script src="{% static 'sensors/js/time-display.js' %}"></script>
-
     <script src="{% static 'sensors/js/common.js' %}"></script>
     <script src="{% static 'sensors/js/charts.js' %}"></script>
-
     <script src="{% static 'sensors/js/place_map_popout.js' %}"></script>
     <script src="{% static 'sensors/js/places_map_folium.js' %}"></script>
-
+    <script src="{% static 'sensors/js/place_map_location_picker.js' %}"></script>
     <script src="{% static 'sensors/js/site_plan_editor.js' %}"></script>
     
     {% block extra_js %}{% endblock %}

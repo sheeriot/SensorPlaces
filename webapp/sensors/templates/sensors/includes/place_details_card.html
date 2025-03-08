@@ -1,24 +1,31 @@
 {% load widget_tweaks %}
 
 <div class="card mb-1">
-    <div class="card-header py-2 px-3">
-        <h5 class="card-title mb-0 d-flex align-items-center">
-            <i class="bi bi-house-gear me-2 text-secondary"></i>
-            <span class="text-secondary fw-normal">{{ place.name }}</span>
-            <div class="btn-group btn-group-sm ms-auto">
-                <a href="{% url 'sensors:place_update' place.slug %}" class="btn btn-warning">
-                    <i class="bi bi-pencil"></i>
-                </a>
-                <a href="{% url 'sensors:place_delete' place.slug %}" class="btn btn-danger">
-                    <i class="bi bi-trash"></i>
-                </a>
-            </div>
+    <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-house-gear me-2"></i>
+            {{ place.name }}
         </h5>
+        <div class="btn-group btn-group-sm">
+            <a href="{% url 'sensors:place_update' place.slug %}" class="btn btn-warning">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'sensors:place_delete' place.slug %}" class="btn btn-danger">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
     </div>
     <div class="card-body px-2 pb-1 pt-2">
         <dl class="row g-0">
             <dt class="text-secondary small mb-1">Address</dt>
             <dd class="mb-2 fw-medium">{{ place.address }}</dd>
+            
+            <dt class="text-secondary small mb-1">Status</dt>
+            <dd class="mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    {% include "sensors/includes/status_active_badge.html" with object=place show_active=true %}
+                </div>
+            </dd>
             
             <dt class="text-secondary small mb-1">Coordinates</dt>
             <dd class="mb-2">

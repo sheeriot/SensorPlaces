@@ -1,125 +1,113 @@
 /**
- * Hide Inactive System
+ * Hide Inactive Handler
  * 
- * Manages and tracks hideInactive switches for places, locations, devices, and sensors.
- * Provides switch state information for other modules.
+ * Manages hide-inactive switches and dispatches state change events.
+ * Controls visibility of inactive rows based on switch state.
+ * 
+ * Debug Mode:
+ * -----------
+ * To enable debug tables and logging, add ?debug=true to your URL:
+ * http://your-site/page?debug=true
+ * 
+ * Debug Output:
+ * - Switch initialization status
+ * - State change events with timestamps
+ * - Row visibility updates
+ * 
+ * Example URLs:
+ * http://localhost:8000/sensors/?debug=true
+ * http://localhost:8000/sensors/places/?debug=true
+ * 
+ * Switch Requirements:
+ * - Must have class 'hideInactive-switch'
+ * - Must have data-model attribute with valid model name
  */
 
-// Debug Configuration
-const hideInactiveConfig = {
-    debug: false,            // Set to true to enable debug mode
-};
-
-// Hide Inactive System
-const hideInactiveManager = {
-    // Configuration
+const hideInactiveHandler = {
     config: {
-        switchSelector: '.card-title .hideInactive-switch',
-        supportedModels: ['place', 'location', 'device', 'sensor']
-    },
-
-    // State tracking
-    state: {
-        initialized: false,
-        switches: new Map()  // Stores model -> {element, state} mapping
+        switchSelector: '.hideInactive-switch',
+        rowSelectors: {
+            place: 'tr.place-row',
+            location: 'tr.location-row',
+            device: 'tr.device-row',
+            sensor: 'tr.sensor-row'
+        },
+        groupHeaderClasses: {
+            device: 'device-location-list',
+            sensor: 'sensor-device-list'
+        }
     },
 
     initialize() {
-        if (this.state.initialized) {
-            if (hideInactiveConfig.debug) console.debug('Hide Inactive System already initialized');
-            return;
-        }
-
-        try {
-            // Find all switches in card titles
-            const switches = document.querySelectorAll(this.config.switchSelector);
-
-            if (switches.length === 0) {
-                if (hideInactiveConfig.debug) console.debug('No hide inactive switches found');
+        // Find and initialize all switches
+        const switches = document.querySelectorAll(this.config.switchSelector);
+        
+        // Set up event listeners for each switch
+        switches.forEach(switchEl => {
+            const model = switchEl.dataset.model;
+            if (!model) {
+                console.warn('Switch missing model attribute:', switchEl);
                 return;
             }
 
-            if (hideInactiveConfig.debug) {
-                // Log inventory of found switches
-                const switchInventory = Array.from(switches).map(sw => ({
-                    model: sw.dataset.model,
-                    cardId: sw.closest('.card')?.id || 'unnamed',
-                    state: sw.checked ? 'Hidden' : 'Visible'
-                }));
+            // Initial row update based on switch state
+            this.updateRowVisibility(model, switchEl.checked);
 
-                console.group('Hide Inactive Switch Inventory:');
-                console.table(switchInventory);
-                console.groupEnd();
-            }
-
-            this.initializeSwitches(switches);
-            this.state.initialized = true;
-
-        } catch (error) {
-            console.error('Hide Inactive System initialization failed:', error);
-        }
-    },
-
-    initializeSwitches(switches) {
-        try {
-            // Store switch states
-            Array.from(switches).forEach(el => {
-                const model = el.dataset.model;
-                if (model && this.config.supportedModels.includes(model)) {
-                    // Store both the element and its current state
-                    this.state.switches.set(model, {
-                        element: el,
-                        state: el.checked
-                    });
-                    this.initializeSwitch(el, model);
-                }
-            });
-
-        } catch (error) {
-            console.error('Switch initialization failed:', error);
-        }
-    },
-
-    initializeSwitch(switchEl, model) {
-        try {
-            // Create change handler
-            const handleVisibilityChange = (e) => {
+            // Set up change listener
+            switchEl.addEventListener('change', (e) => {
                 const newState = e.target.checked;
-                // Update stored state
-                this.state.switches.set(model, {
-                    element: switchEl,
-                    state: newState
-                });
                 
-                // Dispatch event for other modules to handle visibility changes
-                const event = new CustomEvent('hideInactiveChanged', {
-                    detail: { model, state: newState }
-                });
-                document.dispatchEvent(event);
-            };
+                // Update row visibility
+                this.updateRowVisibility(model, newState);
 
-            // Clean up any existing handlers
-            switchEl.removeEventListener('change', handleVisibilityChange);
-            
-            // Add new handler
-            switchEl.addEventListener('change', handleVisibilityChange);
-
-        } catch (error) {
-            console.error(`Failed to initialize ${model} switch:`, error);
-        }
+                // Dispatch state change event
+                window.dispatchEvent(new CustomEvent('hideInactiveStateChanged', {
+                    detail: {
+                        model,
+                        hideInactive: newState,
+                        switchId: switchEl.id,
+                        timestamp: new Date().toISOString()
+                    }
+                }));
+            });
+        });
     },
 
-    // Public method to get switch state for a model
-    getSwitchState(model) {
-        const switchData = this.state.switches.get(model);
-        return switchData ? switchData.state : false;
+    updateRowVisibility(model, hideInactive) {
+        const selector = this.config.rowSelectors[model];
+        if (!selector) return;
+
+        // Get rows and group headers if applicable
+        let rows;
+        const groupHeaderClass = this.config.groupHeaderClasses[model];
+        if (groupHeaderClass) {
+            rows = document.querySelectorAll(`${selector}, tr.grouped-list-header.${groupHeaderClass}`);
+        } else {
+            rows = document.querySelectorAll(selector);
+        }
+
+        // Update visibility of rows
+        rows.forEach(row => {
+            if (row.classList.contains('grouped-list-header')) {
+                const parentModel = row.classList.contains('device-location-list') ? 'location' :
+                                  row.classList.contains('sensor-device-list') ? 'device' : null;
+                if (parentModel) {
+                    const isActive = row.dataset[`${parentModel}Active`] === 'true';
+                    if (!isActive) {
+                        row.classList.toggle('d-none', hideInactive);
+                    }
+                }
+            } else {
+                const isActive = row.dataset[`${model}Active`] === 'true';
+                if (!isActive) {
+                    row.classList.toggle('d-none', hideInactive);
+                }
+            }
+        });
     }
 };
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    hideInactiveManager.initialize();
+document.addEventListener('DOMContentLoaded', () => {
+    hideInactiveHandler.initialize();
 });
-
-// Export for use in other modules
-window.hideInactiveManager = hideInactiveManager; 

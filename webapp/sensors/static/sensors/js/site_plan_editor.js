@@ -210,21 +210,50 @@ const sitePlanSystem = {
     },
 
     prepareEditorContainer() {
+        if (sitePlanConfig.debug) console.group('Preparing Editor Container');
+
         const editorContainer = this.editorContainer;
         editorContainer.innerHTML = '';
         
         const clone = this.mainContainer.cloneNode(true);
         clone.id = 'siteMapEditorClone';
         
-        // Show all hidden locations in the editor
-        const hiddenMarkers = clone.querySelectorAll('.location-marker.d-none');
-        hiddenMarkers.forEach(marker => {
+        // Process all location markers in the editor
+        const markers = clone.querySelectorAll('.location-marker');
+        markers.forEach(marker => {
+            // Remove any display:none that might be set
             marker.classList.remove('d-none');
-            this.logDebug('Showing hidden marker:', marker.dataset.locationId);
+            
+            // Style based on active state
+            const isActive = marker.dataset.locationActive === 'true';
+            if (!isActive) {
+                marker.classList.add('opacity-50');
+                marker.style.opacity = '0.5';
+                
+                if (sitePlanConfig.debug) {
+                    this.logDebug('Styling inactive marker:', {
+                        id: marker.dataset.locationId,
+                        name: marker.title || 'Unnamed'
+                    });
+                }
+            }
+
+            // Add visual feedback for draggable state
+            marker.classList.add('cursor-move');
+            marker.title = `${marker.title || 'Location'} (Drag to reposition)`;
         });
         
+        if (sitePlanConfig.debug) {
+            this.logDebug(`Processed ${markers.length} markers:`, {
+                total: markers.length,
+                active: Array.from(markers).filter(m => m.dataset.locationActive === 'true').length,
+                inactive: Array.from(markers).filter(m => m.dataset.locationActive === 'false').length
+            });
+        }
+        
         editorContainer.appendChild(clone);
-        this.logDebug(`Made ${hiddenMarkers.length} hidden markers visible`);
+        
+        if (sitePlanConfig.debug) console.groupEnd();
     },
 
     initializeEditorMarkers() {

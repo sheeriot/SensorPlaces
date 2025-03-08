@@ -1,0 +1,11 @@
+<span class="badge 
+    {% if object.is_active %}
+        bg-success-subtle text-success
+        {% if show_active != 1 %}
+            d-none
+        {% endif %}
+    {% else %}
+        bg-secondary-subtle text-secondary
+    {% endif %}">
+    {% if object.is_active %}Active{% else %}inactive{% endif %}
+</span>

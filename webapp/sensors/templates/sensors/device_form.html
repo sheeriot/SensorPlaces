@@ -10,13 +10,14 @@
 <div class="row g-4">
     <!-- Place Title Card -->
     {% include 'sensors/includes/place_title_card.html' with place=place %}
+    
     <div class="col-md-4">
         <!-- Place Navigation -->
         {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations current_location=location %}
 
         {% if location %}
             <!-- Location Details when specific location -->
-            {% include 'sensors/includes/location_details_card.html' with place=place location=location %}
+            {% include 'sensors/includes/location_detail_card.html' with place=place location=location %}
         {% else %}
             <!-- Locations List when choosing location -->
             {% include 'sensors/includes/locations_list_card.html' with place=place locations=locations %}
@@ -38,30 +39,21 @@
             </div>
             <div class="card-body">
                 {% if not location and locations %}
-                    <div class="alert alert-info mb-4">
+                    <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
                         <i class="bi bi-info-circle me-2"></i>
-                        Please select a location for the new {{ model_name }}
+                        <div>Please select a location for the new {{ model_name }}</div>
                     </div>
                 {% endif %}
 
                 {% crispy form %}
 
                 {% if form.get_warnings.serial_number %}
-                    <div class="alert alert-warning static-alert d-flex align-items-center py-2 mt-3" role="alert">
+                    <div class="alert alert-warning d-flex align-items-center mt-3" role="alert">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         <div>
                             {% for warning in form.get_warnings.serial_number %}
                                 {{ warning }}
                             {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
-
-                {% if location and not location.is_active %}
-                    <div class="alert alert-warning static-alert d-flex align-items-center py-2 mt-3" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        <div>
-                            This location is inactive. Any {{ model_name }}s created here will also be inactive.
                         </div>
                     </div>
                 {% endif %}

@@ -2,6 +2,7 @@ import folium
 from folium import plugins
 from folium.plugins import BeautifyIcon
 from icecream import ic
+import json
 
 def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom_start=13):
     """Create a map centered on a place or set of places"""
@@ -68,38 +69,63 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
             </div>
             """
             
-            # Define marker options with all necessary data attributes
-            marker_options = {
-                'data-place-slug': place.slug,
-                'data-place-active': str(place.is_active).lower(),
-                'data-place-lat': str(place.latitude),
-                'data-place-lon': str(place.longitude),
-                'data-place-name': place.name,
-                'class': 'place-marker'
-            }
-            
-            # Add status-specific classes for inactive places
-            if not place.is_active:
-                marker_options['class'] += ' opacity-50 text-muted'
+            # Create marker with all options
+            icon_html = f'''
+                <div class="awesome-marker-icon-{'blue' if place.is_active else 'red'} awesome-marker place-marker{' d-none opacity-50 text-muted' if not place.is_active else ''}"
+                    data-place-slug="{place.slug}"
+                    data-place-active="{str(place.is_active).lower()}"
+                    data-place-lat="{str(place.latitude)}"
+                    data-place-lon="{str(place.longitude)}"
+                    data-place-name="{place.name}"
+                    style="margin-left: -17px; margin-top: -42px; width: 35px; height: 45px;"
+                >
+                    <i class="bi bi-{'info-circle' if place.is_active else 'question-circle'} icon-white"></i>
+                </div>
+            '''
             
             marker = folium.Marker(
                 location=[float(place.latitude), float(place.longitude)],
                 popup=folium.Popup(popup_html, max_width=300),
-                icon=folium.Icon(
-                    color='blue' if place.is_active else 'red',
-                    icon='info-sign' if place.is_active else 'question-sign',
-                    prefix='fa'
-                ),
-                name=f"place_marker_{place.slug}",
-                options=marker_options
+                icon=folium.DivIcon(html=icon_html),
+                name=f"place_marker_{place.slug}"
             )
             marker.add_to(m)
         
-        # Fit bounds if multiple active places
-        if len(active_places) > 1:
-            m.fit_bounds([[min(active_lats), min(active_lons)], [max(active_lats), max(active_lons)]])
+        # Calculate bounds for both active and all places
+        bounds_data = {
+            "initial_state": {
+                "hide_inactive": True  # Start with inactive places hidden
+            }
+        }
         
+        # Active places bounds
+        if active_places:
+            bounds_data["active"] = {
+                "sw": [min(active_lats), min(active_lons)],
+                "ne": [max(active_lats), max(active_lons)]
+            }
+            # Fit map to active places initially
+            m.fit_bounds([bounds_data["active"]["sw"], bounds_data["active"]["ne"]])
+        
+        # All places bounds
+        if places:
+            bounds_data["all"] = {
+                "sw": [min(all_lats), min(all_lons)],
+                "ne": [max(all_lats), max(all_lons)]
+            }
+            # If no active places, fit to all places
+            if not active_places:
+                m.fit_bounds([bounds_data["all"]["sw"], bounds_data["all"]["ne"]])
+        
+        # Get the map HTML
         map_html = m.get_root().render()
+        
+        # Add the bounds data as a proper JSON attribute
+        map_html = map_html.replace(
+            'class="folium-map"',
+            f'class="folium-map" data-map-bounds=\'{json.dumps(bounds_data)}\''
+        )
+        
         ic("Generated map HTML length:", len(map_html))
         return map_html
     
