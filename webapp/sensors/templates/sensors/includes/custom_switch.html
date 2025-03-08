@@ -1,0 +1,9 @@
+{% load crispy_forms_field %}
+
+<div class="form-check form-switch d-flex align-items-center">
+    <input type="checkbox" class="form-check-input" name="{{ field.html_name }}" id="{{ field.auto_id }}"
+           {% if field.value %}checked{% endif %} {% if field.field.disabled %}disabled{% endif %}>
+    <label class="form-check-label ms-2" for="{{ field.auto_id }}">
+        Active
+    </label>
+</div> 

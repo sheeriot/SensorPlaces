@@ -6,7 +6,7 @@ app_name = 'sensors'
 urlpatterns = [
     # Place URLs
     path('', views.PlaceListView.as_view(), name='place_list'),
-    path('create/', views.PlaceCreateView.as_view(), name='place_create'),
+    path('place/create/', views.PlaceCreateView.as_view(), name='place_create'),
     path('<slug:place_slug>/', views.PlaceDetailView.as_view(), name='place_detail'),
     path('<slug:place_slug>/update/', views.PlaceUpdateView.as_view(), name='place_update'),
     path('<slug:place_slug>/delete/', views.PlaceDeleteView.as_view(), name='place_delete'),

@@ -9,8 +9,6 @@ from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
 from crispy_forms.bootstrap import PrependedText, FormActions
 from django.db import models
 
-from icecream import ic
-
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -174,7 +172,7 @@ class PlaceForm(forms.ModelForm):
             self.fields['slug'].initial = self.instance.slug
         
         # Configure field properties
-        self.fields['is_active'].label = "Active"
+        self.fields['is_active'].label = ""  # Remove label since we use custom template
         self.fields['is_active'].help_text = None
         
         self.fields['latitude'].label = None
@@ -195,8 +193,12 @@ class PlaceForm(forms.ModelForm):
                 Column('name', css_class='col-md-8'),
                 Column(
                     Div(
-                        Field('is_active', wrapper_class='form-check form-switch'),
-                        css_class='d-flex align-items-center h-100'
+                        Field(
+                            'is_active',
+                            template='sensors/includes/custom_switch.html',
+                            wrapper_class='form-check form-switch d-flex align-items-center'
+                        ),
+                        css_class='h-100 d-flex align-items-center justify-content-start'
                     ),
                     css_class='col-md-4'
                 ),
@@ -334,19 +336,6 @@ class PlaceForm(forms.ModelForm):
             if lon < -180 or lon > 180:
                 raise forms.ValidationError("Longitude must be between -180 and 180 degrees")
         return lon
-
-class ReadOnlyLocationWidget(forms.MultiWidget):
-    def __init__(self, attrs=None):
-        widgets = [
-            forms.Select(attrs={'class': 'form-control', 'readonly': True, 'disabled': True}),
-            forms.HiddenInput()
-        ]
-        super().__init__(widgets, attrs)
-
-    def decompress(self, value):
-        if value:
-            return [value, value]  # Same value for both select and hidden
-        return [None, None]
 
 class DeviceForm(forms.ModelForm):
     class Meta:
@@ -554,36 +543,68 @@ class DeviceForm(forms.ModelForm):
         return getattr(self, '_warnings', {})
 
 class LocationForm(forms.ModelForm):
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+
     class Meta:
         model = Location
         fields = ['name', 'is_active']
 
     def __init__(self, *args, **kwargs):
+        # Get place from initial data or instance
+        initial = kwargs.get('initial', {})
+        instance = kwargs.get('instance')
+        
+        # Try to get place from initial data first, then from instance if available
+        self.place = initial.get('place')
+        if not self.place and instance:
+            self.place = instance.place
+            
+        # Handle referrer
+        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
+        
+        if not self.place:
+            pass
+        
+        # Setup crispy form
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
+        self.helper.form_id = 'locationForm'
+        
+        if referrer:
+            self.fields['referrer'].initial = referrer
         
         # Configure field properties
-        self.fields['is_active'].label = "Active"
-        self.fields['is_active'].help_text = None
+        self.fields['name'].widget.attrs.update({
+            'class': 'form-control',
+            'placeholder': 'Enter location name',
+            'minlength': '3',
+        })
         
-        # Determine if this is a new location or editing existing
-        is_new = not bool(kwargs.get('instance'))
-        submit_text = "Create Location" if is_new else "Update Location"
+        self.fields['is_active'].label = ""  # Remove label since we use custom template
+        self.fields['is_active'].help_text = None
+        self.fields['is_active'].widget.attrs['class'] = 'form-check-input'
+        
+        # If place is inactive, force location to be inactive
+        if self.place and not self.place.is_active:
+            self.fields['is_active'].initial = False
+            self.fields['is_active'].disabled = True
+            self.fields['is_active'].help_text = "This location cannot be active because its place is inactive."
         
         # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
+            Field('referrer', type='hidden'),
             Row(
                 Column('name', css_class='col-md-8'),
                 Column(
                     Div(
                         Field(
-                            'is_active', 
-                            wrapper_class='form-check form-switch form-switch-lg'
+                            'is_active',
+                            template='sensors/includes/custom_switch.html'
                         ),
-                        css_class='d-flex align-items-center h-100'
+                        css_class='h-100 d-flex align-items-center justify-content-start'
                     ),
                     css_class='col-md-4'
                 ),
@@ -598,13 +619,110 @@ class LocationForm(forms.ModelForm):
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
-                    Submit(
-                        'submit',
-                        mark_safe('<i class="bi bi-geo-alt me-1"></i>' + ('Create' if is_new else 'Save')),
-                        css_class='btn btn-success'
-                    ),
+                    HTML("""
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-geo-alt me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
+                        </button>
+                    """),
                     css_class='d-flex justify-content-between align-items-center'
                 ),
                 css_class='mt-3'
             )
-        ) 
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        name = cleaned_data.get('name')
+        is_active = cleaned_data.get('is_active')
+        
+        if name and len(name) < 3:
+            self.add_error('name', 'Location name must be at least 3 characters long.')
+
+        if not self.place:
+            raise forms.ValidationError("Cannot create or edit a location without an associated place.")
+
+        if self.place and not self.place.is_active and is_active:
+            self.add_error('is_active', 'Location cannot be active when its place is inactive.')
+            
+        return cleaned_data 
+
+class PlaceDeleteForm(forms.Form):
+    confirm_name = forms.CharField(
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Type the place name here'
+        })
+    )
+
+    def __init__(self, *args, place=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.place = place
+        
+        # Setup crispy form
+        self.helper = FormHelper()
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
+        self.helper.form_class = 'mb-0'
+        
+        # Custom layout
+        self.helper.layout = Layout(
+            # Warning about locations
+            HTML("""
+                <div class="alert alert-warning mb-3">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This will delete the following locations:
+                    <div class="mt-2">
+                        <ul class="mb-0">
+                            {% for location in locations %}
+                            <li>
+                                <i class="bi bi-geo-alt"></i> {{ location.name }}
+                                {% if location.active_devices_count or location.inactive_devices_count %}
+                                ({{ location.active_devices_count|add:location.inactive_devices_count }} devices)
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            """),
+            # Confirmation input
+            Div(
+                HTML("""
+                    <p class="mb-2">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        This action cannot be undone. Please type <strong>{{ place.name }}</strong> to confirm.
+                    </p>
+                """),
+                Field('confirm_name'),
+                css_class='alert alert-danger'
+            ),
+            # Buttons
+            Div(
+                HTML('<hr class="mt-4">'),
+                Div(
+                    HTML("""
+                        <a href="{% url 'sensors:place_list' %}" 
+                           class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                    """),
+                    Submit(
+                        'submit',
+                        mark_safe('<i class="bi bi-trash"></i> Delete'),
+                        css_class='btn btn-danger'
+                    ),
+                    css_class='d-flex justify-content-between'
+                ),
+                css_class='mt-3'
+            )
+        )
+
+    def clean_confirm_name(self):
+        confirm_name = self.cleaned_data.get('confirm_name')
+        if self.place and confirm_name != self.place.name:
+            raise forms.ValidationError(
+                f'Confirmation name "{confirm_name}" does not match the place name "{self.place.name}". '
+                'Please try again.'
+            )
+        return confirm_name

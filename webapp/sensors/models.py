@@ -80,6 +80,12 @@ class Place(models.Model):
     def updated_at_datetime(self) -> datetime:
         return self.updated_at
 
+    def get_site_plan_url(self) -> Optional[str]:
+        """Safely get the site plan URL or return None."""
+        if self.site_plan and hasattr(self.site_plan, 'url'):
+            return self.site_plan.url
+        return None
+
     class Meta:
         verbose_name_plural = '1. Places'
         ordering = ['-is_active', Lower('name')]

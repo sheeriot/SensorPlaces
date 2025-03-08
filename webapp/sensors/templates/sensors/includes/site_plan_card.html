@@ -31,9 +31,11 @@
                     </div>
                 </div>
             {% endfor %}
+                {% if place.get_site_plan_url %}
                 <div class="site-plan-background position-absolute w-100 h-100" 
-                     style="background-image: url('{{ place.site_plan.url }}');">
+                     style="background-image: url('{{ place.get_site_plan_url }}');">
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>

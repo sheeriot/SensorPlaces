@@ -12,90 +12,11 @@
     {% include 'sensors/includes/place_title_card.html' with place=place %}
 
     <div class="col-md-4">
-        {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations current_location=location show_hidden=True %}
+        {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations show_hidden=1 %}
     </div>
 
     <div class="col-md-8">
         {% include 'sensors/includes/location_form_card.html' with place=place form=form model_name=model_name %}
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('locationForm');
-    const modal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-    
-    // Update confirmation modal with form values
-    function updateConfirmationModal() {
-        document.getElementById('confirmName').textContent = form.querySelector('#id_name').value;
-        const isActive = form.querySelector('#id_is_active').checked;
-        document.getElementById('confirmStatus').innerHTML = 
-            `<span class="badge ${isActive ? 'bg-success' : 'bg-danger'}">
-                ${isActive ? 'Active' : 'Inactive'}
-            </span>`;
-    }
-
-    // Store original values for diff
-    const originalValues = {
-        name: form.querySelector('#id_name').value,
-        is_active: form.querySelector('#id_is_active').checked
-    };
-
-    // Handle form submission
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        updateConfirmationModal();
-        modal.show();
-    });
-
-    // Handle confirmation
-    document.getElementById('confirmSubmit').addEventListener('click', async function() {
-        modal.hide();
-        
-        try {
-            const formData = new FormData(form);
-            const response = await fetch(form.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-            
-            const data = await response.json();
-            console.log('Server response:', data);
-            
-            if (data.status === 'success') {
-                // Just redirect, the toast will be shown on the destination page
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                }
-            } else {
-                throw new Error(data.message || 'Form submission failed');
-            }
-        } catch (error) {
-            console.error('Error:', error); // Debug log
-            toastSystem.show({
-                message: error.message,
-                type: 'danger',
-                addToHistory: true
-            });
-        }
-    });
-
-    // Client-side validation
-    const nameInput = form.querySelector('#id_name');
-    nameInput.addEventListener('input', function() {
-        if (this.value.length < 3) {
-            this.classList.add('is-invalid');
-            this.classList.remove('is-valid');
-        } else {
-            this.classList.add('is-valid');
-            this.classList.remove('is-invalid');
-        }
-    });
-});
-</script>
 {% endblock %}

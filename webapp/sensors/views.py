@@ -5,28 +5,26 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from .models import Place, Location, Device, Sensor, SensorReading
 from .utils import get_sensor_readings  #, write_sensor_reading
-from .forms import SensorForm, PlaceForm, DeviceForm, LocationForm
+from .forms import SensorForm, PlaceForm, DeviceForm, LocationForm, PlaceDeleteForm
 from .map_fun import place_map_create
-from django.conf import settings
+# from django.conf import settings
 from django.http import JsonResponse, HttpRequest, HttpResponseRedirect
 from django.views.decorators.http import require_POST
-from django.contrib.admin.views.decorators import staff_member_required
+# from django.contrib.admin.views.decorators import staff_member_required
 from typing import Any, Dict, List, Optional, Type
 from django.db.models.query import QuerySet
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models import F, Subquery, OuterRef
-from django.db.models.expressions import Value
+# from django.db.models.expressions import Value
 import json
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
-import time
+# import time
 from django.utils import timezone
-import math
-from geopy.distance import geodesic
+# import math
+# from geopy.distance import geodesic
 from django.db.models.query import Prefetch
-
-from icecream import ic
 
 # Add the mixin first, before any classes that use it
 class LocationAnnotationMixin:
@@ -96,7 +94,6 @@ class PlaceListView(ListView):
                 active_devices_count=Count('locations__devices', filter=Q(locations__devices__is_active=True)),
                 active_sensors_count=Count('locations__devices__sensors', filter=Q(locations__devices__sensors__is_active=True))
             ).order_by('-is_active', Lower('name'))
-            ic("Places Count:", self._queryset.count())
         return self._queryset
 
     def get_context_data(self, **kwargs):
@@ -106,7 +103,6 @@ class PlaceListView(ListView):
             map_html = place_map_create(places=self.get_queryset())
             context['place_map_html'] = map_html
         except Exception as e:
-            ic("Error in map creation:", str(e))
             context['place_map_html'] = ""
         
         return context
@@ -125,7 +121,6 @@ class PlaceDetailView(DetailView):
                 active_devices_count=Count('locations__devices', filter=Q(locations__devices__is_active=True)),
                 active_sensors_count=Count('locations__devices__sensors', filter=Q(locations__devices__sensors__is_active=True))
             )
-            ic("Place Detail Query Executed")
         return self._queryset
 
     def get_context_data(self, **kwargs):
@@ -290,12 +285,29 @@ class PlaceDeleteView(DeleteView):
     success_url = reverse_lazy('sensors:place_list')
     slug_url_kwarg = 'place_slug'
     slug_field = 'slug'
+    form_class = PlaceDeleteForm
 
-    def delete(self, request, *args, **kwargs):
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['place'] = self.get_object()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'place'
         place = self.get_object()
-        success_url = str(self.success_url)
         
-        # Create detailed message before deletion
+        # Get locations with device counts for the warning message
+        context['locations'] = Location.objects.filter(place=place).annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        ).order_by('name')
+        
+        context['place'] = place
+        return context
+
+    def form_valid(self, form):
+        place = self.get_object()
         success_message = (
             f"Deleted place <strong>{place.name}</strong><br>"
             f"<small class='text-muted'>"
@@ -304,17 +316,9 @@ class PlaceDeleteView(DeleteView):
             f"</small>"
         )
         
-        place.delete()
+        response = super().form_valid(form)
         
-        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'status': 'success',
-                'message': success_message,
-                'type': 'danger',  # Always use danger type for deletion
-                'redirect_url': success_url
-            })
-            
-        # Add to toast history
+        # Add success message to toast history
         if hasattr(self.request, 'session'):
             toast_history = self.request.session.get('toast_history', [])
             toast_history.append({
@@ -324,7 +328,7 @@ class PlaceDeleteView(DeleteView):
             })
             self.request.session['toast_history'] = toast_history
             
-        return HttpResponseRedirect(success_url)
+        return response
 
 # Location Views
 class LocationListView(LocationAnnotationMixin, ListView):
@@ -341,7 +345,6 @@ class LocationListView(LocationAnnotationMixin, ListView):
                 active_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
                 inactive_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
             ).order_by('-is_active', Lower('name'))
-            ic("Locations Count:", self._queryset.count())
         return self._queryset
 
     def get_context_data(self, **kwargs):
@@ -392,44 +395,39 @@ class LocationDetailView(LocationAnnotationMixin, DetailView):
             'sensors_inactive': Sensor.objects.filter(device__location=self.object, is_active=False).count(),
         })
         
-        ic("Location Detail Device Query Executed")
         return context
 
-class LocationCreateView(SuccessMessageMixin, CreateView):
+class LocationCreateView(SuccessMessageMixin, LocationAnnotationMixin, CreateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
 
-    def get_success_message(self, cleaned_data):
-        place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
-        return (
-            f"Created location <strong>{cleaned_data['name']}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name}<br>"
-            f"<small class='text-muted'>"
-            f"Status: {'Active' if cleaned_data['is_active'] else 'Inactive'}<br>"
-            f"Devices: {cleaned_data['devices'].count()}"
-            f"</small>"
-        )
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # Cache the place
+        self.place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
+        # Add place to initial data
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial']['place'] = self.place
+        
         # Add referrer to form kwargs
         referrer = self.request.META.get('HTTP_REFERER')
         if referrer:
-            kwargs['referrer'] = referrer
+            kwargs['initial']['referrer'] = referrer
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
-            context['place_url'] = reverse('sensors:place_detail', kwargs={'place_slug': place_slug})
-            context['locations'] = context['place'].locations.annotate(
-                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-            )
+        context['place'] = self.place
+        context['place_url'] = reverse('sensors:place_detail', kwargs={'place_slug': self.place.slug})
+        context['locations'] = self.place.locations.annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        )
         return context
 
     def form_valid(self, form):
@@ -466,7 +464,8 @@ class LocationCreateView(SuccessMessageMixin, CreateView):
             return referrer
             
         # Fall back to the default URL if no referrer
-        return reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
+        default_url = reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
+        return default_url
 
 class LocationUpdateView(SuccessMessageMixin, UpdateView):
     model = Location
@@ -583,6 +582,9 @@ class LocationDeleteView(DeleteView):
             self.request.session['toast_history'] = toast_history
             
         return HttpResponseRedirect(success_url)
+
+    def get_success_url(self):
+        return reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
 
 # Device Views
 class DeviceListView(LocationAnnotationMixin, ListView):
@@ -835,10 +837,8 @@ def update_site_plan_layout(request, place_slug):
     
     try:
         place = get_object_or_404(Place, slug=place_slug)
-        ic("Processing update for place:", place.name)
         
         data = json.loads(request.body)
-        ic("Received data:", data)
         
         # Track site plan changes
         site_plan_changes = []
@@ -868,23 +868,15 @@ def update_site_plan_layout(request, place_slug):
         # Track location updates
         location_updates = []
         location_changes = data.get('locations', [])
-        ic("Location updates to process:", len(location_changes))
         
         for update in location_changes:
             location_id = update.get('id')
             new_x = update.get('x')
             new_y = update.get('y')
             
-            ic("Processing location update:", {
-                'id': location_id,
-                'new_x': new_x,
-                'new_y': new_y
-            })
-            
             if location_id and new_x is not None and new_y is not None:
                 location = Location.objects.filter(id=location_id, place=place).first()
                 if location:
-                    ic("Found location:", location.name)
                     old_x = float(location.x_coord) if location.x_coord is not None else 0
                     old_y = float(location.y_coord) if location.y_coord is not None else 0
                     new_x = float(new_x)
@@ -899,10 +891,7 @@ def update_site_plan_layout(request, place_slug):
                         location.x_coord = new_x
                         location.y_coord = new_y
                         location.save(update_fields=['x_coord', 'y_coord'])
-                        ic(f"Updated location {location.name} position")
-                else:
-                    ic(f"Location not found for ID: {location_id}")
-        
+                
         # Construct response message
         message = [f"Updated site plan layout for <strong>{place.name}</strong>"]
         
@@ -944,7 +933,6 @@ def update_site_plan_layout(request, place_slug):
             }
         }
         
-        ic("Sending response:", response_data)
         return JsonResponse(response_data)
         
     except (ValueError, json.JSONDecodeError) as e:
@@ -959,9 +947,6 @@ def update_site_plan_layout(request, place_slug):
             }]
         }, status=400)
     except Exception as e:
-        ic("Server error:", str(e))
-        ic("Exception type:", type(e))
-        ic("Exception traceback:", e.__traceback__)
         error_message = f'Server error: {str(e)}'
         return JsonResponse({
             'error': error_message,
@@ -1093,8 +1078,6 @@ class ToggleActiveView(View):
             data = json.loads(request.body)
             intended_state = data.get('is_active', False)
             
-            print(f"[ToggleActive] Request: model={model}, pk={pk}, intended_state={intended_state}")
-
             # Get the place
             place = get_object_or_404(Place, slug=place_slug)
             
@@ -1127,8 +1110,6 @@ class ToggleActiveView(View):
             elif model == 'sensor':
                 obj = get_object_or_404(Sensor, pk=pk, device__location__place=place)
             
-            print(f"[ToggleActive] Before save: {model}.pk={pk} is_active={obj.is_active}")
-            
             # Store affected items before the change
             affected_items = []
             if model == 'location':
@@ -1143,8 +1124,6 @@ class ToggleActiveView(View):
             obj.is_active = intended_state
             obj.save()
             
-            print(f"[ToggleActive] After save: {model}.pk={pk} is_active={obj.is_active}")
-
             # If deactivating, cascade the change
             if not intended_state:
                 if model == 'location':
@@ -1547,7 +1526,8 @@ class SensorDetailView(LocationAnnotationMixin, DetailView):
                 ),
                 last_reading_time=Subquery(
                     last_reading.values('timestamp')[:1]
-                ))
+                )
+            )  # Remove the extra closing parenthesis here
             
         return self._queryset
 
