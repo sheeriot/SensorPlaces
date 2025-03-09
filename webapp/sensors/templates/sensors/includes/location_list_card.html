@@ -12,11 +12,15 @@ This template expects the following context variables:
                 <i class="bi bi-geo-alt me-2"></i>
                 Locations
             </h5>
-            {% include "sensors/includes/hide_inactive_switch.html" with model="location" %}
+            {% if model_name == "location" %}
+                {% include "sensors/partials/hide_inactive_switch.html" with model="location" %}
+            {% endif %}
         </div>
+        {% if model_name == "location" %}
         <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-geo-alt"></i><i class="bi bi-plus-circle"></i> Add Location
         </a>
+        {% endif %}
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -24,9 +28,11 @@ This template expects the following context variables:
                 <thead>
                     <tr>
                         <th style="width: 40%">Name</th>
-                        <th style="width: 15%">Status</th>
                         <th style="width: 25%">Devices</th>
-                        <th style="width: 20%">Actions</th>
+                        {% if model_name == "location" %}
+                            <th style="width: 15%">Status</th>
+                            <th style="width: 20%">Actions</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>

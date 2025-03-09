@@ -1,20 +1,19 @@
 /**
- * Toast System
+ * Toast UI Manager
  * 
- * Manages toast notifications and history for the application
+ * Manages the UI components of the toast notification system:
+ * - Displays toast notifications
+ * - Updates notification badge count
+ * - Shows history modal and loads history from backend
  * 
- * Configuration:
- * -------------
- * To enable debugging, set debug: true in toastConfig below
- * Debug mode will:
- * - Show toast lifecycle events
- * - Log history operations
- * - Display API interactions
+ * Note: Actual history storage is managed by the backend ToastHistoryView
  */
 
 // System Configuration
 const toastConfig = {
-    debug: false           // Set to true to enable debug mode
+    debug: true,          // Set to true to enable debug mode
+    maxHistory: 50,       // Maximum items to show in history view
+    maxAge: 24 * 60 * 60 * 1000  // Maximum age of history items to show
 };
 
 // Debug logging helper
@@ -27,32 +26,88 @@ function debugLog(message, data = null) {
     }
 }
 
-// Toast System
+// Toast UI Manager
 const toastSystem = {
-    history: [],
-    MAX_HISTORY: 50,
+    history: [],          // Local cache of history for badge/modal
+    MAX_HISTORY: toastConfig.maxHistory,
+    initialized: false,
+    historyLoading: null,
+    historyButton: null,
+    historyBadge: null,
+
+    async initialize() {
+        if (this.initialized) return;
+        
+        debugLog('Initializing toast system');
+
+        // Initialize history button and badge references once
+        this.historyButton = document.getElementById('toastHistoryBtn');
+        this.historyBadge = document.getElementById('toastHistoryBadge');
+        
+        if (this.historyButton && !this.historyButton.hasAttribute('data-toast-initialized')) {
+            this.historyButton.setAttribute('data-toast-initialized', 'true');
+            this.historyButton.addEventListener('click', () => this.showHistory(), { once: false });
+            debugLog('History button initialized');
+        }
+
+        await this.loadHistory();
+        this.initialized = true;
+        debugLog('Toast system initialized');
+    },
 
     async loadHistory() {
+        // If history is already loading, wait for it
+        if (this.historyLoading) {
+            debugLog('History already loading, waiting...');
+            return this.historyLoading;
+        }
+
+        // If history is already loaded, just return
+        if (this.history.length > 0) {
+            debugLog('History already loaded');
+            return Promise.resolve();
+        }
+
+        debugLog('Loading toast history');
         try {
-            const response = await utils.fetchWithCSRF('/api/toast-history/');
+            this.historyLoading = utils.fetchWithCSRF('/api/toast-history/');
+            const response = await this.historyLoading;
             const data = await response.json();
+            
             if (data.history) {
-                this.history = data.history.map(item => ({
-                    ...item,
-                    timestamp: new Date(item.timestamp)
-                }));
+                // Filter out old messages and convert timestamps
+                const now = new Date();
+                this.history = data.history
+                    .map(item => ({
+                        ...item,
+                        timestamp: new Date(item.timestamp)
+                    }))
+                    .filter(item => {
+                        const age = now - item.timestamp;
+                        return age < toastConfig.maxAge;
+                    });
+
                 if (toastConfig.debug) {
-                    console.table(this.history);
+                    debugLog('History loaded', this.history);
                 }
                 this.updateHistoryBadge();
+                
+                // If we filtered out old messages, save the cleaned history
+                if (this.history.length < data.history.length) {
+                    this.saveHistory();
+                }
             }
         } catch (error) {
             console.error('Failed to load toast history:', error);
+        } finally {
+            this.historyLoading = null;
         }
     },
 
     async saveHistory() {
         try {
+            // Clean history before saving
+            this.cleanHistory();
             await utils.fetchWithCSRF('/api/toast-history/', {
                 method: 'POST',
                 body: JSON.stringify({ history: this.history })
@@ -62,7 +117,39 @@ const toastSystem = {
         }
     },
 
+    cleanHistory() {
+        const now = new Date();
+        this.history = this.history
+            .filter(item => {
+                const age = now - item.timestamp;
+                return age < toastConfig.maxAge;
+            })
+            .slice(0, this.MAX_HISTORY);
+        this.updateHistoryBadge();
+    },
+
+    updateHistoryBadge() {
+        if (!this.historyBadge) {
+            this.historyBadge = document.getElementById('toastHistoryBadge');
+        }
+        
+        if (this.historyBadge) {
+            const count = this.history.length;
+            this.historyBadge.textContent = count || '';
+            this.historyBadge.classList.toggle('d-none', count === 0);
+            
+            if (this.historyButton) {
+                this.historyButton.setAttribute('aria-label', `Notification History (${count} notifications)`);
+            }
+            
+            debugLog('History badge updated', { count });
+        }
+    },
+
     show(message, type = 'success', addToHistory = true) {
+        // Clean old toasts first
+        this.cleanHistory();
+
         // Create toast data
         const toastData = {
             id: `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -72,9 +159,7 @@ const toastSystem = {
             addToHistory: typeof message === 'object' ? message.addToHistory : addToHistory
         };
 
-        if (toastConfig.debug) {
-            debugLog('New Toast:', toastData);
-        }
+        debugLog('New Toast:', toastData);
 
         if (toastData.addToHistory) {
             this.history.unshift({
@@ -90,12 +175,24 @@ const toastSystem = {
             this.updateHistoryBadge();
         }
         
-        // Create toast container if needed
+        // Create or get toast container
         let toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
-            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+            toastContainer.className = 'toast-container';  // Let CSS handle positioning
             document.body.appendChild(toastContainer);
+        }
+
+        // Remove old toasts if there are too many visible
+        const visibleToasts = toastContainer.children;
+        if (visibleToasts.length > 5) {
+            Array.from(visibleToasts)
+                .slice(3) // Keep the newest 3
+                .forEach(toast => {
+                    const bsToast = bootstrap.Toast.getInstance(toast);
+                    if (bsToast) bsToast.dispose();
+                    toast.remove();
+                });
         }
 
         // Create and show toast
@@ -145,19 +242,6 @@ const toastSystem = {
                 toastContainer.remove();
             }
         });
-    },
-
-    updateHistoryBadge() {
-        const badge = document.getElementById('toastHistoryBadge');
-        if (badge) {
-            const count = this.history.length;
-            badge.textContent = count || '';
-            badge.classList.toggle('d-none', count === 0);
-            const btn = document.getElementById('toastHistoryBtn');
-            if (btn) {
-                btn.setAttribute('aria-label', `Notification History (${count} notifications)`);
-            }
-        }
     },
 
     showHistory() {
@@ -257,44 +341,12 @@ const toastSystem = {
     }
 };
 
-// Initialize toast system when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    toastSystem.loadHistory();
-    
-    const toastHistoryBtn = document.getElementById('toastHistoryBtn');
-    if (toastHistoryBtn) {
-        toastHistoryBtn.addEventListener('click', () => toastSystem.showHistory());
-    }
-
-    // Process Django messages
-    const toastMessageEl = document.getElementById('toast-message');
-    if (toastMessageEl) {
-        try {
-            const toastMessage = JSON.parse(toastMessageEl.textContent);
-            toastSystem.show(toastMessage);
-        } catch (e) {
-            console.error('Error processing toast message:', e);
-        }
-    }
-
-    // Convert Django alerts to toasts (excluding static alerts)
-    const messages = document.querySelectorAll('.alert:not([data-static="true"]):not(.processed)');
-    messages.forEach(message => {
-        const type = message.classList.contains('alert-success') ? 'success' :
-                    message.classList.contains('alert-warning') ? 'warning' :
-                    message.classList.contains('alert-danger') ? 'danger' : 'info';
-        
-        const messageText = message.childNodes[0]?.textContent.trim() || 
-                          message.textContent.trim();
-        
-        if (messageText) {
-            message.style.opacity = '0';  // Fade out
-            message.classList.add('processed');
-            setTimeout(() => message.remove(), 150);  // Remove after fade
-            toastSystem.show(messageText, type);
-        }
-    });
-});
+// Initialize toast system when DOM is loaded - ensure single initialization
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => toastSystem.initialize(), { once: true });
+} else {
+    toastSystem.initialize();
+}
 
 // Export for use in other modules
 window.toastSystem = toastSystem;

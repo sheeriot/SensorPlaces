@@ -38,12 +38,18 @@ class Place(models.Model):
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
-        return str(self.name)
+        """Return the name of the place."""
+        return self.name
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
             self.slug = slugify(self.name)
         return super().save(*args, **kwargs)
+
+    @property
+    def display_name(self) -> str:
+        """Return a formatted display name for the place."""
+        return self.name
 
     @property
     def name_str(self) -> str:

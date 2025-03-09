@@ -11,7 +11,7 @@
     </td>
     <td>
         {% if device.location.is_active %}
-            {% include "sensors/includes/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug disabled=is_disabled %}
+            {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug disabled=is_disabled %}
         {% else %}
             <span class="d-none">
                 <!-- No message needed, just hide the toggle -->

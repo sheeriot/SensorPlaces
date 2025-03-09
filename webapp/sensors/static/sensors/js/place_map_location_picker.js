@@ -27,6 +27,7 @@ const PlaceMapLocationPicker = {
         if (!mapContainer || !latInput || !lngInput) {
             if (debug) {
                 console.error('Required elements not found:', { mapContainer, latInput, lngInput });
+                this.showToast('Map initialization failed: Required elements not found', 'danger');
                 console.groupEnd();
             }
             return null;
@@ -122,6 +123,12 @@ const PlaceMapLocationPicker = {
             `;
             mapContainer.parentNode.insertBefore(instructions, mapContainer);
         }
+    },
+
+    showToast(message, type = 'info') {
+        document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
+            detail: { message, type }
+        }));
     }
 };
 

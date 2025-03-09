@@ -7,7 +7,7 @@
             <h5 class="card-title mb-0">
                 <i class="bi bi-house-gear me-2"></i>Place:
                 <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-secondary fw-normal">{{ place.name }}</a>
-                {% include "sensors/includes/status_active_badge.html" with object=place %}
+                {% include "sensors/partials/status_active_badge.html" with object=place %}
             </h5>
             <div class="d-flex align-items-center gap-3 small">
                 <span>

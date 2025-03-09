@@ -1,52 +1,52 @@
 <div class="text-center">
     <small class="text-{{ color|default:'warning' }} d-flex align-items-center justify-content-center gap-1">
         {% if links %}
-            <a href="{% url 'sensors:place_list' %}" class="text-decoration-none d-flex align-items-center text-warning">
-                <i class="bi bi-house-gear"></i>Places
+            <a href="{% url 'sensors:place_list' %}" class="text-decoration-none d-flex align-items-center text-light-purple">
+                <i class="bi bi-house-gear text-light-purple"></i>Places
             </a>
         {% else %}
-            <span class="d-flex align-items-center">
-                <i class="bi bi-house-gear"></i>Places
+            <span class="d-flex align-items-center text-light-purple">
+                <i class="bi bi-house-gear text-light-purple"></i>Places
             </span>
         {% endif %}
 
         <i class="bi bi-link text-success fs-6"></i>
 
         {% if place and links %}
-            <a href="{% url 'sensors:place_locations' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-warning">
-                <i class="bi bi-geo-alt"></i>Locations
+            <a href="{% url 'sensors:place_locations' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-blue">
+                <i class="bi bi-geo-alt text-light-blue"></i>Locations
             </a>
             <i class="bi bi-link text-success fs-6"></i>
-            <a href="{% url 'sensors:place_devices' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-warning">
-                <i class="bi bi-hdd-rack"></i>Devices
+            <a href="{% url 'sensors:place_devices' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-gold">
+                <i class="bi bi-hdd-rack text-light-gold"></i>Devices
             </a>
             <i class="bi bi-link text-success fs-6"></i>
-            <a href="{% url 'sensors:place_sensors' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-warning">
-                <i class="bi bi-thermometer"></i>Sensors
+            <a href="{% url 'sensors:place_sensors' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-green">
+                <i class="bi bi-thermometer text-light-green"></i>Sensors
             </a>
         {% elif links %}
-            <a href="#" class="text-decoration-none d-flex align-items-center text-warning" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
-                <i class="bi bi-geo-alt"></i>Locations
+            <a href="#" class="text-decoration-none d-flex align-items-center text-light-blue" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
+                <i class="bi bi-geo-alt text-light-blue"></i>Locations
             </a>
             <i class="bi bi-link text-success fs-6"></i>
-            <a href="#" class="text-decoration-none d-flex align-items-center text-warning" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
-                <i class="bi bi-hdd-rack"></i>Devices
+            <a href="#" class="text-decoration-none d-flex align-items-center text-light-gold" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
+                <i class="bi bi-hdd-rack text-light-gold"></i>Devices
             </a>
             <i class="bi bi-link text-success fs-6"></i>
-            <a href="#" class="text-decoration-none d-flex align-items-center text-warning" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
-                <i class="bi bi-thermometer"></i>Sensors
+            <a href="#" class="text-decoration-none d-flex align-items-center text-light-green" data-bs-toggle="modal" data-bs-target="#selectPlaceModal">
+                <i class="bi bi-thermometer text-light-green"></i>Sensors
             </a>
         {% else %}
-            <span class="d-flex align-items-center">
-                <i class="bi bi-geo-alt"></i>Locations
+            <span class="d-flex align-items-center text-light-blue">
+                <i class="bi bi-geo-alt text-light-blue"></i>Locations
             </span>
             <i class="bi bi-link text-success fs-6"></i>
-            <span class="d-flex align-items-center">
-                <i class="bi bi-hdd-rack"></i>Devices
+            <span class="d-flex align-items-center text-light-gold">
+                <i class="bi bi-hdd-rack text-light-gold"></i>Devices
             </span>
             <i class="bi bi-link text-success fs-6"></i>
-            <span class="d-flex align-items-center">
-                <i class="bi bi-thermometer"></i>Sensors
+            <span class="d-flex align-items-center text-light-green">
+                <i class="bi bi-thermometer text-light-green"></i>Sensors
             </span>
         {% endif %}
     </small>

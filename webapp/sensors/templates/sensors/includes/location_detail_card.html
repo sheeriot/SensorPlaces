@@ -45,7 +45,7 @@
             <div>
                 <div class="text-body-secondary small text-uppercase mb-1">Status</div>
                 <div class="d-flex align-items-center gap-2">
-                    {% include "sensors/includes/status_active_badge.html" with object=location show_active=1 %}
+                    {% include "sensors/partials/status_active_badge.html" with object=location show_active=1 %}
                 </div>
                 <div class="text-body-secondary small text-uppercase mb-1">
                     {# {{ location.is_active }} #}
@@ -53,12 +53,6 @@
                 
             </div>
 
-            <div>
-                <div class="text-body-secondary small text-uppercase mb-1">Position</div>
-                <div class="fs-5">
-                    X: {{ location.x_pos|default:"--" }}, Y: {{ location.y_pos|default:"--" }}
-                </div>
-            </div>
         </div>
     </div>
 </div> 

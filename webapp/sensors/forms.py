@@ -8,6 +8,8 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
 from crispy_forms.bootstrap import PrependedText, FormActions
 from django.db import models
+from icecream import ic
+from django.db.models import Count, Q
 
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
@@ -233,89 +235,50 @@ class PlaceForm(forms.ModelForm):
             Field('slug', type='hidden'),
             Field('referrer', type='hidden'),
             Row(
-                Column('name', css_class='col-md-8'),
+                Column(
+                    Field('name'),
+                    css_class='col-md-7'
+                ),
+                Column(
+                    Div(
+                        HTML('<label class="form-label small mb-1">Place</label>'),
+                        Div(
+                            HTML('<i class="bi bi-house-gear me-1"></i>'),
+                            Div(
+                                Field(
+                                    'place_name',
+                                    css_class='form-control-plaintext px-0 mb-0'
+                                ),
+                                css_class='mb-0'
+                            ),
+                            HTML("""
+                                <span class="badge ms-1 {% if form.instance.place.is_active %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                                    {% if form.instance.place.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            """),
+                            css_class='d-flex align-items-center'
+                        ),
+                        css_class='w-100'
+                    ),
+                    css_class='col-md-5'
+                ),
+                css_class='mb-2'
+            ),
+            Row(
                 Column(
                     Div(
                         Field(
                             'is_active',
-                            template='sensors/includes/custom_switch.html',
-                            wrapper_class='form-check form-switch d-flex align-items-center'
+                            template='sensors/partials/custom_switch.html'
                         ),
-                        css_class='h-100 d-flex align-items-center justify-content-start'
+                        css_class='d-flex align-items-center'
                     ),
                     css_class='col-md-4'
                 ),
-                css_class='mb-3'
-            ),
-            Row(
-                Div(
-                    HTML("""
-                        <div class="text-center mb-2">
-                            <i class="bi bi-globe2 mx-1"></i>
-                            <i class="bi bi-compass mx-1"></i>
-                            <i class="bi bi-geo-alt mx-1"></i>
-                            <i class="bi bi-map mx-1"></i>
-                            <i class="bi bi-pin-map mx-1"></i>
-                        </div>
-                    """),
-                    Div(
-                        HTML("""
-                            <div class="input-group" style="width: fit-content;">
-                                <span class="input-group-text">Latitude</span>
-                                {{ form.latitude }}
-                            </div>
-                        """),
-                        HTML("""
-                            <div class="input-group ms-2" style="width: fit-content;">
-                                <span class="input-group-text">Longitude</span>
-                                {{ form.longitude }}
-                            </div>
-                        """),
-                        css_class='d-flex align-items-center'
-                    ),
-                    HTML("""
-                        <div class="text-center mt-2">
-                            <i class="fas fa-map-marked-alt mx-1"></i>
-                            <i class="fas fa-location-dot mx-1"></i>
-                            <i class="fas fa-earth-americas mx-1"></i>
-                            <i class="fas fa-map-location-dot mx-1"></i>
-                            <i class="fas fa-compass mx-1"></i>
-                        </div>
-                    """),
-                    css_class='col-auto'
-                ),
-                css_class='mb-3 justify-content-center'
+                css_class='mb-2'
             ),
             Div(
-                HTML("""
-                    <div id="place-form-map" 
-                         class="map-container mb-3" 
-                         style="height: 400px;">
-                    </div>
-                """),
-                css_class='mb-3'
-            ),
-            Div(
-                HTML("""
-                    <div class="card mb-3">
-                        <div class="card-header">
-                            <h5 class="mb-0">Site Plan</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-12">
-                                    {{ form.siteplan_image }}
-                                    <div class="form-text">{{ form.siteplan_image.help_text }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                """),
-                *siteplan_layout,  # Include current site plan preview if it exists
-                css_class='mb-3'
-            ),
-            Div(
-                HTML('<hr class="mt-4">'),
+                HTML('<hr class="mt-3">'),
                 Div(
                     HTML("""
                         <a href="{% url 'sensors:place_list' %}" 
@@ -390,6 +353,8 @@ class PlaceForm(forms.ModelForm):
         return lon
 
 class DeviceForm(forms.ModelForm):
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+
     class Meta:
         model = Device
         fields = ['name', 'location', 'device_type', 'manufacturer', 'model', 'serial_number', 'is_active']
@@ -401,55 +366,92 @@ class DeviceForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        # Get referrer from kwargs before calling super
+        referrer = kwargs.pop('referrer', None)
+        # Get place from kwargs before calling super
+        self.place = kwargs.pop('place', None)
+        self.initial_location = kwargs.pop('initial_location', None)
+        
+        # Debug initialization parameters
+        ic("DeviceForm - Init:", {
+            'place': self.place.name if self.place else None,
+            'initial_location': self.initial_location.name if self.initial_location else None,
+            'has_instance': bool(kwargs.get('instance')),
+            'instance_location': kwargs.get('instance').location.name if kwargs.get('instance') else None
+        })
+        
         super().__init__(*args, **kwargs)
         
-        # Get place and location from initial data
-        initial = kwargs.get('initial', {})
-        self.place = initial.get('place')
-        self.initial_location = initial.get('location')
+        # Configure location field based on place
+        if self.place:
+            # Get locations from the place - these will already be annotated by LocationAnnotationMixin
+            locations_qs = Location.objects.filter(
+                place=self.place
+            ).annotate(
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True))
+            ).order_by('-is_active', 'name')
+            
+            # Debug available locations
+            ic("DeviceForm - Locations:", {
+                'count': locations_qs.count(),
+                'locations': [(loc.pk, loc.name, loc.is_active, loc.active_devices_count) for loc in locations_qs]
+            })
+            
+            # Create standard choices tuple with data attributes
+            attrs = {
+                'class': 'form-select',
+            }
+            
+            # Add data attributes for each location's active status
+            for location in locations_qs:
+                attrs[f'data-is-active-{location.pk}'] = str(location.is_active).lower()
+            
+            # Create custom choices with status and device counts
+            choices = []
+            for location in locations_qs:
+                if location.is_active:
+                    label = f"{location.name} ({location.active_devices_count} active)"
+                else:
+                    label = f"{location.name} (inactive)"
+                choices.append((location.pk, label))
+            
+            # Set the queryset and custom widget
+            self.fields['location'].queryset = locations_qs
+            self.fields['location'].widget = forms.Select(
+                attrs=attrs,
+                choices=[('', '---------')] + choices
+            )
+            
+            # Only set initial location if this is an existing device
+            if self.instance and self.instance.pk:
+                ic("DeviceForm - Setting instance location:", {
+                    'location': self.instance.location.name,
+                    'location_id': self.instance.location.pk
+                })
+                self.fields['location'].initial = self.instance.location
 
-        # Configure crispy form
+        # Configure field labels and help text
+        self.fields['is_active'].label = "Active"
+        self.fields['is_active'].help_text = ""
+        self.fields['device_type'].label = "Device Type"
+        self.fields['location'].label = "Location"
+        
+        # Debug final form state
+        ic("DeviceForm - Final State:", {
+            'location_initial': self.fields['location'].initial.pk if self.fields['location'].initial else None,
+            'location_choices': list(self.fields['location'].choices),
+        })
+
+        # Configure crispy form helper
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
         self.helper.form_show_errors = True
-        self.helper.error_text_inline = False
-        self.helper.help_text_inline = False
-        
-        # Configure location field
-        if self.place:
-            locations = Location.objects.filter(place=self.place).order_by('name')
-            self.fields['location'].queryset = locations
-            
-            # Create standard choices tuple while adding data attributes to the widget
-            choices = [(None, '---------')]
-            attrs = {
-                'class': 'form-select',
-                'onchange': 'handleLocationChange(this)'
-            }
-            
-            # Add data attributes to each option
-            for location in locations:
-                choices.append((location.pk, location.name))
-                attrs[f'data-is-active-{location.pk}'] = str(location.is_active).lower()
-            
-            self.fields['location'].widget = forms.Select(attrs=attrs, choices=choices)
-            
-            if self.initial_location:
-                self.fields['location'].initial = self.initial_location
-                # If location is inactive, set device to inactive by default
-                if not self.initial_location.is_active:
-                    self.fields['is_active'].initial = False
+        self.helper.error_text_inline = True
+        self.helper.help_text_inline = True
+        self.helper.form_id = 'device-form'
 
-        # Configure field labels and help text
-        self.fields['is_active'].label = "Active"
-        self.fields['device_type'].label = "Device Type"
-        self.fields['location'].label = "Location"
-        
-        # Determine if new or existing
-        is_new = not bool(kwargs.get('instance'))
-        
         # Simple crispy layout using Bootstrap 5 grid
         self.helper.layout = Layout(
             Row(
@@ -470,92 +472,106 @@ class DeviceForm(forms.ModelForm):
                 Column('serial_number', css_class='col-12'),
                 css_class='mb-3'
             ),
-            Div(
-                Row(
-                    Column(
+            Row(
+                Column(
+                    Div(
                         Div(
-                            Field('is_active', wrapper_class='form-check'),
-                            css_class='mb-1'
-                        ),
-                        Div(
+                            Field('is_active', wrapper_class='form-check form-switch'),
                             HTML("""
-                                <div id="device-status-warning" class="form-text text-warning" style="display: none;">
-                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                                    Device will be inactive as <i class="bi bi-geo-alt"></i> <span id="inactive-location-name"></span> is inactive
-                                </div>
+                                <small id="device-help-inactive" class="form-text text-muted ms-3" style="display: none;">
+                                    Device cannot be active when its location is inactive
+                                </small>
                             """),
-                            css_class='small'
+                            css_class='d-flex align-items-center'
                         ),
-                        css_class='col-auto'
+                        css_class='d-flex'
                     ),
-                    Column(
-                        Div(
-                            HTML("""
-                                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}"
-                                   class="btn btn-outline-secondary">
-                                    <i class="bi bi-x-lg me-1"></i>Cancel
-                                </a>
-                            """),
-                            Submit(
-                                'submit',
-                                mark_safe('<i class="bi bi-hdd-rack me-1"></i>' + ('Create' if is_new else 'Save')),
-                                css_class='btn btn-success ms-2'
-                            ),
-                            css_class='btn-group'
-                        ),
-                        css_class='col text-end'
-                    ),
-                    css_class='align-items-start'
+                    css_class='col-md-12'
                 ),
-                css_class='mt-4'
+                css_class='mb-3'
+            ),
+            Field('referrer', type='hidden'),
+            Div(
+                HTML('<hr class="mt-3">'),
+                Div(
+                    HTML("""
+                        <a href="{{ form.referrer.value|default:'' }}" 
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Cancel
+                        </a>
+                    """),
+                    HTML("""
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-hdd-rack me-1"></i>{% if not instance.pk %}Create{% else %}Save{% endif %}
+                        </button>
+                    """),
+                    css_class='d-flex justify-content-between align-items-center'
+                ),
+                css_class='mt-3'
             ),
             HTML("""
                 <script>
-                function handleLocationChange(select) {
-                    const selectedId = select.value;
-                    const isActive = select.getAttribute(`data-is-active-${selectedId}`) === 'true';
-                    const locationName = select.options[select.selectedIndex].text;
-                    const checkbox = document.querySelector('#id_is_active');
-                    const warning = document.querySelector('#device-status-warning');
-                    const locationNameSpan = document.querySelector('#inactive-location-name');
-                    
-                    if (!isActive && selectedId) {
-                        checkbox.checked = false;
-                        checkbox.disabled = true;
-                        warning.style.display = 'block';
-                        locationNameSpan.textContent = locationName;
-                    } else {
-                        checkbox.disabled = false;
-                        checkbox.checked = true;
-                        warning.style.display = 'none';
-                    }
-                }
-                
-                // Initialize on page load
                 document.addEventListener('DOMContentLoaded', function() {
-                    const select = document.querySelector('#id_location');
-                    if (select.value) {
-                        handleLocationChange(select);
+                    // Get the form element
+                    const form = document.getElementById('device-form');
+                    
+                    // Scope all queries to this form
+                    const locationSelect = form.querySelector('#id_location');
+                    const deviceActiveSwitch = form.querySelector('#id_is_active');
+                    const helpText = form.querySelector('#device-help-inactive');
+                    
+                    function handleLocationChange(select) {
+                        // Get the selected option
+                        const selectedOption = select.options[select.selectedIndex];
+                        // Get the location's active status from data attribute
+                        const locationId = selectedOption.value;
+                        const isActive = select.getAttribute(`data-is-active-${locationId}`) === 'true';
+                        
+                        // Update device active switch
+                        if (!isActive && deviceActiveSwitch.checked) {
+                            deviceActiveSwitch.checked = false;
+                        }
+                        deviceActiveSwitch.disabled = !isActive;
+                        
+                        // Update help text visibility
+                        if (!isActive) {
+                            helpText.textContent = "Device cannot be active when its location is inactive";
+                            helpText.style.display = 'block';
+                        } else {
+                            helpText.style.display = 'none';
+                        }
+                    }
+                    
+                    // Set initial state
+                    if (locationSelect) {
+                        handleLocationChange(locationSelect);
+                        // Add change listener
+                        locationSelect.addEventListener('change', function() {
+                            handleLocationChange(this);
+                        });
                     }
                 });
                 </script>
             """)
         )
 
-        # Add Bootstrap classes to all fields
-        for field_name, field in self.fields.items():
-            if not isinstance(field.widget, (forms.HiddenInput, forms.CheckboxInput)):
-                field.widget.attrs['class'] = 'form-control'
-
     def clean(self):
         cleaned_data = super().clean()
         location = cleaned_data.get('location')
         is_active = cleaned_data.get('is_active')
 
+        if not location:
+            self.add_error('location', 'Please select a location for the device.')
+            return cleaned_data
+
+        # Ensure location belongs to the correct place
+        if self.place and location.place != self.place:
+            self.add_error('location', 'Selected location does not belong to the current place.')
+        
+        # Validate active status based on location
         if location and not location.is_active and is_active:
-            raise forms.ValidationError({
-                'is_active': 'Device cannot be active when its location is inactive.'
-            })
+            self.add_error('is_active', 'Device cannot be active when its location is inactive.')
+        
         return cleaned_data
 
     def clean_serial_number(self):
@@ -598,81 +614,124 @@ class DeviceForm(forms.ModelForm):
         return getattr(self, '_warnings', {})
 
 class LocationForm(forms.ModelForm):
-    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+    referrer = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput()
+    )
+    
+    # Hidden field to store the actual place relationship
+    place_id = forms.ModelChoiceField(
+        queryset=Place.objects.all(),
+        widget=forms.HiddenInput()
+    )
+    
+    # Display-only field for place name
+    place_name = forms.CharField(
+        label='Place',
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control-plaintext fs-5 fw-medium',
+            'readonly': True
+        })
+    )
 
     class Meta:
         model = Location
         fields = ['name', 'is_active']
 
     def __init__(self, *args, **kwargs):
-        # Get place from initial data or instance
-        initial = kwargs.get('initial', {})
-        instance = kwargs.get('instance')
-        
-        # Try to get place from initial data first, then from instance if available
-        self.place = initial.get('place')
-        if not self.place and instance:
-            self.place = instance.place
-            
-        # Handle referrer
-        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
         
-        if not self.place:
-            pass
+        # Debug with icecream
+        ic("LocationForm init:")
+        ic(kwargs.get('initial'))
+        ic(getattr(self.instance, 'place', None))
         
+        # Get place from initial data or instance
+        self.place = None
+        if 'initial' in kwargs and 'place' in kwargs['initial']:
+            self.place = kwargs['initial']['place']
+            ic("Place from initial:", self.place)
+        elif self.instance and self.instance.pk:
+            self.place = self.instance.place
+            ic("Place from instance:", self.place)
+
+        if self.place:
+            self.fields['place_id'].initial = self.place
+            self.fields['place_name'].initial = self.place.name
+            ic("Place active status:", self.place.is_active)
+
+            # Add inactive styling if place is not active
+            if not self.place.is_active:
+                self.fields['place_name'].widget.attrs.update({
+                    'class': 'form-control-plaintext fs-5 fw-medium text-muted opacity-50'
+                })
+            if self.place.is_active:
+                self.fields['place_name'].label = mark_safe("""Place
+                    <span class="badge ms-1 bg-success-subtle text-success">
+                        Active
+                    </span>
+                """)
+            else:
+                self.fields['place_name'].label = mark_safe("""Place
+                    <span class="badge ms-1 bg-secondary-subtle text-secondary">
+                        inactive
+                    </span>
+                """)
+
+        # Configure field properties
+        self.fields['is_active'].label = "Active"
+        self.fields['is_active'].help_text = None
+
         # Setup crispy form
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
-        self.helper.form_id = 'locationForm'
-        self.helper.form_show_errors = True
-        self.helper.error_text_inline = False
-        self.helper.help_text_inline = False
-        
-        if referrer:
-            self.fields['referrer'].initial = referrer
-        
-        # Configure field properties
-        self.fields['name'].widget.attrs.update({
-            'class': 'form-control',
-            'placeholder': 'Enter location name',
-            'minlength': '3',
-        })
-        
-        self.fields['is_active'].label = ""  # Remove label since we use custom template
-        self.fields['is_active'].help_text = None
-        self.fields['is_active'].widget.attrs['class'] = 'form-check-input'
-        
-        # If place is inactive, force location to be inactive
-        if self.place and not self.place.is_active:
-            self.fields['is_active'].initial = False
-            self.fields['is_active'].disabled = True
-            self.fields['is_active'].help_text = "This location cannot be active because its place is inactive."
-        
-        # Custom layout with Bootstrap grid
+
+        # Custom layout
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
+            Field('place_id', type='hidden'),
             Row(
-                Column('name', css_class='col-md-8'),
+                Column(
+                    Field('name'),
+                    css_class='col-md-7'
+                ),
+                Column(
+                    Div(
+                        Div(
+                            HTML('<i class="bi bi-house-gear me-1"></i>'),
+                            Field(
+                                'place_name',
+                                css_class='form-control-plaintext px-0'
+                            ),
+                            css_class='d-flex align-items-center'
+                        ),
+                        css_class='w-100'
+                    ),
+                    css_class='col-md-5'
+                ),
+                css_class='mb-2'
+            ),
+            Row(
                 Column(
                     Div(
                         Field(
                             'is_active',
-                            template='sensors/includes/custom_switch.html'
+                            template='sensors/partials/custom_switch.html'
                         ),
-                        css_class='h-100 d-flex align-items-center justify-content-start'
+                        css_class='d-flex align-items-center'
                     ),
                     css_class='col-md-4'
                 ),
-                css_class='mb-3'
+                css_class='mb-2'
             ),
             Div(
-                HTML('<hr class="mt-4">'),
+                HTML('<hr class="mt-3">'),
                 Div(
                     HTML("""
-                        <a href="{% url 'sensors:place_locations' place_slug=place.slug %}" 
+                        <a href="{{ form.referrer.value|default:'' }}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
@@ -690,19 +749,12 @@ class LocationForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        name = cleaned_data.get('name')
-        is_active = cleaned_data.get('is_active')
+        cleaned_data['place'] = cleaned_data.pop('place_id')
         
-        if name and len(name) < 3:
-            self.add_error('name', 'Location name must be at least 3 characters long.')
-
-        if not self.place:
-            raise forms.ValidationError("Cannot create or edit a location without an associated place.")
-
-        if self.place and not self.place.is_active and is_active:
-            self.add_error('is_active', 'Location cannot be active when its place is inactive.')
-            
-        return cleaned_data 
+        if self.instance and self.instance.pk:
+            if cleaned_data.get('place') != self.instance.place:
+                raise forms.ValidationError("The place field cannot be modified after creation.")
+        return cleaned_data
 
 class PlaceDeleteForm(forms.Form):
     confirm_name = forms.CharField(

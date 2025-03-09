@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {% csrf_token %}
-    <title>{% block title %}Sensor Management{% endblock %}</title>
+    <title>{% block title %}Sensor Management - SensorPlaces{% endblock %}</title>
     
     <!-- Core CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
@@ -26,6 +26,25 @@
     <!-- Leaflet and plugins JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.min.js"></script>
+
+    <!-- Third-party Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+    <!-- Application Core JavaScript -->
+    <script src="{% static 'sensors/js/utils.js' %}"></script>
+    <script src="{% static 'sensors/js/common.js' %}"></script>
+    <script src="{% static 'sensors/js/toast-ui-manager.js' %}"></script>
+
+    <!-- Application Feature JavaScript -->
+    <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
+    <script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
+    <script src="{% static 'sensors/js/place_map_popout.js' %}"></script>
+    <script src="{% static 'sensors/js/places_map_folium.js' %}"></script>
+    <script src="{% static 'sensors/js/place_map_location_picker.js' %}"></script>
+    <script src="{% static 'sensors/js/siteplan_view.js' %}"></script>
+    <script src="{% static 'sensors/js/siteplan_editor.js' %}"></script>
 
     <!-- Add Bootstrap 5 utility classes for static alerts -->
     <style>
@@ -94,7 +113,7 @@
 
             <!-- Sensor Places Icons -->
             <div class="d-none d-md-block me-3">
-                {% include "sensors/includes/sensorsplaces_icons.html" with links=1 %}
+                {% include "sensors/partials/sensorplaces_icons.html" with links=1 %}
             </div>
 
             <!-- Auth section - always visible and right-aligned -->
@@ -135,14 +154,26 @@
 
     <div class="container my-2">
         <!-- Toast System Components -->
-        {% include "sensors/includes/toast_history_modal.html" %}
-        {% if toast_message %}
-            {{ toast_message|json_script:"toast-message" }}
+        {% include "sensors/partials/toast_history_modal.html" %}
+        <!-- Debug toast message -->
+        {% if debug %}
+        <div style="display:none">
+            <p>Session contents:</p>
+            <pre>{{ request.session.items|pprint }}</pre>
+            <p>Toast message:</p>
+            <pre>{{ request.session.toast_message|pprint }}</pre>
+        </div>
+        {% endif %}
+        
+        {% if request.session.toast_message %}
+            {{ request.session.toast_message|json_script:"toast-message" }}
+            {% load sensors_tags %}
+            {{ request.session|pop_session_key:'toast_message' }}
         {% endif %}
 
         <!-- Breadcrumb and Toast Section -->
         <div class="page-header d-flex justify-content-between align-items-start">
-            {% include "sensors/includes/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
+            {% include "sensors/partials/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
         </div>
 
         {% block content %}{% endblock %}
@@ -172,26 +203,6 @@
         </div>
     </footer>
 
-    <!-- Third-party Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-
-    <!-- Application JavaScript -->
-    <script src="{% static 'sensors/js/utils.js' %}"></script>
-    <script src="{% static 'sensors/js/toast-handler.js' %}"></script>
-    <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
-    <script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
-    <script src="{% static 'sensors/js/time-display.js' %}"></script>
-    <script src="{% static 'sensors/js/common.js' %}"></script>
-    <script src="{% static 'sensors/js/charts.js' %}"></script>
-    <script src="{% static 'sensors/js/place_map_popout.js' %}"></script>
-    <script src="{% static 'sensors/js/places_map_folium.js' %}"></script>
-    <script src="{% static 'sensors/js/place_map_location_picker.js' %}"></script>
-    <script src="{% static 'sensors/js/siteplan_view.js' %}"></script>
-    <script src="{% static 'sensors/js/siteplan_editor.js' %}"></script>
-
-    
     {% block extra_js %}{% endblock %}
 </body>
 </html> 

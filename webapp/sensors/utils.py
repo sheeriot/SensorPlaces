@@ -1,6 +1,7 @@
 from influxdb_client_3 import InfluxDBClient3 as InfluxDBClient
 from django.conf import settings
 from datetime import datetime
+from django.utils.safestring import mark_safe
 
 def get_influxdb_client(influx_source):
     return InfluxDBClient(
@@ -38,4 +39,25 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
         print(f"Error querying InfluxDB: {e}")
         return []
     finally:
-        client.close() 
+        client.close()
+
+def add_toast_message(request, title, message, message_type='success', duration=5000):
+    """
+    Add a toast message to the session.
+    
+    Args:
+        request: The HTTP request object
+        title: Title of the toast message (not used, kept for backward compatibility)
+        message: Main message content (can include HTML)
+        message_type: Type of message ('success', 'error', 'info', 'warning')
+        duration: How long to show the toast in milliseconds (not used, kept for backward compatibility)
+    """
+    if 'toast_message' not in request.session:
+        request.session['toast_message'] = {}
+    
+    request.session['toast_message'] = {
+        'message': mark_safe(message),
+        'type': message_type,
+        'addToHistory': True
+    }
+    request.session.modified = True 

@@ -57,7 +57,7 @@
                                 </label>
                             </div>
                             {% if not device.location.is_active %}
-                                {% include "sensors/includes/status_active_badge.html" with object=device show_active=1 %}
+                                {% include "sensors/partials/status_active_badge.html" with object=device show_active=1 %}
                             {% endif %}
                         </div>
                     </dd>

@@ -6,7 +6,7 @@
                 <i class="bi bi-thermometer me-2"></i>
                 Sensors
             </h5>
-            {% include "sensors/includes/hide_inactive_switch.html" with model="sensor" %}
+            {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
         </div>
         {% if device %}
         <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.pk %}" class="btn btn-outline-primary btn-sm">
