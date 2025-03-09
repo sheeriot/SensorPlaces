@@ -1,6 +1,6 @@
 {% extends "sensors/base.html" %}
 
-{% block title %}Delete {{ model_name|title }}{% endblock %}
+{% block title %}Delete Location{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -19,26 +19,34 @@
         <div class="card rounded-3 shadow-sm border-0">
             <div class="card-header bg-white py-2">
                 <h5 class="card-title mb-0">
-                    <i class="bi bi-trash me-2"></i>Delete {{ model_name|title }}
+                    <i class="bi bi-trash me-2"></i>Delete Location
                 </h5>
             </div>
             <div class="card-body">
-                <p>Are you sure you want to delete the {{ model_name }} "{{ object.name }}"?</p>
+                <p>Are you sure you want to delete the location <strong><i class="bi bi-geo-alt"></i> {{ object.name }}</strong>?</p>
                 {% if object.devices.exists %}
                 <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle"></i>
+                    <i class="bi bi-exclamation-triangle me-2"></i>
                     Warning: This location has {{ object.devices.count }} device(s) associated with it.
-                    Deleting this location will also delete all associated devices and their sensors.
+                    <ul class="mb-0 mt-2">
+                    {% for device in object.devices.all %}
+                        <li><i class="bi bi-hdd-rack"></i> {{ device.name }} 
+                            {% if device.sensors.exists %}
+                            ({{ device.sensors.count }} sensor{{ device.sensors.count|pluralize }})
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                    </ul>
                 </div>
                 {% endif %}
                 <p class="text-danger">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    This action cannot be undone. All devices and sensors at this {{ model_name }} will also be deleted.
+                    This action cannot be undone. All devices and sensors at this location will also be deleted.
                 </p>
                 <form method="post" data-delete-form>
                     {% csrf_token %}
                     <div class="d-flex justify-content-between">
-                        <a href="{{ request.META.HTTP_REFERER|default:location_url }}" class="btn btn-secondary">
+                        <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Cancel
                         </a>
                         <button type="submit" class="btn btn-danger">

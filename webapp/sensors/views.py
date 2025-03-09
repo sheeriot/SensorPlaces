@@ -1162,40 +1162,21 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             'pk': self.object.pk
         })
 
-class DeviceDeleteView(LoginRequiredMixin, DeleteView):
+class DeviceDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
     model = Device
     template_name = 'sensors/device_confirm_delete.html'
 
-    def delete(self, request, *args, **kwargs):
-        device = self.get_object()
-        location = device.location
-        place = location.place
-        success_url = self.get_success_url()
-        
-        message = (
-            f"Deleted device <strong>{device.name}</strong> from "
-            f"<i class='bi bi-house-gear'></i> {place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {location.name}<br>"
-            f"<small class='text-muted'>"
-            f"Type: {device.device_type or '-'}<br>"
-            f"Model: {device.model or '-'}<br>"
-            f"Status: {'Active' if device.is_active else 'Inactive'}<br>"
-            f"Sensors: {device.sensors.count()}"
-            f"</small>"
-        )
-        
-        device.delete()
-        
-        add_toast_message(
-            request=self.request,
-            title='Device Deleted',
-            message=message,
-            message_type='warning'
-        )
-        return HttpResponseRedirect(success_url)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Get place from the device's location
+        context['place'] = self.object.location.place
+        context['place_slug'] = self.object.location.place.slug
+        return context
 
     def get_success_url(self):
-        return reverse('sensors:place_devices', kwargs={'place_slug': self.object.location.place.slug})
+        # Redirect to place detail page after deletion
+        return reverse('sensors:place_detail', 
+                      kwargs={'place_slug': self.object.location.place.slug})
 
 class DeviceActiveSensorsView(LoginRequiredMixin, View):
     def get(self, request, place_slug, pk):
@@ -1736,7 +1717,7 @@ def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
         active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
         inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
     ).values('id', 'name', 'is_active', 'active_devices_count', 'inactive_devices_count')
-    
+
     return JsonResponse({
         'devices_active': devices_active.count(),
         'devices_inactive': devices_inactive.count(),
@@ -1747,7 +1728,13 @@ def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
 
 def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
-    # Only get place if place_slug is in kwargs
+    # Get place from kwargs or from the device's location
     if 'place_slug' in self.kwargs:
         context['place'] = self.get_place()
+    else:
+        # Get place from the device being deleted
+        context['place'] = self.object.location.place
+    
+    # Ensure place_slug is available for URL reversals
+    context['place_slug'] = context['place'].slug
     return context
