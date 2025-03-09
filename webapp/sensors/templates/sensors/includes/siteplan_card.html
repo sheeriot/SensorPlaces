@@ -15,11 +15,11 @@
     </div>
     <div class="card-body p-0">
         <!-- Siteplan wrapper with dynamic aspect ratio -->
-        <div class="siteplan-wrapper position-relative bg-light border">
-            <!-- Leaflet map container -->
+        <div class="siteplan-wrapper position-relative bg-light border-top">
+            <!-- Leaflet map container with absolute positioning -->
             <div id="siteplan-container" 
-                 class="position-absolute top-0 start-0 w-100 h-100"
-                 data-image-url="{{ place.site_plan.url }}"
+                 class="position-absolute top-0 start-0 w-100 h-100 leaflet-container"
+                 data-image-url="{{ place.get_siteplan_url }}"
                  data-locations="{{ locations_json|escapejs }}">
             </div>
         </div>

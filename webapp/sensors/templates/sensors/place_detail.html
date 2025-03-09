@@ -27,11 +27,13 @@
         <!-- Locations Table Card -->
         {% include "sensors/includes/location_list_card.html" with locations=locations place=place %}
 
-        <!-- Site Plan/Map Card -->
-        {% if place.site_plan %}
-            {% include "sensors/includes/siteplan_card.html" with place=place locations=locations editable=True %}
+        <!-- Site Plan Card -->
+        {% if place.siteplan_image %}
+            <div class="mt-3">
+                {% include "sensors/includes/siteplan_card.html" with place=place locations_json=locations_json editable=True %}
+            </div>
         {% else %}
-            <div class="card">
+            <div class="card mt-3">
                 <div class="card-body text-center">
                     <h5 class="card-title">No Site Plan Available</h5>
                     <p class="card-text">Upload a site plan to visualize your sensor locations.</p>

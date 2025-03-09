@@ -28,8 +28,8 @@ class Place(models.Model):
     latitude: DecimalField = models.DecimalField(max_digits=9, decimal_places=6)
     longitude: DecimalField = models.DecimalField(max_digits=9, decimal_places=6)
     is_active: BooleanField = models.BooleanField(default=True)
-    site_plan: ImageField = models.ImageField(
-        upload_to='site_plans/',
+    siteplan_image: ImageField = models.ImageField(
+        upload_to='siteplan_images/',
         null=True,
         blank=True,
         validators=[validate_image_size]
@@ -77,10 +77,10 @@ class Place(models.Model):
     def updated_at_datetime(self) -> datetime:
         return self.updated_at
 
-    def get_site_plan_url(self) -> Optional[str]:
-        """Safely get the site plan URL or return None."""
-        if self.site_plan and hasattr(self.site_plan, 'url'):
-            return self.site_plan.url
+    def get_siteplan_url(self) -> Optional[str]:
+        """Safely get the siteplan image URL or return None."""
+        if self.siteplan_image and hasattr(self.siteplan_image, 'url'):
+            return self.siteplan_image.url
         return None
 
     class Meta:
@@ -90,14 +90,14 @@ class Place(models.Model):
 class Location(models.Model):
     name: CharField = models.CharField(max_length=100)
     place: ForeignKey = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='locations')
-    x_coord: DecimalField = models.DecimalField(
+    x_pos: DecimalField = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal('50.00'),  # Center horizontally
         null=True,
         blank=True
     )
-    y_coord: DecimalField = models.DecimalField(
+    y_pos: DecimalField = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal('50.00'),  # Center vertically
@@ -122,11 +122,11 @@ class Location(models.Model):
 
     @property
     def x_coord_value(self) -> Optional[float]:
-        return float(self.x_coord) if self.x_coord is not None else None
+        return float(self.x_pos) if self.x_pos is not None else None
 
     @property
     def y_coord_value(self) -> Optional[float]:
-        return float(self.y_coord) if self.y_coord is not None else None
+        return float(self.y_pos) if self.y_pos is not None else None
 
     class Meta:
         verbose_name_plural = '2. Locations'
