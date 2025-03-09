@@ -165,12 +165,21 @@ const sitePlanSystem = {
             maxZoom: 2
         });
 
-        // Add image overlay
-        const bounds = this.state.imageBounds;
-        this.state.imageOverlay = L.imageOverlay(imageUrl, bounds).addTo(this.state.editorMap);
-
-        // Set container aspect ratio based on image
+        // Get wrapper for loading state
         const wrapper = container.closest('.siteplan-wrapper');
+
+        // Add image overlay with loading handler
+        const bounds = this.state.imageBounds;
+        this.state.imageOverlay = L.imageOverlay(imageUrl, bounds)
+            .addTo(this.state.editorMap)
+            .on('load', () => {
+                // Mark as loaded once image is ready
+                if (wrapper) {
+                    wrapper.classList.add('loaded');
+                }
+                container.dataset.editorReady = 'true';
+            });
+
         if (wrapper) {
             const aspectRatio = (this.state.imageBounds[1][0] / this.state.imageBounds[1][1]) * 100;
             wrapper.style.paddingBottom = `${aspectRatio}%`;
@@ -201,7 +210,6 @@ const sitePlanSystem = {
 
         // Add markers
         this.addEditorMarkers();
-        container.dataset.editorReady = 'true';
         this.logDebug('success', 'Editor map fully initialized and ready');
     },
 

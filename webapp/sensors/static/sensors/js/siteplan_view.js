@@ -160,6 +160,9 @@ const sitePlanView = {
             return;
         }
 
+        // Get wrapper for loading state
+        const wrapper = container.closest('.siteplan-wrapper');
+
         // Initialize the map with minimal controls
         this.state.map = L.map(container, {
             crs: L.CRS.Simple,
@@ -177,11 +180,16 @@ const sitePlanView = {
             maxZoom: 2
         });
 
-        // Add image overlay
-        this.state.imageOverlay = L.imageOverlay(imageUrl, this.state.imageBounds).addTo(this.state.map);
+        // Add image overlay with loading handler
+        this.state.imageOverlay = L.imageOverlay(imageUrl, this.state.imageBounds)
+            .addTo(this.state.map)
+            .on('load', () => {
+                // Mark as loaded once image is ready
+                if (wrapper) {
+                    wrapper.classList.add('loaded');
+                }
+            });
 
-        // Set container aspect ratio based on image
-        const wrapper = container.closest('.siteplan-wrapper');
         if (wrapper) {
             const aspectRatio = (this.state.imageBounds[1][0] / this.state.imageBounds[1][1]) * 100;
             wrapper.style.paddingBottom = `${aspectRatio}%`;

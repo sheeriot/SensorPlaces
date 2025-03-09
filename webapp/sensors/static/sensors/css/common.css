@@ -177,6 +177,12 @@
     width: 100%;
     background-color: var(--bs-light);
     overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.siteplan-wrapper.loaded {
+    opacity: 1;
 }
 
 #siteplan-container,
@@ -190,12 +196,48 @@
     height: 100%;
 }
 
-/* Location Markers */
+/* Loading States */
+.siteplan-wrapper:not(.loaded)::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--bs-border-color);
+    border-top-color: var(--bs-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1000;
+}
+
+/* Editor Loading State */
+#siteplan-editor-map:not([data-editor-ready="true"]) {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+#siteplan-editor-map[data-editor-ready="true"] {
+    opacity: 1;
+}
+
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Location Markers - Add fade in */
 .location-marker {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.siteplan-wrapper.loaded .location-marker {
+    opacity: 1;
 }
 
 .location-marker .marker-label {
@@ -231,26 +273,6 @@
 #siteplan-editor .leaflet-marker-icon.dragging {
     cursor: grabbing;
     opacity: 0.8;
-}
-
-/* Loading indicator */
-[data-editor="true"][data-editor-ready="false"]::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--bs-border-color);
-    border-top-color: var(--bs-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    z-index: 1000;
-}
-
-@keyframes spin {
-    to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 /* Map Controls */
