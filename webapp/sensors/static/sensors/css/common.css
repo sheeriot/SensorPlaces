@@ -179,7 +179,8 @@
     overflow: hidden;
 }
 
-#siteplan-container {
+#siteplan-container,
+#siteplan-editor-map {
     position: absolute;
     top: 0;
     left: 0;
@@ -207,11 +208,22 @@
     background-color: var(--bs-secondary) !important;
 }
 
-/* Editor specific styles */
-.modal-body {
+/* Editor Modal Styles */
+#siteplan-editor .modal-dialog {
+    max-width: 75vw;
+    margin: 1.75rem auto;
+}
+
+#siteplan-editor .modal-body {
     padding: 0 !important;
 }
 
+#siteplan-editor .modal-header,
+#siteplan-editor .modal-footer {
+    padding: 0.5rem 1rem !important;
+}
+
+/* Editor Marker Styles */
 #siteplan-editor .leaflet-marker-icon {
     cursor: grab;
 }
@@ -542,24 +554,4 @@
     background-color: var(--bs-body-bg) !important;
     color: var(--bs-body-color) !important;
     border: 1px solid var(--bs-border-color) !important;
-}
-
-/* Loading State */
-[data-editor="true"][data-editor-ready="false"]::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--bs-border-color);
-    border-top-color: var(--bs-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    z-index: 1000;
-}
-
-@keyframes spin {
-    to { transform: translate(-50%, -50%) rotate(360deg); }
 }

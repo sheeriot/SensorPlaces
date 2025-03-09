@@ -1,5 +1,5 @@
-<!-- Siteplan Editor Header -->
-<div class="modal-header">
+<!-- Siteplan Editor Modal Content -->
+<div class="modal-header py-2">
     <h5 class="modal-title">
         <i class="bi bi-grid"></i> Edit Site Plan Layout
     </h5>
@@ -8,13 +8,16 @@
 
 <!-- Siteplan Editor Body -->
 <div class="modal-body p-0">
-    <div id="siteplan-editor-map" class="bg-light" style="height: 600px;">
-        <!-- Map will be initialized here -->
+    <!-- Match the same wrapper/container structure as view -->
+    <div class="siteplan-wrapper position-relative bg-light">
+        <div id="siteplan-editor-map" class="position-absolute top-0 start-0 w-100 h-100">
+            <!-- Map will be initialized here -->
+        </div>
     </div>
 </div>
 
 <!-- Siteplan Editor Footer -->
-<div class="modal-footer">
+<div class="modal-footer py-2">
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
         <i class="bi bi-x-circle"></i> Cancel
     </button>

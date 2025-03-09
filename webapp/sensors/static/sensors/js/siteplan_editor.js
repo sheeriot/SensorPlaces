@@ -68,15 +68,25 @@ const sitePlanSystem = {
 
         // Set up modal event listeners
         modal.addEventListener('show.bs.modal', () => this.setupEditor());
+        modal.addEventListener('shown.bs.modal', () => {
+            // Force a resize after modal is fully shown
+            if (this.state.editorMap) {
+                this.state.editorMap.invalidateSize();
+                this.fitMapPerfectly();
+            }
+        });
         modal.addEventListener('hidden.bs.modal', () => this.cleanupEditor());
 
         // Initialize save button click handler
-        const saveButton = this.saveButton;
+        const saveButton = document.getElementById('siteplan-save');
         if (saveButton) {
-            saveButton.addEventListener('click', () => this.saveChanges());
+            saveButton.addEventListener('click', () => {
+                this.logDebug('saves', 'Save button clicked');
+                this.saveChanges();
+            });
             this.logDebug('initialization', 'Save button handler initialized');
         } else {
-            this.logDebug('error', 'Save button not found');
+            this.logDebug('error', 'Save button not found with ID: siteplan-save');
         }
 
         if (this.resetButton) {
@@ -138,34 +148,56 @@ const sitePlanSystem = {
     },
 
     initializeEditorMap(container, imageUrl) {
-        // Initialize map
+        // Initialize map with same settings as view, but enable dragging
         this.state.editorMap = L.map(container, {
             crs: L.CRS.Simple,
-            dragging: false,
             zoomControl: false,
-            scrollWheelZoom: false,
+            dragging: true,      // Enable for marker dragging
+            touchZoom: false,    // Disable zoom
+            scrollWheelZoom: false, // Disable zoom
             doubleClickZoom: false,
             boxZoom: false,
-            keyboard: false
+            keyboard: false,
+            attributionControl: false,
+            zoomSnap: 0,
+            zoomDelta: 0,
+            minZoom: -2,         // Allow some zoom flexibility for better fitting
+            maxZoom: 2
         });
 
-        // Add image as background
+        // Add image overlay
         const bounds = this.state.imageBounds;
         this.state.imageOverlay = L.imageOverlay(imageUrl, bounds).addTo(this.state.editorMap);
-        
-        // Fit bounds and invalidate size after a short delay
-        this.state.editorMap.fitBounds(bounds);
-        
-        // Force a size update after everything is ready
-        setTimeout(() => {
-            this.logDebug('initialization', 'Final container dimensions:', {
-                width: container.offsetWidth,
-                height: container.offsetHeight,
-                style: container.style.cssText
-            });
-            this.state.editorMap.invalidateSize();
-            this.state.editorMap.fitBounds(bounds);
-        }, 100);
+
+        // Set container aspect ratio based on image
+        const wrapper = container.closest('.siteplan-wrapper');
+        if (wrapper) {
+            const aspectRatio = (this.state.imageBounds[1][0] / this.state.imageBounds[1][1]) * 100;
+            wrapper.style.paddingBottom = `${aspectRatio}%`;
+            
+            // Clear any existing styles that might interfere
+            wrapper.style.height = '';
+            wrapper.style.minHeight = '';
+            wrapper.style.maxHeight = '';
+            container.style.position = 'absolute';
+        }
+
+        // Initial fit
+        this.fitMapPerfectly();
+
+        // Create a ResizeObserver for the wrapper
+        const resizeObserver = new ResizeObserver(() => {
+            requestAnimationFrame(() => this.fitMapPerfectly());
+        });
+
+        // Observe both wrapper and container
+        if (wrapper) resizeObserver.observe(wrapper);
+        resizeObserver.observe(container);
+
+        // Also handle window resize
+        window.addEventListener('resize', () => {
+            requestAnimationFrame(() => this.fitMapPerfectly());
+        });
 
         // Add markers
         this.addEditorMarkers();
@@ -396,6 +428,39 @@ const sitePlanSystem = {
                 addToHistory: true
             });
         }
+    },
+
+    // Function to ensure map fits perfectly
+    fitMapPerfectly() {
+        if (!this.state.editorMap || !this.state.imageBounds) return;
+        
+        // Force a size update
+        this.state.editorMap.invalidateSize();
+        
+        // Get current container size
+        const container = this.editorContainer;
+        const containerWidth = container.offsetWidth;
+        const containerHeight = container.offsetHeight;
+        
+        // Calculate zoom to fit perfectly
+        const imageWidth = this.state.imageBounds[1][1];
+        const imageHeight = this.state.imageBounds[1][0];
+        const widthRatio = containerWidth / imageWidth;
+        const heightRatio = containerHeight / imageHeight;
+        const zoom = Math.min(widthRatio, heightRatio);
+        
+        // Center and zoom
+        this.state.editorMap.setView([imageHeight/2, imageWidth/2], Math.log2(zoom));
+        this.state.editorMap.fitBounds(this.state.imageBounds, {
+            animate: false,
+            padding: [0, 0]
+        });
+        
+        this.logDebug('operation', 'Map fit perfectly', {
+            containerSize: `${containerWidth}x${containerHeight}`,
+            imageSize: `${imageWidth}x${imageHeight}`,
+            zoom: zoom
+        });
     },
 
     // Utility Methods
