@@ -135,20 +135,20 @@ class SensorForm(forms.ModelForm):
 class PlaceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
     slug = forms.CharField(widget=forms.HiddenInput(), required=False)
-    site_plan = forms.ImageField(
+    siteplan_image = forms.ImageField(
         required=False,
         widget=forms.FileInput(attrs={
             'class': 'form-control',
             'accept': 'image/*',
             'data-bs-toggle': 'tooltip',
-            'title': 'Upload a site plan image (minimum 200x200)',
+            'title': 'Upload a siteplan image (minimum 200x200)',
         }),
-        help_text='Upload a site plan image (minimum 200x200 pixels)'
+        help_text='Upload a siteplan image (minimum 200x200 pixels)'
     )
 
     class Meta:
         model = Place
-        fields = ['name', 'is_active', 'latitude', 'longitude', 'slug', 'site_plan']
+        fields = ['name', 'is_active', 'latitude', 'longitude', 'slug', 'siteplan_image']
         widgets = {
             'latitude': forms.NumberInput(attrs={
                 'step': '0.00001',
@@ -202,14 +202,14 @@ class PlaceForm(forms.ModelForm):
         is_new = not bool(kwargs.get('instance'))
 
         # Add site plan preview if it exists
-        site_plan_layout = []
-        if self.instance and self.instance.site_plan:
-            site_plan_layout = [
+        siteplan_layout = []
+        if self.instance and self.instance.siteplan_image:
+            siteplan_layout = [
                 Div(
                     HTML("""
                         <div class="card mb-3">
                             <div class="card-body text-center">
-                                <img src="{{ object.site_plan.url }}" 
+                                <img src="{{ object.siteplan_image.url }}" 
                                      alt="Site Plan" 
                                      class="img-fluid mb-2" 
                                      style="max-height: 300px;">
@@ -220,14 +220,14 @@ class PlaceForm(forms.ModelForm):
             ]
 
         # Update the site plan field in the form
-        self.fields['site_plan'].widget.attrs.update({
+        self.fields['siteplan_image'].widget.attrs.update({
             'class': 'form-control',
             'accept': 'image/*'
         })
-        if self.instance and self.instance.site_plan:
-            self.fields['site_plan'].help_text = f'Upload a new site plan image to replace the current one (minimum 200x200 pixels)'
+        if self.instance and self.instance.siteplan_image:
+            self.fields['siteplan_image'].help_text = f'Upload a new site plan image to replace the current one (minimum 200x200 pixels)'
         else:
-            self.fields['site_plan'].help_text = 'Upload a site plan image (minimum 200x200 pixels)'
+            self.fields['siteplan_image'].help_text = 'Upload a site plan image (minimum 200x200 pixels)'
 
         self.helper.layout = Layout(
             Field('slug', type='hidden'),
@@ -304,14 +304,14 @@ class PlaceForm(forms.ModelForm):
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-12">
-                                    {{ form.site_plan }}
-                                    <div class="form-text">{{ form.site_plan.help_text }}</div>
+                                    {{ form.siteplan_image }}
+                                    <div class="form-text">{{ form.siteplan_image.help_text }}</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 """),
-                *site_plan_layout,  # Include current site plan preview if it exists
+                *siteplan_layout,  # Include current site plan preview if it exists
                 css_class='mb-3'
             ),
             Div(
@@ -337,21 +337,21 @@ class PlaceForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         
-        # Ensure site_plan is preserved
-        if 'site_plan' in self.files:
-            cleaned_data['site_plan'] = self.files['site_plan']
+        # Ensure siteplan_image is preserved
+        if 'siteplan_image' in self.files:
+            cleaned_data['siteplan_image'] = self.files['siteplan_image']
         
         return cleaned_data
 
-    def clean_site_plan(self):
-        site_plan = self.cleaned_data.get('site_plan')
+    def clean_siteplan_image(self):
+        siteplan_image = self.cleaned_data.get('siteplan_image')
         
-        if site_plan:
+        if siteplan_image:
             try:
                 # Always reset to beginning
-                site_plan.seek(0)
+                siteplan_image.seek(0)
                 
-                img = Image.open(site_plan)
+                img = Image.open(siteplan_image)
                 
                 # Basic dimension check
                 if img.width < 200 or img.height < 200:
@@ -361,13 +361,13 @@ class PlaceForm(forms.ModelForm):
                     )
                 
                 # Reset file pointer one final time
-                site_plan.seek(0)
-                return site_plan
+                siteplan_image.seek(0)
+                return siteplan_image
                     
             except Exception as e:
                 raise forms.ValidationError(f"Image validation failed: {str(e)}")
         
-        return site_plan
+        return siteplan_image
 
     def clean_latitude(self):
         lat = self.cleaned_data['latitude']

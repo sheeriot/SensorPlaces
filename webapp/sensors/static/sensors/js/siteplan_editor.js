@@ -78,7 +78,7 @@ const sitePlanSystem = {
         modal.addEventListener('hidden.bs.modal', () => this.cleanupEditor());
 
         // Initialize save button click handler
-        const saveButton = document.getElementById('siteplan-save');
+        const saveButton = this.saveButton;
         if (saveButton) {
             saveButton.addEventListener('click', () => {
                 this.logDebug('saves', 'Save button clicked');
@@ -98,12 +98,25 @@ const sitePlanSystem = {
 
     cleanupEditor() {
         if (this.state.editorMap) {
+            // Remove event listeners first
+            this.state.editorMap.off();
+            this.state.markers.forEach(({marker}) => {
+                if (marker) {
+                    marker.off();
+                    marker.remove();
+                }
+            });
+            
+            // Clear state
+            this.state.markers.clear();
+            this.state.isDirty = false;
+            
+            // Remove map last
             this.state.editorMap.remove();
             this.state.editorMap = null;
             this.state.imageOverlay = null;
-            this.state.markers.clear();
             this.state.imageBounds = null;
-            this.state.isDirty = false;
+            
             this.logDebug('initialization', 'Editor cleaned up');
         }
     },
@@ -215,29 +228,18 @@ const sitePlanSystem = {
 
     addEditorMarkers() {
         try {
-            // Parse locations data
             const rawData = this.viewContainer.dataset.locations || '[]';
             const unescapedData = rawData.replace(/\\u(\w{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
             const locations = JSON.parse(unescapedData);
 
             locations.forEach(location => {
-                const coords = this.percentToImageCoords(location.x, location.y);
+                const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
                 
-                // Create marker with label
-                const iconType = window.sitePlanView.getRandomIcon(location.name);
-                const icon = L.divIcon({
-                    className: `location-marker bg-primary border border-2 border-white rounded-3 shadow-sm p-2`,
-                    iconSize: null,  // Let it size to content
-                    iconAnchor: null, // Will be set after creation
-                    html: `
-                        <div class="d-flex flex-column align-items-center">
-                            <i class="bi bi-${iconType}-fill text-white fs-5"></i>
-                            <div class="marker-label text-white small mt-1">
-                                ${location.name}
-                            </div>
-                        </div>
-                    `
-                });
+                // Get the existing icon type from the view
+                const viewMarker = window.sitePlanView.state.markers.get(location.id);
+                const iconType = viewMarker ? viewMarker.iconType : window.sitePlanView.getRandomIcon(location.name);
+                
+                const icon = window.sitePlanView.createIcon(location.is_active, iconType, location.name);
                 
                 const marker = L.marker(coords, {
                     icon: icon,
@@ -246,20 +248,7 @@ const sitePlanSystem = {
                 });
 
                 // Create informative popup
-                const popupContent = `
-                    <div class="p-2">
-                        <h6 class="mb-1">${location.name}</h6>
-                        ${location.description ? `<p class="mb-1 small text-muted">${location.description}</p>` : ''}
-                        ${location.active_devices_count ? `
-                            <div class="text-success small">
-                                <i class="bi bi-circle-fill me-1"></i>
-                                ${location.active_devices_count} active device${location.active_devices_count !== 1 ? 's' : ''}
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-                
-                marker.bindPopup(popupContent, {
+                marker.bindPopup(window.sitePlanView.createMarkerPopup(location), {
                     offset: [0, -10],
                     closeButton: false,
                     className: 'location-popup',
@@ -343,18 +332,18 @@ const sitePlanSystem = {
     },
 
     // Helper Methods
-    percentToImageCoords(xPercent, yPercent) {
+    percentToImageCoords(x_pos, y_pos) {
         const bounds = this.state.imageBounds;
-        const imageX = (xPercent / 100) * bounds[1][1];
-        const imageY = (yPercent / 100) * bounds[1][0];
+        const imageX = (x_pos / 100) * bounds[1][1];
+        const imageY = (y_pos / 100) * bounds[1][0];
         return [imageY, imageX];
     },
 
     imageCoordsToPercent(coords) {
         const bounds = this.state.imageBounds;
         return {
-            x: (coords.lng / bounds[1][1]) * 100,
-            y: (coords.lat / bounds[1][0]) * 100
+            x_pos: (coords.lng / bounds[1][1]) * 100,
+            y_pos: (coords.lat / bounds[1][0]) * 100
         };
     },
 
@@ -376,15 +365,29 @@ const sitePlanSystem = {
     async saveChanges() {
         if (!this.state.isDirty) return;
 
-        const updates = {
-            locations: Array.from(this.state.markers.entries()).map(([id, {marker}]) => {
-                const percent = this.imageCoordsToPercent(marker.getLatLng());
-                return {
-                    id,
-                    x: percent.x,
-                    y: percent.y
-                };
+        // Get only changed markers
+        const changedLocations = Array.from(this.state.markers.entries())
+            .map(([id, {marker, originalPosition}]) => {
+                const currentPos = this.imageCoordsToPercent(marker.getLatLng());
+                // Round to 2 decimal places to avoid floating point issues
+                const x_pos = parseFloat(currentPos.x_pos.toFixed(2));
+                const y_pos = parseFloat(currentPos.y_pos.toFixed(2));
+                
+                // Compare with original position
+                if (x_pos !== originalPosition.x_pos || y_pos !== originalPosition.y_pos) {
+                    return { id, x_pos, y_pos };
+                }
+                return null;
             })
+            .filter(loc => loc !== null);
+
+        if (changedLocations.length === 0) {
+            this.logDebug('saves', 'No location changes detected');
+            return;
+        }
+
+        const updates = {
+            locations: changedLocations
         };
 
         try {
@@ -403,8 +406,7 @@ const sitePlanSystem = {
             
             const data = await response.json();
             
-            if (!response.ok) {
-                // Show the specific error from the backend
+            if (!response.ok || data.type === 'error' || data.type === 'danger') {
                 toastSystem.show({
                     message: data.message || 'Failed to save changes',
                     type: data.type || 'danger',
@@ -417,15 +419,39 @@ const sitePlanSystem = {
 
             // Success case
             this.state.isDirty = false;
+            
+            // Update the view's location data
+            if (data.changes && data.changes.locations) {
+                const updatedLocations = data.changes.locations.map(change => ({
+                    id: change.id,
+                    name: change.name,
+                    x_pos: parseFloat(change.new_position.x_pos.toFixed(2)),
+                    y_pos: parseFloat(change.new_position.y_pos.toFixed(2))
+                }));
+                
+                this.logDebug('saves', 'Dispatching siteplan-update event with locations:', updatedLocations);
+                
+                // Dispatch update event
+                window.dispatchEvent(new CustomEvent('siteplan-update', {
+                    detail: { locations: updatedLocations }
+                }));
+            }
+            
+            // Close the modal
+            const modal = bootstrap.Modal.getInstance(this.modal);
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Show success toast
             toastSystem.show({
                 message: data.message || 'Changes saved successfully',
-                type: data.type || 'success',
+                type: data.type || 'warning', // Default to warning for updates
                 tags: data.tags || 'layout-update',
                 addToHistory: true
             });
             
-            // Reload the page to refresh the view
-            window.location.reload();
+            this.logDebug('success', 'Changes saved successfully:', data);
             
         } catch (error) {
             this.logDebug('error', 'Save failed:', error);
@@ -442,32 +468,18 @@ const sitePlanSystem = {
     fitMapPerfectly() {
         if (!this.state.editorMap || !this.state.imageBounds) return;
         
-        // Force a size update
-        this.state.editorMap.invalidateSize();
-        
-        // Get current container size
+        // Only update if container is visible
         const container = this.editorContainer;
-        const containerWidth = container.offsetWidth;
-        const containerHeight = container.offsetHeight;
+        if (!container || container.offsetWidth === 0) return;
         
-        // Calculate zoom to fit perfectly
-        const imageWidth = this.state.imageBounds[1][1];
-        const imageHeight = this.state.imageBounds[1][0];
-        const widthRatio = containerWidth / imageWidth;
-        const heightRatio = containerHeight / imageHeight;
-        const zoom = Math.min(widthRatio, heightRatio);
-        
-        // Center and zoom
-        this.state.editorMap.setView([imageHeight/2, imageWidth/2], Math.log2(zoom));
+        this.state.editorMap.invalidateSize();
         this.state.editorMap.fitBounds(this.state.imageBounds, {
             animate: false,
             padding: [0, 0]
         });
         
-        this.logDebug('operation', 'Map fit perfectly', {
-            containerSize: `${containerWidth}x${containerHeight}`,
-            imageSize: `${imageWidth}x${imageHeight}`,
-            zoom: zoom
+        this.logDebug('operation', 'Map fit updated', {
+            containerSize: `${container.offsetWidth}x${container.offsetHeight}`
         });
     },
 

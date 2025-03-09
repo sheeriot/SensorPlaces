@@ -9,6 +9,7 @@ const sitePlanView = {
         map: null,
         imageOverlay: null,
         markers: new Map(), // id -> L.Marker
+        locations: new Map(), // id -> location data
         imageBounds: null,
         initialized: false
     },
@@ -89,10 +90,21 @@ const sitePlanView = {
             }
         });
 
+        // Listen for siteplan updates
+        window.addEventListener('siteplan-update', (event) => {
+            console.log('Received siteplan update event:', event.detail);
+            console.log('Current locations state:', Array.from(this.state.locations.entries()));
+            console.log('Current markers state:', Array.from(this.state.markers.entries()));
+            
+            if (event.detail.locations) {
+                this.updateLocations(event.detail.locations);
+            }
+        });
+
         return new Promise((resolve) => {
             const container = document.getElementById('siteplan-container');
             if (!container) {
-                console.log('No site plan container found');
+                console.error('No site plan container found - is the template including siteplan_card.html?');
                 this.state.initialized = true;
                 resolve();
                 return;
@@ -101,14 +113,16 @@ const sitePlanView = {
             // Get the image URL and locations data
             const imageUrl = container.dataset.imageUrl;
             if (!imageUrl) {
-                console.log('No image URL found');
+                console.error('No image URL found - check if place.get_siteplan_url is returning a value');
                 this.state.initialized = true;
                 resolve();
                 return;
             }
 
-            // Debug: Log the raw locations data
-            console.log('Raw locations data:', container.dataset.locations);
+            // Debug logging
+            console.log('Found container:', container);
+            console.log('Image URL:', imageUrl);
+            console.log('Locations data:', container.dataset.locations);
 
             // Create a temporary image to get dimensions
             const img = new Image();
@@ -128,6 +142,12 @@ const sitePlanView = {
                     console.log('Unescaped data:', unescapedData);
                     const locations = JSON.parse(unescapedData);
                     console.log('Parsed locations:', locations);
+                    
+                    // Store locations in state
+                    locations.forEach(location => {
+                        this.state.locations.set(location.id, location);
+                    });
+                    
                     this.addMarkers(locations);
 
                     // Set initial visibility based on switch state
@@ -176,8 +196,8 @@ const sitePlanView = {
             attributionControl: false,
             zoomSnap: 0,
             zoomDelta: 0,
-            minZoom: -2,
-            maxZoom: 2
+            minZoom: -2,         // Match editor settings
+            maxZoom: 2          // Match editor settings
         });
 
         // Add image overlay with loading handler
@@ -201,38 +221,12 @@ const sitePlanView = {
             container.style.position = 'absolute';
         }
 
-        // Function to ensure map fits perfectly
-        const fitMapPerfectly = () => {
-            if (!this.state.map || !this.state.imageBounds) return;
-            
-            // Force a size update
-            this.state.map.invalidateSize();
-            
-            // Get current container size
-            const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
-            
-            // Calculate zoom to fit perfectly
-            const imageWidth = this.state.imageBounds[1][1];
-            const imageHeight = this.state.imageBounds[1][0];
-            const widthRatio = containerWidth / imageWidth;
-            const heightRatio = containerHeight / imageHeight;
-            const zoom = Math.min(widthRatio, heightRatio);
-            
-            // Center and zoom
-            this.state.map.setView([imageHeight/2, imageWidth/2], Math.log2(zoom));
-            this.state.map.fitBounds(this.state.imageBounds, {
-                animate: false,
-                padding: [0, 0]
-            });
-        };
-
         // Initial fit
-        fitMapPerfectly();
+        this.fitMapPerfectly();
 
         // Create a ResizeObserver for the wrapper
         const resizeObserver = new ResizeObserver(() => {
-            requestAnimationFrame(fitMapPerfectly);
+            requestAnimationFrame(() => this.fitMapPerfectly());
         });
 
         // Observe both wrapper and container
@@ -240,7 +234,23 @@ const sitePlanView = {
         resizeObserver.observe(container);
 
         // Also handle window resize
-        window.addEventListener('resize', fitMapPerfectly);
+        window.addEventListener('resize', () => {
+            requestAnimationFrame(() => this.fitMapPerfectly());
+        });
+    },
+
+    // Update fitMapPerfectly method to match editor's implementation
+    fitMapPerfectly() {
+        if (!this.state.map || !this.state.imageBounds) return;
+        
+        // Force a size update
+        this.state.map.invalidateSize();
+        
+        // Fit bounds exactly
+        this.state.map.fitBounds(this.state.imageBounds, {
+            animate: false,
+            padding: [0, 0]
+        });
     },
 
     // Add markers to the map
@@ -256,7 +266,7 @@ const sitePlanView = {
         console.log('Available icons after shuffle:', this.buildingIcons);
         
         locations.forEach(location => {
-            const coords = this.percentToImageCoords(location.x, location.y);
+            const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
             
             // Get random icon type for this location
             const iconType = this.getRandomIcon(location.name);
@@ -306,6 +316,88 @@ const sitePlanView = {
                 }
             }
         });
+    },
+
+    updateLocations(updates) {
+        console.log('Starting updateLocations with:', updates);
+        console.log('Current locations state:', Array.from(this.state.locations.entries()));
+        console.log('Current markers state:', Array.from(this.state.markers.entries()));
+        
+        let changed = false;
+        
+        updates.forEach(update => {
+            const location = this.state.locations.get(update.id);
+            console.log(`Processing update for location ${update.id}:`, update);
+            console.log('Found existing location:', location);
+            
+            if (location) {
+                // Only update the position properties
+                location.x_pos = parseFloat(update.x_pos.toFixed(2));
+                location.y_pos = parseFloat(update.y_pos.toFixed(2));
+                
+                // Remove old marker
+                const markerData = this.state.markers.get(update.id);
+                console.log('Found existing marker data:', markerData);
+                
+                if (markerData && markerData.marker) {
+                    markerData.marker.remove();
+                }
+                
+                // Add new marker for this location
+                const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
+                console.log('New coordinates:', coords);
+                
+                const iconType = markerData ? markerData.iconType : this.getRandomIcon(location.name);
+                console.log('Using icon type:', iconType);
+                
+                // Create new marker with existing properties
+                const marker = L.marker(coords, {
+                    icon: this.createIcon(location.is_active, iconType, location.name),
+                    title: location.name
+                });
+
+                // Add popup with location info
+                marker.bindPopup(this.createMarkerPopup(location), {
+                    offset: [0, -10],
+                    closeButton: false,
+                    className: 'location-popup',
+                    autoPan: false,
+                    autoPanPadding: [50, 50],
+                    keepInView: true
+                });
+
+                // Show popup on hover
+                marker.on('mouseover', function() {
+                    this.openPopup();
+                });
+                
+                marker.on('mouseout', function() {
+                    this.closePopup();
+                });
+
+                // Add to map and store reference
+                marker.addTo(this.state.map);
+                this.state.markers.set(location.id, {
+                    marker,
+                    is_active: location.is_active,
+                    iconType
+                });
+                
+                changed = true;
+                console.log('Updated marker for location:', location.id);
+            }
+        });
+        
+        if (changed) {
+            // Update visibility based on current switch state
+            const locationSwitch = document.querySelector('.hideInactive-switch[data-model="location"]');
+            if (locationSwitch && locationSwitch.checked) {
+                this.updateMarkersVisibility(true);
+            }
+            
+            console.log('Final locations state:', Array.from(this.state.locations.entries()));
+            console.log('Final markers state:', Array.from(this.state.markers.entries()));
+        }
     }
 };
 

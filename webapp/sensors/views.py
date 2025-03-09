@@ -36,8 +36,33 @@ logger = logging.getLogger(__name__)
 class LocationAnnotationMixin:
     """Mixin to add annotated locations to context data."""
     
+    def get_location_data(self, location: Location) -> Dict[str, Any]:
+        """Convert a Location instance to a JSON-serializable dictionary.
+        
+        Args:
+            location: The Location model instance
+            
+        Returns:
+            Dict containing the location data for JavaScript
+        """
+        return {
+            'id': location.id,
+            'name': location.name,
+            'x_pos': float(location.x_pos) if isinstance(location.x_pos, Decimal) else location.x_pos,
+            'y_pos': float(location.y_pos) if isinstance(location.y_pos, Decimal) else location.y_pos,
+            'is_active': location.is_active,
+            'active_devices_count': location.active_devices_count
+        }
+
     def get_annotated_locations(self, place: Place) -> QuerySet[Location]:
-        """Get locations with device and sensor counts."""
+        """Get annotated locations for a place.
+        
+        Args:
+            place: The Place model instance
+            
+        Returns:
+            QuerySet of Location instances with annotations
+        """
         return Location.objects.filter(place=place).annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False)),
@@ -46,28 +71,27 @@ class LocationAnnotationMixin:
         ).order_by('-is_active', Lower('name'))
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
-        """Add annotated locations to context."""
+        """Add location data to the template context.
+        
+        Returns:
+            Dict containing template context with:
+                - locations: QuerySet of Location instances
+                - locations_json: JSON string of location data for JavaScript
+                - place: Place instance
+        """
         context = super().get_context_data(**kwargs)
         if hasattr(self, 'kwargs') and 'place_slug' in self.kwargs:
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-            context['locations'] = self.get_annotated_locations(place)
-            context['place'] = place
-            
-            # Get locations with annotations
             locations = self.get_annotated_locations(place)
             
             # Convert locations to JSON-serializable format
-            locations_data = [{
-                'id': loc.id,
-                'name': loc.name,
-                'x': float(loc.x_coord) if isinstance(loc.x_coord, Decimal) else loc.x_coord,
-                'y': float(loc.y_coord) if isinstance(loc.y_coord, Decimal) else loc.y_coord,
-                'is_active': loc.is_active,
-                'active_devices_count': loc.active_devices_count
-            } for loc in locations]
+            locations_data = [self.get_location_data(loc) for loc in locations]
             
-            context['locations'] = locations
-            context['locations_json'] = json.dumps(locations_data)
+            context.update({
+                'locations': locations,  # Full queryset for template
+                'locations_json': json.dumps(locations_data),  # JSON for JavaScript
+                'place': place
+            })
             
         return context
 
@@ -142,9 +166,6 @@ class PlaceDetailView(LocationAnnotationMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        from icecream import ic
-        import json
-        from decimal import Decimal
         
         # Ensure place is in context
         if 'place' not in context and hasattr(self, 'object'):
@@ -155,14 +176,14 @@ class PlaceDetailView(LocationAnnotationMixin, DetailView):
             locations_data = []
             for location in context['locations']:
                 # Convert Decimal to float for JSON serialization
-                x_coord = float(location.x_coord) if isinstance(location.x_coord, Decimal) else location.x_coord
-                y_coord = float(location.y_coord) if isinstance(location.y_coord, Decimal) else location.y_coord
+                x_pos = float(location.x_pos) if isinstance(location.x_pos, Decimal) else location.x_pos
+                y_pos = float(location.y_pos) if isinstance(location.y_pos, Decimal) else location.y_pos
                 
                 locations_data.append({
                     'id': location.id,
                     'name': location.name,
-                    'x': x_coord,  # Match JavaScript property names
-                    'y': y_coord,  # Match JavaScript property names
+                    'x_pos': x_pos,  # Match JavaScript property names
+                    'y_pos': y_pos,  # Match JavaScript property names
                     'is_active': location.is_active,
                     'active_devices_count': location.active_devices_count
                 })
@@ -254,7 +275,7 @@ class PlaceUpdateView(SuccessMessageMixin, UpdateView):
             # Get the object if not already loaded
             obj = self.get_object() if not self.object else self.object
             self._original_values = {
-                'site_plan': obj.site_plan.name if obj.site_plan else None,
+                'siteplan_image': obj.siteplan_image.name if obj.siteplan_image else None,
                 'is_active': obj.is_active,
                 # Add other fields you want to track
             }
@@ -274,11 +295,9 @@ class PlaceUpdateView(SuccessMessageMixin, UpdateView):
         messages = []
 
         # Now we can safely compare the values
-        if self._original_values.get('site_plan') != (place.site_plan.name if place.site_plan else None):
-            if place.site_plan:
+        if self._original_values.get('siteplan_image') != (place.siteplan_image.name if place.siteplan_image else None):
+            if place.siteplan_image:
                 messages.append("Site plan was updated")
-            else:
-                messages.append("Site plan was removed")
 
         if not messages:
             messages.append("Place updated successfully")
@@ -457,7 +476,10 @@ class LocationCreateView(SuccessMessageMixin, LocationAnnotationMixin, CreateVie
         context['locations'] = self.place.locations.annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        )
+        ).select_related('place').prefetch_related(
+            'devices',
+            'devices__device_type'
+        ).order_by('name')
         return context
 
     def form_valid(self, form):
@@ -861,7 +883,6 @@ class DeviceMoveLocationView(View):
 
 @require_POST
 def siteplan_update(request, place_slug):
-    """Update the site plan layout settings for a place"""
     try:
         ic("Starting siteplan_update for place:", place_slug)
         place = get_object_or_404(Place, slug=place_slug)
@@ -870,60 +891,29 @@ def siteplan_update(request, place_slug):
         
         # Track changes with before/after values
         changes = []
-        
-        # Site plan transform changes
-        if 'siteplan_scale' in data:
-            old_scale = place.siteplan_scale
-            new_scale = float(data['siteplan_scale'])
-            if old_scale != new_scale:
-                changes.append(
-                    f"Scale: {old_scale:.2f} → {new_scale:.2f}"
-                )
-                place.siteplan_scale = new_scale
-        
-        if 'siteplan_x' in data:
-            old_x = place.siteplan_x
-            new_x = float(data['siteplan_x'])
-            if old_x != new_x:
-                changes.append(
-                    f"X offset: {old_x:.1f}px → {new_x:.1f}px"
-                )
-                place.siteplan_x = new_x
-        
-        if 'siteplan_y' in data:
-            old_y = place.siteplan_y
-            new_y = float(data['siteplan_y'])
-            if old_y != new_y:
-                changes.append(
-                    f"Y offset: {old_y:.1f}px → {new_y:.1f}px"
-                )
-                place.siteplan_y = new_y
-
-        if changes:
-            place.save(update_fields=['siteplan_scale', 'siteplan_x', 'siteplan_y'])
+        location_changes = []
         
         # Location position changes
-        location_changes = []
         if 'locations' in data:
             ic("Processing location updates")
             for location_update in data['locations']:
                 location = get_object_or_404(Location, id=location_update['id'], place=place)
-                old_x = location.x_coord
-                old_y = location.y_coord
-                new_x = float(location_update['x'])
-                new_y = float(location_update['y'])
+                old_x = float(location.x_pos)
+                old_y = float(location.y_pos)
+                new_x = round(float(location_update['x_pos']), 2)
+                new_y = round(float(location_update['y_pos']), 2)
                 
                 if old_x != new_x or old_y != new_y:
                     ic(f"Location {location.name} moved:", old_x, old_y, "->", new_x, new_y)
                     location_changes.append({
                         'id': location.id,
                         'name': location.name,
-                        'old_position': {'x': float(old_x), 'y': float(old_y)},
-                        'new_position': {'x': new_x, 'y': new_y}
+                        'old_position': {'x_pos': old_x, 'y_pos': old_y},
+                        'new_position': {'x_pos': new_x, 'y_pos': new_y}
                     })
-                    location.x_coord = new_x
-                    location.y_coord = new_y
-                    location.save(update_fields=['x_coord', 'y_coord'])
+                    location.x_pos = new_x
+                    location.y_pos = new_y
+                    location.save(update_fields=['x_pos', 'y_pos'])
 
         if not changes and not location_changes:
             ic("No changes detected")
@@ -933,19 +923,25 @@ def siteplan_update(request, place_slug):
                 'tags': 'layout-update'
             })
 
-        # Create success message
+        # Create detailed success message
         message_parts = []
-        if changes:
-            message_parts.append("Updated site plan settings")
         if location_changes:
-            message_parts.append(f"Moved {len(location_changes)} location{'s' if len(location_changes) > 1 else ''}")
+            locations_detail = "<br><small class='text-muted'>Changes:<ul class='mb-0'>"
+            for change in location_changes:
+                locations_detail += (
+                    f"<li><i class='bi bi-geo-alt'></i> {change['name']}: "
+                    f"({change['old_position']['x_pos']:.2f}, {change['old_position']['y_pos']:.2f}) → "
+                    f"({change['new_position']['x_pos']:.2f}, {change['new_position']['y_pos']:.2f})</li>"
+                )
+            locations_detail += "</ul></small>"
+            message_parts.append(f"Moved {len(location_changes)} location{'s' if len(location_changes) > 1 else ''}{locations_detail}")
         
         success_message = " and ".join(message_parts)
         ic("Success:", success_message)
         
         return JsonResponse({
             'message': success_message,
-            'type': 'success',
+            'type': 'warning',
             'tags': 'layout-update',
             'changes': {
                 'locations': location_changes
@@ -1537,7 +1533,6 @@ class SensorDetailView(LocationAnnotationMixin, DetailView):
                     last_reading.values('timestamp')[:1]
                 )
             )
-            
         return self._queryset
 
     def get_context_data(self, **kwargs):
