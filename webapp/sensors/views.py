@@ -28,6 +28,7 @@ from django.db.models.query import Prefetch
 from icecream import ic
 import logging
 from django.core.files.uploadedfile import UploadedFile
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,23 @@ class LocationAnnotationMixin:
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
             context['locations'] = self.get_annotated_locations(place)
             context['place'] = place
+            
+            # Get locations with annotations
+            locations = self.get_annotated_locations(place)
+            
+            # Convert locations to JSON-serializable format
+            locations_data = [{
+                'id': loc.id,
+                'name': loc.name,
+                'x': float(loc.x_coord) if isinstance(loc.x_coord, Decimal) else loc.x_coord,
+                'y': float(loc.y_coord) if isinstance(loc.y_coord, Decimal) else loc.y_coord,
+                'is_active': loc.is_active,
+                'active_devices_count': loc.active_devices_count
+            } for loc in locations]
+            
+            context['locations'] = locations
+            context['locations_json'] = json.dumps(locations_data)
+            
         return context
 
 def calculate_zoom(distance=0):
@@ -126,6 +144,7 @@ class PlaceDetailView(LocationAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         from icecream import ic
         import json
+        from decimal import Decimal
         
         # Ensure place is in context
         if 'place' not in context and hasattr(self, 'object'):
@@ -135,11 +154,15 @@ class PlaceDetailView(LocationAnnotationMixin, DetailView):
         if 'locations' in context:
             locations_data = []
             for location in context['locations']:
+                # Convert Decimal to float for JSON serialization
+                x_coord = float(location.x_coord) if isinstance(location.x_coord, Decimal) else location.x_coord
+                y_coord = float(location.y_coord) if isinstance(location.y_coord, Decimal) else location.y_coord
+                
                 locations_data.append({
                     'id': location.id,
                     'name': location.name,
-                    'x': location.x_coord_value,  # Match JavaScript property names
-                    'y': location.y_coord_value,  # Match JavaScript property names
+                    'x': x_coord,  # Match JavaScript property names
+                    'y': y_coord,  # Match JavaScript property names
                     'is_active': location.is_active,
                     'active_devices_count': location.active_devices_count
                 })
@@ -837,147 +860,111 @@ class DeviceMoveLocationView(View):
             return JsonResponse({'error': str(e)}, status=500)
 
 @require_POST
-def update_site_plan_layout(request, place_slug):
+def siteplan_update(request, place_slug):
     """Update the site plan layout settings for a place"""
     try:
+        ic("Starting siteplan_update for place:", place_slug)
         place = get_object_or_404(Place, slug=place_slug)
         data = json.loads(request.body)
+        ic("Received data:", data)
         
         # Track changes with before/after values
         changes = []
         
         # Site plan transform changes
-        if 'site_plan_scale' in data:
-            old_scale = place.site_plan_scale
-            new_scale = float(data['site_plan_scale'])
+        if 'siteplan_scale' in data:
+            old_scale = place.siteplan_scale
+            new_scale = float(data['siteplan_scale'])
             if old_scale != new_scale:
                 changes.append(
                     f"Scale: {old_scale:.2f} → {new_scale:.2f}"
                 )
-                place.site_plan_scale = new_scale
+                place.siteplan_scale = new_scale
         
-        if 'site_plan_x' in data:
-            old_x = place.site_plan_x
-            new_x = float(data['site_plan_x'])
+        if 'siteplan_x' in data:
+            old_x = place.siteplan_x
+            new_x = float(data['siteplan_x'])
             if old_x != new_x:
                 changes.append(
                     f"X offset: {old_x:.1f}px → {new_x:.1f}px"
                 )
-                place.site_plan_x = new_x
+                place.siteplan_x = new_x
         
-        if 'site_plan_y' in data:
-            old_y = place.site_plan_y
-            new_y = float(data['site_plan_y'])
+        if 'siteplan_y' in data:
+            old_y = place.siteplan_y
+            new_y = float(data['siteplan_y'])
             if old_y != new_y:
                 changes.append(
                     f"Y offset: {old_y:.1f}px → {new_y:.1f}px"
                 )
-                place.site_plan_y = new_y
+                place.siteplan_y = new_y
 
         if changes:
-            place.save(update_fields=['site_plan_scale', 'site_plan_x', 'site_plan_y'])
+            place.save(update_fields=['siteplan_scale', 'siteplan_x', 'siteplan_y'])
         
         # Location position changes
         location_changes = []
-        for update in data.get('locations', []):
-            location_id = update.get('id')
-            new_x = update.get('x')
-            new_y = update.get('y')
-            
-            if location_id and new_x is not None and new_y is not None:
-                location = Location.objects.filter(id=location_id, place=place).first()
-                if location:
-                    old_x = float(location.x_coord) if location.x_coord is not None else 0
-                    old_y = float(location.y_coord) if location.y_coord is not None else 0
-                    new_x = float(new_x)
-                    new_y = float(new_y)
-                    
-                    if old_x != new_x or old_y != new_y:
-                        location_changes.append({
-                            'name': location.name,
-                            'changes': f"({old_x:.1f}, {old_y:.1f}) → ({new_x:.1f}, {new_y:.1f})"
-                        })
-                        location.x_coord = new_x
-                        location.y_coord = new_y
-                        location.save(update_fields=['x_coord', 'y_coord'])
+        if 'locations' in data:
+            ic("Processing location updates")
+            for location_update in data['locations']:
+                location = get_object_or_404(Location, id=location_update['id'], place=place)
+                old_x = location.x_coord
+                old_y = location.y_coord
+                new_x = float(location_update['x'])
+                new_y = float(location_update['y'])
+                
+                if old_x != new_x or old_y != new_y:
+                    ic(f"Location {location.name} moved:", old_x, old_y, "->", new_x, new_y)
+                    location_changes.append({
+                        'id': location.id,
+                        'name': location.name,
+                        'old_position': {'x': float(old_x), 'y': float(old_y)},
+                        'new_position': {'x': new_x, 'y': new_y}
+                    })
+                    location.x_coord = new_x
+                    location.y_coord = new_y
+                    location.save(update_fields=['x_coord', 'y_coord'])
 
-        # Construct detailed message
-        message_parts = [f"Updated site plan layout for <strong>{place.name}</strong>"]
-        
+        if not changes and not location_changes:
+            ic("No changes detected")
+            return JsonResponse({
+                'message': 'No changes detected',
+                'type': 'info',
+                'tags': 'layout-update'
+            })
+
+        # Create success message
+        message_parts = []
         if changes:
-            message_parts.append("<br><small class='text-muted'>Site Plan Changes:")
-            changes_with_icon = [f"<i class='bi bi-house-gear'></i> {change}" for change in changes]
-            message_parts.append(", ".join(changes_with_icon))
-            message_parts.append("</small>")
-        
+            message_parts.append("Updated site plan settings")
         if location_changes:
-            message_parts.append("<br><small class='text-muted'>Location Changes:")
-            for change in location_changes:
-                message_parts.append(
-                    f"<br><i class='bi bi-geo-alt'></i> {change['name']}: {change['changes']}"
-                )
-            message_parts.append("</small>")
-
-        success_message = "".join(message_parts)
+            message_parts.append(f"Moved {len(location_changes)} location{'s' if len(location_changes) > 1 else ''}")
         
-        # Add to session toast history
-        toast_count = 0
-        if hasattr(request, 'session'):
-            toast_history = request.session.get('toast_history', [])
-            toast_history.append({
-                'message': success_message,
-                'type': 'warning',  # Using warning type for updates
-                'timestamp': timezone.now().isoformat(),
-                'tags': 'warning safe layout-update'  # Add tags for filtering
-            })
-            request.session['toast_history'] = toast_history
-            request.session.modified = True
-            toast_count = len(toast_history)
-
-        # Add to Django messages if available (persistent storage)
-        messages.warning(request, success_message, extra_tags='safe layout-update')
-        
-        response_data = {
-            'status': 'success',
-            'message': success_message,
-            'type': 'warning',
-            'tags': 'warning safe layout-update',
-            'toast_count': toast_count,  # Add count to response
-            'changes': {
-                'site_plan': {
-                    'scale': place.site_plan_scale,
-                    'x': place.site_plan_x,
-                    'y': place.site_plan_y
-                },
-                'locations': location_changes
-            }
-        }
-        
-        return JsonResponse(response_data)
-        
-    except Exception as e:
-        error_message = f'Error updating layout: {str(e)}'
-        
-        # Add error to session toast history
-        if hasattr(request, 'session'):
-            toast_history = request.session.get('toast_history', [])
-            toast_history.append({
-                'message': error_message,
-                'type': 'danger',
-                'timestamp': timezone.now().isoformat(),
-                'tags': 'error layout-update'
-            })
-            request.session['toast_history'] = toast_history
-            request.session.modified = True
-
-        # Add to Django messages
-        messages.error(request, error_message, extra_tags='layout-update')
+        success_message = " and ".join(message_parts)
+        ic("Success:", success_message)
         
         return JsonResponse({
-            'error': str(e),
+            'message': success_message,
+            'type': 'success',
+            'tags': 'layout-update',
+            'changes': {
+                'locations': location_changes
+            }
+        })
+
+    except json.JSONDecodeError:
+        ic("Error: Invalid JSON data")
+        return JsonResponse({
+            'message': 'Invalid JSON data',
             'type': 'danger',
-            'tags': 'error layout-update',
-            'message': error_message
+            'tags': 'error layout-update'
+        }, status=400)
+    except Exception as e:
+        ic("Error:", str(e))
+        return JsonResponse({
+            'message': f'Error updating site plan: {str(e)}',
+            'type': 'danger',
+            'tags': 'error layout-update'
         }, status=500)
 
 @require_POST

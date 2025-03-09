@@ -51,7 +51,7 @@ urlpatterns = [
     
     # API URLs
     path('api/<slug:place_slug>/stats/', views.place_stats, name='place_stats'),
-    path('api/<slug:place_slug>/update_site_plan_layout/', views.update_site_plan_layout, name='update_site_plan_layout'),
+    path('api/<slug:place_slug>/siteplan_update/', views.siteplan_update, name='siteplan_update'),
 
     # New consolidated toggle active endpoint
     path('api/<slug:place_slug>/toggle_active/<str:model>/<int:pk>/', views.ToggleActiveView.as_view(), name='toggle_active'),

@@ -171,141 +171,74 @@
     color: var(--bs-gray-600);
 }
 
-/* Site Plan specific styles */
-.site-plan-wrapper {
+/* Site Plan Container - Minimal required styles */
+.siteplan-wrapper {
     position: relative;
     width: 100%;
-    max-width: 800px;
-    margin: 0 auto;
-    padding-bottom: 75%; /* Default 4:3 aspect ratio */
     background-color: var(--bs-light);
+    overflow: hidden;
 }
 
-.site-plan-container {
+#siteplan-container {
     position: absolute;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
     height: 100%;
 }
 
-/* Leaflet Customizations */
-.leaflet-container {
-    width: 100% !important;
-    height: 100% !important;
-    background: var(--bs-light) !important;
-    font-family: var(--bs-body-font-family) !important;
-}
-
-.leaflet-control-container .leaflet-control {
-    border: none !important;
-    border-radius: var(--bs-border-radius) !important;
-    box-shadow: var(--bs-box-shadow-sm) !important;
-}
-
-.leaflet-marker-icon {
-    border: 2px solid white !important;
-    border-radius: 4px !important;
-    box-shadow: var(--bs-box-shadow-sm) !important;
-}
-
-.leaflet-popup {
-    margin-bottom: 15px !important;
-}
-
-.leaflet-popup-content-wrapper {
-    padding: 0.5rem !important;
-    border-radius: var(--bs-border-radius) !important;
-    box-shadow: var(--bs-box-shadow-sm) !important;
-}
-
-.leaflet-popup-content {
-    margin: 0 !important;
-    line-height: 1.4 !important;
-}
-
-/* Navigation styles */
-.current-location {
-    font-weight: 500 !important;
-    background-color: var(--bs-primary-bg-subtle) !important;
-    color: var(--bs-primary) !important;
-}
-
-/* Location marker specific styles */
+/* Location Markers */
 .location-marker {
-    position: absolute;
-    cursor: pointer;
-    z-index: 10;
-    transform: translate(-50%, -50%); /* Center the marker on its position */
-}
-
-.location-marker .marker-content {
-    font-size: 0.75rem;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     white-space: nowrap;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    color: white;
-    background-color: var(--bs-primary);
 }
 
-.location-marker .location-name,
-.location-marker .device-count {
-    margin: 0;
-    padding: 0;
+.location-marker .marker-label {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
     text-align: center;
 }
 
-/* Editor styles */
-#siteMapEditorContainer {
-    width: 100%;
-    height: 100%;
+.location-marker.bg-secondary {
+    background-color: var(--bs-secondary) !important;
 }
 
-.dragging {
+/* Editor specific styles */
+.modal-body {
+    padding: 0 !important;
+}
+
+#siteplan-editor .leaflet-marker-icon {
+    cursor: grab;
+}
+
+#siteplan-editor .leaflet-marker-icon.dragging {
+    cursor: grabbing;
     opacity: 0.8;
-    z-index: 1000 !important;
 }
 
-/* Remove all other styles that can be replaced with Bootstrap classes */
-
-/* Chart styles */
-.readings-chart-container {
-    position: relative;
-    width: 100%;
-    height: 400px;
+/* Loading indicator */
+[data-editor="true"][data-editor-ready="false"]::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--bs-border-color);
+    border-top-color: var(--bs-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1000;
 }
 
-/* Chart tooltip customization */
-.chartjs-tooltip {
-    background-color: var(--chart-tooltip-bg) !important;
-    color: var(--chart-tooltip-text) !important;
-    font-family: var(--sensor-font-mono) !important;
-    font-size: var(--chart-font-size) !important;
-}
-
-/* Chart axis labels */
-.chartjs-axis-label {
-    font-family: var(--sensor-font-mono) !important;
-    font-size: var(--chart-font-size) !important;
-    color: var(--bs-body-color) !important;
-}
-
-/* Chart grid lines */
-.chartjs-grid-line {
-    stroke: var(--chart-grid-color) !important;
-}
-
-/* Chart point styling */
-.chartjs-point {
-    stroke: var(--chart-line-color) !important;
-    fill: var(--bs-body-bg) !important;
-}
-
-/* Chart line styling */
-.chartjs-line {
-    stroke: var(--chart-line-color) !important;
-    stroke-width: 2px !important;
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 /* Map Controls */
@@ -446,17 +379,172 @@
     display: block !important;
 } */
 
-/* Modal enhancements */
-.modal-xl {
-    max-width: 90vw;
+/* Site Plan Editor */
+#siteplan-editor {
+    padding-left: 0 !important;
 }
 
-.modal-body {
-    padding: 1rem;
+#siteplan-editor .modal-dialog {
+    max-width: 75vw;
+    margin: 1.75rem auto;
 }
 
-/* Site Plan and Editor specific styles that Bootstrap can't handle */
-/* Loading spinner for editor */
+#siteplan-editor .modal-body {
+    padding: 0 !important;
+}
+
+#siteplan-editor .modal-header {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+#siteplan-editor .modal-footer {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+/* Site Plan Editor Map */
+#siteplan-editor-map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+#siteplan-editor-map .leaflet-container {
+    background: var(--bs-light) !important;
+    outline: none !important;
+}
+
+/* Position controls in a better spot */
+#siteplan-editor-map .leaflet-control-container .leaflet-top {
+    top: 1rem;
+}
+
+#siteplan-editor-map .leaflet-control-container .leaflet-left {
+    left: 1rem;
+}
+
+/* Style the zoom controls */
+#siteplan-editor-map .leaflet-control-zoom {
+    border: none !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: var(--bs-box-shadow) !important;
+    overflow: hidden;
+}
+
+#siteplan-editor-map .leaflet-control-zoom a {
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 1.2rem !important;
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+    transition: all 0.2s ease-in-out;
+}
+
+#siteplan-editor-map .leaflet-control-zoom a:hover {
+    background-color: var(--bs-light) !important;
+    color: var(--bs-primary) !important;
+}
+
+#siteplan-editor-map .leaflet-control-zoom a:first-child {
+    border-bottom: none !important;
+}
+
+/* Image overlay in editor */
+#siteplan-editor-map .leaflet-image-layer {
+    image-rendering: -webkit-optimize-contrast;  /* Sharper image rendering */
+    image-rendering: crisp-edges;
+}
+
+/* Editor markers */
+#siteplan-editor-map .leaflet-marker-icon {
+    cursor: pointer;
+    transform-origin: center center;
+}
+
+#siteplan-editor-map .leaflet-marker-icon.dragging {
+    cursor: grabbing;
+    box-shadow: var(--bs-box-shadow);
+    opacity: 0.9;
+}
+
+/* Editor Container */
+.editor-container {
+    min-height: 400px;
+    background: var(--bs-light);
+}
+
+.editor-container .leaflet-container {
+    background: var(--bs-light) !important;
+}
+
+/* Leaflet Image Layer */
+.leaflet-image-layer {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Location popup styling */
+.location-popup.leaflet-popup {
+    margin-bottom: 5px;
+}
+
+.location-popup .leaflet-popup-content-wrapper {
+    background: var(--toast-warning-bg);
+    border-radius: 4px;
+    box-shadow: var(--bs-box-shadow-sm);
+    padding: 0.5rem;
+    text-align: center;
+}
+
+.location-popup .leaflet-popup-content {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.2;
+    color: var(--toast-warning-text);
+    white-space: nowrap;
+    text-align: center;
+    min-width: 150px;
+}
+
+.location-popup .leaflet-popup-tip {
+    background: var(--toast-warning-bg);
+    box-shadow: none;
+}
+
+/* Editor Marker States */
+.modal-body .leaflet-marker-icon {
+    cursor: pointer;
+    transform-origin: center center;
+}
+
+.modal-body .leaflet-marker-icon.dragging {
+    cursor: grabbing;
+    box-shadow: var(--bs-box-shadow);
+    opacity: 0.9;
+}
+
+/* Zoom Controls */
+.leaflet-control-zoom {
+    border: none !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: var(--bs-box-shadow) !important;
+    overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 1.2rem !important;
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+}
+
+/* Loading State */
 [data-editor="true"][data-editor-ready="false"]::before {
     content: '';
     position: absolute;
@@ -475,77 +563,3 @@
 @keyframes spin {
     to { transform: translate(-50%, -50%) rotate(360deg); }
 }
-
-/* Modal size override for editor */
-.modal-xl {
-    max-width: 90vw;
-}
-
-/* Site Plan Editor Styles */
-.modal-body .leaflet-container {
-    background: var(--bs-light) !important;
-    outline: none !important;
-}
-
-/* Position controls in a better spot */
-.modal-body .leaflet-control-container .leaflet-top {
-    top: 1rem;
-}
-
-.modal-body .leaflet-control-container .leaflet-left {
-    left: 1rem;
-}
-
-/* Style the zoom controls */
-.modal-body .leaflet-control-zoom {
-    border: none !important;
-    border-radius: var(--bs-border-radius) !important;
-    box-shadow: var(--bs-box-shadow) !important;
-    overflow: hidden;
-}
-
-.modal-body .leaflet-control-zoom a {
-    width: 36px !important;
-    height: 36px !important;
-    line-height: 36px !important;
-    font-size: 1.2rem !important;
-    background-color: var(--bs-body-bg) !important;
-    color: var(--bs-body-color) !important;
-    border: 1px solid var(--bs-border-color) !important;
-    transition: all 0.2s ease-in-out;
-}
-
-.modal-body .leaflet-control-zoom a:hover {
-    background-color: var(--bs-light) !important;
-    color: var(--bs-primary) !important;
-}
-
-.modal-body .leaflet-control-zoom a:first-child {
-    border-bottom: none !important;
-}
-
-/* Image overlay in editor */
-.modal-body .leaflet-image-layer {
-    image-rendering: -webkit-optimize-contrast;  /* Sharper image rendering */
-    image-rendering: crisp-edges;
-}
-
-/* Editor markers */
-.modal-body .leaflet-marker-icon {
-    border: 2px solid white !important;
-    border-radius: 4px !important;
-    box-shadow: var(--bs-box-shadow-sm) !important;
-    transition: all 0.2s ease-in-out !important;
-}
-
-.modal-body .leaflet-marker-icon:hover {
-    transform: scale(1.1) !important;
-    box-shadow: var(--bs-box-shadow) !important;
-}
-
-.modal-body .leaflet-marker-dragging {
-    transform: scale(1.2) !important;
-    opacity: 0.8 !important;
-}
-
-/* ... rest of existing styles ... */

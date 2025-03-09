@@ -13,6 +13,14 @@ const sitePlanView = {
         initialized: false
     },
 
+    // Helper Methods
+    percentToImageCoords(xPercent, yPercent) {
+        const bounds = this.state.imageBounds;
+        const imageX = (xPercent / 100) * bounds[1][1];
+        const imageY = (yPercent / 100) * bounds[1][0];
+        return [imageY, imageX];
+    },
+
     // Available building icons
     buildingIcons: [
         'building',
@@ -36,15 +44,34 @@ const sitePlanView = {
     createIcon(isActive, iconType, locationName) {
         console.log(`Creating ${isActive ? 'active' : 'inactive'} icon for '${locationName}' with type: ${iconType}`);
         return L.divIcon({
-            className: `location-marker bg-${isActive ? 'primary' : 'secondary'} border border-2 border-white rounded-3 shadow-sm d-flex align-items-center justify-content-center p-1`,
-            iconSize: [48, 36],
-            iconAnchor: [24, 18],
+            className: `location-marker bg-${isActive ? 'primary' : 'secondary'} border border-2 border-white rounded-3 shadow-sm p-2`,
+            iconSize: null,  // Let it size to content
+            iconAnchor: null, // Will be set automatically
             html: `
                 <div class="d-flex flex-column align-items-center">
                     <i class="bi bi-${iconType}${isActive ? '-fill' : ''} text-white fs-5"></i>
+                    <div class="marker-label text-white small mt-1">
+                        ${locationName}
+                    </div>
                 </div>
             `
         });
+    },
+
+    // Create marker popup
+    createMarkerPopup(location) {
+        return `
+            <div class="p-2">
+                <h6 class="mb-1">${location.name}</h6>
+                ${location.description ? `<p class="mb-1 small text-muted">${location.description}</p>` : ''}
+                ${location.active_devices_count ? `
+                    <div class="text-success small">
+                        <i class="bi bi-circle-fill me-1"></i>
+                        ${location.active_devices_count} active device${location.active_devices_count !== 1 ? 's' : ''}
+                    </div>
+                ` : ''}
+            </div>
+        `;
     },
 
     // Initialize the view
@@ -63,7 +90,7 @@ const sitePlanView = {
         });
 
         return new Promise((resolve) => {
-            const container = document.getElementById('site-plan-container');
+            const container = document.getElementById('siteplan-container');
             if (!container) {
                 console.log('No site plan container found');
                 this.state.initialized = true;
@@ -133,7 +160,7 @@ const sitePlanView = {
             return;
         }
 
-        // Initialize the map
+        // Initialize the map with minimal controls
         this.state.map = L.map(container, {
             crs: L.CRS.Simple,
             zoomControl: false,
@@ -142,23 +169,77 @@ const sitePlanView = {
             scrollWheelZoom: false,
             doubleClickZoom: false,
             boxZoom: false,
-            keyboard: false
+            keyboard: false,
+            attributionControl: false,
+            zoomSnap: 0,
+            zoomDelta: 0,
+            minZoom: -2,
+            maxZoom: 2
         });
 
         // Add image overlay
         this.state.imageOverlay = L.imageOverlay(imageUrl, this.state.imageBounds).addTo(this.state.map);
 
-        // Fit map to bounds
-        this.state.map.fitBounds(this.state.imageBounds);
+        // Set container aspect ratio based on image
+        const wrapper = container.closest('.siteplan-wrapper');
+        if (wrapper) {
+            const aspectRatio = (this.state.imageBounds[1][0] / this.state.imageBounds[1][1]) * 100;
+            wrapper.style.paddingBottom = `${aspectRatio}%`;
+            
+            // Clear any existing styles that might interfere
+            wrapper.style.height = '';
+            wrapper.style.minHeight = '';
+            wrapper.style.maxHeight = '';
+            container.style.position = 'absolute';
+        }
+
+        // Function to ensure map fits perfectly
+        const fitMapPerfectly = () => {
+            if (!this.state.map || !this.state.imageBounds) return;
+            
+            // Force a size update
+            this.state.map.invalidateSize();
+            
+            // Get current container size
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            
+            // Calculate zoom to fit perfectly
+            const imageWidth = this.state.imageBounds[1][1];
+            const imageHeight = this.state.imageBounds[1][0];
+            const widthRatio = containerWidth / imageWidth;
+            const heightRatio = containerHeight / imageHeight;
+            const zoom = Math.min(widthRatio, heightRatio);
+            
+            // Center and zoom
+            this.state.map.setView([imageHeight/2, imageWidth/2], Math.log2(zoom));
+            this.state.map.fitBounds(this.state.imageBounds, {
+                animate: false,
+                padding: [0, 0]
+            });
+        };
+
+        // Initial fit
+        fitMapPerfectly();
+
+        // Create a ResizeObserver for the wrapper
+        const resizeObserver = new ResizeObserver(() => {
+            requestAnimationFrame(fitMapPerfectly);
+        });
+
+        // Observe both wrapper and container
+        if (wrapper) resizeObserver.observe(wrapper);
+        resizeObserver.observe(container);
+
+        // Also handle window resize
+        window.addEventListener('resize', fitMapPerfectly);
     },
 
     // Add markers to the map
     addMarkers(locations) {
         if (!this.state.map || !this.state.imageBounds) return;
 
-        const bounds = this.state.imageBounds;
-        
-        // Shuffle the buildingIcons array before starting
+        // Shuffle available icons before assigning
         this.buildingIcons = this.buildingIcons
             .map(value => ({ value, sort: Math.random() }))
             .sort((a, b) => a.sort - b.sort)
@@ -167,38 +248,42 @@ const sitePlanView = {
         console.log('Available icons after shuffle:', this.buildingIcons);
         
         locations.forEach(location => {
-            // Convert percentage coordinates to image coordinates
-            const imageX = (location.x / 100) * bounds[1][1];
-            const imageY = (location.y / 100) * bounds[1][0];
-
+            const coords = this.percentToImageCoords(location.x, location.y);
+            
             // Get random icon type for this location
             const iconType = this.getRandomIcon(location.name);
-
+            
             // Create marker with popup
-            const marker = L.marker([imageY, imageX], {
+            const marker = L.marker(coords, {
                 icon: this.createIcon(location.is_active, iconType, location.name),
                 title: location.name
             });
 
             // Add popup with location info
-            marker.bindPopup(`
-                <div class="p-2 ${!location.is_active ? 'text-muted' : ''}">
-                    <h6 class="mb-1">${location.name}</h6>
-                    ${location.active_devices_count > 0 ? `
-                        <div class="text-muted small">
-                            ${location.active_devices_count} active device${location.active_devices_count !== 1 ? 's' : ''}
-                        </div>
-                    ` : ''}
-                    ${!location.is_active ? '<div class="small">(Inactive)</div>' : ''}
-                </div>
-            `);
+            marker.bindPopup(this.createMarkerPopup(location), {
+                offset: [0, -10],
+                closeButton: false,
+                className: 'location-popup',
+                autoPan: false,
+                autoPanPadding: [50, 50],
+                keepInView: true
+            });
 
-            // Add to map and store reference with active state
+            // Show popup on hover
+            marker.on('mouseover', function() {
+                this.openPopup();
+            });
+            
+            marker.on('mouseout', function() {
+                this.closePopup();
+            });
+
+            // Add to map and store reference
             marker.addTo(this.state.map);
             this.state.markers.set(location.id, {
                 marker,
                 is_active: location.is_active,
-                iconType // Store the icon type for visibility updates
+                iconType
             });
         });
     },
