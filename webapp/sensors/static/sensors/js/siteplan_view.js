@@ -166,7 +166,11 @@ const sitePlanView = {
 
                     // Set initial visibility based on switch state
                     const locationSwitch = document.querySelector('.hideInactive-switch[data-model="location"]');
-                    if (locationSwitch && locationSwitch.checked) {
+                    if (locationSwitch) {
+                        // If switch exists, use its state
+                        this.updateMarkersVisibility(locationSwitch.checked);
+                    } else {
+                        // If no switch exists, hide inactive locations by default
                         this.updateMarkersVisibility(true);
                     }
                 } catch (error) {
@@ -322,7 +326,7 @@ const sitePlanView = {
 
     // Update markers visibility based on hide-inactive state
     updateMarkersVisibility(hideInactive) {
-        this.state.markers.forEach(({marker, is_active, iconType}) => {
+        this.state.markers.forEach(({marker, is_active}) => {
             if (!is_active) {
                 const element = marker.getElement();
                 if (element) {
