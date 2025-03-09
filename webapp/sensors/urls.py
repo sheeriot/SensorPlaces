@@ -17,8 +17,6 @@ urlpatterns = [
     path('<slug:place_slug>/location/<int:pk>/', views.LocationDetailView.as_view(), name='location_detail'),
     path('<slug:place_slug>/location/<int:pk>/update/', views.LocationUpdateView.as_view(), name='location_update'),
     path('<slug:place_slug>/location/<int:pk>/delete/', views.LocationDeleteView.as_view(), name='location_delete'),
-
-    # path('<slug:place_slug>/location/<int:pk>/position/', views.location_update_position, name='location_update_position'),
     
     # Device URLs - nested under places and locations
     path('<slug:place_slug>/location/<int:location_pk>/device/create/', views.DeviceCreateView.as_view(), name='device_create'),

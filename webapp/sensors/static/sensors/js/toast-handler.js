@@ -277,8 +277,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Convert Django alerts to toasts
-    const messages = document.querySelectorAll('.alert:not(.processed):not(.static-alert)');
+    // Convert Django alerts to toasts (excluding static alerts)
+    const messages = document.querySelectorAll('.alert:not([data-static="true"]):not(.processed)');
     messages.forEach(message => {
         const type = message.classList.contains('alert-success') ? 'success' :
                     message.classList.contains('alert-warning') ? 'warning' :
@@ -288,8 +288,9 @@ document.addEventListener('DOMContentLoaded', function() {
                           message.textContent.trim();
         
         if (messageText) {
+            message.style.opacity = '0';  // Fade out
             message.classList.add('processed');
-            message.remove();
+            setTimeout(() => message.remove(), 150);  // Remove after fade
             toastSystem.show(messageText, type);
         }
     });

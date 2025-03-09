@@ -11,10 +11,9 @@ from django.db.models.functions import Lower
 from typing import Any, Optional, Union, cast
 # from django.urls import reverse
 from datetime import datetime
-# from decimal import Decimal
+from decimal import Decimal
 from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
 from django.contrib.auth import get_user_model
-from icecream import ic
 
 def validate_image_size(image):
     filesize = image.size
@@ -35,13 +34,6 @@ class Place(models.Model):
         blank=True,
         validators=[validate_image_size]
     )
-    site_plan_scale = models.FloatField(default=1.0)
-    site_plan_x: FloatField = models.FloatField(default=0)
-    site_plan_y: FloatField = models.FloatField(default=0)
-    site_plan_aspect_ratio: FloatField = models.FloatField(
-        default=1.333,  # 4:3 aspect ratio (1024/768)
-        help_text="Aspect ratio of the site plan (width/height)"
-    )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -49,30 +41,9 @@ class Place(models.Model):
         return str(self.name)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        ic("=== Place.save starting ===")
-        if self.site_plan:
-            ic("Site plan before save:", {
-                'name': self.site_plan.name,
-                'size': getattr(self.site_plan, 'size', None),
-                'position': getattr(self.site_plan, 'tell', lambda: None)(),
-                'closed': getattr(getattr(self.site_plan, 'file', None), 'closed', None)
-            })
-        
         if not self.slug:
             self.slug = slugify(self.name)
-        try:
-            result = super().save(*args, **kwargs)
-            
-            if self.site_plan:
-                ic("Site plan after save:", {
-                    'name': self.site_plan.name,
-                    'url': self.site_plan.url if self.site_plan else None
-                })
-            
-            return result
-        except Exception as e:
-            ic("Error in Place.save:", str(e))
-            raise
+        return super().save(*args, **kwargs)
 
     @property
     def name_str(self) -> str:
@@ -119,8 +90,20 @@ class Place(models.Model):
 class Location(models.Model):
     name: CharField = models.CharField(max_length=100)
     place: ForeignKey = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='locations')
-    x_coord: DecimalField = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    y_coord: DecimalField = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    x_coord: DecimalField = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('50.00'),  # Center horizontally
+        null=True,
+        blank=True
+    )
+    y_coord: DecimalField = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('50.00'),  # Center vertically
+        null=True,
+        blank=True
+    )
     is_active: BooleanField = models.BooleanField(
         default=True,
         help_text="Inactive locations will be hidden by default"

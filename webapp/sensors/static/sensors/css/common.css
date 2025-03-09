@@ -16,6 +16,7 @@
     --grouped-header-hover-bg: rgba(var(--bs-primary-rgb), 0.1);
     --grouped-header-inactive-bg: rgba(var(--bs-secondary-rgb), 0.05);
     --grouped-header-inactive-hover-bg: rgba(var(--bs-secondary-rgb), 0.1);
+    --alert-static-opacity: 1;
 }
 
 /* Essential custom styles that Bootstrap doesn't provide */
@@ -174,22 +175,53 @@
 .site-plan-wrapper {
     position: relative;
     width: 100%;
-    overflow: hidden;
-    padding-bottom: 75%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding-bottom: 75%; /* Default 4:3 aspect ratio */
+    background-color: var(--bs-light);
 }
 
-#siteMapContainer {
-    position: relative;
+.site-plan-container {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
 }
 
-.site-plan-background {
-    position: absolute;
-    inset: 0;
-    background-size: contain;
-    background-position: center;
-    background-repeat: no-repeat;
+/* Leaflet Customizations */
+.leaflet-container {
+    width: 100% !important;
+    height: 100% !important;
+    background: var(--bs-light) !important;
+    font-family: var(--bs-body-font-family) !important;
+}
+
+.leaflet-control-container .leaflet-control {
+    border: none !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: var(--bs-box-shadow-sm) !important;
+}
+
+.leaflet-marker-icon {
+    border: 2px solid white !important;
+    border-radius: 4px !important;
+    box-shadow: var(--bs-box-shadow-sm) !important;
+}
+
+.leaflet-popup {
+    margin-bottom: 15px !important;
+}
+
+.leaflet-popup-content-wrapper {
+    padding: 0.5rem !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: var(--bs-box-shadow-sm) !important;
+}
+
+.leaflet-popup-content {
+    margin: 0 !important;
+    line-height: 1.4 !important;
 }
 
 /* Navigation styles */
@@ -204,22 +236,27 @@
     position: absolute;
     cursor: pointer;
     z-index: 10;
+    transform: translate(-50%, -50%); /* Center the marker on its position */
 }
 
 .location-marker .marker-content {
     font-size: 0.75rem;
     line-height: 1;
     white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    color: white;
+    background-color: var(--bs-primary);
+}
+
+.location-marker .location-name,
+.location-marker .device-count {
+    margin: 0;
+    padding: 0;
+    text-align: center;
 }
 
 /* Editor styles */
-.site-plan-editor {
-    position: relative;
-    width: 100%;
-    height: 600px;
-    overflow: hidden;
-}
-
 #siteMapEditorContainer {
     width: 100%;
     height: 100%;
@@ -272,16 +309,6 @@
 }
 
 /* Map Controls */
-.leaflet-control-zoom {
-    border: none !important;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.2) !important;
-}
-
-.leaflet-control-zoom a {
-    background-color: white !important;
-    color: #666 !important;
-}
-
 .folium-map .legend {
     background-color: white;
     border-radius: 3px;
@@ -409,7 +436,116 @@
     background-color: var(--grouped-header-inactive-hover-bg) !important;
 }
 
-/* Form error handling */
-.alert.static-alert {
-    display: block !important;  /* Ensures alerts aren't hidden by toast system */
-} 
+/* Replace the complex alert handling with this simple rule */
+.alert {
+    opacity: var(--alert-static-opacity) !important;
+}
+
+/* Remove the old static-alert class definition */
+/* .alert.static-alert {
+    display: block !important;
+} */
+
+/* Modal enhancements */
+.modal-xl {
+    max-width: 90vw;
+}
+
+.modal-body {
+    padding: 1rem;
+}
+
+/* Site Plan and Editor specific styles that Bootstrap can't handle */
+/* Loading spinner for editor */
+[data-editor="true"][data-editor-ready="false"]::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--bs-border-color);
+    border-top-color: var(--bs-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1000;
+}
+
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Modal size override for editor */
+.modal-xl {
+    max-width: 90vw;
+}
+
+/* Site Plan Editor Styles */
+.modal-body .leaflet-container {
+    background: var(--bs-light) !important;
+    outline: none !important;
+}
+
+/* Position controls in a better spot */
+.modal-body .leaflet-control-container .leaflet-top {
+    top: 1rem;
+}
+
+.modal-body .leaflet-control-container .leaflet-left {
+    left: 1rem;
+}
+
+/* Style the zoom controls */
+.modal-body .leaflet-control-zoom {
+    border: none !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: var(--bs-box-shadow) !important;
+    overflow: hidden;
+}
+
+.modal-body .leaflet-control-zoom a {
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 1.2rem !important;
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+    transition: all 0.2s ease-in-out;
+}
+
+.modal-body .leaflet-control-zoom a:hover {
+    background-color: var(--bs-light) !important;
+    color: var(--bs-primary) !important;
+}
+
+.modal-body .leaflet-control-zoom a:first-child {
+    border-bottom: none !important;
+}
+
+/* Image overlay in editor */
+.modal-body .leaflet-image-layer {
+    image-rendering: -webkit-optimize-contrast;  /* Sharper image rendering */
+    image-rendering: crisp-edges;
+}
+
+/* Editor markers */
+.modal-body .leaflet-marker-icon {
+    border: 2px solid white !important;
+    border-radius: 4px !important;
+    box-shadow: var(--bs-box-shadow-sm) !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.modal-body .leaflet-marker-icon:hover {
+    transform: scale(1.1) !important;
+    box-shadow: var(--bs-box-shadow) !important;
+}
+
+.modal-body .leaflet-marker-dragging {
+    transform: scale(1.2) !important;
+    opacity: 0.8 !important;
+}
+
+/* ... rest of existing styles ... */

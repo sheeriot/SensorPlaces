@@ -26,8 +26,19 @@
     <!-- Leaflet and plugins JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.min.js"></script>
+
+    <!-- Add Bootstrap 5 utility classes for static alerts -->
+    <style>
+        .alert[data-static="true"] {
+            /* Bootstrap 5 utilities */
+            --bs-alert-margin: 1rem;
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+    </style>
 </head>
-<body {% if place %}data-place-slug="{{ place.slug|escapejs }}"{% endif %}>
+<body {% if place %}data-place-slug="{{ place.slug }}"{% endif %}>
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
         <div class="container">
             <div class="d-flex align-items-center flex-grow-1">
@@ -166,14 +177,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 
-    <!-- Application Configuration -->
-    <script>
-        window.currentPlaceSlug = {% if place %}"{{ place.slug|escapejs }}"{% else %}null{% endif %};
-        if (document.body.dataset.placeSlug !== window.currentPlaceSlug && window.currentPlaceSlug !== null) {
-            console.error('Place slug mismatch between data attribute and window variable');
-        }
-    </script>
-    
     <!-- Application JavaScript -->
     <script src="{% static 'sensors/js/utils.js' %}"></script>
     <script src="{% static 'sensors/js/toast-handler.js' %}"></script>
@@ -185,7 +188,9 @@
     <script src="{% static 'sensors/js/place_map_popout.js' %}"></script>
     <script src="{% static 'sensors/js/places_map_folium.js' %}"></script>
     <script src="{% static 'sensors/js/place_map_location_picker.js' %}"></script>
+    <script src="{% static 'sensors/js/site_plan_view.js' %}"></script>
     <script src="{% static 'sensors/js/site_plan_editor.js' %}"></script>
+
     
     {% block extra_js %}{% endblock %}
 </body>

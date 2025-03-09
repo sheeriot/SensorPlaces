@@ -1,118 +1,36 @@
-<!-- Site Plan/Map Card -->
-<div class="card mb-4" id="site_plan_card">
+{% load static %}
+
+<!-- Site Plan Card -->
+<div class="card mb-4" id="site-plan-card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
             <i class="bi bi-map me-2"></i>
             Site Plan
         </h5>
         {% if editable %}
-        <button id="editSitePlan" class="btn btn-sm btn-outline-primary">
+        <button id="site-plan-edit" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-grid"></i> Edit Layout
         </button>
         {% endif %}
     </div>
     <div class="card-body p-0">
-        <div class="site-plan-wrapper position-relative">
-            <div id="site-plan-layout" 
-                 class="position-absolute w-100"
-                 style="aspect-ratio: {{ place.site_plan_aspect_ratio|default:1.333 }};"
-                 data-scale="{{ place.site_plan_scale|default:1.0 }}"
-                 data-x="{{ place.site_plan_x|default:0 }}"
-                 data-y="{{ place.site_plan_y|default:0 }}"
-                 data-aspect-ratio="{{ place.site_plan_aspect_ratio|default:1.333 }}">
-            {% for location in locations %}
-                <div class="location-marker {% if not location.is_active %}opacity-50 d-none{% endif %} position-absolute p-1" 
-                     data-location-id="{{ location.pk }}"
-                     data-location-active="{{ location.is_active|lower }}"
-                     data-x="{{ location.x_coord|default:50 }}"
-                     data-y="{{ location.y_coord|default:50 }}"
-                     style="left: {{ location.x_coord|default:50 }}%; top: {{ location.y_coord|default:50 }}%;">
-                    <div class="marker-content p-0 m-0 {% if location.is_active %}bg-primary{% else %}bg-secondary{% endif %}">
-                        <div class="location-name p-0 m-0">{{ location.name }}</div>
-                        <div class="device-count p-0 m-0">{{ location.active_devices_count }}</div>
-                    </div>
-                </div>
-            {% endfor %}
-                {% if place.get_site_plan_url %}
-                <div class="site-plan-background position-absolute w-100 h-100" 
-                     style="background-image: url('{{ place.get_site_plan_url }}');
-                            aspect-ratio: {{ place.site_plan_aspect_ratio|default:1.333 }};">
-                </div>
-                {% endif %}
+        <!-- Site plan wrapper with fixed aspect ratio -->
+        <div class="position-relative bg-light border" style="padding-bottom: 75%">
+            <!-- Leaflet map container -->
+            <div id="site-plan-container" 
+                 class="position-absolute top-0 start-0 w-100 h-100"
+                 data-image-url="{{ place.get_site_plan_url }}"
+                 data-locations="{{ locations_json|escapejs }}">
             </div>
         </div>
     </div>
 </div>
 
-<!-- Edit Modal -->
+<!-- Site Plan Editor Modal -->
 <div class="modal fade" id="sitePlanModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Site Plan Layout</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <!-- Controls Panel -->
-                <div id="editControls" class="p-2 border-bottom">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <!-- Aspect Ratio Controls -->
-                        <div class="btn-group btn-group-sm me-2">
-                            <select id="aspectRatioSelect" class="form-select form-select-sm" style="width: auto;">
-                                <option value="1.333" {% if place.site_plan_aspect_ratio == 1.333 %}selected{% endif %}>4:3</option>
-                                <option value="1.778" {% if place.site_plan_aspect_ratio == 1.778 %}selected{% endif %}>16:9</option>
-                                <option value="1.0" {% if place.site_plan_aspect_ratio == 1.0 %}selected{% endif %}>1:1</option>
-                                <option value="custom" {% if place.site_plan_aspect_ratio not in '1.333,1.778,1.0'|stringformat:'s' %}selected{% endif %}>Custom</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Zoom Controls -->
-                        <div class="btn-group btn-group-sm">
-                            <button id="zoomIn" class="btn btn-outline-secondary">
-                                <i class="bi bi-zoom-in"></i>
-                            </button>
-                            <button id="zoomOut" class="btn btn-outline-secondary">
-                                <i class="bi bi-zoom-out"></i>
-                            </button>
-                        </div>
-                        
-                        <!-- Movement Controls -->
-                        <div class="btn-group btn-group-sm">
-                            <button id="moveLeft" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-left"></i>
-                            </button>
-                            <button id="moveUp" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-up"></i>
-                            </button>
-                            <button id="moveDown" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-down"></i>
-                            </button>
-                            <button id="moveRight" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-right"></i>
-                            </button>
-                        </div>
-                        
-                        <!-- Reset Control -->
-                        <div class="btn-group btn-group-sm">
-                            <button id="resetView" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrows-fullscreen"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Site Plan Editor -->
-                <div class="site-plan-editor">
-                    <div id="siteMapEditorContainer" class="position-relative"
-                         style="aspect-ratio: {{ place.site_plan_aspect_ratio|default:1.333 }};">
-                        <!-- Markers and background will be cloned here -->
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="savePositions">Save Changes</button>
-            </div>
+            {% include "sensors/includes/site_plan_editor.html" %}
         </div>
     </div>
 </div> 

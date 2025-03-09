@@ -8,7 +8,6 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
 from crispy_forms.bootstrap import PrependedText, FormActions
 from django.db import models
-from icecream import ic
 
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
@@ -336,81 +335,37 @@ class PlaceForm(forms.ModelForm):
         )
 
     def clean(self):
-        ic("=== Starting PlaceForm.clean ===")
         cleaned_data = super().clean()
         
+        # Ensure site_plan is preserved
         if 'site_plan' in self.files:
-            file = self.files['site_plan']
-            ic("File in clean method:", {
-                'name': file.name,
-                'size': file.size,
-                'position': file.tell(),
-                'content_type': file.content_type
-            })
+            cleaned_data['site_plan'] = self.files['site_plan']
         
         return cleaned_data
 
     def clean_site_plan(self):
-        ic("=== Starting clean_site_plan ===")
         site_plan = self.cleaned_data.get('site_plan')
         
         if site_plan:
-            ic("Initial file state:", {
-                'name': site_plan.name,
-                'size': site_plan.size,
-                'position': site_plan.tell(),
-                'content_type': site_plan.content_type
-            })
-            
             try:
                 # Always reset to beginning
                 site_plan.seek(0)
-                ic("After seek(0), position:", site_plan.tell())
                 
-                # Try to read first few bytes to verify it's an image
-                header = site_plan.read(16)
-                ic("File header (hex):", header.hex())
+                img = Image.open(site_plan)
                 
-                # Reset again for PIL
+                # Basic dimension check
+                if img.width < 200 or img.height < 200:
+                    raise forms.ValidationError(
+                        f'Image must be at least 200x200 pixels. '
+                        f'Uploaded image is {img.width}x{img.height} pixels.'
+                    )
+                
+                # Reset file pointer one final time
                 site_plan.seek(0)
-                
-                try:
-                    img = Image.open(site_plan)
-                    ic("PIL opened image:", {
-                        'format': img.format,
-                        'mode': img.mode,
-                        'size': img.size,
-                        'file_position': site_plan.tell()
-                    })
-                    
-                    # Basic dimension check
-                    if img.width < 200 or img.height < 200:
-                        raise forms.ValidationError(
-                            f'Image must be at least 200x200 pixels. '
-                            f'Uploaded image is {img.width}x{img.height} pixels.'
-                        )
-                    
-                    # Reset file pointer one final time
-                    site_plan.seek(0)
-                    ic("Final position:", site_plan.tell())
-                    
-                    return site_plan
-                    
-                except Exception as e:
-                    ic("PIL Error:", {
-                        'error_type': type(e).__name__,
-                        'error_msg': str(e),
-                        'file_position': site_plan.tell()
-                    })
-                    raise forms.ValidationError(f"Image validation failed: {str(e)}")
+                return site_plan
                     
             except Exception as e:
-                ic("File handling error:", {
-                    'error_type': type(e).__name__,
-                    'error_msg': str(e),
-                    'file_position': getattr(site_plan, 'tell', lambda: None)()
-                })
-                raise forms.ValidationError(f"File handling error: {str(e)}")
+                raise forms.ValidationError(f"Image validation failed: {str(e)}")
         
         return site_plan
 

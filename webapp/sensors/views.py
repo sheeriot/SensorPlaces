@@ -112,7 +112,7 @@ class PlaceListView(ListView):
         
         return context
 
-class PlaceDetailView(DetailView):
+class PlaceDetailView(LocationAnnotationMixin, DetailView):
     model = Place
     context_object_name = 'place'
     template_name = 'sensors/place_detail.html'
@@ -120,34 +120,38 @@ class PlaceDetailView(DetailView):
     slug_field = 'slug'
 
     def get_queryset(self) -> QuerySet[Place]:
-        if not hasattr(self, '_queryset'):
-            self._queryset = Place.objects.annotate(
-                active_locations_count=Count('locations', filter=Q(locations__is_active=True)),
-                active_devices_count=Count('locations__devices', filter=Q(locations__devices__is_active=True)),
-                active_sensors_count=Count('locations__devices__sensors', filter=Q(locations__devices__sensors__is_active=True))
-            )
-        return self._queryset
+        return Place.objects.all()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['model_name'] = 'place'
-        place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
+        from icecream import ic
+        import json
         
-        # Annotate locations with device counts
-        locations = Location.objects.filter(place=place).annotate(
-            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).order_by('-is_active', 'name')
-        context['locations'] = locations
-        
-        # Add device counts
-        context.update({
-            'devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
-            'devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
-            'sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
-            'sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
-        })
-        
+        # Ensure place is in context
+        if 'place' not in context and hasattr(self, 'object'):
+            context['place'] = self.object
+            
+        # Debug locations from LocationAnnotationMixin
+        if 'locations' in context:
+            locations_data = []
+            for location in context['locations']:
+                locations_data.append({
+                    'id': location.id,
+                    'name': location.name,
+                    'x': location.x_coord_value,  # Match JavaScript property names
+                    'y': location.y_coord_value,  # Match JavaScript property names
+                    'is_active': location.is_active,
+                    'active_devices_count': location.active_devices_count
+                })
+            context['locations_json'] = json.dumps(locations_data)
+            
+            ic("Locations in context:", locations_data)
+            ic("Locations count:", len(locations_data))
+            ic("First location data:", locations_data[0] if locations_data else None)
+        else:
+            ic("No locations in context!")
+            context['locations_json'] = '[]'
+            
         return context
 
 class PlaceCreateView(SuccessMessageMixin, CreateView):
@@ -233,31 +237,13 @@ class PlaceUpdateView(SuccessMessageMixin, UpdateView):
             }
 
     def form_invalid(self, form):
-        ic("=== Form Invalid in PlaceUpdateView ===")
-        ic("Form errors:", form.errors)
-        ic("Files present:", {
-            'files': dict(form.files),
-            'cleaned_data': getattr(form, 'cleaned_data', None)
-        })
         return super().form_invalid(form)
 
     def form_valid(self, form):
-        ic("=== Form Valid in PlaceUpdateView ===")
-        ic("Before save:", {
-            'has_site_plan': 'site_plan' in form.cleaned_data,
-            'site_plan_type': type(form.cleaned_data.get('site_plan')).__name__ if 'site_plan' in form.cleaned_data else None,
-            'files_present': bool(form.files)
-        })
-        
         try:
             response = super().form_valid(form)
-            ic("After save - success")
             return response
         except Exception as e:
-            ic("Error saving form:", {
-                'error_type': type(e).__name__,
-                'error_message': str(e)
-            })
             raise
 
     def get_success_message(self, cleaned_data):
@@ -853,44 +839,47 @@ class DeviceMoveLocationView(View):
 @require_POST
 def update_site_plan_layout(request, place_slug):
     """Update the site plan layout settings for a place"""
-    if not request.user.has_perm('sensors.change_place'):
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
     try:
         place = get_object_or_404(Place, slug=place_slug)
-        
         data = json.loads(request.body)
         
-        # Track site plan changes
-        site_plan_changes = []
+        # Track changes with before/after values
+        changes = []
         
-        # Check and update site plan transform
+        # Site plan transform changes
         if 'site_plan_scale' in data:
             old_scale = place.site_plan_scale
-            place.site_plan_scale = float(data['site_plan_scale'])
-            if old_scale != place.site_plan_scale:
-                site_plan_changes.append(f"scale: {old_scale:.2f} → {place.site_plan_scale:.2f}")
+            new_scale = float(data['site_plan_scale'])
+            if old_scale != new_scale:
+                changes.append(
+                    f"Scale: {old_scale:.2f} → {new_scale:.2f}"
+                )
+                place.site_plan_scale = new_scale
         
         if 'site_plan_x' in data:
             old_x = place.site_plan_x
-            place.site_plan_x = float(data['site_plan_x'])
-            if old_x != place.site_plan_x:
-                site_plan_changes.append(f"x offset: {old_x:.1f} → {place.site_plan_x:.1f}")
+            new_x = float(data['site_plan_x'])
+            if old_x != new_x:
+                changes.append(
+                    f"X offset: {old_x:.1f}px → {new_x:.1f}px"
+                )
+                place.site_plan_x = new_x
         
         if 'site_plan_y' in data:
             old_y = place.site_plan_y
-            place.site_plan_y = float(data['site_plan_y'])
-            if old_y != place.site_plan_y:
-                site_plan_changes.append(f"y offset: {old_y:.1f} → {place.site_plan_y:.1f}")
-        
-        if site_plan_changes:
+            new_y = float(data['site_plan_y'])
+            if old_y != new_y:
+                changes.append(
+                    f"Y offset: {old_y:.1f}px → {new_y:.1f}px"
+                )
+                place.site_plan_y = new_y
+
+        if changes:
             place.save(update_fields=['site_plan_scale', 'site_plan_x', 'site_plan_y'])
         
-        # Track location updates
-        location_updates = []
-        location_changes = data.get('locations', [])
-        
-        for update in location_changes:
+        # Location position changes
+        location_changes = []
+        for update in data.get('locations', []):
             location_id = update.get('id')
             new_x = update.get('x')
             new_y = update.get('y')
@@ -904,79 +893,91 @@ def update_site_plan_layout(request, place_slug):
                     new_y = float(new_y)
                     
                     if old_x != new_x or old_y != new_y:
-                        location_updates.append({
+                        location_changes.append({
                             'name': location.name,
-                            'old_pos': {'x': old_x, 'y': old_y},
-                            'new_pos': {'x': new_x, 'y': new_y}
+                            'changes': f"({old_x:.1f}, {old_y:.1f}) → ({new_x:.1f}, {new_y:.1f})"
                         })
                         location.x_coord = new_x
                         location.y_coord = new_y
                         location.save(update_fields=['x_coord', 'y_coord'])
-                
-        # Construct response message
-        message = [f"Updated site plan layout for <strong>{place.name}</strong>"]
+
+        # Construct detailed message
+        message_parts = [f"Updated site plan layout for <strong>{place.name}</strong>"]
         
-        if site_plan_changes:
-            message.append("<br><small class='text-muted'>Site Plan Changes:")
-            changes_with_icon = [f"<i class='bi bi-house-gear'></i> {change}" for change in site_plan_changes]
-            message.append(", ".join(changes_with_icon))
-            message.append("</small>")
+        if changes:
+            message_parts.append("<br><small class='text-muted'>Site Plan Changes:")
+            changes_with_icon = [f"<i class='bi bi-house-gear'></i> {change}" for change in changes]
+            message_parts.append(", ".join(changes_with_icon))
+            message_parts.append("</small>")
         
-        if location_updates:
-            message.append("<br><small class='text-muted'>Location Changes:")
-            for update in location_updates:
-                message.append(
-                    f"<br><i class='bi bi-geo-alt'></i> {update['name']}: "
-                    f"({update['old_pos']['x']:.1f}, {update['old_pos']['y']:.1f}) → "
-                    f"({update['new_pos']['x']:.1f}, {update['new_pos']['y']:.1f})"
+        if location_changes:
+            message_parts.append("<br><small class='text-muted'>Location Changes:")
+            for change in location_changes:
+                message_parts.append(
+                    f"<br><i class='bi bi-geo-alt'></i> {change['name']}: {change['changes']}"
                 )
-            message.append("</small>")
+            message_parts.append("</small>")
+
+        success_message = "".join(message_parts)
         
-        final_message = "".join(message)
+        # Add to session toast history
+        toast_count = 0
+        if hasattr(request, 'session'):
+            toast_history = request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'warning',  # Using warning type for updates
+                'timestamp': timezone.now().isoformat(),
+                'tags': 'warning safe layout-update'  # Add tags for filtering
+            })
+            request.session['toast_history'] = toast_history
+            request.session.modified = True
+            toast_count = len(toast_history)
+
+        # Add to Django messages if available (persistent storage)
+        messages.warning(request, success_message, extra_tags='safe layout-update')
         
         response_data = {
             'status': 'success',
-            'message': final_message,
+            'message': success_message,
             'type': 'warning',
-            'messages': [{                       # Add messages array for toast history
-                'message': final_message,
-                'tags': 'warning safe',          # Include both warning and safe tags
-                'level': messages.WARNING
-            }],
+            'tags': 'warning safe layout-update',
+            'toast_count': toast_count,  # Add count to response
             'changes': {
                 'site_plan': {
                     'scale': place.site_plan_scale,
                     'x': place.site_plan_x,
-                    'y': place.site_plan_y,
-                    'changed': bool(site_plan_changes)
+                    'y': place.site_plan_y
                 },
-                'locations': location_updates
+                'locations': location_changes
             }
         }
         
         return JsonResponse(response_data)
         
-    except (ValueError, json.JSONDecodeError) as e:
-        error_message = f'Invalid data format: {str(e)}'
-        return JsonResponse({
-            'error': error_message,
-            'type': 'danger',
-            'messages': [{                       # Add error message to history
-                'message': error_message,
-                'tags': 'error',
-                'level': messages.ERROR
-            }]
-        }, status=400)
     except Exception as e:
-        error_message = f'Server error: {str(e)}'
-        return JsonResponse({
-            'error': error_message,
-            'type': 'danger',
-            'messages': [{                       # Add error message to history
+        error_message = f'Error updating layout: {str(e)}'
+        
+        # Add error to session toast history
+        if hasattr(request, 'session'):
+            toast_history = request.session.get('toast_history', [])
+            toast_history.append({
                 'message': error_message,
-                'tags': 'error',
-                'level': messages.ERROR
-            }]
+                'type': 'danger',
+                'timestamp': timezone.now().isoformat(),
+                'tags': 'error layout-update'
+            })
+            request.session['toast_history'] = toast_history
+            request.session.modified = True
+
+        # Add to Django messages
+        messages.error(request, error_message, extra_tags='layout-update')
+        
+        return JsonResponse({
+            'error': str(e),
+            'type': 'danger',
+            'tags': 'error layout-update',
+            'message': error_message
         }, status=500)
 
 @require_POST
@@ -1567,14 +1568,14 @@ class SensorDetailView(LocationAnnotationMixin, DetailView):
             try:
                 readings = get_sensor_readings(sensor=sensor, minutes=60)
                 if readings:
-                    values = [reading['value'] for reading in readings]
+                    values = [reading.value for reading in readings]
                     context['readings_summary'] = {
                         'count': len(values),
                         'min': min(values),
                         'max': max(values),
                         'avg': sum(values) / len(values),
-                        'first_timestamp': readings[0]['timestamp'],
-                        'last_timestamp': readings[-1]['timestamp'],
+                        'first_timestamp': readings[0].timestamp,
+                        'last_timestamp': readings[-1].timestamp,
                         'unit': sensor.unit
                     }
                     context['recent_readings'] = readings[:10]  # Last 10 readings
