@@ -16,15 +16,16 @@ This template expects:
         </a>
     </td>
     <td>
+        <span class="text-success">{{ location.active_devices_count }}</span>
+        <span class="text-secondary">({{ location.inactive_devices_count }})</span>
+    </td>
+    {% if model_name == "location" %}
+    <td>
         {% if place.is_active %}
             {% include "sensors/partials/toggle_active_button.html" with type="location" id=location.pk is_active=location.is_active place_slug=place.slug %}
         {% else %}
             {% include "sensors/partials/status_active_badge.html" with object=location show_active=1 %}
         {% endif %}
-    </td>
-    <td>
-        <span class="text-success">{{ location.active_devices_count }}</span>
-        <span class="text-secondary">({{ location.inactive_devices_count }})</span>
     </td>
     <td>
         <div class="btn-group btn-group-sm">
@@ -38,4 +39,5 @@ This template expects:
             </a>
         </div>
     </td>
+    {% endif %}
 </tr> 

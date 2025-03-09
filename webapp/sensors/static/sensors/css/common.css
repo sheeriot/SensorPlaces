@@ -19,6 +19,12 @@
     --alert-static-opacity: 1;
 }
 
+
+.text-light-purple { color: #DDA0DD; }
+.text-light-blue { color: #66B2E8; }
+.text-light-gold { color: #FFEAA0; }
+.text-light-green { color: #A8E6CF; }
+
 /* Essential custom styles that Bootstrap doesn't provide */
 .sensor-value,
 .sensor-timestamp {
@@ -577,3 +583,5 @@
     color: var(--bs-body-color) !important;
     border: 1px solid var(--bs-border-color) !important;
 }
+
+

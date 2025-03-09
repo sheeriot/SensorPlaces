@@ -630,10 +630,16 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['initial'] = {
-            'place': self.place,
-            'location': self.location
-        }
+        kwargs['place'] = self.place
+        kwargs['initial_location'] = self.location
+        
+        # Add debug logging
+        ic("DeviceCreateView - get_form_kwargs:", {
+            'place': kwargs['place'].name if kwargs.get('place') else None,
+            'initial_location': kwargs.get('initial_location'),
+            'has_data': bool(kwargs.get('data')),
+        })
+        
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -1030,22 +1036,54 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        self.place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        kwargs['place'] = self.place
+        kwargs['referrer'] = self.request.META.get('HTTP_REFERER', '')
+        
+        # Debug the kwargs being passed to form
+        ic("DeviceUpdateView - get_form_kwargs:", {
+            'place': kwargs['place'],
+            'instance': kwargs.get('instance'),
+            'initial': kwargs.get('initial'),
+            'data': bool(kwargs.get('data')),
+            'referrer': kwargs.get('referrer'),
+        })
+        
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
+        return initial
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        ic("DeviceUpdateView - Context:", context)
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
-            context['place_url'] = reverse('sensors:place_detail', kwargs={'place_slug': place_slug})
+        context['model_name'] = 'device'
+        context['place'] = self.place
+        
+        # Debug context data
+        ic("DeviceUpdateView - get_context_data:", {
+            'place': context['place'],
+            'form_instance': context['form'].instance if 'form' in context else None,
+            'locations_count': Location.objects.filter(place=self.place).count()
+        })
+        
         return context
 
     def form_valid(self, form):
         # Store original values before save
         device = self.get_object()
-        ic("DeviceUpdateView - Original Values:", {
+        ic("DeviceUpdateView - Original Device:", {
+            'id': device.pk,
             'name': device.name,
             'is_active': device.is_active,
-            'location': device.location.name,
+            'location': {
+                'id': device.location.pk,
+                'name': device.location.name,
+                'place': device.location.place.name
+            },
             'device_type': device.device_type,
             'model': device.model
         })
@@ -1061,10 +1099,15 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         response = super().form_valid(form)
         device = self.object
         
-        ic("DeviceUpdateView - Updated Values:", {
+        ic("DeviceUpdateView - Updated Device:", {
+            'id': device.pk,
             'name': device.name,
             'is_active': device.is_active,
-            'location': device.location.name,
+            'location': {
+                'id': device.location.pk,
+                'name': device.location.name,
+                'place': device.location.place.name
+            },
             'device_type': device.device_type,
             'model': device.model
         })
@@ -1102,12 +1145,15 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             title='Device Updated',
             message=message
         )
-        
         return response
 
     def form_invalid(self, form):
         """Handle form validation errors by displaying them in the form"""
-        ic("DeviceUpdateView - Form Invalid:", form.errors)
+        ic("DeviceUpdateView - Form Invalid:", {
+            'errors': form.errors,
+            'non_field_errors': form.non_field_errors(),
+            'cleaned_data': getattr(form, 'cleaned_data', None)
+        })
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):

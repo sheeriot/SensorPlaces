@@ -9,7 +9,7 @@
         </a>
     </td>
     <td>
-        {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=device.location.place.slug disabled=not device.is_active %}
+        {% include "sensors/partials/toggle_active_button.html" with type="sensor" place_slug=device.location.place.slug id=sensor.pk is_active=sensor.is_active disabled=not %}
     </td>
     <td>{{ sensor.sensor_type }}</td>
     <td class="text-end">
