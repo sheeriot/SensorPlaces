@@ -1,184 +1,23 @@
 {% extends "sensors/base.html" %}
 
-{% block title %}Locations - {{ place.name }}{% endblock %}
+{% block title %}Locations @ {{ place.name }}{% endblock %}
 
 {% block content %}
 <div class="row">
-    <!-- Header with Title and Actions -->
-    <div class="col-md-12 mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item">
-                            <a href="{% url 'sensors:place_detail' place.slug %}">{{ place.name }}</a>
-                        </li>
-                        <li class="breadcrumb-item active">Locations</li>
-                    </ol>
-                </nav>
-                <h1 class="mb-0">Locations @ {{ place.name }}</h1>
-            </div>
-            <div class="btn-group">
-                <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add Location
-                </a>
-            </div>
-        </div>
-    </div>
-
     <!-- Place Title Card -->
-    <div class="col-12">
+    <div class="col-12 mb-1">
         {% include "sensors/includes/place_title_card.html" with place=place %}
     </div>
-
-    <!-- Left Column: Location List -->
-    <div class="col-md-6">
-        {% include "sensors/includes/location_list_card.html" with locations=place.locations.all place=place %}
+</div>
+<div class="row">
+    <!-- Left Column: place_nav and place_details -->
+    <div class="col-md-4">
+        {% include "sensors/includes/place_nav_card.html" with place=place locations=locations %}
+        {% include "sensors/includes/siteplan_card.html" with place=place locations=locations %}
     </div>
-
-    <!-- Right Column: Site Plan -->
-    <div class="col-md-6">
-        {% include "sensors/includes/site_plan_card.html" with place=place locations=locations.all %}
+    <!-- Right Column: Locations and Site Plan -->
+    <div class="col-md-8">
+        {% include "sensors/includes/location_list_card.html" with place=place locations=locations %}
     </div>
 </div>
-
 {% endblock %}
-
-{% block extra_css %}
-<style>
-    .location-marker {
-        cursor: move;
-        transform: translate(-50%, -50%);
-        z-index: 100;
-        position: relative;
-    }
-    .location-marker.dragging {
-        z-index: 1000;
-    }
-    
-    .location-label {
-        position: absolute;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 12px;
-        white-space: nowrap;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: -20px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .location-label .badge {
-        font-size: 10px;
-        padding: 3px 6px;
-    }
-    
-    .location-popup {
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        margin-bottom: 10px;
-        background: white;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        padding: 8px;
-        width: 200px;
-        z-index: 1000;
-        display: none;
-    }
-    
-    .location-marker:hover .location-popup {
-        display: block;
-    }
-    
-    .location-marker .bi {
-        filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
-    }
-
-    #siteMapContainer:not(.edit-mode) .location-marker {
-        cursor: pointer;
-    }
-
-    .folium-map {
-        height: 500px;
-        width: 100%;
-        border-radius: 0 0 0.25rem 0.25rem;
-    }
-
-    .inactive-location {
-        display: none;
-    }
-</style>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-// Add CSRF token to the page
-const csrfToken = '{{ csrf_token }}';
-const placeSlug = '{{ place.slug }}';
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Site Plan Editing
-    const container = document.getElementById('siteMapContainer');
-    const locationMarkers = document.querySelectorAll('.location-marker');
-    let isDragging = false;
-    let currentMarker = null;
-    let startX, startY;
-    let originalX, originalY;
-
-    // Marker drag functionality
-    locationMarkers.forEach(marker => {
-        marker.addEventListener('mousedown', startDragging);
-    });
-
-    function startDragging(e) {
-        if (!container.classList.contains('edit-mode')) return;
-        
-        isDragging = true;
-        currentMarker = e.target.closest('.location-marker');
-        currentMarker.classList.add('dragging');
-        
-        const rect = container.getBoundingClientRect();
-        startX = e.clientX - rect.left;
-        startY = e.clientY - rect.top;
-        originalX = parseFloat(currentMarker.dataset.x);
-        originalY = parseFloat(currentMarker.dataset.y);
-    }
-
-    document.addEventListener('mousemove', function(e) {
-        if (!isDragging || !currentMarker) return;
-
-        const rect = container.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Calculate percentage positions
-        let newX = (x / rect.width) * 100;
-        let newY = (y / rect.height) * 100;
-
-        // Clamp values between 0 and 100
-        newX = Math.max(0, Math.min(100, newX));
-        newY = Math.max(0, Math.min(100, newY));
-
-        // Update marker position
-        currentMarker.style.left = `${newX}%`;
-        currentMarker.style.top = `${newY}%`;
-        currentMarker.dataset.x = newX.toFixed(2);
-        currentMarker.dataset.y = newY.toFixed(2);
-    });
-
-    document.addEventListener('mouseup', function() {
-        if (currentMarker) {
-            currentMarker.classList.remove('dragging');
-        }
-        isDragging = false;
-        currentMarker = null;
-    });
-});
-</script>
-{% endblock %} 

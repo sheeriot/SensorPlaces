@@ -19,9 +19,11 @@ from django.urls import path, include
 # from sensors.views import HomeView
 from django.conf import settings
 from django.conf.urls.static import static
+from icecream import ic
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('sensors.urls')),
+    path('accounts/', include('allauth.urls')),  # This should be before your other URLs
+    path('', include('sensors.urls')),  # Your app URLs
     # path('', HomeView.as_view(), name='home'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -5,777 +5,819 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from .models import Place, Location, Device, Sensor, SensorReading
 from .utils import get_sensor_readings  #, write_sensor_reading
-from .forms import SensorForm, PlaceForm, DeviceForm
-import folium
-from django.conf import settings
-from django.http import JsonResponse, HttpRequest
+from .forms import SensorForm, PlaceForm, DeviceForm, LocationForm, PlaceDeleteForm
+from .map_fun import place_map_create
+# from django.conf import settings
+from django.http import JsonResponse, HttpRequest, HttpResponseRedirect
 from django.views.decorators.http import require_POST
-from django.contrib.admin.views.decorators import staff_member_required
-from typing import Any, Dict
+# from django.contrib.admin.views.decorators import staff_member_required
+from typing import Any, Dict, List, Optional, Type
 from django.db.models.query import QuerySet
 from django.db.models import Count, Q
+from django.db.models.functions import Lower
+from django.db.models import F, Subquery, OuterRef
+# from django.db.models.expressions import Value
 import json
 from django.views import View
-
+from django.contrib.auth.mixins import LoginRequiredMixin
+# import time
+from django.utils import timezone
+# import math
+# from geopy.distance import geodesic
+from django.db.models.query import Prefetch
 from icecream import ic
+import logging
+from django.core.files.uploadedfile import UploadedFile
+from decimal import Decimal
+
+logger = logging.getLogger(__name__)
+
+# Add the mixin first, before any classes that use it
+class LocationAnnotationMixin:
+    """Mixin to add annotated locations to context data."""
+    
+    def get_annotated_locations(self, place: Place) -> QuerySet[Location]:
+        """Get locations with device and sensor counts."""
+        return Location.objects.filter(place=place).annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False)),
+            active_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
+            inactive_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
+        ).order_by('-is_active', Lower('name'))
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        """Add annotated locations to context."""
+        context = super().get_context_data(**kwargs)
+        if hasattr(self, 'kwargs') and 'place_slug' in self.kwargs:
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            context['locations'] = self.get_annotated_locations(place)
+            context['place'] = place
+            
+            # Get locations with annotations
+            locations = self.get_annotated_locations(place)
+            
+            # Convert locations to JSON-serializable format
+            locations_data = [{
+                'id': loc.id,
+                'name': loc.name,
+                'x': float(loc.x_coord) if isinstance(loc.x_coord, Decimal) else loc.x_coord,
+                'y': float(loc.y_coord) if isinstance(loc.y_coord, Decimal) else loc.y_coord,
+                'is_active': loc.is_active,
+                'active_devices_count': loc.active_devices_count
+            } for loc in locations]
+            
+            context['locations'] = locations
+            context['locations_json'] = json.dumps(locations_data)
+            
+        return context
+
+def calculate_zoom(distance=0):
+    """Calculate appropriate zoom level based on distance in kilometers"""
+    if distance <= 0.4:
+        return 16
+    if distance <= 1:
+        return 15
+    if distance <= 2:
+        return 14
+    elif distance <= 4:
+        return 13
+    elif distance <= 10:
+        return 12
+    elif distance <= 17:
+        return 11
+    elif distance <= 30:
+        return 10
+    elif distance <= 60:
+        return 9
+    elif distance <= 120:
+        return 8
+    elif distance <= 250:
+        return 7
+    elif distance <= 550:
+        return 6
+    elif distance <= 1100:
+        return 5
+    elif distance <= 2000:
+        return 4
+    elif distance <= 5000:
+        return 3
+    else:
+        return 2
 
 # Place Views
 class PlaceListView(ListView):
     model = Place
     context_object_name = 'places'
     template_name = 'sensors/place_list.html'
-
-    def get_map_center(self, places):
-        if not places.exists():
-            # Default to Austin, TX if no places
-            return 30.26715, -97.74306
-
-        # Calculate average lat/lon
-        total_lat = sum(float(place.latitude) for place in places)
-        total_lon = sum(float(place.longitude) for place in places)
-        count = places.count()
-        
-        return total_lat/count, total_lon/count
-
-    def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset()
-        
-        # Filter by place if slug provided
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            queryset = queryset.filter(slug=place_slug)
-
-        # Annotate with counts for locations, devices, and sensors
-        return queryset.annotate(
-            locations_count=Count('locations', distinct=True),
-            active_locations_count=Count(
-                'locations',
-                filter=Q(locations__is_active=True),
-                distinct=True
-            ),
-            devices_count=Count(
-                'locations__devices',
-                distinct=True
-            ),
-            active_devices_count=Count(
-                'locations__devices',
-                filter=Q(locations__devices__is_active=True),
-                distinct=True
-            ),
-            sensors_count=Count(
-                'locations__devices__sensors',
-                distinct=True
-            ),
-            active_sensors_count=Count(
-                'locations__devices__sensors',
-                filter=Q(locations__devices__sensors__is_active=True),
-                distinct=True
-            )
-        )
+    
+    def get_queryset(self) -> QuerySet[Place]:
+        if not hasattr(self, '_queryset'):
+            self._queryset = Place.objects.annotate(
+                active_locations_count=Count('locations', filter=Q(locations__is_active=True)),
+                active_devices_count=Count('locations__devices', filter=Q(locations__devices__is_active=True)),
+                active_sensors_count=Count('locations__devices__sensors', filter=Q(locations__devices__sensors__is_active=True))
+            ).order_by('-is_active', Lower('name'))
+        return self._queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        places = self.get_queryset()
-        # ic(places)
+        context['model_name'] = 'place'
+        try:
+            map_html = place_map_create(places=self.get_queryset())
+            context['place_map_html'] = map_html
+        except Exception as e:
+            context['place_map_html'] = ""
         
-        # Get geographic center of all places
-        center_lat, center_lon = self.get_map_center(places)
-        
-        m = folium.Map(location=[center_lat, center_lon], zoom_start=11)
-        
-        # Add markers for all places
-        for place in places:
-            # ic(vars(place))
-            marker_color = 'green' if place.is_active else 'red'
-            # Create rich tooltip with place details
-            tooltip_html = f'''
-                <div style="text-align: left">
-                    <strong>{place.name}</strong><br>
-                    <small>{place.address}</small><br>
-                    <small>{place.latitude}, {place.longitude}</small><br>
-                    <small>{place.locations.count()} locations</small>
-                </div>
-            '''
-            
-            place_popup = f'<a href="{reverse("sensors:place_detail", kwargs={"slug": place.slug})}">{place.name}</a>'
-            folium.Marker(
-                location=[float(place.latitude), float(place.longitude)],
-                popup=place_popup,
-                tooltip=folium.Tooltip(tooltip_html),
-                icon=folium.Icon(color=marker_color, icon='info-sign'),
-                options={'className': 'inactive-place' if not place.is_active else ''}
-            ).add_to(m)
-        
-        # Add the map HTML to context
-        context['map_html'] = m._repr_html_()
         return context
 
-class PlaceDetailView(DetailView):
+class PlaceDetailView(LocationAnnotationMixin, DetailView):
     model = Place
     context_object_name = 'place'
     template_name = 'sensors/place_detail.html'
+    slug_url_kwarg = 'place_slug'
+    slug_field = 'slug'
 
-    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+    def get_queryset(self) -> QuerySet[Place]:
+        return Place.objects.all()
+
+    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        place = self.get_object()
+        from icecream import ic
+        import json
+        from decimal import Decimal
         
-        # Annotate devices and sensors
-        devices = Device.objects.filter(location__place=place)
-        sensors = Sensor.objects.filter(device__location__place=place)
-        
-        # Annotate locations with device counts
-        locations = place.locations.annotate(
-            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).order_by('name')  # Add consistent ordering
-        
-        context['locations'] = locations
-        
-        # Create map centered on place
-        m = folium.Map(
-            location=[float(place.latitude), float(place.longitude)],
-            zoom_start=15
-        )
-        
-        # Add marker for the place
-        folium.Marker(
-            location=[float(place.latitude), float(place.longitude)],
-            popup=place.name,
-            tooltip=place.name,
-            icon=folium.Icon(color='red', icon='info-sign')
-        ).add_to(m)
-        
-        context['map_html'] = m._repr_html_()
-
-        context.update({
-            'devices_active': devices.filter(is_active=True).count(),
-            'devices_inactive': devices.filter(is_active=False).count(),
-            'sensors_active': sensors.filter(is_active=True).count(),
-            'sensors_inactive': sensors.filter(is_active=False).count(),
-        })
+        # Ensure place is in context
+        if 'place' not in context and hasattr(self, 'object'):
+            context['place'] = self.object
+            
+        # Debug locations from LocationAnnotationMixin
+        if 'locations' in context:
+            locations_data = []
+            for location in context['locations']:
+                # Convert Decimal to float for JSON serialization
+                x_coord = float(location.x_coord) if isinstance(location.x_coord, Decimal) else location.x_coord
+                y_coord = float(location.y_coord) if isinstance(location.y_coord, Decimal) else location.y_coord
+                
+                locations_data.append({
+                    'id': location.id,
+                    'name': location.name,
+                    'x': x_coord,  # Match JavaScript property names
+                    'y': y_coord,  # Match JavaScript property names
+                    'is_active': location.is_active,
+                    'active_devices_count': location.active_devices_count
+                })
+            context['locations_json'] = json.dumps(locations_data)
+            
+            ic("Locations in context:", locations_data)
+            ic("Locations count:", len(locations_data))
+            ic("First location data:", locations_data[0] if locations_data else None)
+        else:
+            ic("No locations in context!")
+            context['locations_json'] = '[]'
+            
         return context
 
 class PlaceCreateView(SuccessMessageMixin, CreateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
-    success_url = reverse_lazy('sensors:place_list')
-    success_message = "Place %(name)s was created successfully"
+
+    def get_success_message(self, cleaned_data):
+        place = self.object
+        return (
+            f"Created place <strong>{place.name}</strong><br>"
+            f"<small class='text-muted'>"
+            f"Location: ({place.latitude}, {place.longitude})<br>"
+            f"Status: {'Active' if place.is_active else 'Inactive'}"
+            f"</small>"
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['referrer'] = referrer
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'place'
+        return context
+
+    def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
+        return reverse('sensors:place_list')
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        
+        # Add to toast history first
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'success',  # Always use success type for creation
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            self.request.session.modified = True
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'success',
+                'redirect_url': self.get_success_url()
+            })
+        
+        return response
 
 class PlaceUpdateView(SuccessMessageMixin, UpdateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
-    success_url = reverse_lazy('sensors:place_list')
-    success_message = "Place %(name)s was updated successfully"
+    slug_url_kwarg = 'place_slug'
+    success_message = "Place updated successfully."
+
+    def setup(self, request, *args, **kwargs):
+        """Store original values when the view is initialized"""
+        super().setup(request, *args, **kwargs)
+        self._original_values = {}
+        if hasattr(self, 'object'):
+            # Get the object if not already loaded
+            obj = self.get_object() if not self.object else self.object
+            self._original_values = {
+                'site_plan': obj.site_plan.name if obj.site_plan else None,
+                'is_active': obj.is_active,
+                # Add other fields you want to track
+            }
+
+    def form_invalid(self, form):
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        try:
+            response = super().form_valid(form)
+            return response
+        except Exception as e:
+            raise
+
+    def get_success_message(self, cleaned_data):
+        place = self.object
+        messages = []
+
+        # Now we can safely compare the values
+        if self._original_values.get('site_plan') != (place.site_plan.name if place.site_plan else None):
+            if place.site_plan:
+                messages.append("Site plan was updated")
+            else:
+                messages.append("Site plan was removed")
+
+        if not messages:
+            messages.append("Place updated successfully")
+
+        return " | ".join(messages)
+
+    def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
+        return reverse('sensors:place_list')
 
 class PlaceDeleteView(DeleteView):
     model = Place
     template_name = 'sensors/place_confirm_delete.html'
     success_url = reverse_lazy('sensors:place_list')
-    
+    slug_url_kwarg = 'place_slug'
+    slug_field = 'slug'
+    form_class = PlaceDeleteForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['place'] = self.get_object()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'place'
+        place = self.get_object()
+        
+        # Get locations with device counts for the warning message
+        context['locations'] = Location.objects.filter(place=place).annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        ).order_by('name')
+        
+        context['place'] = place
+        return context
+
+    def form_invalid(self, form):
+        """Handle form validation errors with regular form messages"""
+        return self.render_to_response(self.get_context_data(form=form))
+
     def delete(self, request, *args, **kwargs):
-        messages.success(self.request, f"Place {self.get_object().name} was deleted successfully") # type: ignore
-        return super().delete(request, *args, **kwargs)
+        """Only add toast notification after successful deletion"""
+        place = self.get_object()
+        success_url = self.get_success_url()
+        message_type = 'danger'
+        
+        # Create success message
+        success_message = (
+            f"Deleted place <strong>{place.name}</strong><br>"
+            f"<small class='text-muted'>"
+            f"Location: ({place.latitude}, {place.longitude})<br>"
+            f"Status: {'Active' if place.is_active else 'Inactive'}"
+            f"</small>"
+        )
+        
+        # Delete the place
+        place.delete()
+        
+        # Only add toast notification after successful deletion
+        if hasattr(request, 'session'):
+            toast_history = request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': message_type,
+                'timestamp': timezone.now().isoformat()
+            })
+            request.session['toast_history'] = toast_history
+            request.session.modified = True
+            
+        return HttpResponseRedirect(success_url)
+
+    def form_valid(self, form):
+        """Validate form before deletion"""
+        return self.delete(self.request)
 
 # Location Views
-class LocationListView(ListView):
+class LocationListView(LocationAnnotationMixin, ListView):
     model = Location
     context_object_name = 'locations'
     template_name = 'sensors/location_list.html'
 
-    def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset()
-        
-        # Filter by place if slug provided
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            queryset = queryset.filter(place__slug=place_slug)
-        
-        # Annotate with device counts
-        return queryset.annotate(
-            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).order_by('name')
+    def get_queryset(self) -> QuerySet[Location]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            self._queryset = Location.objects.filter(place=place).annotate(
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False)),
+                active_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
+                inactive_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
+            ).order_by('-is_active', Lower('name'))
+        return self._queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['model_name'] = 'location'
+        place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        context['place'] = place
+
+        # Add place statistics
+        context.update({
+            'devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
+            'devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
+            'sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
+            'sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
+        })
         
-        # Add place context if slug provided
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            place = get_object_or_404(Place, slug=place_slug)
-            context['place'] = place
-            
-            # Create map centered on place
-            if not place.site_plan:
-                m = folium.Map(
-                    location=[float(place.latitude), float(place.longitude)],
-                    zoom_start=15
-                )
-                
-                # Add marker for the place
-                folium.Marker(
-                    location=[float(place.latitude), float(place.longitude)],
-                    popup=place.name,
-                    tooltip=place.name,
-                    icon=folium.Icon(color='red', icon='info-sign')
-                ).add_to(m)
-                
-                # Add markers for all locations
-                for location in self.get_queryset():
-                    if location.x_coord and location.y_coord:
-                        folium.Marker(
-                            location=[float(location.x_coord), float(location.y_coord)],
-                            popup=location.name,
-                            tooltip=location.name + ' ' + (str(location.active_devices_count) if location.active_devices_count > 0 else ''),
-                            icon=folium.Icon(color='blue', icon='info-sign')
-                        ).add_to(m)
-                
-                context['map_html'] = m._repr_html_()
-        ic(context)
         return context
 
-class LocationDetailView(DetailView):
+class LocationDetailView(LocationAnnotationMixin, DetailView):
     model = Location
+    context_object_name = 'location'
     template_name = 'sensors/location_detail.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['model_name'] = 'location'
         
-        # Get all locations for the place with device counts
-        locations = self.object.place.locations.annotate(
-            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).order_by('name')  # Add consistent ordering
-
-        # for location in locations:
-        #     ic(location.name, location.active_devices_count, location.inactive_devices_count)
-
-        # Add the annotated locations to the context
-        context['place_locations'] = locations
-        context['place'] = self.object.place
+        # Add annotated devices to context with proper prefetching
+        context['devices'] = Device.objects.filter(
+            location=self.object
+        ).select_related(
+            'device_type'
+        ).prefetch_related(
+            'sensors'
+        ).annotate(
+            active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+            inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+        ).order_by(
+            '-is_active', 
+            Lower('name')
+        )
         
-        # Get devices for this location with their sensor data
-        devices = self.object.devices.all()
-        device_data = []
-        for device in devices:
-            device_data.append({
-                'device': device,
-                'total_sensors': device.sensors.count(),
-                'active_sensors': device.sensors.filter(is_active=True).count(),
-            })
-        
-        context['device_data'] = device_data
-        context['total_devices'] = devices.count()
-        context['active_devices'] = devices.filter(is_active=True).count()
+        # Add device and sensor counts
+        context.update({
+            'devices_active': Device.objects.filter(location=self.object, is_active=True).count(),
+            'devices_inactive': Device.objects.filter(location=self.object, is_active=False).count(),
+            'sensors_active': Sensor.objects.filter(device__location=self.object, is_active=True).count(),
+            'sensors_inactive': Sensor.objects.filter(device__location=self.object, is_active=False).count(),
+        })
         
         return context
 
-class LocationCreateView(SuccessMessageMixin, CreateView):
+class LocationCreateView(SuccessMessageMixin, LocationAnnotationMixin, CreateView):
     model = Location
-    fields = ['name', 'is_active']
+    form_class = LocationForm
     template_name = 'sensors/location_form.html'
-    success_message = "Location %(name)s was created successfully"
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # Cache the place
+        self.place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add place to initial data
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial']['place'] = self.place
+        
+        # Add referrer to form kwargs
+        referrer = self.request.META.get('HTTP_REFERER')
+        if referrer:
+            kwargs['initial']['referrer'] = referrer
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
+        context['model_name'] = 'location'
+        context['place'] = self.place
+        context['place_url'] = reverse('sensors:place_detail', kwargs={'place_slug': self.place.slug})
+        context['locations'] = self.place.locations.annotate(
+            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+        )
         return context
 
     def form_valid(self, form):
         place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
         form.instance.place = place
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        
+        # Add to toast history first
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'success',  # Always use success type for creation
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            self.request.session.modified = True
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'success',
+                'redirect_url': self.get_success_url()
+            })
+        
+        return response
 
     def get_success_url(self):
-        return reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
+        default_url = reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
+        return default_url
 
 class LocationUpdateView(SuccessMessageMixin, UpdateView):
     model = Location
-    fields = ['name', 'is_active']
+    form_class = LocationForm
     template_name = 'sensors/location_form.html'
-    success_message = "Location %(name)s was updated successfully"
+
+    def form_valid(self, form):
+        # Store original values before save
+        self._original_values = {
+            'name': self.get_object().name,
+            'is_active': self.get_object().is_active
+        }
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        
+        # Add to toast history first
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'warning',  # Always use warning type for updates
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            self.request.session.modified = True
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'warning',
+                'redirect_url': self.get_success_url()
+            })
+        
+        return response
+
+    def get_success_message(self, cleaned_data):
+        location = self.object
+        place = location.place
+        changes = []
+        if hasattr(self, '_original_values'):
+            if self._original_values['name'] != cleaned_data['name']:
+                changes.append(f"name: {self._original_values['name']} → {cleaned_data['name']}")
+            if self._original_values['is_active'] != cleaned_data['is_active']:
+                changes.append(f"active: {self._original_values['is_active']} → {cleaned_data['is_active']}")
+        
+        message = (
+            f"Updated location <strong>{cleaned_data['name']}</strong> in "
+            f"<i class='bi bi-house-gear'></i> {place.name}"
+        )
+        if changes:
+            message += f"<br><small class='text-muted'>Changes: {', '.join(changes)}</small>"
+        return message
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['model_name'] = 'location'
         place_slug = self.kwargs.get('place_slug')
         if place_slug:
             context['place'] = get_object_or_404(Place, slug=place_slug)
+            context['place_url'] = reverse('sensors:place_detail', kwargs={'place_slug': place_slug})
+            context['locations'] = context['place'].locations.annotate(
+                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+            )
         return context
 
     def get_success_url(self):
+        # Try to get the referrer from the form data
+        referrer = self.request.POST.get('referrer')
+        if referrer:
+            return referrer
+            
+        # Fall back to the default URL if no referrer
         return reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
 
 class LocationDeleteView(DeleteView):
     model = Location
     template_name = 'sensors/location_confirm_delete.html'
 
+    def delete(self, request, *args, **kwargs):
+        location = self.get_object()
+        place = location.place
+        success_url = self.get_success_url()
+        
+        # Create detailed message before deletion
+        success_message = (
+            f"Deleted location <strong>{location.name}</strong> from "
+            f"<i class='bi bi-house-gear'></i> {place.name}<br>"
+            f"<small class='text-muted'>"
+            f"Status: {'Active' if location.is_active else 'Inactive'}<br>"
+            f"Devices: {location.devices.count()}"
+            f"</small>"
+        )
+        
+        location.delete()
+        
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'danger',  # Always use danger type for deletion
+                'redirect_url': success_url
+            })
+            
+        # Add to toast history
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'danger',
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            
+        return HttpResponseRedirect(success_url)
+
     def get_success_url(self):
         return reverse('sensors:place_locations', kwargs={'place_slug': self.object.place.slug})
 
-    def delete(self, request, *args, **kwargs):
-        messages.success(self.request, f"Location {self.get_object().name} was deleted successfully")
-        return super().delete(request, *args, **kwargs)
-
 # Device Views
-class DeviceListView(ListView):
+class DeviceListView(LocationAnnotationMixin, ListView):
     model = Device
     context_object_name = 'devices'
     template_name = 'sensors/device_list.html'
 
-    def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset()
-        place_slug = self.kwargs.get('place_slug')
-        location_pk = self.kwargs.get('location_pk')
-        
-        if place_slug:
-            queryset = queryset.filter(location__place__slug=place_slug)
+    def get_queryset(self) -> QuerySet[Device]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            location_pk = self.kwargs.get('location_pk')
+            
+            base_queryset = super().get_queryset()
+            queryset = base_queryset.filter(location__place=place)
+            
+            # Filter by location if specified
             if location_pk:
                 queryset = queryset.filter(location_id=location_pk)
-        
-        return queryset
-
-    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
-        context = super().get_context_data(**kwargs)
-        place_slug = self.kwargs.get('place_slug')
-        location_pk = self.kwargs.get('location_pk')
-        
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
-            # Get all locations for this place with device counts
-            locations = context['place'].locations.annotate(
-                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-            )
-            context['place_locations'] = locations
-            if location_pk:
-                # Get current location with annotations
-                context['location'] = locations.get(pk=location_pk)
             
-            # Add total active devices count
-            context['active_devices_count'] = Device.objects.filter(
-                location__place=context['place'],
+            # Add annotations and ordering
+            self._queryset = queryset.select_related(
+                'location', 
+                'location__place'
+            ).prefetch_related(
+                Prefetch(
+                    'sensors',
+                    queryset=Sensor.objects.order_by('-is_active', Lower('name'))
+                )
+            ).annotate(
+                active_sensors=Count('sensors', filter=Q(sensors__is_active=True)),
+                total_sensors=Count('sensors')
+            ).order_by(
+                '-location__is_active',  # Active locations first
+                'location__name',
+                '-is_active',           # Active devices first
+                'name'
+            )
+        return self._queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'device'
+        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        
+        # Add device and sensor counts
+        queryset = self.get_queryset()
+        context.update({
+            'devices_active': queryset.filter(is_active=True).count(),
+            'devices_inactive': queryset.filter(is_active=False).count(),
+            'sensors_active': Sensor.objects.filter(
+                device__in=queryset,
                 is_active=True
-            ).count()
+            ).count(),
+            'sensors_inactive': Sensor.objects.filter(
+                device__in=queryset,
+                is_active=False
+            ).count(),
+        })
         
         return context
 
-class DeviceDetailView(DetailView):
+class DeviceDetailView(LocationAnnotationMixin, DetailView):
     model = Device
     context_object_name = 'device'
     template_name = 'sensors/device_detail.html'
 
-    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+    def get_queryset(self) -> QuerySet[Device]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            base_queryset = super().get_queryset()
+            self._queryset = base_queryset.filter(location__place=place)\
+                .annotate(active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)))\
+                .prefetch_related(
+                    Prefetch(
+                        'sensors',
+                        queryset=Sensor.objects.order_by('-is_active', Lower('name'))
+                    ))
+        return self._queryset
+
+    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        sensors = self.object.sensors.all()
-        
-        context.update({
-            'total_sensors': sensors.count(),
-            'active_sensors': sensors.filter(is_active=True).count(),
-            'sensors': sensors,  # Pass all sensors to template
-        })
+        context['model_name'] = 'device'
+        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
         return context
 
-class DeviceCreateView(SuccessMessageMixin, CreateView):
+class DeviceCreateView(LocationAnnotationMixin, LoginRequiredMixin, CreateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
-    success_message = "Device %(name)s was created successfully"
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        place_slug = self.kwargs.get('place_slug')
-        location_pk = self.kwargs.get('location_pk')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
+    def setup(self, request, *args, **kwargs):
+        """Cache common values during view setup"""
+        super().setup(request, *args, **kwargs)
+        self._place = None
+        self._location = None
+        self._locations = None
+
+    @property
+    def place(self):
+        """Cached place getter"""
+        if self._place is None:
+            place_slug = self.kwargs.get('place_slug')
+            self._place = get_object_or_404(Place, slug=place_slug)
+        return self._place
+
+    @property
+    def location(self):
+        """Cached location getter"""
+        if self._location is None:
+            location_pk = self.kwargs.get('location_pk')
             if location_pk:
-                # Get all locations for this place with device counts
-                locations = context['place'].locations.annotate(
-                    active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-                    inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+                self._location = get_object_or_404(Location, pk=location_pk, place=self.place)
+        return self._location
+
+    @property
+    def locations(self):
+        """Cached locations getter with annotations"""
+        if self._locations is None:
+            self._locations = Location.objects.filter(place=self.place).annotate(
+                active_devices_count=Count(
+                    'devices',
+                    filter=Q(devices__is_active=True)
+                ),
+                inactive_devices_count=Count(
+                    'devices',
+                    filter=Q(devices__is_active=False)
                 )
-                context['place_locations'] = locations
-                # Get current location with annotations
-                context['location'] = locations.get(pk=location_pk)
-        return context
+            ).select_related('place').prefetch_related(
+                'devices',
+                'devices__device_type'
+            ).order_by('name')
+        return self._locations
 
-    def get_initial(self):
-        initial = super().get_initial()
-        location = get_object_or_404(Location, pk=self.kwargs.get('location_pk'))
-        initial['place_slug'] = self.kwargs.get('place_slug')
-        initial['location_pk'] = self.kwargs.get('location_pk')
-        if not location.is_active:
-            initial['is_active'] = False
-        return initial
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        location = get_object_or_404(Location, pk=self.kwargs.get('location_pk'))
-        if not location.is_active:
-            form.fields['is_active'].disabled = True
-        return form
-
-    def form_valid(self, form):
-        location_pk = self.kwargs.get('location_pk')
-        location = get_object_or_404(Location, pk=location_pk)
-        form.instance.location = location
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.object.location.place.slug,
-            'location_pk': self.object.location.pk,
-            'pk': self.object.pk
-        })
-
-class DeviceUpdateView(SuccessMessageMixin, UpdateView):
-    model = Device
-    form_class = DeviceForm
-    template_name = 'sensors/device_form.html'
-    success_message = "Device %(name)s was updated successfully"
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['initial'] = {
+            'place': self.place,
+            'location': self.location
+        }
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        place_slug = self.kwargs.get('place_slug')
-        location_pk = self.kwargs.get('location_pk')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
-            if location_pk:
-                # Get all locations for this place with device counts
-                locations = context['place'].locations.annotate(
-                    active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-                    inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-                )
-                context['place_locations'] = locations
-                # Get current location with annotations
-                context['location'] = locations.get(pk=location_pk)
-        return context
-
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['place_slug'] = self.kwargs.get('place_slug')
-        initial['location_pk'] = self.kwargs.get('location_pk')
-        return initial
-
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.object.location.place.slug,
-            'location_pk': self.object.location.pk,
-            'pk': self.object.pk
-        })
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        # If device is set to inactive, cascade to all sensors
-        if not form.instance.is_active:
-            self.object.sensors.all().update(is_active=False)
-        return response
-
-class DeviceDeleteView(DeleteView):
-    model = Device
-    template_name = 'sensors/device_confirm_delete.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        place_slug = self.kwargs.get('place_slug')
-        location_pk = self.kwargs.get('location_pk')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
-            if location_pk:
-                context['location'] = get_object_or_404(Location, pk=location_pk, place=context['place'])
-        return context
-
-    def get_success_url(self):
-        return reverse('sensors:location_detail',
-                      kwargs={'place_slug': self.object.location.place.slug,
-                             'pk': self.object.location.pk})
-
-    def delete(self, request, *args, **kwargs):
-        messages.success(self.request, f"Device {self.get_object().name} was deleted successfully")
-        return super().delete(request, *args, **kwargs)
-
-# Sensor Views
-class SensorListView(ListView):
-    model = Sensor
-    context_object_name = 'sensors'
-    template_name = 'sensors/sensor_list.html'
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            queryset = queryset.filter(device__location__place__slug=place_slug)
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
-        return context
-
-class SensorDetailView(DetailView):
-    model = Sensor
-    context_object_name = 'sensor'
-    template_name = 'sensors/sensor_detail.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Get recent readings from InfluxDB
-        context['influx_readings'] = get_sensor_readings(
-            sensor=self.object,
-            limit=100
-        )
-        return context
-
-class SensorCreateView(SuccessMessageMixin, CreateView):
-    model = Sensor
-    form_class = SensorForm
-    template_name = 'sensors/sensor_form.html'
-    success_message = "Sensor %(name)s was created successfully"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        device_pk = self.kwargs.get('device_pk')
-        context['device'] = get_object_or_404(Device, pk=device_pk)
-        return context
-
-    def get_initial(self):
-        initial = super().get_initial()
-        device = get_object_or_404(Device, pk=self.kwargs.get('device_pk'))
-        # Set initial active state based on device state
-        if not device.is_active:
-            initial['is_active'] = False
-        return initial
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        device = get_object_or_404(Device, pk=self.kwargs.get('device_pk'))
-        if not device.is_active:
-            form.fields['is_active'].disabled = True
-            form.fields['is_active'].initial = False
-        return form
-
-    def form_valid(self, form):
-        device_pk = self.kwargs.get('device_pk')
-        device = get_object_or_404(Device, pk=device_pk)
-        form.instance.device = device
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.object.device.location.place.slug,
-            'location_pk': self.object.device.location.pk,
-            'pk': self.object.device.pk
-        })
-
-class SensorUpdateView(SuccessMessageMixin, UpdateView):
-    model = Sensor
-    form_class = SensorForm
-    template_name = 'sensors/sensor_form.html'
-    success_message = "Sensor %(name)s was updated successfully"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['device'] = self.object.device
-        return context
-
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.object.device.location.place.slug,
-            'location_pk': self.object.device.location.pk,
-            'pk': self.object.device.pk
-        })
-
-class SensorDeleteView(DeleteView):
-    model = Sensor
-    template_name = 'sensors/sensor_confirm_delete.html'
-    
-    def get_success_url(self):
-        # Get the place_slug and location_pk from the sensor's device
-        place_slug = self.object.device.location.place.slug
-        location_pk = self.object.device.location.pk
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': place_slug,
-            'location_pk': location_pk,
-            'pk': self.object.device.pk
-        })
-
-    def delete(self, request, *args, **kwargs):
-        messages.success(self.request, f"Sensor {self.get_object().name} was deleted successfully")
-        return super().delete(request, *args, **kwargs)
-
-# SensorReading Views
-class SensorReadingListView(ListView):
-    model = SensorReading
-    context_object_name = 'readings'
-    template_name = 'sensors/reading_list.html'
-    ordering = ['-timestamp']
-    paginate_by = 50
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            queryset = queryset.filter(sensor__device__location__place__slug=place_slug)
-        return queryset.order_by(self.ordering)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            context['place'] = get_object_or_404(Place, slug=place_slug)
-        return context
-
-class SensorReadingDetailView(DetailView):
-    model = SensorReading
-    context_object_name = 'reading'
-    template_name = 'sensors/reading_detail.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Add InfluxDB detailed data for this reading
-        return context
-
-class SensorReadingCreateView(SuccessMessageMixin, CreateView):
-    model = SensorReading
-    fields = ['sensor', 'value', 'notes']
-    template_name = 'sensors/reading_form.html'
-    success_message = "Reading for %(sensor)s was created successfully"
-
-    def get_success_url(self):
-        return reverse('sensors:place_readings', kwargs={'place_slug': self.object.sensor.device.location.place.slug})
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        # Write to InfluxDB
-        success = write_sensor_reading(
-            sensor=form.instance.sensor,
-            value=form.instance.value,
-            timestamp=form.instance.timestamp
-        )
-        if not success:
-            messages.warning(self.request, "Reading saved to database but failed to write to InfluxDB")
-        return response
-
-def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
-    place = get_object_or_404(Place, slug=place_slug)
-    
-    # Get device and sensor counts
-    devices_active = Device.objects.filter(location__place=place, is_active=True)
-    devices_inactive = Device.objects.filter(location__place=place, is_active=False)
-    sensors_active = Sensor.objects.filter(device__location__place=place, is_active=True)
-    sensors_inactive = Sensor.objects.filter(device__location__place=place, is_active=False)
-    
-    # Get location statistics
-    locations = place.locations.annotate(
-        active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-        inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-    ).values('id', 'name', 'is_active', 'active_devices_count', 'inactive_devices_count')
-    
-    return JsonResponse({
-        'devices_active': devices_active.count(),
-        'devices_inactive': devices_inactive.count(),
-        'sensors_active': sensors_active.count(),
-        'sensors_inactive': sensors_inactive.count(),
-        'locations': list(locations)
-    })
-
-# @staff_member_required
-@require_POST
-def location_update_position(request: HttpRequest, place_slug: str, pk: int) -> JsonResponse:
-    location = get_object_or_404(Location, pk=pk)
-    if place_slug != location.place.slug:
-        return JsonResponse({'status': 'error', 'message': 'Invalid place slug'}, status=400)
-    try:
-        data = json.loads(request.body)
-        location.x_coord = data.get('x_coord')
-        location.y_coord = data.get('y_coord')
-        location.save()
-        return JsonResponse({'status': 'success'})
-    except ValueError as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-
-@require_POST
-def sensor_toggle_active(request, place_slug, pk):
-    """Toggle sensor active status"""
-    sensor = get_object_or_404(Sensor, pk=pk,
-                              device__location__place__slug=place_slug)
-    
-    # Toggle the status
-    sensor.is_active = not sensor.is_active
-    sensor.save()
-    
-    # Get updated statistics
-    device = sensor.device
-    total_sensors = device.sensors.count()
-    active_sensors = device.sensors.filter(is_active=True).count()
-    
-    return JsonResponse({
-        'status': 'success',
-        'is_active': sensor.is_active,
-        'total_sensors': total_sensors,
-        'active_sensors': active_sensors,
-    })
-
-class DeviceToggleActiveView(View):
-    def post(self, request, place_slug, pk):
-        device = get_object_or_404(Device, pk=pk)
+        context['model_name'] = 'device'
+        context['place'] = self.place
+        context['locations'] = self.locations
         
-        try:
-            data = json.loads(request.body)
-            is_active = data.get('is_active', False)
+        if self.location:
+            context['location'] = self.location
+        
+        return context
+
+    def get_success_url(self):
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'pk': self.object.pk
+        })
+
+    def get_success_message(self, cleaned_data):
+        device = self.object
+        location = device.location
+        place = location.place
+        return (
+            f"Created device <strong>{device.name}</strong> in "
+            f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name}<br>"
+            f"<small class='text-muted'>"
+            f"Type: {device.device_type or '-'}<br>"
+            f"Model: {device.model or '-'}<br>"
+            f"Status: {'Active' if device.is_active else 'Inactive'}"
+            f"</small>"
+        )
+
+    def get_queryset(self) -> QuerySet[Device]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            base_queryset = super().get_queryset()
             
-            # Update device status
-            device.is_active = is_active
-            device.save()
-            
-            # If device is set to inactive, cascade to all sensors
-            if not is_active:
-                device.sensors.all().update(is_active=False)
-            
-            # Get updated statistics for the location
-            location = device.location
-            active_devices_count = location.devices.filter(is_active=True).count()
-            inactive_devices_count = location.devices.filter(is_active=False).count()
-            
-            # Get total active devices count for the place
-            total_active_devices = Device.objects.filter(
-                location__place=location.place,
-                is_active=True
-            ).count()
-            
-            return JsonResponse({
-                'status': 'success',
-                'is_active': device.is_active,
-                'active_devices_count': active_devices_count,
-                'inactive_devices_count': inactive_devices_count,
-                'total_active_devices': total_active_devices,
-            })
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            # Get sensors ordered properly
+            sensors = Sensor.objects.filter(
+                device=OuterRef('pk')
+            ).order_by('-is_active', Lower('name')).values_list('pk', flat=True)
+
+            self._queryset = base_queryset.filter(location__place=place).annotate(
+                active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                sensor_list=Subquery(sensors))
+        return self._queryset
 
 class DeviceMoveLocationView(View):
     def post(self, request, pk):
         # Get the device and validate it exists
         device = get_object_or_404(Device, pk=pk)
-        ic('device move location - from', device.location)
         
         try:
             data = json.loads(request.body)
             new_location_id = data.get('new_location_id')
-            # ic('new_location_id', new_location_id)
+            # 'new_location_id', new_location_id)
             if not new_location_id:
                 return JsonResponse({'error': 'new_location_id is required'}, status=400)
             
             # Get the new location and validate it exists
             new_location = get_object_or_404(Location, pk=new_location_id)
-            # ic('new_location', new_location)
+            # 'new_location', new_location)
             # Store old location for counter updates
             old_location = device.location
             
@@ -796,7 +838,7 @@ class DeviceMoveLocationView(View):
             # Update the device's location
             device.location = new_location
             device.save()
-            # ic('saved device.location', device.location)
+            # 'saved device.location', device.location)
             # Get updated counts
             old_location_count = old_location.devices.filter(is_active=True).count()
             new_location_count = new_location.devices.filter(is_active=True).count()
@@ -805,12 +847,11 @@ class DeviceMoveLocationView(View):
                 'new_location_name': new_location.name,
                 'old_location_count': old_location_count,
                 'new_location_count': new_location_count,
-                'total_active_devices': Device.objects.filter(
+                'active_devices_count': Device.objects.filter(
                     location__place=device.location.place,
                     is_active=True
                 ).count()
             })
-            ic('results', results)
             return results
             
         except json.JSONDecodeError:
@@ -819,23 +860,112 @@ class DeviceMoveLocationView(View):
             return JsonResponse({'error': str(e)}, status=500)
 
 @require_POST
-def update_site_plan_layout(request, slug):
+def siteplan_update(request, place_slug):
     """Update the site plan layout settings for a place"""
-    if not request.user.has_perm('sensors.change_place'):
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-        
-    place = get_object_or_404(Place, slug=slug)
     try:
+        ic("Starting siteplan_update for place:", place_slug)
+        place = get_object_or_404(Place, slug=place_slug)
         data = json.loads(request.body)
-        place.site_plan_scale = float(data.get('site_plan_scale', 1.0))
-        place.site_plan_x = float(data.get('site_plan_x', 0))
-        place.site_plan_y = float(data.get('site_plan_y', 0))
-        place.save(update_fields=['site_plan_scale', 'site_plan_x', 'site_plan_y'])
-        return JsonResponse({'status': 'success'})
-    except (ValueError, json.JSONDecodeError) as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        ic("Received data:", data)
+        
+        # Track changes with before/after values
+        changes = []
+        
+        # Site plan transform changes
+        if 'siteplan_scale' in data:
+            old_scale = place.siteplan_scale
+            new_scale = float(data['siteplan_scale'])
+            if old_scale != new_scale:
+                changes.append(
+                    f"Scale: {old_scale:.2f} → {new_scale:.2f}"
+                )
+                place.siteplan_scale = new_scale
+        
+        if 'siteplan_x' in data:
+            old_x = place.siteplan_x
+            new_x = float(data['siteplan_x'])
+            if old_x != new_x:
+                changes.append(
+                    f"X offset: {old_x:.1f}px → {new_x:.1f}px"
+                )
+                place.siteplan_x = new_x
+        
+        if 'siteplan_y' in data:
+            old_y = place.siteplan_y
+            new_y = float(data['siteplan_y'])
+            if old_y != new_y:
+                changes.append(
+                    f"Y offset: {old_y:.1f}px → {new_y:.1f}px"
+                )
+                place.siteplan_y = new_y
+
+        if changes:
+            place.save(update_fields=['siteplan_scale', 'siteplan_x', 'siteplan_y'])
+        
+        # Location position changes
+        location_changes = []
+        if 'locations' in data:
+            ic("Processing location updates")
+            for location_update in data['locations']:
+                location = get_object_or_404(Location, id=location_update['id'], place=place)
+                old_x = location.x_coord
+                old_y = location.y_coord
+                new_x = float(location_update['x'])
+                new_y = float(location_update['y'])
+                
+                if old_x != new_x or old_y != new_y:
+                    ic(f"Location {location.name} moved:", old_x, old_y, "->", new_x, new_y)
+                    location_changes.append({
+                        'id': location.id,
+                        'name': location.name,
+                        'old_position': {'x': float(old_x), 'y': float(old_y)},
+                        'new_position': {'x': new_x, 'y': new_y}
+                    })
+                    location.x_coord = new_x
+                    location.y_coord = new_y
+                    location.save(update_fields=['x_coord', 'y_coord'])
+
+        if not changes and not location_changes:
+            ic("No changes detected")
+            return JsonResponse({
+                'message': 'No changes detected',
+                'type': 'info',
+                'tags': 'layout-update'
+            })
+
+        # Create success message
+        message_parts = []
+        if changes:
+            message_parts.append("Updated site plan settings")
+        if location_changes:
+            message_parts.append(f"Moved {len(location_changes)} location{'s' if len(location_changes) > 1 else ''}")
+        
+        success_message = " and ".join(message_parts)
+        ic("Success:", success_message)
+        
+        return JsonResponse({
+            'message': success_message,
+            'type': 'success',
+            'tags': 'layout-update',
+            'changes': {
+                'locations': location_changes
+            }
+        })
+
+    except json.JSONDecodeError:
+        ic("Error: Invalid JSON data")
+        return JsonResponse({
+            'message': 'Invalid JSON data',
+            'type': 'danger',
+            'tags': 'error layout-update'
+        }, status=400)
     except Exception as e:
-        return JsonResponse({'error': 'Server error'}, status=500)
+        ic("Error:", str(e))
+        return JsonResponse({
+            'message': f'Error updating site plan: {str(e)}',
+            'type': 'danger',
+            'tags': 'error layout-update'
+        }, status=500)
 
 @require_POST
 def test_sensor_readings(request, place_slug, sensor_pk):
@@ -885,3 +1015,923 @@ def test_sensor_readings(request, place_slug, sensor_pk):
             'status': 'error',
             'message': f'Failed to connect to InfluxDB: {str(e)}'
         }, status=500)
+
+class ToastHistoryView(View):
+    """API view for managing toast notification history in the session."""
+    
+    def get(self, request):
+        """Retrieve the toast history from the session."""
+        history = request.session.get('toast_history', [])
+        return JsonResponse({'history': history})
+
+    def post(self, request):
+        """Update the toast history in the session."""
+        try:
+            data = json.loads(request.body)
+            history = data.get('history', [])
+            
+            # Ensure history doesn't exceed maximum size (50 items)
+            history = history[:50]
+            
+            # Store in session
+            request.session['toast_history'] = history
+            request.session.modified = True
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Toast history updated successfully'
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid JSON data'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=500)
+
+    def delete(self, request):
+        """Clear the toast history from the session."""
+        if 'toast_history' in request.session:
+            del request.session['toast_history']
+            request.session.modified = True
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Toast history cleared successfully'
+        })
+
+class ToggleActiveView(View):
+    """Consolidated view for toggling active status of locations, devices, and sensors."""
+    
+    def post(self, request: HttpRequest, place_slug: str, model: str, pk: int) -> JsonResponse:
+        """Handle POST request to toggle active status.
+        
+        Args:
+            request: The HTTP request
+            place_slug: The slug of the place
+            model: The type of model to toggle (location, device, or sensor)
+            pk: The primary key of the model instance
+        """
+        try:
+            # Validate model type
+            if model not in ['location', 'device', 'sensor']:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Invalid model type: {model}'
+                }, status=400)
+
+            # Get request data
+            data = json.loads(request.body)
+            intended_state = data.get('is_active', False)
+            
+            # Get the place
+            place = get_object_or_404(Place, slug=place_slug)
+            
+            # Get and validate the object based on model type
+            if model == 'location':
+                obj = get_object_or_404(Location, pk=pk, place=place)
+            elif model == 'device':
+                obj = get_object_or_404(Device, pk=pk, location__place=place)
+                # Check if trying to activate device with inactive location
+                if intended_state and not obj.location.is_active:
+                    return JsonResponse({
+                        'status': 'warning',
+                        'message': (
+                            f"Cannot activate device <strong>{obj.name}</strong> because its location "
+                            f"<strong>{obj.location.name}</strong> is inactive.<br>"
+                            f"<small class='text-muted'>Please activate the location first.</small>"
+                        ),
+                        'is_active': False,
+                        'type': 'warning',
+                        'toast': {
+                            'message': (
+                                f"Cannot activate device <strong>{obj.name}</strong> because its location "
+                                f"<strong>{obj.location.name}</strong> is inactive.<br>"
+                                f"<small class='text-muted'>Please activate the location first.</small>"
+                            ),
+                            'type': 'warning',
+                            'addToHistory': True
+                        }
+                    })
+            elif model == 'sensor':
+                obj = get_object_or_404(Sensor, pk=pk, device__location__place=place)
+            
+            # Store affected items before the change
+            affected_items = []
+            if model == 'location':
+                affected_items = [
+                    f"{device.name} ({len(device.sensors.all())} sensors)"
+                    for device in obj.devices.all()
+                ]
+            elif model == 'device':
+                affected_items = [sensor.name for sensor in obj.sensors.all()]
+
+            # Update the active status
+            obj.is_active = intended_state
+            obj.save()
+            
+            # If deactivating, cascade the change
+            if not intended_state:
+                if model == 'location':
+                    Device.objects.filter(location=obj).update(is_active=False)
+                    Sensor.objects.filter(device__location=obj).update(is_active=False)
+                elif model == 'device':
+                    Sensor.objects.filter(device=obj).update(is_active=False)
+            
+            # Build status message
+            message = self._build_status_message(obj, model, intended_state, affected_items)
+            
+            # Prepare response data
+            # Determine message type based on state transition
+            message_type = 'success' if intended_state else 'danger'  # success for activation, danger for deactivation
+            
+            response_data = {
+                'status': 'success',
+                'message': message,
+                'is_active': obj.is_active,
+                'type': message_type,
+                'toast': {
+                    'message': message,
+                    'type': message_type,  # Use same type for toast
+                    'addToHistory': True
+                }
+            }
+            
+            print(f"[ToggleActive] Response: {json.dumps(response_data, indent=2)}")
+            
+            return JsonResponse(response_data)
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid JSON data'
+            }, status=400)
+        except Exception as e:
+            print(f"[ToggleActive] Error: {str(e)}")
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=500)
+
+    def _build_status_message(self, obj, model: str, is_active: bool, affected_items: list) -> str:
+        """Build a descriptive status message with icons and affected items."""
+        
+        action = 'Activated' if is_active else 'Deactivated'
+        
+        if model == 'location':
+            message = (
+                f"{action} <i class='bi bi-geo-alt'></i> {obj.name} in "
+                f"<i class='bi bi-house-gear'></i> {obj.place.name}"
+            )
+            if not is_active and affected_items:  # Only show affected items when deactivating
+                message += "<br><br>Affected devices:<ul class='mb-0'>"
+                for device in affected_items:
+                    message += f"<li><i class='bi bi-hdd-rack'></i> {device}</li>"
+                message += "</ul>"
+                
+        elif model == 'device':
+            message = (
+                f"{action} <i class='bi bi-hdd-rack'></i> {obj.name} in "
+                f"<i class='bi bi-house-gear'></i> {obj.location.place.name} > "
+                f"<i class='bi bi-geo-alt'></i> {obj.location.name}"
+            )
+            if not is_active and affected_items:  # Only show affected items when deactivating
+                message += "<br><br>Affected sensors:<ul class='mb-0'>"
+                for sensor in affected_items:
+                    message += f"<li><i class='bi bi-thermometer'></i> {sensor}</li>"
+                message += "</ul>"
+                
+        else:  # sensor
+            message = (
+                f"{action} <i class='bi bi-thermometer'></i> {obj.name} in "
+                f"<i class='bi bi-house-gear'></i> {obj.device.location.place.name} > "
+                f"<i class='bi bi-geo-alt'></i> {obj.device.location.name} > "
+                f"<i class='bi bi-hdd-rack'></i> {obj.device.name}"
+            )
+            
+        return message
+
+class DeviceUpdateView(LocationAnnotationMixin, SuccessMessageMixin, UpdateView):
+    model = Device
+    form_class = DeviceForm
+    template_name = 'sensors/device_form.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'device'
+        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        context['locations'] = Location.objects.filter(place=context['place']).order_by('-is_active', Lower('name'))
+        return context
+    
+    def form_valid(self, form):
+        # Store original values before save
+        self._original_values = {
+            'name': self.get_object().name,
+            'is_active': self.get_object().is_active,
+            'location': self.get_object().location,
+            'device_type': self.get_object().device_type,
+            'model': self.get_object().model
+        }
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+
+        # Add to toast history
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'warning',  # Always use warning type for updates
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            self.request.session.modified = True
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'warning',
+                'redirect_url': self.get_success_url()
+            })
+
+        return response
+
+    def get_success_message(self, cleaned_data):
+        device = self.object
+        location = device.location
+        place = location.place
+        changes = []
+        if hasattr(self, '_original_values'):
+            if self._original_values['name'] != cleaned_data['name']:
+                changes.append(f"name: {self._original_values['name']} → {cleaned_data['name']}")
+            if self._original_values['is_active'] != cleaned_data['is_active']:
+                changes.append(f"active: {self._original_values['is_active']} → {cleaned_data['is_active']}")
+            if self._original_values['location'] != cleaned_data['location']:
+                changes.append(f"location: {self._original_values['location'].name} → {cleaned_data['location'].name}")
+            if self._original_values['device_type'] != cleaned_data['device_type']:
+                changes.append(f"type: {self._original_values['device_type']} → {cleaned_data['device_type']}")
+            if self._original_values['model'] != cleaned_data['model']:
+                changes.append(f"model: {self._original_values['model']} → {cleaned_data['model']}")
+
+        message = (
+                f"Updated device <strong>{device.name}</strong> in "
+                f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name}"
+            )
+        if changes:
+            message += f"<br><small class='text-muted'>Changes: {', '.join(changes)}</small>"
+        return message
+
+    def get_success_url(self):
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'pk': self.object.pk
+        })
+
+class DeviceDeleteView(DeleteView):
+    model = Device
+    template_name = 'sensors/device_confirm_delete.html'
+
+    def delete(self, request, *args, **kwargs):
+        device = self.get_object()
+        location = device.location
+        place = location.place
+        success_url = self.get_success_url()
+        
+        # Create detailed message before deletion
+        success_message = (
+            f"Deleted device <strong>{device.name}</strong> from "
+            f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name}<br>"
+            f"<small class='text-muted'>"
+            f"Type: {device.device_type or '-'}<br>"
+            f"Model: {device.model or '-'}<br>"
+            f"Status: {'Active' if device.is_active else 'Inactive'}<br>"
+            f"Sensors: {device.sensors.count()}"
+            f"</small>"
+        )
+        
+        # Delete the device
+        device.delete()
+        
+        # Add success message to session
+        messages.success(request, success_message)
+        
+        return HttpResponseRedirect(success_url)
+
+    def get_success_url(self):
+        return reverse('sensors:place_devices', kwargs={'place_slug': self.object.location.place.slug})
+
+class DeviceActiveSensorsView(View):
+    def get(self, request, place_slug, pk):
+        device = get_object_or_404(Device, pk=pk)
+        
+        try:
+            active_sensors = device.sensors.filter(is_active=True)
+            
+            sensors_data = [{
+                'name': sensor.name,
+                'type': sensor.sensor_type,
+                'unit': sensor.unit,
+                'id': sensor.pk
+            } for sensor in active_sensors]
+            
+            return JsonResponse({
+                'status': 'success',
+                'sensors': sensors_data
+            })
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=500)
+
+class SensorCreateView(LocationAnnotationMixin, SuccessMessageMixin, CreateView):
+    model = Sensor
+    form_class = SensorForm
+    template_name = 'sensors/sensor_form.html'
+
+    def setup(self, request, *args, **kwargs):
+        """Cache common values during view setup"""
+        super().setup(request, *args, **kwargs)
+        self._place = None
+        self._device = None
+
+    @property
+    def place(self):
+        """Cached place getter"""
+        if self._place is None:
+            place_slug = self.kwargs.get('place_slug')
+            self._place = get_object_or_404(Place, slug=place_slug)
+        return self._place
+
+    @property
+    def device(self):
+        """Cached device getter"""
+        if self._device is None:
+            device_pk = self.kwargs.get('device_pk')
+            if device_pk:
+                self._device = get_object_or_404(
+                    Device.objects.select_related(
+            'location'
+                    ),
+                    pk=device_pk,
+                    location__place=self.place
+                )
+        return self._device
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['initial'] = {
+            'device': self.device,
+            'is_active': True
+        }
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'sensor'
+        context['place'] = self.place
+        
+        if self.device:
+            context['device'] = self.device
+            context['location'] = self.device.location
+        
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        
+        # Add to toast history
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'success',  # Always use success type for creation
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            self.request.session.modified = True
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'success',
+                'redirect_url': self.get_success_url()
+            })
+        
+        return response
+
+    def get_success_message(self, cleaned_data):
+        sensor = self.object
+        device = sensor.device
+        location = device.location
+        place = location.place
+        return (
+            f"Created sensor <strong>{sensor.name}</strong> in "
+            f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name} > "
+            f"<i class='bi-hdd-rack'></i> {device.name}<br> > "
+            f"<i class='bi bi-thermometer'></i> {sensor.name}<br>"
+            f"<small class='text-muted'>"
+            f"Type: {sensor.sensor_type or '-'}<br>"
+            f"Unit: {sensor.unit or '-'}<br>"
+            f"Status: {'Active' if sensor.is_active else 'inactive'}"
+            f"</small>"
+        )
+
+    def get_success_url(self):
+        return reverse('sensors:sensor_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'pk': self.object.pk
+        })
+
+class SensorListView(LocationAnnotationMixin, ListView):
+    model = Sensor
+    context_object_name = 'sensors'
+    template_name = 'sensors/sensor_list.html'
+
+    def get_queryset(self) -> QuerySet[Sensor]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            
+            # If we have a device_pk, filter by that device
+            device_pk = self.kwargs.get('device_pk')
+            if device_pk:
+                device = get_object_or_404(Device, pk=device_pk, location__place=place)
+                self._queryset = device.sensors.all()
+            else:
+                # Otherwise, get all sensors for the place
+                self._queryset = Sensor.objects.filter(device__location__place=place)
+            
+            # Apply ordering: active sensors first, then alphabetically by name
+            self._queryset = self._queryset.order_by('-is_active', Lower('name'))
+            
+            # Prefetch related fields to avoid N+1 queries
+            self._queryset = self._queryset.select_related(
+                'device',
+                'device__location',
+                'device__location__place'
+            )
+            
+        return self._queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'sensor'
+        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        
+        # If we're looking at a specific device's sensors, add it to context
+        device_pk = self.kwargs.get('device_pk')
+        if device_pk:
+            context['device'] = get_object_or_404(
+                Device, 
+                pk=device_pk,
+                location__place=context['place']
+            )
+            context['location'] = context['device'].location
+        
+        # Add sensor statistics
+        context.update({
+            'sensors_active': self.get_queryset().filter(is_active=True).count(),
+            'sensors_inactive': self.get_queryset().filter(is_active=False).count(),
+        })
+        
+        return context
+
+class SensorDetailView(LocationAnnotationMixin, DetailView):
+    model = Sensor
+    context_object_name = 'sensor'
+    template_name = 'sensors/sensor_detail.html'
+
+    def get_queryset(self) -> QuerySet[Sensor]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            base_queryset = super().get_queryset()
+            
+            # Filter sensors for this place and prefetch related fields
+            self._queryset = base_queryset.filter(
+                device__location__place=place
+            ).select_related(
+                'device',
+                'device__location',
+                'device__location__place'
+            )
+            
+            # Get the last reading if it exists
+            last_reading = SensorReading.objects.filter(
+                sensor=OuterRef('pk')
+            ).order_by('-timestamp')
+            
+            # Annotate with the last reading value and timestamp
+            self._queryset = self._queryset.annotate(
+                last_value=Subquery(
+                    last_reading.values('value')[:1]
+                ),
+                last_reading_time=Subquery(
+                    last_reading.values('timestamp')[:1]
+                )
+            )
+            
+        return self._queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'sensor'
+        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        
+        # Add device and location to context
+        sensor = self.get_object()
+        context['device'] = sensor.device
+        context['location'] = sensor.device.location
+        
+        # Try to get recent readings if this is an InfluxDB sensor
+        if sensor.data_type == 'INFLUX':
+            try:
+                readings = get_sensor_readings(sensor=sensor, minutes=60)
+                if readings:
+                    values = [reading.value for reading in readings]
+                    context['readings_summary'] = {
+                        'count': len(values),
+                        'min': min(values),
+                        'max': max(values),
+                        'avg': sum(values) / len(values),
+                        'first_timestamp': readings[0].timestamp,
+                        'last_timestamp': readings[-1].timestamp,
+                        'unit': sensor.unit
+                    }
+                    context['recent_readings'] = readings[:10]  # Last 10 readings
+            except Exception as e:
+                ic(f"Error getting sensor readings: {str(e)}")
+                context['readings_error'] = str(e)
+        
+        return context
+
+class SensorUpdateView(LocationAnnotationMixin, SuccessMessageMixin, UpdateView):
+    model = Sensor
+    form_class = SensorForm
+    template_name = 'sensors/sensor_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'sensor'
+        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        
+        # Add device and location to context
+        sensor = self.get_object()
+        context['device'] = sensor.device
+        context['location'] = sensor.device.location
+        
+        return context
+
+    def form_valid(self, form):
+        # Store original values before save
+        sensor = self.get_object()
+        self._original_values = {
+            'name': sensor.name,
+            'is_active': sensor.is_active,
+            'device': sensor.device,
+            'sensor_type': sensor.sensor_type,
+            'data_type': sensor.data_type,
+            'unit': sensor.unit,
+            'influx_measurement': getattr(sensor, 'influx_measurement', None),
+            'influx_field': getattr(sensor, 'influx_field', None),
+            'influx_filter_tags': getattr(sensor, 'influx_filter_tags', None)
+        }
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        
+        # Add to toast history
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'warning',  # Always use warning type for updates
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            self.request.session.modified = True
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'warning',
+                'redirect_url': self.get_success_url()
+            })
+        
+        return response
+
+    def get_success_message(self, cleaned_data):
+        sensor = self.object
+        device = sensor.device
+        location = device.location
+        place = location.place
+        
+        changes = []
+        if hasattr(self, '_original_values'):
+            if self._original_values['name'] != cleaned_data['name']:
+                changes.append(f"name: {self._original_values['name']} → {cleaned_data['name']}")
+            if self._original_values['is_active'] != cleaned_data['is_active']:
+                changes.append(f"active: {self._original_values['is_active']} → {cleaned_data['is_active']}")
+            if self._original_values['device'] != cleaned_data['device']:
+                changes.append(f"device: {self._original_values['device'].name} → {cleaned_data['device'].name}")
+            if self._original_values['sensor_type'] != cleaned_data['sensor_type']:
+                changes.append(f"type: {self._original_values['sensor_type']} → {cleaned_data['sensor_type']}")
+            if self._original_values['data_type'] != cleaned_data['data_type']:
+                changes.append(f"data source: {self._original_values['data_type']} → {cleaned_data['data_type']}")
+            if self._original_values['unit'] != cleaned_data['unit']:
+                changes.append(f"unit: {self._original_values['unit']} → {cleaned_data['unit']}")
+            if self._original_values['influx_measurement'] != cleaned_data.get('influx_measurement'):
+                changes.append(f"measurement: {self._original_values['influx_measurement']} → {cleaned_data.get('influx_measurement')}")
+            if self._original_values['influx_field'] != cleaned_data.get('influx_field'):
+                changes.append(f"field: {self._original_values['influx_field']} → {cleaned_data.get('influx_field')}")
+            if self._original_values['influx_filter_tags'] != cleaned_data.get('influx_filter_tags'):
+                changes.append(f"filter tags: {self._original_values['influx_filter_tags']} → {cleaned_data.get('influx_filter_tags')}")
+        
+        message = (
+            f"Updated sensor <strong>{sensor.name}</strong> in "
+            f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name} > "
+            f"<i class='bi bi-hdd-rack'></i> {device.name} > "
+            f"<i class='bi bi-thermometer'></i> {sensor.name}"
+        )
+        if changes:
+            message += f"<br><small class='text-muted'>Changes: {', '.join(changes)}</small>"
+        return message
+
+    def get_success_url(self):
+        return reverse('sensors:sensor_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'pk': self.object.pk
+        })
+
+class SensorDeleteView(DeleteView):
+    model = Sensor
+    template_name = 'sensors/sensor_confirm_delete.html'
+
+    def delete(self, request, *args, **kwargs):
+        sensor = self.get_object()
+        device = sensor.device
+        location = device.location
+        place = location.place
+        success_url = self.get_success_url()
+        
+        # Create detailed message before deletion
+        success_message = (
+            f"Deleted sensor: "
+            f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name} > "
+            f"<i class='bi bi-hdd-rack'></i> {device.name}<br> > "
+            f"<i class='bi bi-thermometer'></i> {sensor.name}<br>"
+            f"<small class='text-muted'>"
+            f"Type: {sensor.sensor_type or '-'}<br>"
+            f"Unit: {sensor.unit or '-'}<br>"
+            f"Data Source: {sensor.data_type}<br>"
+            f"Status: {'Active' if sensor.is_active else 'Inactive'}"
+            f"</small>"
+        )
+        
+        sensor.delete()
+        
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'danger',  # Always use danger type for deletion
+                'redirect_url': success_url
+            })
+            
+        # Add to toast history
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'danger',
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            
+        return HttpResponseRedirect(success_url)
+
+    def get_success_url(self):
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'pk': self.object.device.pk
+        })
+
+class SensorReadingListView(ListView):
+    model = SensorReading
+    context_object_name = 'readings'
+    template_name = 'sensors/sensor_reading_list.html'
+    paginate_by = 20
+
+    def get_queryset(self):
+        sensor = get_object_or_404(Sensor, pk=self.kwargs['sensor_pk'])
+        queryset = super().get_queryset().filter(sensor=sensor)
+
+        # Filter by date range if provided
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+        if start_date and end_date:
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                queryset = queryset.filter(timestamp__date__range=[start_date, end_date])
+            except ValueError:
+                messages.error(self.request, 'Invalid date format. Please use YYYY-MM-DD.')
+        elif start_date or end_date:
+            messages.error(self.request, 'Both start_date and end_date must be provided.')
+
+        return queryset.select_related('sensor', 'sensor__device', 'sensor__device__location', 'sensor__device__location__place').order_by('-timestamp')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sensor = get_object_or_404(Sensor, pk=self.kwargs['sensor_pk'])
+        context['sensor'] = sensor
+        context['device'] = sensor.device
+        context['location'] = sensor.device.location
+        context['place'] = sensor.device.location.place
+        context['model_name'] = 'sensor_reading'
+
+        # Calculate statistics
+        readings = context['readings']
+        if readings:
+            values = [reading.value for reading in readings]
+            context['readings_summary'] = {
+                'count': len(values),
+                'min': min(values),
+                'max': max(values),
+                'avg': sum(values) / len(values),
+                'first_timestamp': readings[0].timestamp,
+                'last_timestamp': readings[-1].timestamp,
+                'unit': sensor.unit
+            }
+
+        return context
+
+class SensorReadingDetailView(DetailView):
+    model = SensorReading
+    context_object_name = 'reading'
+    template_name = 'sensors/sensor_reading_detail.html'
+
+    def get_queryset(self):
+        sensor = get_object_or_404(Sensor, pk=self.kwargs['sensor_pk'])
+        return super().get_queryset().filter(sensor=sensor)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        reading = self.get_object()
+        sensor = reading.sensor
+        context['sensor'] = sensor
+        context['device'] = sensor.device
+        context['location'] = sensor.device.location
+        context['place'] = sensor.device.location.place
+        context['model_name'] = 'sensor_reading'
+
+        # Get previous and next reading IDs
+        readings = list(self.get_queryset())
+        current_index = readings.index(reading)
+        context['prev_reading_id'] = readings[current_index - 1].id if current_index > 0 else None
+        context['next_reading_id'] = readings[current_index + 1].id if current_index < len(readings) - 1 else None
+
+        return context
+
+class SensorReadingCreateView(LocationAnnotationMixin, SuccessMessageMixin, CreateView):
+    model = SensorReading
+    fields = ['value', 'timestamp']
+    template_name = 'sensors/sensor_reading_form.html'
+
+    def setup(self, request, *args, **kwargs):
+        """Cache common values during view setup"""
+        super().setup(request, *args, **kwargs)
+        self._place = None
+        self._sensor = None
+
+    @property
+    def place(self):
+        """Cached place getter"""
+        if self._place is None:
+            place_slug = self.kwargs.get('place_slug')
+            self._place = get_object_or_404(Place, slug=place_slug)
+        return self._place
+
+    @property
+    def sensor(self):
+        """Cached sensor getter"""
+        if self._sensor is None:
+            sensor_pk = self.kwargs.get('sensor_pk')
+            if sensor_pk:
+                self._sensor = get_object_or_404(
+                    Sensor.objects.select_related(
+                        'device',
+                        'device__location'
+                    ),
+                    pk=sensor_pk,
+                    device__location__place=self.place
+                )
+        return self._sensor
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Set initial timestamp to now
+        kwargs['initial'] = {
+            'timestamp': timezone.now()
+        }
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'model_name': 'sensor_reading',
+            'place': self.place,
+            'sensor': self.sensor,
+            'device': self.sensor.device,
+            'location': self.sensor.device.location,
+        })
+        return context
+
+    def form_valid(self, form):
+        form.instance.sensor = self.sensor
+        response = super().form_valid(form)
+        success_message = self.get_success_message(form.cleaned_data)
+        
+        # Add to toast history
+        if hasattr(self.request, 'session'):
+            toast_history = self.request.session.get('toast_history', [])
+            toast_history.append({
+                'message': success_message,
+                'type': 'success',  # Always use success type for creation
+                'timestamp': timezone.now().isoformat()
+            })
+            self.request.session['toast_history'] = toast_history
+            self.request.session.modified = True
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'success',
+                'message': success_message,
+                'type': 'success',
+                'redirect_url': self.get_success_url()
+            })
+        
+        return response
+
+    def get_success_message(self, cleaned_data):
+        reading = self.object
+        sensor = reading.sensor
+        device = sensor.device
+        location = device.location
+        place = location.place
+        
+        return (
+            f"Created reading for sensor: "
+            f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name} > "
+            f"<i class='bi bi-hdd-rack'></i> {device.name}<br> > "
+            f"<i class='bi bi-thermometer'></i> {sensor.name}<br> "
+            f"<small class='text-muted'>"
+            f"Value: {reading.value} {sensor.unit or '-'}<br>"
+            f"Timestamp: {reading.timestamp}"
+            f"</small>"
+        )
+
+    def get_success_url(self):
+        return reverse('sensors:sensor_reading_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'sensor_pk': self.sensor.pk,
+            'pk': self.object.pk
+        })
+
+def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
+    place = get_object_or_404(Place, slug=place_slug)
+    
+    # Get device and sensor counts
+    devices_active = Device.objects.filter(location__place=place, is_active=True)
+    devices_inactive = Device.objects.filter(location__place=place, is_active=False)
+    sensors_active = Sensor.objects.filter(device__location__place=place, is_active=True)
+    sensors_inactive = Sensor.objects.filter(device__location__place=place, is_active=False)
+    
+    # Get location statistics
+    locations = place.locations.annotate(
+        active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
+        inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+    ).values('id', 'name', 'is_active', 'active_devices_count', 'inactive_devices_count')
+    
+    return JsonResponse({
+        'devices_active': devices_active.count(),
+        'devices_inactive': devices_inactive.count(),
+        'sensors_active': sensors_active.count(),
+        'sensors_inactive': sensors_inactive.count(),
+        'locations': list(locations)
+    })
+
+def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context['places'] = Place.objects.all()
+    return context

@@ -1,13 +1,13 @@
 {% load widget_tweaks %}
+{% load sensor_filters %}
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<div class="card rounded-3 shadow-sm border-0 mb-3">
+<div class="card rounded-3 shadow-sm border-0 mb-1">
     <div class="card-header bg-white py-2">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">
-                <i class="bi bi-building me-2"></i>{{ place.name }}
+                <i class="bi bi-house-gear me-2"></i>Place:
+                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-secondary fw-normal">{{ place.name }}</a>
+                {% include "sensors/includes/status_active_badge.html" with object=place %}
             </h5>
             <div class="d-flex align-items-center gap-3 small">
                 <span>
@@ -16,74 +16,38 @@
                 <span>
                     <i class="bi bi-geo-alt me-1"></i>{{ place.latitude }}, {{ place.longitude }}
                 </span>
-                <a href="#" class="btn btn-outline-primary" id="openMap">
-                    View Map
+                <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openPlaceMap" 
+                   data-place-map-popout="true"
+                   data-bs-toggle="modal" 
+                   data-bs-target="#placeMapModal" 
+                   data-place-lat="{{ place.latitude }}"
+                   data-place-lon="{{ place.longitude }}"
+                   data-place-name="{{ place.name }}"
+                   data-place-slug="{{ place.slug }}">
+                    <i class="bi bi-globe"></i>
                 </a>
             </div>
         </div>
     </div>
-    {% if show_map %}
-    <div class="card-body py-2">
-        <div class="row mt-2">
-            <div class="col-12">
-                <div class="border rounded">
-                    {{ map_html|safe }}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
-<!-- Modal for Map -->
-<div id="mapModal" class="modal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg" role="document">
+<!-- Place Map Modal -->
+<div class="modal fade" id="placeMapModal" data-map-type="popout">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">{{ place.name }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">
+                    <i class="bi bi-globe me-2"></i>{{ place.name }} Map
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0">
-                <div id="leafletMap" style="height: 500px;"></div>
+                <div id="placeMapContainer" class="place-map-container" 
+                     data-place-lat="{{ place.latitude }}"
+                     data-place-lon="{{ place.longitude }}"
+                     data-place-name="{{ place.name }}"
+                     data-place-slug="{{ place.slug }}"></div>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const openMapButton = document.getElementById('openMap');
-    const mapModal = document.getElementById('mapModal');
-    let map = null;
-
-    openMapButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        const modal = new bootstrap.Modal(mapModal);
-        modal.show();
-    });
-
-    mapModal.addEventListener('shown.bs.modal', function () {
-        if (!map) {
-            setTimeout(function() {
-                map = L.map('leafletMap');
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(map);
-
-                const lat = {{ place.latitude }};
-                const lng = {{ place.longitude }};
-                map.setView([lat, lng], 15);
-                
-                L.marker([lat, lng])
-                    .addTo(map)
-                    .bindPopup("{{ place.name }}")
-                    .openPopup();
-
-                map.invalidateSize();
-            }, 100);
-        } else {
-            map.invalidateSize();
-        }
-    });
-});
-</script> 

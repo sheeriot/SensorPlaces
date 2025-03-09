@@ -1,0 +1,41 @@
+{% comment %}
+This template expects:
+- location: Location object with active_devices_count and inactive_devices_count annotations
+- place: Place object
+{% endcomment %}
+<tr class="location-row {% if not location.is_active %}opacity-50 text-muted d-none{% endif %}" 
+    data-location-active="{{ location.is_active|lower }}" 
+    data-location-id="{{ location.pk }}"
+    data-location-name="{{ location.name }}"
+    data-place-name="{{ place.name }}">
+    <td>
+        <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
+           class="btn btn-outline-info text-dark m-0 p-1 small d-flex align-items-center">
+            <i class="bi bi-geo-alt me-1"></i>
+            <span class="d-inline-block text-truncate" style="max-width: 150px;">{{ location.name }}</span>
+        </a>
+    </td>
+    <td>
+        {% if place.is_active %}
+            {% include "sensors/includes/toggle_active_button.html" with type="location" id=location.pk is_active=location.is_active place_slug=place.slug %}
+        {% else %}
+            {% include "sensors/includes/status_active_badge.html" with object=location show_active=1 %}
+        {% endif %}
+    </td>
+    <td>
+        <span class="text-success">{{ location.active_devices_count }}</span>
+        <span class="text-secondary">({{ location.inactive_devices_count }})</span>
+    </td>
+    <td>
+        <div class="btn-group btn-group-sm">
+            <a href="{% url 'sensors:location_update' place_slug=place.slug pk=location.pk %}" 
+               class="btn btn-warning">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'sensors:location_delete' place_slug=place.slug pk=location.pk %}" 
+               class="btn btn-danger">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+    </td>
+</tr> 

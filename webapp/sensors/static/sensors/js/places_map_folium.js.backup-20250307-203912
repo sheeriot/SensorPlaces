@@ -1,0 +1,569 @@
+/**
+ * Places Map Folium System
+ * Handles Folium map initialization and marker management
+ */
+
+const placesMapFoliumSystem = {
+    state: {
+        map: null,
+        hideInactiveState: false,
+        userHasAdjustedView: false,
+        debug: true
+    },
+
+    async initialize() {
+        if (this.state.debug) {
+            console.group('Places Map Folium');
+            console.log('Initializing at:', new Date().toISOString());
+            
+            // Log if hide-inactive system is available
+            console.log('Hide Inactive System:', {
+                available: !!window.hideInactiveManager,
+                initialized: window.hideInactiveManager?.isInitialized
+            });
+        }
+
+        // Get the map container first to check for initial state
+        const mapContainer = document.getElementById('places-map-folium');
+        if (!mapContainer) {
+            if (this.state.debug) console.groupEnd();
+            return;
+        }
+
+        try {
+            const foliumMap = await this.waitForFoliumMap(mapContainer);
+            if (!foliumMap) {
+                if (this.state.debug) console.groupEnd();
+                return;
+            }
+
+            // Set initial state from map data
+            try {
+                const boundsData = JSON.parse(foliumMap.dataset.mapBounds || '{}');
+                if (boundsData.initial_state?.hide_inactive) {
+                    this.state.hideInactiveState = true;
+                    if (this.state.debug) {
+                        console.log('Setting initial hide state:', this.state.hideInactiveState);
+                    }
+                }
+            } catch (e) {
+                if (this.state.debug) console.warn('Failed to parse initial state:', e);
+            }
+
+            // Log map element data
+            if (this.state.debug) {
+                console.log('Map element found:', {
+                    element: foliumMap,
+                    dataset: foliumMap.dataset,
+                    bounds: foliumMap.dataset.mapBounds,
+                    hideInactive: this.state.hideInactiveState
+                });
+            }
+
+            await this.initializeMapInstance(foliumMap);
+            await this.setupHideInactiveListeners();
+        } catch (error) {
+            console.error('Map initialization error:', error);
+            if (this.state.debug) console.groupEnd();
+        }
+    },
+
+    waitForFoliumMap(container) {
+        return new Promise(resolve => {
+            const findMap = () => {
+                const map = container.querySelector('.folium-map');
+                // Only resolve once Leaflet classes are present
+                if (map?.classList.contains('leaflet-container')) {
+                    return map;
+                }
+                return null;
+            };
+            
+            const map = findMap();
+            if (map) {
+                resolve(map);
+                return;
+            }
+            
+            const observer = new MutationObserver((mutations, obs) => {
+                const map = findMap();
+                if (map) {
+                    obs.disconnect();
+                    resolve(map);
+                }
+            });
+
+            observer.observe(container, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        });
+    },
+
+    async initializeMapInstance(foliumMap) {
+        if (this.state.debug) {
+            console.group('Initializing Map Instance');
+            console.log('Folium map element:', foliumMap);
+            console.log('Map ID:', foliumMap.id);
+            // Log any script tags inside the map
+            const scripts = foliumMap.getElementsByTagName('script');
+            console.log('Found scripts:', Array.from(scripts).map(s => s.textContent.slice(0, 100) + '...'));
+        }
+
+        // Wait for Folium's initialization script to run
+        await new Promise(resolve => {
+            // If map already exists in the global scope, use it
+            if (window[foliumMap.id]) {
+                if (this.state.debug) console.log('Found map in global scope');
+                resolve(window[foliumMap.id]);
+                return;
+            }
+
+            // Otherwise wait for it to be defined
+            const checkInterval = setInterval(() => {
+                if (window[foliumMap.id]) {
+                    clearInterval(checkInterval);
+                    if (this.state.debug) console.log('Map initialized in global scope');
+                    resolve(window[foliumMap.id]);
+                }
+            }, 100);
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                if (this.state.debug) console.warn('Timeout waiting for map initialization');
+                resolve(null);
+            }, 5000);
+        });
+
+        // Get the map instance from the global scope
+        const leafletMap = window[foliumMap.id];
+
+        if (this.state.debug) {
+            console.log('Found Leaflet map:', !!leafletMap);
+            if (leafletMap) {
+                console.log('Map details:', {
+                    zoom: leafletMap.getZoom(),
+                    center: leafletMap.getCenter(),
+                    bounds: leafletMap.getBounds()
+                });
+            }
+        }
+
+        if (!leafletMap) {
+            throw new Error('Could not find Leaflet map instance');
+        }
+
+        this.state.map = leafletMap;
+        
+        // Set up map interaction tracking
+        this.state.map.on('zoomend dragend', () => {
+            if (!this.state.userHasAdjustedView) {
+                this.state.userHasAdjustedView = true;
+            }
+        });
+
+        this.setupMapEventHandlers(foliumMap);
+        this.initializeMarkerSystem();
+        
+        if (this.state.debug) {
+            console.log('Map initialization complete');
+            console.groupEnd();
+        }
+
+        window.dispatchEvent(new CustomEvent('leafletMapReady', {
+            detail: { containerId: 'places-map-folium' }
+        }));
+    },
+
+    waitForLeaflet(foliumMap) {
+        if (this.state.debug) {
+            console.group('Waiting for Leaflet');
+            console.log('Initial _leaflet_map state:', foliumMap._leaflet_map);
+        }
+
+        return new Promise((resolve, reject) => {
+            if (foliumMap._leaflet_map) {
+                if (this.state.debug) {
+                    console.log('Leaflet map already available');
+                    console.groupEnd();
+                }
+                resolve();
+                return;
+            }
+
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds maximum wait
+            
+            const checkMap = setInterval(() => {
+                attempts++;
+                if (this.state.debug) {
+                    console.log(`Checking for Leaflet map (attempt ${attempts}/${maxAttempts})`);
+                }
+
+                if (foliumMap._leaflet_map) {
+                    clearInterval(checkMap);
+                    if (this.state.debug) {
+                        console.log('Leaflet map found');
+                        console.groupEnd();
+                    }
+                    resolve();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkMap);
+                    if (this.state.debug) {
+                        console.warn('Timeout waiting for Leaflet map');
+                        console.groupEnd();
+                    }
+                    reject(new Error('Timeout waiting for Leaflet map'));
+                }
+            }, 100);
+        });
+    },
+
+    setupHideInactiveListeners() {
+        if (this.state.debug) {
+            console.group('Setting up hide-inactive listeners');
+            console.log('Current hide-inactive state:', {
+                manager: window.hideInactiveManager,
+                initialized: window.hideInactiveManager?.isInitialized,
+                placeState: window.hideInactiveManager?.getSwitchStateByModel('place')
+            });
+        }
+
+        // Check initial state
+        if (window.hideInactiveManager?.isInitialized) {
+            this.state.hideInactiveState = window.hideInactiveManager.getSwitchStateByModel('place');
+            this.updateMarkersVisibility(this.state.hideInactiveState);
+        }
+
+        // Listen for state changes
+        window.addEventListener('hideInactiveStateChanged', (e) => {
+            if (e.detail.model === 'place') {
+                if (this.state.debug) {
+                    console.group('Hide Inactive State Change');
+                    console.log('Previous state:', this.state.hideInactiveState);
+                    console.log('New state:', e.detail.hideInactive);
+                    console.log('User has adjusted view:', this.state.userHasAdjustedView);
+                }
+
+                this.state.hideInactiveState = e.detail.hideInactive;
+                this.state.userHasAdjustedView = false;
+                this.updateMarkersVisibility(e.detail.hideInactive);
+
+                if (this.state.debug) console.groupEnd();
+            }
+        });
+
+        if (this.state.debug) console.groupEnd();
+    },
+
+    updateMarkersVisibility(hideInactive) {
+        if (this.state.debug) {
+            console.group('Updating Markers Visibility');
+            console.log('Hide inactive:', hideInactive);
+            console.log('User has adjusted view:', this.state.userHasAdjustedView);
+        }
+
+        const markerPane = document.querySelector('.leaflet-marker-pane');
+        if (!markerPane) {
+            if (this.state.debug) {
+                console.log('No marker pane found');
+                console.groupEnd();
+            }
+            return;
+        }
+
+        const markers = markerPane.querySelectorAll('.leaflet-marker-icon');
+        const visibleMarkers = [];
+        
+        markers.forEach(marker => {
+            const placeMarker = marker.querySelector('.place-marker');
+            if (!placeMarker) return;
+
+            const isActive = placeMarker.dataset.placeActive === 'true';
+
+            // Handle inactive markers visibility
+            if (!isActive) {
+                // Toggle display style
+                marker.style.display = hideInactive ? 'none' : '';
+                // Toggle d-none class
+                if (hideInactive) {
+                    placeMarker.classList.add('d-none');
+                } else {
+                    placeMarker.classList.remove('d-none');
+                }
+            }
+
+            // Collect coordinates for visible markers
+            if (isActive || !hideInactive) {
+                const lat = parseFloat(placeMarker.dataset.placeLat);
+                const lon = parseFloat(placeMarker.dataset.placeLon);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    visibleMarkers.push([lat, lon]);
+                }
+            }
+        });
+
+        if (this.state.debug) {
+            console.log('Visible markers:', visibleMarkers.length);
+            console.log('Will fit map to markers:', {
+                hasMap: !!this.state.map,
+                hasMarkers: visibleMarkers.length > 0
+            });
+        }
+
+        if (visibleMarkers.length > 0 && this.state.map) {
+            const mapEl = document.querySelector('.folium-map');
+            if (this.state.debug && mapEl) {
+                console.log('Map bounds data:', {
+                    raw: mapEl.dataset.mapBounds,
+                    parsed: JSON.parse(mapEl.dataset.mapBounds || '{}')
+                });
+            }
+            this.fitMapToMarkers(visibleMarkers);
+        }
+
+        if (this.state.debug) console.groupEnd();
+    },
+
+    fitMapToMarkers(markers) {
+        const mapEl = document.querySelector('.folium-map');
+        if (!mapEl) {
+            if (this.state.debug) console.log('No map element found for bounds data');
+            return;
+        }
+
+        try {
+            if (this.state.debug) {
+                console.group('Fitting Map to Markers');
+                console.log('Map element data:', {
+                    id: mapEl.id,
+                    hideInactive: this.state.hideInactiveState
+                });
+            }
+
+            let boundsData;
+            try {
+                boundsData = JSON.parse(mapEl.dataset.mapBounds || '{}');
+                if (this.state.debug) {
+                    console.log('Parsed bounds data:', boundsData);
+                }
+            } catch (e) {
+                if (this.state.debug) console.warn('Failed to parse bounds data:', e);
+                boundsData = {};
+            }
+
+            let bounds;
+            // Use pre-calculated bounds if available
+            const boundsType = this.state.hideInactiveState ? 'active' : 'all';
+            if (boundsData[boundsType]) {
+                if (this.state.debug) {
+                    console.log(`Using ${boundsType} bounds:`, boundsData[boundsType]);
+                }
+                bounds = [
+                    boundsData[boundsType].sw,
+                    boundsData[boundsType].ne
+                ];
+            } else {
+                // Fallback to marker-based bounds
+                if (this.state.debug) console.log('Using marker-based bounds');
+                bounds = L.latLngBounds(markers).pad(0.1);
+            }
+
+            if (this.state.debug) {
+                console.log('Current zoom:', this.state.map.getZoom());
+                console.log('Applying bounds:', bounds);
+            }
+            
+            this.state.map.fitBounds(bounds);
+            
+            if (this.state.debug) {
+                console.log('New zoom:', this.state.map.getZoom());
+            }
+
+            setTimeout(() => {
+                this.state.map.invalidateSize();
+                if (this.state.debug) console.log('Map size invalidated');
+            }, 100);
+
+            if (this.state.debug) console.groupEnd();
+        } catch (error) {
+            console.error('Error fitting map to bounds:', error);
+            // Fallback to marker-based bounds
+            const bounds = L.latLngBounds(markers).pad(0.1);
+            this.state.map.fitBounds(bounds);
+        }
+    },
+
+    // Add method to reset user view state
+    resetUserViewState() {
+        this.state.userHasAdjustedView = false;
+        this.updateMarkersVisibility(this.state.hideInactiveState);
+    },
+
+    setupMapEventHandlers(mapElement) {
+        const resizeObserver = new ResizeObserver(() => {
+            if (this.state.map) {
+                // Only adjust bounds on resize if user hasn't manually changed view
+                if (!this.state.userHasAdjustedView) {
+                    this.updateMarkersVisibility(this.state.hideInactiveState);
+                } else {
+                    this.state.map.invalidateSize();
+                }
+            }
+        });
+        
+        resizeObserver.observe(mapElement);
+        window.addEventListener('resize', () => {
+            if (this.state.map) {
+                setTimeout(() => {
+                    if (!this.state.userHasAdjustedView) {
+                        this.updateMarkersVisibility(this.state.hideInactiveState);
+                    } else {
+                        this.state.map.invalidateSize();
+                    }
+                }, 100);
+            }
+        });
+    },
+
+    initializeMarkerSystem() {
+        const markerPane = document.querySelector('.leaflet-marker-pane');
+        if (!markerPane) return;
+
+        if (this.state.debug) {
+            console.group('Marker System Initialization');
+            console.log('Initial hide inactive state:', this.state.hideInactiveState);
+        }
+
+        // First, analyze all markers without modifying them
+        const markerStates = [];
+        const markers = Array.from(markerPane.querySelectorAll('.leaflet-marker-icon'));
+        
+        if (this.state.debug) {
+            console.log('Found marker elements:', markers.length);
+            console.log('Marker elements:', markers.map(m => ({
+                classes: Array.from(m.classList),
+                hasPlaceMarker: !!m.querySelector('.place-marker')
+            })));
+        }
+
+        markers.forEach(marker => {
+            const placeMarker = marker.querySelector('.place-marker');
+            if (!placeMarker) return;
+
+            markerStates.push({
+                name: placeMarker.dataset.placeName || 'Unnamed',
+                active: placeMarker.dataset.placeActive === 'true',
+                isHidden: placeMarker.classList.contains('d-none'),
+                displayStyle: marker.style.display,
+                expectedHidden: !placeMarker.dataset.placeActive === 'true' && this.state.hideInactiveState,
+                coordinates: [
+                    parseFloat(placeMarker.dataset.placeLat),
+                    parseFloat(placeMarker.dataset.placeLon)
+                ]
+            });
+        });
+
+        if (this.state.debug) {
+            console.log('Analyzed marker states:', markerStates.length);
+            console.table(markerStates);
+        }
+
+        // Now process markers
+        markers.forEach(this.processMarker.bind(this));
+
+        // Watch for new markers
+        new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                if (mutation.addedNodes) {
+                    if (this.state.debug) {
+                        console.group('New Markers Added');
+                        console.log('Number of new nodes:', mutation.addedNodes.length);
+                    }
+                    
+                    Array.from(mutation.addedNodes)
+                        .filter(node => node instanceof Element)
+                        .forEach(node => {
+                            // First analyze
+                            if (this.isMarkerElement(node)) {
+                                const placeMarker = node.querySelector('.place-marker');
+                                if (placeMarker) {
+                                    const state = {
+                                        name: placeMarker.dataset.placeName || 'Unnamed',
+                                        active: placeMarker.dataset.placeActive === 'true',
+                                        isHidden: placeMarker.classList.contains('d-none'),
+                                        displayStyle: node.style.display,
+                                        expectedHidden: !placeMarker.dataset.placeActive === 'true' && this.state.hideInactiveState
+                                    };
+                                    if (this.state.debug) {
+                                        console.log('New marker state:', state);
+                                    }
+                                }
+                            }
+                            // Then process
+                            this.processMarker(node);
+                        });
+
+                    if (this.state.debug) console.groupEnd();
+                }
+            });
+        }).observe(markerPane, {
+            childList: true,
+            subtree: true
+        });
+
+        if (this.state.debug) console.groupEnd();
+    },
+
+    isMarkerElement(node) {
+        // First check if it's an Element
+        if (!(node instanceof Element)) return false;
+        
+        // Then check if it has the marker class
+        return Array.from(node.classList || []).some(cls => 
+            cls.includes('marker') || 
+            cls.includes('Marker')
+        );
+    },
+
+    processMarker(node) {
+        if (!this.isMarkerElement(node)) return;
+
+        const placeMarker = node.querySelector('.place-marker');
+        if (!placeMarker) return;
+
+        const isActive = placeMarker.dataset.placeActive === 'true';
+        
+        if (!isActive) {
+            node.classList.add('opacity-50', 'text-muted');
+            node.style.opacity = '0.5';
+            
+            // Handle visibility based on current state
+            node.style.display = this.state.hideInactiveState ? 'none' : '';
+            if (this.state.hideInactiveState) {
+                placeMarker.classList.add('d-none');
+            } else {
+                placeMarker.classList.remove('d-none');
+            }
+        }
+
+        window.dispatchEvent(new CustomEvent('placeMarkerProcessed', {
+            detail: {
+                id: placeMarker.dataset.placeId || 'unknown',
+                name: placeMarker.dataset.placeName || 'Unnamed',
+                active: isActive,
+                coordinates: [
+                    parseFloat(placeMarker.dataset.placeLat),
+                    parseFloat(placeMarker.dataset.placeLon)
+                ]
+            }
+        }));
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    placesMapFoliumSystem.initialize();
+}); 

@@ -1,118 +1,24 @@
 {% extends "sensors/base.html" %}
 {% load widget_tweaks %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}
-    {% if object %}Edit Sensor{% else %}New Sensor{% endif %}
+    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12 mb-3">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item">
-                    <a href="{% url 'sensors:place_detail' device.location.place.slug %}">{{ device.location.place.name }}</a>
-                </li>
-                <li class="breadcrumb-item">
-                    <a href="{% url 'sensors:location_detail' place_slug=device.location.place.slug pk=device.location.pk %}">
-                        {{ device.location.name }}
-                    </a>
-                </li>
-                <li class="breadcrumb-item">
-                    <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug location_pk=device.location.pk pk=device.pk %}">
-                        {{ device.name }}
-                    </a>
-                </li>
-                <li class="breadcrumb-item active">
-                    {% if object %}Edit Sensor{% else %}New Sensor{% endif %}
-                </li>
-            </ol>
-        </nav>
-    </div>
+<div class="container-fluid">
+    {% include 'sensors/includes/place_title_card.html' with place=place %}
+    <div class="row">
+        <div class="col-md-4">
+            {% include "sensors/includes/device_details_card.html" with device=device %}
+            {% include "sensors/includes/location_details_card.html" with location=device.location %}
+        </div>
 
-    <!-- Place Title Card -->
-    <div class="col-12">
-        {% include "sensors/includes/place_title_card.html" with place=device.location.place %}
-    </div>
-
-    <div class="col-md-4">
-        <!-- Device Details Card -->
-        {% include "sensors/includes/device_details_card.html" with device=device %}
-
-        <!-- Location Details Card -->
-        {% include "sensors/includes/location_details_card.html" with location=device.location %}
-    </div>
-
-    <div class="col-md-8">
-        <div class="card rounded-3 shadow-sm border-0">
-            <div class="card-header bg-white py-2">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-cpu me-2"></i>
-                    {% if object %}Edit Sensor{% else %}New Sensor{% endif %}
-                </h5>
-            </div>
-            <div class="card-body">
-                {% crispy form %}
-
-                {% if not device.is_active %}
-                <div class="alert alert-warning d-flex align-items-center py-2 mb-3" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <div>
-                        This device is inactive. Any sensors created here will also be inactive.
-                    </div>
-                </div>
-                {% endif %}
-            </div>
+        <div class="col-md-8">
+            {% include "sensors/includes/sensor_form_card.html" %}
         </div>
     </div>
 </div>
-
-{% block extra_css %}
-<style>
-    /* Larger switch styling */
-    .form-switch-lg .form-check-input {
-        width: 3em;
-        height: 1.5em;
-        margin-top: 0;
-    }
-    
-    .form-switch-lg .form-check-input:checked {
-        background-color: var(--bs-success);
-        border-color: var(--bs-success);
-    }
-
-    /* Fade transition for InfluxDB fields */
-    .influx-fields {
-        transition: opacity 0.3s ease-in-out;
-    }
-</style>
 {% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dataTypeSelect = document.querySelector('#id_data_type');
-    const influxFields = document.querySelector('.influx-fields');
-    
-    function toggleInfluxFields() {
-        if (dataTypeSelect.value === 'INFLUX') {
-            influxFields.style.display = 'block';
-            influxFields.style.opacity = '1';
-        } else {
-            influxFields.style.opacity = '0';
-            setTimeout(() => {
-                influxFields.style.display = 'none';
-            }, 300);
-        }
-    }
-    
-    // Initial state
-    toggleInfluxFields();
-    
-    // Listen for changes
-    dataTypeSelect.addEventListener('change', toggleInfluxFields);
-});
-</script>
-{% endblock %}
-{% endblock %} 

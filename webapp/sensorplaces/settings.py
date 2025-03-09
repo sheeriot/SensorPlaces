@@ -37,10 +37,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'sensors.apps.SensorsConfig',
+    'django.contrib.sites',
+    
+    # Allauth
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    
+    # Your apps
+    'sensors',
     'widget_tweaks',
     'crispy_forms',
     'crispy_bootstrap5',
+    # ... other apps
 ]
 
 MIDDLEWARE = [
@@ -51,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',  # Required for allauth
 ]
 
 ROOT_URLCONF = 'sensorplaces.urls'
@@ -58,7 +69,10 @@ ROOT_URLCONF = 'sensorplaces.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR / 'sensors' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -66,6 +80,10 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.static',
+            ],
+            'builtins': [
+                'django.templatetags.static',
             ],
         },
     },
@@ -119,7 +137,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    BASE_DIR / "sensors" / "static",
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -151,3 +172,53 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
+
+# Authentication settings
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+SITE_ID = 1
+
+# Basic login URLs
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = '/accounts/login/'
+
+# Email settings for development (console backend)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Django-allauth configuration
+ACCOUNT_LOGIN_METHODS = {'username', 'email'}  # Allow both username and email login
+
+# Rate limiting settings
+ACCOUNT_RATE_LIMITS = {
+    'login_failed': '5/300s',  # 5 attempts per 300 seconds (5 minutes)
+}
+
+# Email verification settings
+ACCOUNT_EMAIL_VERIFICATION = "optional"  # Change from "mandatory" to "optional"
+ACCOUNT_EMAIL_REQUIRED = True  # Keep email required but verification optional
+
+# If you want to completely disable email verification for local users:
+SOCIALACCOUNT_EMAIL_VERIFICATION = "mandatory"  # Keep strict verification for social accounts
+SOCIALACCOUNT_EMAIL_REQUIRED = True  # Keep email required for social accounts
+
+# Google OAuth2 settings
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
+    }
+}
+
+ACCOUNT_LOGOUT_ON_GET = True  # Add this to allow logout without confirmation
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True  # Add this to auto-login after email confirmation

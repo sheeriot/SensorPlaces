@@ -1,213 +1,46 @@
 {% extends "sensors/base.html" %}
 {% load sensor_filters %}
 
-{% block extra_css %}
-<style>
-    .bg-light-success {
-        background-color: #d1e7dd !important;
-    }
-    .location-marker {
-        cursor: move;
-        transform: translate(-50%, -50%);
-        z-index: 100;
-        position: relative;
-    }
-    .location-marker.dragging {
-        z-index: 1000;
-    }
-    .location-label {
-        position: absolute;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 12px;
-        white-space: nowrap;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: -20px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .location-label .badge {
-        font-size: 10px;
-        padding: 3px 6px;
-    }
-    
-    .location-popup {
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        margin-bottom: 10px;
-        background: white;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        padding: 8px;
-        width: 200px;
-        z-index: 1000;
-        display: none;
-    }
-    
-    .location-marker:hover .location-popup {
-        display: block;
-    }
-    
-    .location-marker .bi-hexagon-fill {
-        filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
-    }
-
-    #siteMapContainer {
-        background: #f8f9fa;
-        border-radius: 0 0 0.375rem 0.375rem;
-        max-height: 70vh;
-    }
-</style>
-{% endblock %}
-
-{% block title %}{{ place.name }}{% endblock %}
+{% block title %}Sensor Places - {{ place.name }}{% endblock %}
 
 {% block content %}
 <div class="row">
-    <!-- Header with Title and Actions -->
-    <div class="col-md-12 mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1>Place: {{ place.name }}</h1>
-            <div class="btn-group">
-                <a href="{% url 'sensors:place_update' place.slug %}" class="btn btn-warning">
-                    <i class="bi bi-pencil"></i> Edit
-                </a>
-                <a href="{% url 'sensors:place_delete' place.slug %}" class="btn btn-danger">
-                    <i class="bi bi-trash"></i> Delete
-                </a>
-            </div>
-        </div>
-    </div>
+    <!-- Header with Title and Navigation -->
+
     <!-- Place Title Card -->
     <div class="col-12">
-        {% include "sensors/includes/place_title_card.html" with place=place %}
+        {% include "sensors/includes/place_title_card.html" with place=place place_map_html=place_map_html %}
     </div>
+
     <!-- Left Column: Place Details -->
     <div class="col-md-4">
-        <!-- Place Details Card -->
-        {% include "sensors/includes/place_details_card.html" with place=place %}
         
-        <div class="card mb-4">
-            <div class="card bg-light p-0">
-                <table class="table table-sm mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3">Counts (Live)</th>
-                            <th class="text-center">Active (<span class="text-danger">inactive</span>)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="table-group-divider font-weight-bold">
-                        <tr>
-                            <td class="ps-3">
-                                <i class="bi bi-heptagon me-1"></i>Locations
-                            </td>
-                            <td class="text-center text-success">
-                                {{ locations|filter_active|length }}
-                                (<span class="text-center text-danger">{{ locations|filter_inactive|length }}</span>)
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="ps-3">
-                                <i class="bi bi-hdd-rack me-1"></i>Devices
-                            </td>
-                            <td class="text-center">
-                                <span id="devices-active" class="text-success">{{ devices_active }}</span>
-                                (<span id="devices-inactive" class="text-danger">{{ devices_inactive }}</span>)
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="ps-3">
-                                <i class="bi bi-thermometer me-1"></i>Sensors
-                            </td>
-                            <td class="text-center">
-                                <span id="sensors-active" class="text-success">{{ sensors_active }}</span>
-                                (<span id="sensors-inactive" class="text-danger">{{ sensors_inactive }}</span>)
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <!-- Place Details Card -->
+        {% include "sensors/includes/place_details_card.html" with place=place place_map_html=place_map_html %}
+ 
+        <!-- Include the live counts partial -->
+        {% include 'sensors/includes/live_counts_card.html' %}
     </div>
 
     <!-- Right Column: Locations and Site Plan/Map -->
     <div class="col-md-8">
         <!-- Locations Table Card -->
-        {% include "sensors/includes/locations_card.html" with locations=locations place=place %}
+        {% include "sensors/includes/location_list_card.html" with locations=locations place=place %}
 
         <!-- Site Plan/Map Card -->
         {% if place.site_plan %}
-            {% include "sensors/includes/site_plan_card.html" with place=place locations=locations %}
+            {% include "sensors/includes/siteplan_card.html" with place=place locations=locations editable=True %}
         {% else %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Location Map</h5>
-                </div>
-                <div class="card-body p-0">
-                    {{ map_html|safe }}
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">No Site Plan Available</h5>
+                    <p class="card-text">Upload a site plan to visualize your sensor locations.</p>
+                    <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Upload Site Plan
+                    </a>
                 </div>
             </div>
         {% endif %}
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-// Add CSRF token to the page
-const csrfToken = '{{ csrf_token }}';
-
-document.addEventListener('DOMContentLoaded', function() {
-    const hideInactiveSwitch = document.getElementById('hideInactiveSwitch');
-    const locationRows = document.querySelectorAll('tr[data-active]');
-    const locationMarkers = document.querySelectorAll('.location-marker');
-
-    function filterLocations() {
-        const hideInactive = hideInactiveSwitch.checked;
-        
-        // Filter table rows
-        locationRows.forEach(row => {
-            const isActive = row.dataset.active === 'true';
-            row.style.display = (hideInactive && !isActive) ? 'none' : '';
-        });
-
-        // Filter map markers
-        locationMarkers.forEach(marker => {
-            const isActive = marker.dataset.active === 'true';
-            marker.style.display = (hideInactive && !isActive) ? 'none' : '';
-        });
-    }
-
-    // Initial filter
-    hideInactiveSwitch.checked = true;  // Start with inactive locations hidden
-    filterLocations();
-
-    // Filter on toggle change
-    hideInactiveSwitch.addEventListener('change', filterLocations);
-});
-
-// Real-time updates (every 30 seconds)
-function updateStatistics() {
-    fetch(`{% url 'sensors:place_stats' place_slug=place.slug %}`)
-        .then(response => response.json())
-        .then(data => {
-            // Update device counts
-            document.getElementById('devices-active').textContent = data.devices_active;
-            document.getElementById('devices-inactive').textContent = data.devices_inactive;
-            
-            // Update sensor counts
-            document.getElementById('sensors-active').textContent = data.sensors_active;
-            document.getElementById('sensors-inactive').textContent = data.sensors_inactive;
-        });
-}
-
-setInterval(updateStatistics, 30000);
-</script>
 {% endblock %} 

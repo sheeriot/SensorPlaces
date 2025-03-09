@@ -1,0 +1,21 @@
+/* Grouped List Headers */
+.grouped-list-header {
+    background-color: rgba(13, 110, 253, 0.05) !important;  /* Very subtle blue */
+}
+
+.grouped-list-header th {
+    padding: 0.5rem 1rem !important;
+}
+
+.grouped-list-header:hover {
+    background-color: rgba(13, 110, 253, 0.1) !important;  /* Slightly darker on hover */
+}
+
+/* Inactive state */
+.grouped-list-header.opacity-50 {
+    background-color: rgba(108, 117, 125, 0.05) !important;  /* Very subtle gray when inactive */
+}
+
+.grouped-list-header.opacity-50:hover {
+    background-color: rgba(108, 117, 125, 0.1) !important;  /* Slightly darker gray on hover when inactive */
+} 

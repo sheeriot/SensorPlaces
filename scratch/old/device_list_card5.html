@@ -1,0 +1,43 @@
+<tbody>
+    {% if location %}
+        <!-- Single Location Group -->
+        <tr class="table-light">
+            <td colspan="6" class="p-0">
+                <div class="d-flex align-items-center">
+                    <span class="btn py-1 small d-flex align-items-center {% if not location.is_active %}opacity-50{% else %}text-dark{% endif %}">
+                        <i class="bi bi-geo-alt me-1" style="font-size: 1rem;"></i>
+                        <strong class="mb-0">{{ location.name }}</strong>
+                        {% if not location.is_active %}
+                            <span class="badge bg-danger ms-2">inactive</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </td>
+        </tr>
+        {% for device in devices %}
+            {% include "sensors/includes/device_row.html" with device=device place=place %}
+        {% endfor %}
+    {% else %}
+        <!-- Multiple Locations Groups -->
+        {% regroup devices by location as location_list %}
+        {% for location_group in location_list %}
+            <tr class="table-light">
+                <td colspan="6" class="p-0">
+                    <div class="d-flex align-items-center">
+                        <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location_group.grouper.pk %}" 
+                            class="btn py-1 small d-flex align-items-center {% if not location_group.grouper.is_active %}opacity-50{% else %}text-dark{% endif %}">
+                            <i class="bi bi-geo-alt me-1" style="font-size: 1rem;"></i>
+                            <strong class="mb-0">{{ location_group.grouper.name }}</strong>
+                            {% if not location_group.grouper.is_active %}
+                                <span class="badge bg-danger ms-2">inactive</span>
+                            {% endif %}
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% for device in location_group.list %}
+                {% include "sensors/includes/device_row.html" with device=device place=place %}
+            {% endfor %}
+        {% endfor %}
+    {% endif %}
+</tbody> 

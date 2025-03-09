@@ -1,149 +1,44 @@
-{% load widget_tweaks %}
+{% comment %}
+This template expects the following context variables:
+- locations: QuerySet of Location objects with active_devices_count and inactive_devices_count annotations
+- place: Place object
+- show_inactive: boolean (optional, defaults to True)
+{% endcomment %}
 
-<div class="card mb-4">
+<div class="card" id="location-list-card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <span>
-                <i class="bi bi-geo-alt"></i>
+            <h5 class="card-title mb-0 d-flex align-items-center gap-2">
+                <i class="bi bi-geo-alt me-2"></i>
                 Locations
-            </span>
-            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                <input class="form-check-input" type="checkbox" id="hideInactiveLocations" checked>
-                <label class="form-check-label small-label" for="hideInactiveLocations">
-                    Hide<br>Inactive
-                </label>
-            </div>
+            </h5>
+            {% include "sensors/includes/hide_inactive_switch.html" with model="location" %}
         </div>
-        <div class="btn-group">
-            <a href="{% url 'sensors:place_locations' place_slug=place.slug %}" class="btn btn-info btn-sm">
-                <i class="bi bi-list-ul"></i>
-            </a>
-            <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-primary btn-sm">
-                <i class="bi bi-plus"></i>
-            </a>
-        </div>
+        <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-geo-alt"></i><i class="bi bi-plus-circle"></i> Add Location
+        </a>
     </div>
     <div class="card-body p-0">
-        <div class="list-group list-group-flush rounded-bottom">
-            {% regroup locations|dictsort:"name"|dictsortreversed:"is_active" by is_active as location_groups %}
-            {% for group in location_groups %}
-                {% for location in group.list %}
-                <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
-                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-1 px-2
-                          {% if location == current_location %}active-location{% endif %}"
-                   data-active="{{ location.is_active|lower }}"
-                   data-location-id="{{ location.pk }}">
-                    <div>
-                        {{ location.name }}
-                        {% if not location.is_active %}
-                        <span class="badge bg-danger ms-2">inactive</span>
-                        {% endif %}
-                    </div>
-                    <div class="d-flex align-items-center">
-                        <span class="device-counts me-2">
-                            <span class="text-success font-monospace fw-bold active-count" id="location-{{ location.pk }}-active">{{ location.active_devices_count }}</span>
-                            <span class="text-body-secondary font-monospace" id="location-{{ location.pk }}-inactive">({{ location.inactive_devices_count|default:0 }})</span>
-                        </span>
-                        <i class="bi bi-hdd-rack"></i>
-                    </div>
-                </a>
-                {% endfor %}
-            {% empty %}
-            <div class="list-group-item text-center text-muted py-2">
-                <i class="bi bi-inbox"></i>
-                <p class="mb-0 mt-2">No locations found</p>
-            </div>
-            {% endfor %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 40%">Name</th>
+                        <th style="width: 15%">Status</th>
+                        <th style="width: 25%">Devices</th>
+                        <th style="width: 20%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for location in locations %}
+                        {% include "sensors/includes/location_row.html" with place=place location=location %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center p-3">No locations found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
-
-<style>
-.small-label {
-    font-size: 0.7rem;
-    line-height: 0.9;
-    text-align: center;
-}
-
-.device-counts {
-    font-size: 0.875rem;
-}
-
-.active-count {
-    font-size: 1.1rem;
-}
-
-.active-location {
-    background-color: #f0f7ff !important;
-    border-color: #dee2e6 !important;
-    color: inherit !important;
-}
-
-.active-location:hover {
-    background-color: #e5f1ff !important;
-}
-
-.list-group-item.hidden {
-    display: none !important;
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const hideInactiveSwitch = document.getElementById('hideInactiveLocations');
-    const locationItems = document.querySelectorAll('[data-active]');
-    const siteMapMarkers = document.querySelectorAll('.location-marker[data-active]');
-
-    function filterLocations() {
-        const hideInactive = hideInactiveSwitch.checked;
-        
-        // Filter list items
-        locationItems.forEach(item => {
-            item.classList.toggle('hidden', hideInactive && item.getAttribute('data-active') === 'false');
-        });
-
-        // Filter map markers
-        siteMapMarkers.forEach(marker => {
-            marker.style.display = (hideInactive && marker.getAttribute('data-active') === 'false') ? 'none' : 'block';
-        });
-    }
-
-    // Initial filter
-    filterLocations();
-
-    // Filter on toggle change
-    hideInactiveSwitch.addEventListener('change', filterLocations);
-
-    // Update location stats every 30 seconds
-    function updateLocationStats() {
-        const placeSlug = '{{ place.slug }}';
-        if (!placeSlug) return;
-
-        fetch(`{% url 'sensors:place_stats' place_slug=place.slug %}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Update location device counts
-                data.locations.forEach(loc => {
-                    const activeCountEl = document.getElementById(`location-${loc.id}-active`);
-                    const inactiveCountEl = document.getElementById(`location-${loc.id}-inactive`);
-                    if (activeCountEl) activeCountEl.textContent = loc.active_devices_count;
-                    if (inactiveCountEl) inactiveCountEl.textContent = loc.inactive_devices_count || '0';
-                });
-            })
-            .catch(error => {
-                console.error('Error updating location stats:', error);
-            });
-    }
-
-    // Initial stats update
-    updateLocationStats();
-
-    // Set up interval for updates
-    setInterval(updateLocationStats, 30000);
-});
-</script> 

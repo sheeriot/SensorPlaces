@@ -1,0 +1,579 @@
+/* Only keep truly custom styles that Bootstrap doesn't provide */
+
+/* Custom variables - should be in :root */
+:root {
+    --sensor-font-mono: var(--bs-font-monospace);
+    --toast-width: 600px;
+    --toast-min-width: 400px;
+    --toast-warning-bg: #fff8e6;     /* Very light yellow background */
+    --toast-warning-text: #663c00;   /* Very dark orange text */
+    --chart-line-color: rgb(75, 192, 192);
+    --chart-grid-color: rgba(0, 0, 0, 0.1);
+    --chart-tooltip-bg: rgba(0, 0, 0, 0.8);
+    --chart-tooltip-text: #ffffff;
+    --chart-font-size: 12px;
+    --grouped-header-bg: rgba(var(--bs-primary-rgb), 0.05);
+    --grouped-header-hover-bg: rgba(var(--bs-primary-rgb), 0.1);
+    --grouped-header-inactive-bg: rgba(var(--bs-secondary-rgb), 0.05);
+    --grouped-header-inactive-hover-bg: rgba(var(--bs-secondary-rgb), 0.1);
+    --alert-static-opacity: 1;
+}
+
+/* Essential custom styles that Bootstrap doesn't provide */
+.sensor-value,
+.sensor-timestamp {
+    font-family: var(--sensor-font-mono);
+}
+
+/* Map Preview */
+.preview-map {
+    height: 300px;
+}
+
+/* Form Switch Large */
+.form-switch.form-switch-lg {
+    padding-left: 2.5em;
+    min-height: 2em;
+}
+
+.form-switch.form-switch-lg .form-check-input {
+    height: 2em;
+    width: calc(3em + 0.75rem);
+    border-radius: 4em;
+}
+
+/* Map Instructions */
+.map-instructions {
+    font-size: 1.1rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    border: 1px solid #dee2e6;
+}
+
+.map-instructions i {
+    color: #0d6efd;
+}
+
+/* Place Map Container */
+.place-map-container {
+    height: 500px;
+}
+
+.place-map-container .leaflet-container {
+    height: 100%;
+    width: 100%;
+}
+
+/* Popup styling */
+.place-popup.leaflet-popup {
+    margin-bottom: 5px;  /* Space between marker and popup */
+}
+
+.place-popup .leaflet-popup-content-wrapper {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    padding: 2px 5px;
+}
+
+.place-popup .leaflet-popup-content {
+    margin: 5px;
+    font-size: 14px;
+    line-height: 1.2;
+    color: #333;
+    text-align: center;
+}
+
+.place-popup .leaflet-popup-tip-container {
+    width: 20px;
+    height: 10px;
+}
+
+.place-popup .leaflet-popup-tip {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: none;
+    width: 10px;
+    height: 10px;
+}
+
+/* Toast System */
+.toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1070;
+    width: var(--toast-width);
+    max-width: 100%;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    width: 100%;
+    min-width: var(--toast-min-width);
+    max-width: var(--toast-width);
+}
+
+/* Toast Colors - Used by both toasts and history items */
+.toast.text-success,
+.toast-history-item .text-success {
+    color: var(--bs-success-text) !important;
+    background-color: var(--bs-success-bg-subtle) !important;
+    border: 1px solid var(--bs-success-border-subtle) !important;
+}
+
+.toast.text-danger,
+.toast-history-item .text-danger {
+    color: var(--bs-danger-text) !important;
+    background-color: var(--bs-danger-bg-subtle) !important;
+    border: 1px solid var(--bs-danger-border-subtle) !important;
+}
+
+.toast.text-warning,
+.toast-history-item .text-warning {
+    color: var(--toast-warning-text) !important;
+    background-color: var(--toast-warning-bg) !important;
+    border: 1px solid #ffb700 !important;
+}
+
+.toast.text-info,
+.toast-history-item .text-info {
+    color: var(--bs-info-text) !important;
+    background-color: var(--bs-info-bg-subtle) !important;
+    border: 1px solid var(--bs-info-border-subtle) !important;
+}
+
+.toast .btn-close {
+    opacity: 0.75;
+}
+
+.toast .toast-body {
+    padding: 0.75rem 0;
+}
+
+/* Toast History */
+.toast-history-list {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.toast-history-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.toast-history-time {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.75rem;
+    color: var(--bs-gray-600);
+}
+
+/* Site Plan Container - Minimal required styles */
+.siteplan-wrapper {
+    position: relative;
+    width: 100%;
+    background-color: var(--bs-light);
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.siteplan-wrapper.loaded {
+    opacity: 1;
+}
+
+#siteplan-container,
+#siteplan-editor-map {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Loading States */
+.siteplan-wrapper:not(.loaded)::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--bs-border-color);
+    border-top-color: var(--bs-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1000;
+}
+
+/* Editor Loading State */
+#siteplan-editor-map:not([data-editor-ready="true"]) {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+#siteplan-editor-map[data-editor-ready="true"] {
+    opacity: 1;
+}
+
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Location Markers - Add fade in */
+.location-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.siteplan-wrapper.loaded .location-marker {
+    opacity: 1;
+}
+
+.location-marker .marker-label {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    text-align: center;
+}
+
+.location-marker.bg-secondary {
+    background-color: var(--bs-secondary) !important;
+}
+
+/* Editor Modal Styles */
+#siteplan-editor .modal-dialog {
+    max-width: 75vw;
+    margin: 1.75rem auto;
+}
+
+#siteplan-editor .modal-body {
+    padding: 0 !important;
+}
+
+#siteplan-editor .modal-header,
+#siteplan-editor .modal-footer {
+    padding: 0.5rem 1rem !important;
+}
+
+/* Editor Marker Styles */
+#siteplan-editor .leaflet-marker-icon {
+    cursor: grab;
+}
+
+#siteplan-editor .leaflet-marker-icon.dragging {
+    cursor: grabbing;
+    opacity: 0.8;
+}
+
+/* Map Controls */
+.folium-map .legend {
+    background-color: white;
+    border-radius: 3px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+}
+
+.folium-map .d-none {
+    display: none !important;
+}
+
+.leaflet-control-layers {
+    border: none !important;
+    border-radius: 4px !important;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2) !important;
+}
+
+.leaflet-control-layers-toggle {
+    background-color: white !important;
+}
+
+.leaflet-control-layers-expanded {
+    padding: 10px !important;
+    background-color: white !important;
+    border-radius: 4px !important;
+}
+
+/* Essential Folium Map Styles */
+.folium-map {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+}
+
+#places_map_html {
+    width: 100%;
+    height: 500px;
+    position: relative;
+}
+
+/* Hide inactive places when needed */
+.place-marker.d-none {
+    display: none !important;
+}
+
+/* Map Controls */
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2) !important;
+}
+
+/* ... rest of the map CSS ... */
+
+/* Folium map in place details */
+.folium-map-container {
+    min-height: 300px;
+}
+
+/* Popout map */
+.place-map-container {
+    height: 500px;
+}
+
+/* Modal Backdrop Enhancement */
+.modal-backdrop {
+    transition: opacity 0.15s linear;
+}
+
+/* Ensure modals don't cause layout shifts */
+.modal {
+    padding-left: 0 !important;
+}
+
+.modal.fade .modal-dialog {
+    transition: transform 0.2s ease-out !important;
+}
+
+/* Auth Card Decorations */
+.auth-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.corner-icon {
+    position: absolute;
+    font-size: 1.5rem;
+    opacity: 0.15;
+    color: var(--bs-dark);
+    padding: 1rem;
+}
+
+.corner-icon.top-left {
+    top: 0;
+    left: 0;
+}
+
+.corner-icon.top-right {
+    top: 0;
+    right: 0;
+}
+
+.corner-icon.bottom-left {
+    bottom: 0;
+    left: 0;
+}
+
+.corner-icon.bottom-right {
+    bottom: 0;
+    right: 0;
+}
+
+/* Grouped List Headers - only custom properties that Bootstrap can't handle */
+.grouped-list-header {
+    background-color: var(--grouped-header-bg) !important;
+}
+
+.grouped-list-header:hover {
+    background-color: var(--grouped-header-hover-bg) !important;
+}
+
+.grouped-list-header.opacity-50 {
+    background-color: var(--grouped-header-inactive-bg) !important;
+}
+
+.grouped-list-header.opacity-50:hover {
+    background-color: var(--grouped-header-inactive-hover-bg) !important;
+}
+
+/* Replace the complex alert handling with this simple rule */
+.alert {
+    opacity: var(--alert-static-opacity) !important;
+}
+
+/* Remove the old static-alert class definition */
+/* .alert.static-alert {
+    display: block !important;
+} */
+
+/* Site Plan Editor */
+#siteplan-editor {
+    padding-left: 0 !important;
+}
+
+#siteplan-editor .modal-dialog {
+    max-width: 75vw;
+    margin: 1.75rem auto;
+}
+
+#siteplan-editor .modal-body {
+    padding: 0 !important;
+}
+
+#siteplan-editor .modal-header {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+#siteplan-editor .modal-footer {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+/* Site Plan Editor Map */
+#siteplan-editor-map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+#siteplan-editor-map .leaflet-container {
+    background: var(--bs-light) !important;
+    outline: none !important;
+}
+
+/* Position controls in a better spot */
+#siteplan-editor-map .leaflet-control-container .leaflet-top {
+    top: 1rem;
+}
+
+#siteplan-editor-map .leaflet-control-container .leaflet-left {
+    left: 1rem;
+}
+
+/* Style the zoom controls */
+#siteplan-editor-map .leaflet-control-zoom {
+    border: none !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: var(--bs-box-shadow) !important;
+    overflow: hidden;
+}
+
+#siteplan-editor-map .leaflet-control-zoom a {
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 1.2rem !important;
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+    transition: all 0.2s ease-in-out;
+}
+
+#siteplan-editor-map .leaflet-control-zoom a:hover {
+    background-color: var(--bs-light) !important;
+    color: var(--bs-primary) !important;
+}
+
+#siteplan-editor-map .leaflet-control-zoom a:first-child {
+    border-bottom: none !important;
+}
+
+/* Image overlay in editor */
+#siteplan-editor-map .leaflet-image-layer {
+    image-rendering: -webkit-optimize-contrast;  /* Sharper image rendering */
+    image-rendering: crisp-edges;
+}
+
+/* Editor markers */
+#siteplan-editor-map .leaflet-marker-icon {
+    cursor: pointer;
+    transform-origin: center center;
+}
+
+#siteplan-editor-map .leaflet-marker-icon.dragging {
+    cursor: grabbing;
+    box-shadow: var(--bs-box-shadow);
+    opacity: 0.9;
+}
+
+/* Editor Container */
+.editor-container {
+    min-height: 400px;
+    background: var(--bs-light);
+}
+
+.editor-container .leaflet-container {
+    background: var(--bs-light) !important;
+}
+
+/* Leaflet Image Layer */
+.leaflet-image-layer {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Location popup styling */
+.location-popup.leaflet-popup {
+    margin-bottom: 5px;
+}
+
+.location-popup .leaflet-popup-content-wrapper {
+    background: var(--toast-warning-bg);
+    border-radius: 4px;
+    box-shadow: var(--bs-box-shadow-sm);
+    padding: 0.5rem;
+    text-align: center;
+}
+
+.location-popup .leaflet-popup-content {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.2;
+    color: var(--toast-warning-text);
+    white-space: nowrap;
+    text-align: center;
+    min-width: 150px;
+}
+
+.location-popup .leaflet-popup-tip {
+    background: var(--toast-warning-bg);
+    box-shadow: none;
+}
+
+/* Editor Marker States */
+.modal-body .leaflet-marker-icon {
+    cursor: pointer;
+    transform-origin: center center;
+}
+
+.modal-body .leaflet-marker-icon.dragging {
+    cursor: grabbing;
+    box-shadow: var(--bs-box-shadow);
+    opacity: 0.9;
+}
+
+/* Zoom Controls */
+.leaflet-control-zoom {
+    border: none !important;
+    border-radius: var(--bs-border-radius) !important;
+    box-shadow: var(--bs-box-shadow) !important;
+    overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 1.2rem !important;
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+}

@@ -1,0 +1,36 @@
+{% load static %}
+
+<!-- Siteplan Card -->
+<div class="card mb-4" id="siteplan-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-map me-2"></i>
+            Site Plan
+        </h5>
+        {% if editable %}
+        <button id="siteplan-edit" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-grid"></i> Edit Layout
+        </button>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        <!-- Siteplan wrapper with dynamic aspect ratio -->
+        <div class="siteplan-wrapper position-relative bg-light border">
+            <!-- Leaflet map container -->
+            <div id="siteplan-container" 
+                 class="position-absolute top-0 start-0 w-100 h-100"
+                 data-image-url="{{ place.site_plan.url }}"
+                 data-locations="{{ locations_json|escapejs }}">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Siteplan Editor Modal -->
+<div class="modal fade" id="siteplan-editor" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            {% include "sensors/includes/siteplan_editor.html" %}
+        </div>
+    </div>
+</div> 

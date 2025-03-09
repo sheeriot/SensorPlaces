@@ -1,16 +1,29 @@
 {% extends "sensors/base.html" %}
 
-{% block title %}Delete Location{% endblock %}
+{% block title %}Delete {{ model_name|title }}{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Delete Location</h2>
+<div class="row">
+    <!-- Place Title Card -->
+    <div class="col-12">
+        {% include "sensors/includes/place_title_card.html" with place=place %}
+    </div>
+</div>
+
+<div class="row">
+    <!-- Two Column Layout -->
+    <div class="col-md-4">
+        {% include "sensors/includes/place_nav_card.html" with place=place locations=locations location=location %}
+    </div>
+    <div class="col-md-8">
+        <div class="card rounded-3 shadow-sm border-0">
+            <div class="card-header bg-white py-2">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-trash me-2"></i>Delete {{ model_name|title }}
+                </h5>
             </div>
             <div class="card-body">
-                <p>Are you sure you want to delete the location "{{ object.name }}"?</p>
+                <p>Are you sure you want to delete the {{ model_name }} "{{ object.name }}"?</p>
                 {% if object.devices.exists %}
                 <div class="alert alert-warning">
                     <i class="bi bi-exclamation-triangle"></i>
@@ -18,11 +31,15 @@
                     Deleting this location will also delete all associated devices and their sensors.
                 </div>
                 {% endif %}
-                <form method="post">
+                <p class="text-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    This action cannot be undone. All devices and sensors at this {{ model_name }} will also be deleted.
+                </p>
+                <form method="post" data-delete-form>
                     {% csrf_token %}
                     <div class="d-flex justify-content-between">
-                        <a href="{% url 'sensors:place_locations' place_slug=location.place.slug %}" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> Back
+                        <a href="{{ request.META.HTTP_REFERER|default:location_url }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
                         </a>
                         <button type="submit" class="btn btn-danger">
                             <i class="bi bi-trash"></i> Delete
