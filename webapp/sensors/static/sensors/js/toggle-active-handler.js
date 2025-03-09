@@ -291,11 +291,7 @@ const toggleActiveManager = {
                 });
 
                 if (data.toast) {
-                    toastSystem.show({
-                        message: data.toast.message,
-                        type: data.toast.type,
-                        addToHistory: true
-                    });
+                    this.showToast(data.toast.message, data.toast.type, true);
                 }
 
                 if (toggleActiveConfig.debug) {
@@ -309,11 +305,7 @@ const toggleActiveManager = {
                     console.warn('Toggle Status Warning:', data.message);
                 }
                 if (data.toast) {
-                    toastSystem.show({
-                        message: data.toast.message,
-                        type: data.toast.type,
-                        addToHistory: true
-                    });
+                    this.showToast(data.toast.message, data.toast.type, true);
                 }
                 return data;
             } else {
@@ -323,11 +315,7 @@ const toggleActiveManager = {
             if (toggleActiveConfig.debug) {
                 console.error('Toggle Status Error:', error);
             }
-            toastSystem.show({
-                message: error.message,
-                type: 'danger',
-                addToHistory: true
-            });
+            this.showToast(error.message, 'danger', true);
             return null;
         } finally {
             if (toggleActiveConfig.debug) {
@@ -433,11 +421,7 @@ const toggleActiveManager = {
                     message += '</ul>';
                 }
                 
-                toastSystem.show({
-                    message: message,
-                    type: 'success',
-                    addToHistory: true
-                });
+                this.showToast(message, 'success', true);
                 return data;
             } else {
                 throw new Error(data.message || 'Failed to update device status');
@@ -446,11 +430,7 @@ const toggleActiveManager = {
             if (toggleActiveConfig.debug) {
                 console.debug('Error:', { type: 'device', error: error.message });
             }
-            toastSystem.show({
-                message: error.message,
-                type: 'danger',
-                addToHistory: true
-            });
+            this.showToast(error.message, 'danger', true);
             return null;
         }
     },
@@ -699,6 +679,13 @@ const toggleActiveManager = {
                 modalComponents.modal.show();
             });
         });
+    },
+
+    // Function to show toast using event system
+    showToast(message, type = 'info', addToHistory = true) {
+        document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
+            detail: { message, type, addToHistory }
+        }));
     }
 };
 

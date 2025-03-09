@@ -4,7 +4,7 @@
  */
 
 const sitePlanConfig = {
-    debug: true,
+    debug: false,
     logGroups: {
         initialization: true,
         markers: true,
@@ -304,11 +304,7 @@ const sitePlanSystem = {
                     if (newPos.lat < bounds[0][0] || newPos.lat > bounds[1][0] ||
                         newPos.lng < bounds[0][1] || newPos.lng > bounds[1][1]) {
                         this.setLatLng(originalPosition);
-                        toastSystem.show({
-                            message: 'Marker must stay within the site plan bounds',
-                            type: 'warning',
-                            duration: 3000
-                        });
+                        this.showToast('Marker must stay within the site plan bounds', 'warning');
                     }
                 });
 
@@ -407,12 +403,7 @@ const sitePlanSystem = {
             const data = await response.json();
             
             if (!response.ok || data.type === 'error' || data.type === 'danger') {
-                toastSystem.show({
-                    message: data.message || 'Failed to save changes',
-                    type: data.type || 'danger',
-                    tags: data.tags || 'error layout-update',
-                    addToHistory: true
-                });
+                this.showToast(data.message || 'Failed to save changes', data.type || 'danger');
                 this.logDebug('error', 'Save failed:', data);
                 return;
             }
@@ -444,23 +435,13 @@ const sitePlanSystem = {
             }
             
             // Show success toast
-            toastSystem.show({
-                message: data.message || 'Changes saved successfully',
-                type: data.type || 'warning', // Default to warning for updates
-                tags: data.tags || 'layout-update',
-                addToHistory: true
-            });
+            this.showToast(data.message || 'Changes saved successfully', data.type || 'warning');
             
             this.logDebug('success', 'Changes saved successfully:', data);
             
         } catch (error) {
             this.logDebug('error', 'Save failed:', error);
-            toastSystem.show({
-                message: 'Network error while saving changes',
-                type: 'danger',
-                tags: 'error layout-update network',
-                addToHistory: true
-            });
+            this.showToast('Network error while saving changes', 'danger');
         }
     },
 
@@ -481,6 +462,13 @@ const sitePlanSystem = {
         this.logDebug('operation', 'Map fit updated', {
             containerSize: `${container.offsetWidth}x${container.offsetHeight}`
         });
+    },
+
+    // Function to show toast using event system
+    showToast(message, type = 'info') {
+        document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
+            detail: { message, type }
+        }));
     },
 
     // Utility Methods

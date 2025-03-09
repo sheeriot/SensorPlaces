@@ -11,7 +11,21 @@ const sitePlanView = {
         markers: new Map(), // id -> L.Marker
         locations: new Map(), // id -> location data
         imageBounds: null,
-        initialized: false
+        initialized: false,
+        debug: false  // Add debug flag
+    },
+
+    // Debug logging helper
+    log(...args) {
+        if (this.state.debug) {
+            console.log(...args);
+        }
+    },
+
+    error(...args) {
+        if (this.state.debug) {
+            console.error(...args);
+        }
     },
 
     // Helper Methods
@@ -37,13 +51,13 @@ const sitePlanView = {
     getRandomIcon(locationName) {
         const idx = Math.floor(Math.random() * this.buildingIcons.length);
         const selectedIcon = this.buildingIcons[idx];
-        console.log(`Assigning icon '${selectedIcon}' to location '${locationName}' (index ${idx} of ${this.buildingIcons.length})`);
+        this.log(`Assigning icon '${selectedIcon}' to location '${locationName}' (index ${idx} of ${this.buildingIcons.length})`);
         return selectedIcon;
     },
 
     // Create marker icon
     createIcon(isActive, iconType, locationName) {
-        console.log(`Creating ${isActive ? 'active' : 'inactive'} icon for '${locationName}' with type: ${iconType}`);
+        this.log(`Creating ${isActive ? 'active' : 'inactive'} icon for '${locationName}' with type: ${iconType}`);
         return L.divIcon({
             className: `location-marker bg-${isActive ? 'primary' : 'secondary'} border border-2 border-white rounded-3 shadow-sm p-2`,
             iconSize: null,  // Let it size to content
@@ -79,7 +93,7 @@ const sitePlanView = {
     initialize() {
         // Prevent multiple initializations
         if (this.state.initialized) {
-            console.log('Site plan view already initialized');
+            this.log('Site plan view already initialized');
             return Promise.resolve();
         }
 
@@ -92,9 +106,9 @@ const sitePlanView = {
 
         // Listen for siteplan updates
         window.addEventListener('siteplan-update', (event) => {
-            console.log('Received siteplan update event:', event.detail);
-            console.log('Current locations state:', Array.from(this.state.locations.entries()));
-            console.log('Current markers state:', Array.from(this.state.markers.entries()));
+            this.log('Received siteplan update event:', event.detail);
+            this.log('Current locations state:', Array.from(this.state.locations.entries()));
+            this.log('Current markers state:', Array.from(this.state.markers.entries()));
             
             if (event.detail.locations) {
                 this.updateLocations(event.detail.locations);
@@ -104,7 +118,7 @@ const sitePlanView = {
         return new Promise((resolve) => {
             const container = document.getElementById('siteplan-container');
             if (!container) {
-                console.error('No site plan container found - is the template including siteplan_card.html?');
+                this.error('No site plan container found - is the template including siteplan_card.html?');
                 this.state.initialized = true;
                 resolve();
                 return;
@@ -113,16 +127,16 @@ const sitePlanView = {
             // Get the image URL and locations data
             const imageUrl = container.dataset.imageUrl;
             if (!imageUrl) {
-                console.error('No image URL found - check if place.get_siteplan_url is returning a value');
+                this.error('No image URL found - check if place.get_siteplan_url is returning a value');
                 this.state.initialized = true;
                 resolve();
                 return;
             }
 
             // Debug logging
-            console.log('Found container:', container);
-            console.log('Image URL:', imageUrl);
-            console.log('Locations data:', container.dataset.locations);
+            this.log('Found container:', container);
+            this.log('Image URL:', imageUrl);
+            this.log('Locations data:', container.dataset.locations);
 
             // Create a temporary image to get dimensions
             const img = new Image();
@@ -136,12 +150,12 @@ const sitePlanView = {
                 // Add markers if we have location data
                 try {
                     const rawData = container.dataset.locations || '[]';
-                    console.log('Attempting to parse:', rawData);
+                    this.log('Attempting to parse:', rawData);
                     // Unescape the JSON string before parsing
                     const unescapedData = rawData.replace(/\\u(\w{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-                    console.log('Unescaped data:', unescapedData);
+                    this.log('Unescaped data:', unescapedData);
                     const locations = JSON.parse(unescapedData);
-                    console.log('Parsed locations:', locations);
+                    this.log('Parsed locations:', locations);
                     
                     // Store locations in state
                     locations.forEach(location => {
@@ -156,15 +170,15 @@ const sitePlanView = {
                         this.updateMarkersVisibility(true);
                     }
                 } catch (error) {
-                    console.error('Failed to parse locations data:', error);
-                    console.error('Raw data was:', container.dataset.locations);
+                    this.error('Failed to parse locations data:', error);
+                    this.error('Raw data was:', container.dataset.locations);
                 }
 
                 this.state.initialized = true;
                 resolve();
             };
             img.onerror = () => {
-                console.error('Failed to load site plan image');
+                this.error('Failed to load site plan image');
                 this.state.initialized = true;
                 resolve();
             };
@@ -176,7 +190,7 @@ const sitePlanView = {
     initializeMap(container, imageUrl) {
         // Check if map is already initialized
         if (this.state.map) {
-            console.log('Map already initialized');
+            this.log('Map already initialized');
             return;
         }
 
@@ -263,7 +277,7 @@ const sitePlanView = {
             .sort((a, b) => a.sort - b.sort)
             .map(({ value }) => value);
         
-        console.log('Available icons after shuffle:', this.buildingIcons);
+        this.log('Available icons after shuffle:', this.buildingIcons);
         
         locations.forEach(location => {
             const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
@@ -319,16 +333,16 @@ const sitePlanView = {
     },
 
     updateLocations(updates) {
-        console.log('Starting updateLocations with:', updates);
-        console.log('Current locations state:', Array.from(this.state.locations.entries()));
-        console.log('Current markers state:', Array.from(this.state.markers.entries()));
+        this.log('Starting updateLocations with:', updates);
+        this.log('Current locations state:', Array.from(this.state.locations.entries()));
+        this.log('Current markers state:', Array.from(this.state.markers.entries()));
         
         let changed = false;
         
         updates.forEach(update => {
             const location = this.state.locations.get(update.id);
-            console.log(`Processing update for location ${update.id}:`, update);
-            console.log('Found existing location:', location);
+            this.log(`Processing update for location ${update.id}:`, update);
+            this.log('Found existing location:', location);
             
             if (location) {
                 // Only update the position properties
@@ -337,7 +351,7 @@ const sitePlanView = {
                 
                 // Remove old marker
                 const markerData = this.state.markers.get(update.id);
-                console.log('Found existing marker data:', markerData);
+                this.log('Found existing marker data:', markerData);
                 
                 if (markerData && markerData.marker) {
                     markerData.marker.remove();
@@ -345,10 +359,10 @@ const sitePlanView = {
                 
                 // Add new marker for this location
                 const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
-                console.log('New coordinates:', coords);
+                this.log('New coordinates:', coords);
                 
                 const iconType = markerData ? markerData.iconType : this.getRandomIcon(location.name);
-                console.log('Using icon type:', iconType);
+                this.log('Using icon type:', iconType);
                 
                 // Create new marker with existing properties
                 const marker = L.marker(coords, {
@@ -384,7 +398,7 @@ const sitePlanView = {
                 });
                 
                 changed = true;
-                console.log('Updated marker for location:', location.id);
+                this.log('Updated marker for location:', location.id);
             }
         });
         
@@ -395,8 +409,8 @@ const sitePlanView = {
                 this.updateMarkersVisibility(true);
             }
             
-            console.log('Final locations state:', Array.from(this.state.locations.entries()));
-            console.log('Final markers state:', Array.from(this.state.markers.entries()));
+            this.log('Final locations state:', Array.from(this.state.locations.entries()));
+            this.log('Final markers state:', Array.from(this.state.markers.entries()));
         }
     }
 };
@@ -406,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Only initialize if not already initialized
     if (!sitePlanView.state.initialized) {
         sitePlanView.initialize().then(() => {
-            console.log('Site plan view initialization complete');
+            sitePlanView.log('Site plan view initialization complete');
         });
     }
 });

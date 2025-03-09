@@ -1,15 +1,13 @@
 {% extends "sensors/base.html" %}
-{% load widget_tweaks %}
 {% load crispy_forms_tags %}
-{% load static %}
 
 {% block title %}
-    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
+    {% if object %}Edit{% else %}New{% endif %} Location
 {% endblock %}
 
 {% block content %}
 <div class="row g-4">
-    {% include 'sensors/includes/place_title_card.html' with place=place %}
+    {% include 'sensors/partials/place_title_card.html' with place=place %}
 
     <div class="col-md-4">
         {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations show_hidden=1 %}

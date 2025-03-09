@@ -12,7 +12,7 @@ This template expects the following context variables:
                 <i class="bi bi-geo-alt me-2"></i>
                 Locations
             </h5>
-            {% include "sensors/includes/hide_inactive_switch.html" with model="location" %}
+            {% include "sensors/partials/hide_inactive_switch.html" with model="location" %}
         </div>
         <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-geo-alt"></i><i class="bi bi-plus-circle"></i> Add Location
