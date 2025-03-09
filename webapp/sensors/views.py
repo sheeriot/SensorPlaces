@@ -105,6 +105,17 @@ class LocationAnnotationMixin:
             
         return context
 
+class ToastMessageMixin:
+    """Mixin to handle toast message cleanup from session."""
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Get toast message from session if it exists
+        if 'toast_message' in self.request.session:
+            context['toast_message'] = self.request.session.pop('toast_message')
+            self.request.session.modified = True
+        return context
+
 def calculate_zoom(distance=0):
     """Calculate appropriate zoom level based on distance in kilometers"""
     if distance <= 0.4:
@@ -139,7 +150,7 @@ def calculate_zoom(distance=0):
         return 2
 
 # Place Views
-class PlaceListView(LoginRequiredMixin, ListView):
+class PlaceListView(LoginRequiredMixin, ToastMessageMixin, ListView):
     model = Place
     context_object_name = 'places'
     template_name = 'sensors/place_list.html'
@@ -164,7 +175,7 @@ class PlaceListView(LoginRequiredMixin, ListView):
         
         return context
 
-class PlaceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
+class PlaceDetailView(LoginRequiredMixin, LocationAnnotationMixin, ToastMessageMixin, DetailView):
     model = Place
     context_object_name = 'place'
     template_name = 'sensors/place_detail.html'
@@ -204,7 +215,7 @@ class PlaceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
             
         return context
 
-class PlaceCreateView(LoginRequiredMixin, CreateView):
+class PlaceCreateView(LoginRequiredMixin, ToastMessageMixin, CreateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
@@ -224,11 +235,12 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
         add_toast_message(
             request=self.request,
             title='Place Created',
-            message=message
+            message=message,
+            message_type='success'
         )
         return response
 
-class PlaceUpdateView(LoginRequiredMixin, UpdateView):
+class PlaceUpdateView(LoginRequiredMixin, ToastMessageMixin, UpdateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
@@ -273,11 +285,12 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
         add_toast_message(
             request=self.request,
             title='Place Updated',
-            message=message
+            message=message,
+            message_type='warning'
         )
         return response
 
-class PlaceDeleteView(LoginRequiredMixin, DeleteView):
+class PlaceDeleteView(LoginRequiredMixin, ToastMessageMixin, DeleteView):
     model = Place
     template_name = 'sensors/place_confirm_delete.html'
     success_url = reverse_lazy('sensors:place_list')
@@ -303,7 +316,7 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
             request=self.request,
             title='Place Deleted',
             message=message,
-            message_type='warning'
+            message_type='danger'
         )
         return HttpResponseRedirect(success_url)
 
@@ -374,7 +387,7 @@ class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView
         
         return context
 
-class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
+class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, ToastMessageMixin, CreateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
@@ -396,11 +409,12 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
         add_toast_message(
             request=self.request,
             title='Location Created',
-            message=message
+            message=message,
+            message_type='success'
         )
         return response
 
-class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
+class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, ToastMessageMixin, UpdateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
@@ -447,11 +461,26 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
             f"</small>"
         )
         
+        # Debug logging
+        ic("LocationUpdateView - Adding toast message:", {
+            'message': message,
+            'type': 'warning',
+            'session_before': dict(self.request.session),
+        })
+        
         add_toast_message(
             request=self.request,
             title='Location Updated',
-            message=message
+            message=message,
+            message_type='warning'
         )
+        
+        # Debug logging
+        ic("LocationUpdateView - After adding toast:", {
+            'session_after': dict(self.request.session),
+            'toast_message': self.request.session.get('toast_message')
+        })
+        
         return response
 
     def form_invalid(self, form):
@@ -483,7 +512,7 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
             request=self.request,
             title='Location Deleted',
             message=message,
-            message_type='warning'
+            message_type='danger'
         )
         return HttpResponseRedirect(success_url)
 
@@ -580,7 +609,7 @@ class DeviceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
         context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
         return context
 
-class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
+class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, ToastMessageMixin, CreateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
@@ -679,7 +708,8 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         add_toast_message(
             request=self.request,
             title='Device Created',
-            message=message
+            message=message,
+            message_type='success'
         )
         return response
 
@@ -1031,7 +1061,7 @@ class ToggleActiveView(View):
             
         return message
 
-class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
+class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, ToastMessageMixin, UpdateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
@@ -1041,53 +1071,11 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         self.place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
         kwargs['place'] = self.place
         kwargs['referrer'] = self.request.META.get('HTTP_REFERER', '')
-        
-        # Debug the kwargs being passed to form
-        ic("DeviceUpdateView - get_form_kwargs:", {
-            'place': kwargs['place'],
-            'instance': kwargs.get('instance'),
-            'initial': kwargs.get('initial'),
-            'data': bool(kwargs.get('data')),
-            'referrer': kwargs.get('referrer'),
-        })
-        
         return kwargs
-
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
-        return initial
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['model_name'] = 'device'
-        context['place'] = self.place
-        
-        # Debug context data
-        ic("DeviceUpdateView - get_context_data:", {
-            'place': context['place'],
-            'form_instance': context['form'].instance if 'form' in context else None,
-            'locations_count': Location.objects.filter(place=self.place).count()
-        })
-        
-        return context
 
     def form_valid(self, form):
         # Store original values before save
         device = self.get_object()
-        ic("DeviceUpdateView - Original Device:", {
-            'id': device.pk,
-            'name': device.name,
-            'is_active': device.is_active,
-            'location': {
-                'id': device.location.pk,
-                'name': device.location.name,
-                'place': device.location.place.name
-            },
-            'device_type': device.device_type,
-            'model': device.model
-        })
-        
         self._original_values = {
             'name': device.name,
             'is_active': device.is_active,
@@ -1098,25 +1086,9 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         
         response = super().form_valid(form)
         device = self.object
-        
-        ic("DeviceUpdateView - Updated Device:", {
-            'id': device.pk,
-            'name': device.name,
-            'is_active': device.is_active,
-            'location': {
-                'id': device.location.pk,
-                'name': device.location.name,
-                'place': device.location.place.name
-            },
-            'device_type': device.device_type,
-            'model': device.model
-        })
-        
-        # Create success message for toast
-        location = device.location
-        place = location.place
         changes = []
         
+        # Build list of changes
         if hasattr(self, '_original_values'):
             if self._original_values['name'] != form.cleaned_data['name']:
                 changes.append(f"name: {self._original_values['name']} → {form.cleaned_data['name']}")
@@ -1129,12 +1101,11 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             if self._original_values['model'] != form.cleaned_data['model']:
                 changes.append(f"model: {self._original_values['model']} → {form.cleaned_data['model']}")
 
-        ic("DeviceUpdateView - Changes:", changes)
-
+        # Build toast message
         message = (
             f"Updated device <strong>{device.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {location.name}<br>"
+            f"<i class='bi bi-house-gear'></i> {device.location.place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {device.location.name}<br>"
             f"<small class='text-muted'>"
             f"Changes: {', '.join(changes) if changes else 'No changes'}"
             f"</small>"
@@ -1143,24 +1114,10 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         add_toast_message(
             request=self.request,
             title='Device Updated',
-            message=message
+            message=message,
+            message_type='warning'  # Use warning type to highlight changes
         )
         return response
-
-    def form_invalid(self, form):
-        """Handle form validation errors by displaying them in the form"""
-        ic("DeviceUpdateView - Form Invalid:", {
-            'errors': form.errors,
-            'non_field_errors': form.non_field_errors(),
-            'cleaned_data': getattr(form, 'cleaned_data', None)
-        })
-        return self.render_to_response(self.get_context_data(form=form))
-
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
-            'pk': self.object.pk
-        })
 
 class DeviceDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
     model = Device
@@ -1202,7 +1159,7 @@ class DeviceActiveSensorsView(LoginRequiredMixin, View):
                 'message': str(e)
             }, status=500)
 
-class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
+class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, ToastMessageMixin, CreateView):
     model = Sensor
     form_class = SensorForm
     template_name = 'sensors/sensor_form.html'
@@ -1256,13 +1213,15 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         return context
 
     def form_valid(self, form):
+        form.instance.sensor = self.sensor
         response = super().form_valid(form)
         success_message = self.get_success_message(form.cleaned_data)
         
         add_toast_message(
             request=self.request,
             title='Sensor Created',
-            message=success_message
+            message=success_message,
+            message_type='success'
         )
         return response
 
@@ -1275,12 +1234,11 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             f"Created sensor <strong>{sensor.name}</strong> in "
             f"<i class='bi bi-house-gear'></i> {place.name} > "
             f"<i class='bi bi-geo-alt'></i> {location.name} > "
-            f"<i class='bi bi-hdd-rack'></i> {device.name}<br> > "
-            f"<i class='bi bi-thermometer'></i> {sensor.name}<br>"
+            f"<i class='bi bi-hdd-rack'></i> {device.name}<br>"
             f"<small class='text-muted'>"
             f"Type: {sensor.sensor_type or '-'}<br>"
             f"Unit: {sensor.unit or '-'}<br>"
-            f"Status: {'Active' if sensor.is_active else 'inactive'}"
+            f"Status: {'Active' if sensor.is_active else 'Inactive'}"
             f"</small>"
         )
 
@@ -1443,7 +1401,8 @@ class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         add_toast_message(
             request=self.request,
             title='Sensor Updated',
-            message=success_message
+            message=success_message,
+            message_type='warning'
         )
         return response
 
@@ -1522,7 +1481,7 @@ class SensorDeleteView(LoginRequiredMixin, DeleteView):
             request=self.request,
             title='Sensor Deleted',
             message=message,
-            message_type='warning'
+            message_type='danger'
         )
         return HttpResponseRedirect(success_url)
 
@@ -1671,7 +1630,8 @@ class SensorReadingCreateView(LoginRequiredMixin, LocationAnnotationMixin, Creat
         add_toast_message(
             request=self.request,
             title='Sensor Reading Created',
-            message=success_message
+            message=success_message,
+            message_type='success'
         )
         return response
 

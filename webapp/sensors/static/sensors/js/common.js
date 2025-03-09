@@ -60,13 +60,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Process any Django messages on page load
     const toastMessageEl = document.getElementById('toast-message');
+    debugLog('Looking for toast message element:', {
+        found: !!toastMessageEl,
+        elementId: toastMessageEl?.id,
+        hasContent: toastMessageEl?.textContent?.length > 0
+    });
+    
     if (toastMessageEl && !toastMessageEl.hasAttribute('data-toast-processed')) {
         toastMessageEl.setAttribute('data-toast-processed', 'true');
         try {
-            const toastMessage = JSON.parse(toastMessageEl.textContent);
-            window.showToast(toastMessage.message, toastMessage.type);
+            const toastData = JSON.parse(toastMessageEl.textContent);
+            debugLog('Parsed toast data:', toastData);
+            
+            // Ensure addToHistory is set with a default of true
+            toastData.addToHistory = toastData.addToHistory ?? true;
+            
+            if (window.toastSystem) {
+                debugLog('Showing toast via toastSystem');
+                window.toastSystem.show(toastData);
+            } else {
+                debugLog('toastSystem not ready, deferring to DOMContentLoaded');
+                document.addEventListener('DOMContentLoaded', () => {
+                    window.toastSystem.show(toastData);
+                });
+            }
         } catch (e) {
             console.error('Error processing toast message:', e);
+            debugLog('Toast message content:', toastMessageEl.textContent);
         }
     }
 });

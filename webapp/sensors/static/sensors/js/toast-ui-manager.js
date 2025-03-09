@@ -1,22 +1,19 @@
 /**
- * Toast System
+ * Toast UI Manager
  * 
- * Manages toast notifications and history for the application
+ * Manages the UI components of the toast notification system:
+ * - Displays toast notifications
+ * - Updates notification badge count
+ * - Shows history modal and loads history from backend
  * 
- * Configuration:
- * -------------
- * To enable debugging, set debug: true in toastConfig below
- * Debug mode will:
- * - Show toast lifecycle events
- * - Log history operations
- * - Display API interactions
+ * Note: Actual history storage is managed by the backend ToastHistoryView
  */
 
 // System Configuration
 const toastConfig = {
     debug: true,          // Set to true to enable debug mode
-    maxHistory: 50,       // Maximum number of items to keep in history
-    maxAge: 24 * 60 * 60 * 1000  // Maximum age of history items (24 hours)
+    maxHistory: 50,       // Maximum items to show in history view
+    maxAge: 24 * 60 * 60 * 1000  // Maximum age of history items to show
 };
 
 // Debug logging helper
@@ -29,9 +26,9 @@ function debugLog(message, data = null) {
     }
 }
 
-// Toast System
+// Toast UI Manager
 const toastSystem = {
-    history: [],
+    history: [],          // Local cache of history for badge/modal
     MAX_HISTORY: toastConfig.maxHistory,
     initialized: false,
     historyLoading: null,
@@ -182,7 +179,7 @@ const toastSystem = {
         let toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
-            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+            toastContainer.className = 'toast-container';  // Let CSS handle positioning
             document.body.appendChild(toastContainer);
         }
 

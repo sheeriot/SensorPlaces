@@ -108,7 +108,7 @@
 /* Toast System */
 .toast-container {
     position: fixed;
-    top: 1rem;
+    top: 7rem;  /* Increased from 4rem to 7rem to move it down ~70px */
     right: 1rem;
     z-index: 1070;
     width: var(--toast-width);

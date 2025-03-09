@@ -47,18 +47,17 @@ def add_toast_message(request, title, message, message_type='success', duration=
     
     Args:
         request: The HTTP request object
-        title: Title of the toast message
+        title: Title of the toast message (not used, kept for backward compatibility)
         message: Main message content (can include HTML)
         message_type: Type of message ('success', 'error', 'info', 'warning')
-        duration: How long to show the toast in milliseconds
+        duration: How long to show the toast in milliseconds (not used, kept for backward compatibility)
     """
-    if 'toast_messages' not in request.session:
-        request.session['toast_messages'] = []
+    if 'toast_message' not in request.session:
+        request.session['toast_message'] = {}
     
-    request.session['toast_messages'].append({
-        'title': title,
+    request.session['toast_message'] = {
         'message': mark_safe(message),
         'type': message_type,
-        'duration': duration
-    })
+        'addToHistory': True
+    }
     request.session.modified = True 

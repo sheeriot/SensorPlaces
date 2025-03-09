@@ -35,7 +35,7 @@
     <!-- Application Core JavaScript -->
     <script src="{% static 'sensors/js/utils.js' %}"></script>
     <script src="{% static 'sensors/js/common.js' %}"></script>
-    <script src="{% static 'sensors/js/toast-handler.js' %}"></script>
+    <script src="{% static 'sensors/js/toast-ui-manager.js' %}"></script>
 
     <!-- Application Feature JavaScript -->
     <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
@@ -155,8 +155,20 @@
     <div class="container my-2">
         <!-- Toast System Components -->
         {% include "sensors/partials/toast_history_modal.html" %}
-        {% if toast_message %}
-            {{ toast_message|json_script:"toast-message" }}
+        <!-- Debug toast message -->
+        {% if debug %}
+        <div style="display:none">
+            <p>Session contents:</p>
+            <pre>{{ request.session.items|pprint }}</pre>
+            <p>Toast message:</p>
+            <pre>{{ request.session.toast_message|pprint }}</pre>
+        </div>
+        {% endif %}
+        
+        {% if request.session.toast_message %}
+            {{ request.session.toast_message|json_script:"toast-message" }}
+            {% load sensors_tags %}
+            {{ request.session|pop_session_key:'toast_message' }}
         {% endif %}
 
         <!-- Breadcrumb and Toast Section -->
