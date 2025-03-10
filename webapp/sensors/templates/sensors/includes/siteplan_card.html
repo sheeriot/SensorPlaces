@@ -13,6 +13,7 @@
         </button>
         {% endif %}
     </div>
+    {% if place.siteplan_image %}
     <div class="card-body p-0">
         <!-- Siteplan wrapper with dynamic aspect ratio -->
         <div class="siteplan-wrapper position-relative bg-light border-top">
@@ -24,6 +25,11 @@
             </div>
         </div>
     </div>
+    {% else %}
+    <div class="card-body p-0">
+        <p class="text-center text-muted">No site plan image available</p>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Siteplan Editor Modal -->

@@ -1,7 +1,8 @@
 from influxdb_client_3 import InfluxDBClient3 as InfluxDBClient
-from django.conf import settings
-from datetime import datetime
-from django.utils.safestring import mark_safe
+# from django.conf import settings
+# from datetime import datetime
+# from django.utils.safestring import mark_safe
+from icecream import ic
 
 def get_influxdb_client(influx_source):
     return InfluxDBClient(
@@ -41,23 +42,18 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
     finally:
         client.close()
 
-def add_toast_message(request, title, message, message_type='success', duration=5000):
-    """
-    Add a toast message to the session.
+def add_toast_message(request, title: str, message: str, message_type: str = 'info'):
+    """Add a toast message directly to the request object."""
+    ic("add_toast_message called:", {
+        'title': title,
+        'message': message,
+        'type': message_type
+    })
     
-    Args:
-        request: The HTTP request object
-        title: Title of the toast message (not used, kept for backward compatibility)
-        message: Main message content (can include HTML)
-        message_type: Type of message ('success', 'error', 'info', 'warning')
-        duration: How long to show the toast in milliseconds (not used, kept for backward compatibility)
-    """
-    if 'toast_message' not in request.session:
-        request.session['toast_message'] = {}
-    
-    request.session['toast_message'] = {
-        'message': mark_safe(message),
+    request.toast_message = {
+        'message': message,
         'type': message_type,
         'addToHistory': True
     }
-    request.session.modified = True 
+    
+    ic("Toast message added to request:", request.toast_message) 

@@ -118,7 +118,7 @@ const sitePlanView = {
         return new Promise((resolve) => {
             const container = document.getElementById('siteplan-container');
             if (!container) {
-                this.error('No site plan container found - is the template including siteplan_card.html?');
+                this.log('No site plan container found - is the template including siteplan_card.html?');
                 this.state.initialized = true;
                 resolve();
                 return;
@@ -127,7 +127,7 @@ const sitePlanView = {
             // Get the image URL and locations data
             const imageUrl = container.dataset.imageUrl;
             if (!imageUrl) {
-                this.error('No image URL found - check if place.get_siteplan_url is returning a value');
+                this.log('No siteplan image configured for this place');
                 this.state.initialized = true;
                 resolve();
                 return;
@@ -182,7 +182,7 @@ const sitePlanView = {
                 resolve();
             };
             img.onerror = () => {
-                this.error('Failed to load site plan image');
+                this.log('No siteplan image available or failed to load:', imageUrl);
                 this.state.initialized = true;
                 resolve();
             };

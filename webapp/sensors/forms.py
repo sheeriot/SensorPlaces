@@ -5,11 +5,12 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
+from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit, TemplateNameMixin
 from crispy_forms.bootstrap import PrependedText, FormActions
 from django.db import models
 from icecream import ic
 from django.db.models import Count, Q
+
 
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
@@ -154,19 +155,21 @@ class PlaceForm(forms.ModelForm):
         widgets = {
             'latitude': forms.NumberInput(attrs={
                 'step': '0.00001',
-                'class': 'form-control',
-                'style': 'width: 140px;',
+                'class': 'form-control form-control-sm',
+                'style': 'width: 110px;',
                 'min': -90,
                 'max': 90,
-                'pattern': r'-?\d+\.\d{0,5}'
+                'pattern': r'-?\d+\.\d{0,5}',
+                'maxlength': 10
             }),
             'longitude': forms.NumberInput(attrs={
                 'step': '0.00001',
-                'class': 'form-control',
-                'style': 'width: 140px;',
+                'class': 'form-control form-control-sm',
+                'style': 'width: 110px;',
                 'min': -180,
                 'max': 180,
-                'pattern': r'-?\d+\.\d{0,5}'
+                'pattern': r'-?\d+\.\d{0,5}',
+                'maxlength': 11
             })
         }
 
@@ -189,8 +192,19 @@ class PlaceForm(forms.ModelForm):
             self.fields['slug'].initial = self.instance.slug
         
         # Configure field properties
-        self.fields['is_active'].label = ""  # Remove label since we use custom template
-        self.fields['is_active'].help_text = None
+        # setup Active field
+        # if self.instance and self.instance.is_active:
+        #     self.fields['is_active'].label = mark_safe("""
+        #         <span class="badge ms-1 bg-success-subtle text-success">
+        #             Active
+        #         </span>
+        #     """)
+        # else:
+        #     self.fields['is_active'].label = mark_safe("""
+        #         <span class="badge ms-1 bg-secondary-subtle text-secondary">
+        #             inactive
+        #         </span>
+        #     """)
         
         self.fields['latitude'].label = None
         self.fields['longitude'].label = None
@@ -235,50 +249,48 @@ class PlaceForm(forms.ModelForm):
             Field('slug', type='hidden'),
             Field('referrer', type='hidden'),
             Row(
-                Column(
-                    Field('name'),
-                    css_class='col-md-7'
-                ),
-                Column(
-                    Div(
-                        HTML('<label class="form-label small mb-1">Place</label>'),
-                        Div(
-                            HTML('<i class="bi bi-house-gear me-1"></i>'),
-                            Div(
-                                Field(
-                                    'place_name',
-                                    css_class='form-control-plaintext px-0 mb-0'
-                                ),
-                                css_class='mb-0'
-                            ),
-                            HTML("""
-                                <span class="badge ms-1 {% if form.instance.place.is_active %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
-                                    {% if form.instance.place.is_active %}Active{% else %}Inactive{% endif %}
-                                </span>
-                            """),
-                            css_class='d-flex align-items-center'
-                        ),
-                        css_class='w-100'
-                    ),
-                    css_class='col-md-5'
-                ),
-                css_class='mb-2'
-            ),
-            Row(
+                Column('name', css_class='col-md-8'),
                 Column(
                     Div(
                         Field(
                             'is_active',
                             template='sensors/partials/custom_switch.html'
                         ),
-                        css_class='d-flex align-items-center'
+                        css_class='d-flex align-items-center h-100'
                     ),
                     css_class='col-md-4'
                 ),
-                css_class='mb-2'
+                css_class='mb-3'
             ),
+            # Fieldset for coordinates and map
             Div(
-                HTML('<hr class="mt-3">'),
+                HTML("""
+                    <fieldset class="border rounded-2 p-3">
+                        <legend class="float-none w-auto px-2 mb-0 fs-5 bg-secondary-subtle">
+                            <i class="bi bi-geo-alt me-1"></i>Place Coordinates
+                        </legend>
+                        <div class="d-flex justify-content-center gap-3 mb-2">
+                            <div class="input-group input-group-sm flex-nowrap" style="width: 220px;">
+                                <span class="input-group-text" style="width: 45px;">Lat</span>
+                                {{ form.latitude }}
+                            </div>
+                            <div class="input-group input-group-sm flex-nowrap" style="width: 220px;">
+                                <span class="input-group-text" style="width: 45px;">Lng</span>
+                                {{ form.longitude }}
+                            </div>
+                        </div>
+                        <div id="place-form-map" class="rounded border" style="height: 400px;"></div>
+                    </fieldset>
+                """),
+                css_class='mb-3'
+            ),
+            Row(
+                Column('siteplan_image', css_class='col-12'),
+                css_class='mb-3'
+            ),
+            *siteplan_layout,
+            Div(
+                HTML('<hr class="mt-4">'),
                 Div(
                     HTML("""
                         <a href="{% url 'sensors:place_list' %}" 
@@ -299,10 +311,32 @@ class PlaceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        name = cleaned_data.get('name')
+        current_slug = cleaned_data.get('slug')
         
-        # Ensure siteplan_image is preserved
-        if 'siteplan_image' in self.files:
-            cleaned_data['siteplan_image'] = self.files['siteplan_image']
+        if name:
+            # Only generate new slug if this is a new place or slug is missing
+            if not current_slug:
+                base_slug = slugify(name)
+                slug = base_slug
+                # Ensure unique slug
+                counter = 1
+                # Don't check against self when verifying uniqueness
+                slug_qs = Place.objects.filter(slug=slug)
+                if self.instance and self.instance.pk:
+                    slug_qs = slug_qs.exclude(pk=self.instance.pk)
+                
+                while slug_qs.exists():
+                    slug = f"{base_slug}-{counter}"
+                    counter += 1
+                    slug_qs = Place.objects.filter(slug=slug)
+                    if self.instance and self.instance.pk:
+                        slug_qs = slug_qs.exclude(pk=self.instance.pk)
+                
+                cleaned_data['slug'] = slug
+            else:
+                # Keep existing slug
+                cleaned_data['slug'] = current_slug
         
         return cleaned_data
 
@@ -642,24 +676,16 @@ class LocationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Debug with icecream
-        ic("LocationForm init:")
-        ic(kwargs.get('initial'))
-        ic(getattr(self.instance, 'place', None))
-        
         # Get place from initial data or instance
         self.place = None
         if 'initial' in kwargs and 'place' in kwargs['initial']:
             self.place = kwargs['initial']['place']
-            ic("Place from initial:", self.place)
         elif self.instance and self.instance.pk:
             self.place = self.instance.place
-            ic("Place from instance:", self.place)
 
         if self.place:
             self.fields['place_id'].initial = self.place
             self.fields['place_name'].initial = self.place.name
-            ic("Place active status:", self.place.is_active)
 
             # Add inactive styling if place is not active
             if not self.place.is_active:

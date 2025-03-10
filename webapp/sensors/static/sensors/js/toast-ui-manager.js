@@ -147,6 +147,11 @@ const toastSystem = {
     },
 
     show(message, type = 'success', addToHistory = true) {
+        if (toastConfig.debug) {
+            console.group('=== Toast UI Manager Processing ===');
+            debugLog('show() called with:', { message, type, addToHistory });
+        }
+
         // Clean old toasts first
         this.cleanHistory();
 
@@ -159,7 +164,9 @@ const toastSystem = {
             addToHistory: typeof message === 'object' ? message.addToHistory : addToHistory
         };
 
-        debugLog('New Toast:', toastData);
+        if (toastConfig.debug) {
+            debugLog('Processed toast data:', toastData);
+        }
 
         if (toastData.addToHistory) {
             this.history.unshift({
@@ -242,6 +249,11 @@ const toastSystem = {
                 toastContainer.remove();
             }
         });
+
+        if (toastConfig.debug) {
+            debugLog('Toast displayed successfully');
+            console.groupEnd();
+        }
     },
 
     showHistory() {

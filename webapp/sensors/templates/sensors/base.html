@@ -151,24 +151,23 @@
             </div>
         </div>
     </nav>
-
+<!-- Add this near the top of your base.html, after the <body> tag -->
+    {% if debug %}
+    <div style="display:none">
+        <p>Session contents:</p>
+        <pre>{{ request.session.items|pprint }}</pre>
+        <p>Toast message:</p>
+        <pre>{{ request.session.toast_message|pprint }}</pre>
+    </div>
+    {% endif %}
     <div class="container my-2">
         <!-- Toast System Components -->
         {% include "sensors/partials/toast_history_modal.html" %}
-        <!-- Debug toast message -->
-        {% if debug %}
-        <div style="display:none">
-            <p>Session contents:</p>
-            <pre>{{ request.session.items|pprint }}</pre>
-            <p>Toast message:</p>
-            <pre>{{ request.session.toast_message|pprint }}</pre>
-        </div>
-        {% endif %}
         
-        {% if request.session.toast_message %}
-            {{ request.session.toast_message|json_script:"toast-message" }}
-            {% load sensors_tags %}
-            {{ request.session|pop_session_key:'toast_message' }}
+        <!-- Toast Message Container -->
+        {% if toast_message %}
+            <div id="server-toast-message" data-processed="false"></div>
+            {{ toast_message|json_script:"toast-message-data" }}
         {% endif %}
 
         <!-- Breadcrumb and Toast Section -->

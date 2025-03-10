@@ -11,6 +11,15 @@ const commonConfig = {
     debug: true  // Set to true to enable debug mode
 };
 
+// Add global error handler for uncaught promise rejections
+window.addEventListener('unhandledrejection', event => {
+    // Only suppress the specific extension-related error
+    if (event.reason && event.reason.message && 
+        event.reason.message.includes('message channel closed')) {
+        event.preventDefault(); // Prevent the error from appearing in console
+    }
+});
+
 // Debug logging helper
 function debugLog(message, data = null) {
     if (!commonConfig.debug) return;
@@ -22,74 +31,94 @@ function debugLog(message, data = null) {
     }
 }
 
-// Global state
-if (typeof window.currentPlaceSlug === 'undefined') {
-    window.currentPlaceSlug = null;
-}
-
-// Custom events for toast notifications
-const ToastEvents = {
-    SHOW: 'sensors:toast:show',
-    HISTORY: 'sensors:toast:history',
-    CLEAR: 'sensors:toast:clear'
-};
-
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize place slug from body data attribute
+    window.currentPlaceSlug = document.body.dataset.placeSlug || null;
+
     if (commonConfig.debug) {
         console.group('=== Common System Startup ===');
         console.log('Current place slug:', window.currentPlaceSlug);
         console.groupEnd();
+
+        console.group('=== Toast System Initialization ===');
+        console.log('Toast system available:', !!window.toastSystem);
+        console.groupEnd();
     }
 
     // Initialize toast event listeners
-    document.addEventListener(ToastEvents.SHOW, (event) => {
-        debugLog('Toast event received', event.detail);
+    document.addEventListener('sensors:toast:show', (event) => {
+        if (commonConfig.debug) {
+            console.group('=== Toast Message Processing ===');
+            debugLog('Toast event received:', event.detail);
+            debugLog('Toast system available:', !!window.toastSystem);
+        }
+
         if (window.toastSystem) {
             const { message, type = 'info', addToHistory = true } = event.detail;
+            debugLog('Showing toast:', { message, type, addToHistory });
             window.toastSystem.show(message, type, addToHistory);
+        } else {
+            debugLog('Warning: Toast system not available');
+        }
+
+        if (commonConfig.debug) {
+            console.groupEnd();
         }
     });
 
     // Helper function to show toasts
     window.showToast = function(message, type = 'info', addToHistory = true) {
-        document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
+        debugLog('showToast called:', { message, type, addToHistory });
+        document.dispatchEvent(new CustomEvent('sensors:toast:show', {
             detail: { message, type, addToHistory }
         }));
     };
 
-    // Process any Django messages on page load
-    const toastMessageEl = document.getElementById('toast-message');
-    debugLog('Looking for toast message element:', {
-        found: !!toastMessageEl,
-        elementId: toastMessageEl?.id,
-        hasContent: toastMessageEl?.textContent?.length > 0
-    });
-    
-    if (toastMessageEl && !toastMessageEl.hasAttribute('data-toast-processed')) {
-        toastMessageEl.setAttribute('data-toast-processed', 'true');
+    // Check for server-side toast message
+    const serverToastEl = document.getElementById('server-toast-message');
+    if (serverToastEl) {
+        if (commonConfig.debug) {
+            console.group('=== Server Toast Message Found ===');
+            debugLog('Processing server toast message element:', serverToastEl);
+        }
+
         try {
-            const toastData = JSON.parse(toastMessageEl.textContent);
-            debugLog('Parsed toast data:', toastData);
-            
-            // Ensure addToHistory is set with a default of true
-            toastData.addToHistory = toastData.addToHistory ?? true;
-            
-            if (window.toastSystem) {
-                debugLog('Showing toast via toastSystem');
-                window.toastSystem.show(toastData);
-            } else {
-                debugLog('toastSystem not ready, deferring to DOMContentLoaded');
-                document.addEventListener('DOMContentLoaded', () => {
+            const toastScript = document.getElementById('toast-message-data');
+            if (toastScript) {
+                debugLog('Found toast script element:', toastScript);
+                debugLog('Toast script content:', toastScript.textContent);
+                
+                const toastData = JSON.parse(toastScript.textContent);
+                debugLog('Parsed server toast data:', toastData);
+                
+                if (window.toastSystem) {
+                    debugLog('Passing toast to toastSystem.show():', toastData);
                     window.toastSystem.show(toastData);
-                });
+                    serverToastEl.setAttribute('data-processed', 'true');
+                    debugLog('Server toast message handed off to toast system');
+                } else {
+                    debugLog('Warning: Toast system not available for server message');
+                }
+            } else {
+                debugLog('No toast-message-data script element found');
+                debugLog('All script elements:', document.getElementsByTagName('script'));
             }
         } catch (e) {
-            console.error('Error processing toast message:', e);
-            debugLog('Toast message content:', toastMessageEl.textContent);
+            console.error('Error processing server toast message:', e);
+            debugLog('Toast script element:', toastScript);
+            debugLog('Raw toast script content:', toastScript?.textContent);
+        }
+
+        if (commonConfig.debug) {
+            console.groupEnd();
         }
     }
 });
 
 // Export toast events for other modules
-window.ToastEvents = ToastEvents;
+window.ToastEvents = {
+    SHOW: 'sensors:toast:show',
+    HISTORY: 'sensors:toast:history',
+    CLEAR: 'sensors:toast:clear'
+};
