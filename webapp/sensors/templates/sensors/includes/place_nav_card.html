@@ -5,7 +5,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
             <i class="bi bi-geo-alt me-2"></i>
-            Locations
+            <a href="{% url 'sensors:location_list' place_slug=place.slug %}">Locations</a>
         </h5>
         <div class="d-flex gap-3 small">
             <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openPlaceMap" 

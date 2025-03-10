@@ -43,16 +43,32 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
         client.close()
 
 def add_toast_message(request, title: str, message: str, message_type: str = 'info'):
-    """Add a toast message directly to the request object."""
+    """Add a toast message directly to the request object.
+    
+    Args:
+        request: The request object to attach the message to
+        title: The title of the message (may be used in modal views)
+        message: The main message content
+        message_type: Type of message ('success', 'info', 'warning', 'danger')
+    """
     ic("add_toast_message called:", {
         'title': title,
         'message': message,
         'type': message_type
     })
     
+    # Ensure message type is valid
+    valid_types = ['success', 'info', 'warning', 'danger']
+    if message_type not in valid_types:
+        message_type = 'info'
+    
+    # Format the message if title is provided
+    formatted_message = f"{title}: {message}" if title else message
+    
     request.toast_message = {
-        'message': message,
-        'type': message_type
+        'message': formatted_message,
+        'type': message_type,
+        'addToHistory': True  # API responses should be added to history
     }
     
     ic("Toast message added to request:", request.toast_message) 

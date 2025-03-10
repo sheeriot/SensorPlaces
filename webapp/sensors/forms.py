@@ -536,7 +536,7 @@ class DeviceForm(forms.ModelForm):
                     """),
                     HTML("""
                         <button type="submit" class="btn btn-success">
-                            <i class="bi bi-hdd-rack me-1"></i>{% if not instance.pk %}Create{% else %}Save{% endif %}
+                            <i class="bi bi-hdd-rack me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
                         </button>
                     """),
                     css_class='d-flex justify-content-between align-items-center'

@@ -2,13 +2,7 @@
 <div class="card rounded-3 shadow-sm border-0">
     <div class="card-header bg-white py-2">
         <h5 class="card-title mb-0">
-            <i class="bi bi-hdd-rack me-2"></i>
-            {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
-            {% if location %}
-            <small class="text-body-secondary ms-2">
-                @ <i class="bi bi-geo-alt"></i> {{ location.name }}
-            </small>
-            {% endif %}
+            {% if object %}Edit Device: <i class="bi bi-hdd-rack"></i> {{ device.name }}{% else %}New Device<i class="bi bi-hdd-rack me-2"></i>@ <i class="bi bi-house-gear"></i> {{ place.name }} {% endif %}
         </h5>
     </div>
     <div class="card-body device-form-card" id="device-form-card">

@@ -170,7 +170,7 @@ const toggleActiveManager = {
         }
 
         try {
-            const response = await utils.fetchWithCSRF(
+            const data = await utils.fetchWithCSRF(
                 `/api/${placeSlug}/toggle_active/${type}/${id}/`,
                 {
                     method: 'POST',
@@ -178,11 +178,8 @@ const toggleActiveManager = {
                 }
             );
             
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-            
             if (toggleActiveConfig.debug) {
-                console.debug('Response:', data);
+                console.debug('Server Response:', data);
             }
             
             if (data.status === 'success') {
@@ -290,22 +287,11 @@ const toggleActiveManager = {
                     }
                 });
 
-                if (data.toast) {
-                    this.showToast(data.toast.message, data.toast.type, true);
-                }
-
-                if (toggleActiveConfig.debug) {
-                    console.debug('UI Update Complete');
-                }
-
                 return data;
             } else if (data.status === 'warning') {
                 // Handle warning status without throwing an error
                 if (toggleActiveConfig.debug) {
                     console.warn('Toggle Status Warning:', data.message);
-                }
-                if (data.toast) {
-                    this.showToast(data.toast.message, data.toast.type, true);
                 }
                 return data;
             } else {
@@ -315,7 +301,11 @@ const toggleActiveManager = {
             if (toggleActiveConfig.debug) {
                 console.error('Toggle Status Error:', error);
             }
-            this.showToast(error.message, 'danger', true);
+            this.showToast({
+                message: error.message,
+                type: 'danger',
+                addToHistory: true
+            });
             return null;
         } finally {
             if (toggleActiveConfig.debug) {
@@ -681,11 +671,28 @@ const toggleActiveManager = {
         });
     },
 
-    // Function to show toast using event system
-    showToast(message, type = 'info', addToHistory = true) {
-        document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
-            detail: { message, type, addToHistory }
-        }));
+    // Update showToast to handle both object and parameter formats
+    showToast(messageOrObject, type = 'info', addToHistory = true) {
+        let toastData;
+        
+        if (typeof messageOrObject === 'object') {
+            toastData = messageOrObject;
+        } else {
+            toastData = {
+                message: messageOrObject,
+                type: type,
+                addToHistory: addToHistory
+            };
+        }
+
+        // Use the toast system if available, otherwise fallback to event dispatch
+        if (window.toastSystem) {
+            window.toastSystem.show(toastData);
+        } else {
+            document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
+                detail: toastData
+            }));
+        }
     }
 };
 

@@ -86,12 +86,12 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'sensors:place_locations' place_slug=place.slug %}">
+                                    <a class="dropdown-item" href="{% url 'sensors:location_list' place_slug=place.slug %}">
                                         <i class="bi bi-diagram-3"></i> Locations
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'sensors:place_devices' place_slug=place.slug %}">
+                                    <a class="dropdown-item" href="{% url 'sensors:device_list' place_slug=place.slug %}">
                                         <i class="bi bi-hdd-rack"></i> Devices
                                     </a>
                                 </li>

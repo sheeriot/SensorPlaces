@@ -42,7 +42,7 @@
                     <dd class="col-12">
                         <div class="d-flex align-items-center gap-3">
                             <div class="form-check form-switch mb-0 {% if not device.location.is_active %}d-none{% endif %}">
-                                <input class="form-check-input device-status-toggle" 
+                                <input class="form-check-input toggle-device-active" 
                                        type="checkbox" 
                                        id="deviceStatus_{{ device.pk }}"
                                        data-device-id="{{ device.pk }}"

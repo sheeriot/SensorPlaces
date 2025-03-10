@@ -1004,16 +1004,16 @@ class ToggleActiveView(View):
                 'toast': {
                     'message': message,
                     'type': message_type,  # Use same type for toast
-                    'addToHistory': True
+                    # 'addToHistory': True
                 }
             }
             
-            # Build and add toast message
-            self.request.toast_message = {
-                'message': message,
-                'type': message_type,
-                'addToHistory': True
-            }
+            # # Build and add toast message
+            # self.request.toast_message = {
+            #     'message': message,
+            #     'type': message_type,
+            #     'addToHistory': True
+            # }
             
             return JsonResponse(response_data)
 
@@ -1071,6 +1071,13 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'device'
+        context['location'] = self.object.location
+        context['device'] = self.object
+        return context
+    
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         self.place = get_object_or_404(Place, slug=self.kwargs['place_slug'])

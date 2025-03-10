@@ -13,7 +13,7 @@ urlpatterns = [
     
     # Location URLs - nested under places
     path('<slug:place_slug>/location/create/', views.LocationCreateView.as_view(), name='location_create'),
-    path('<slug:place_slug>/locations/', views.LocationListView.as_view(), name='place_locations'),
+    path('<slug:place_slug>/locations/', views.LocationListView.as_view(), name='location_list'),
     path('<slug:place_slug>/location/<int:pk>/', views.LocationDetailView.as_view(), name='location_detail'),
     path('<slug:place_slug>/location/<int:pk>/update/', views.LocationUpdateView.as_view(), name='location_update'),
     path('<slug:place_slug>/location/<int:pk>/delete/', views.LocationDeleteView.as_view(), name='location_delete'),
@@ -25,7 +25,7 @@ urlpatterns = [
     path('<slug:place_slug>/device/create/', views.DeviceCreateView.as_view(), name='device_create_choose_location'),
     
     # Device URLs - nested under device
-    path('<slug:place_slug>/devices/', views.DeviceListView.as_view(), name='place_devices'),
+    path('<slug:place_slug>/devices/', views.DeviceListView.as_view(), name='device_list'),
     path('<slug:place_slug>/location/<int:location_pk>/devices/', views.DeviceListView.as_view(), name='location_devices'),
     
     path('<slug:place_slug>/device/<int:pk>/', views.DeviceDetailView.as_view(), name='device_detail'),
@@ -35,7 +35,7 @@ urlpatterns = [
     # Sensor URLs - nested under places, locations, and devices
     path('<slug:place_slug>/device/<int:device_pk>/sensor/create/', views.SensorCreateView.as_view(), name='sensor_create'),
     
-    path('<slug:place_slug>/sensors/', views.SensorListView.as_view(), name='place_sensors'),
+    path('<slug:place_slug>/sensors/', views.SensorListView.as_view(), name='sensor_list'),
     path('<slug:place_slug>/location/<int:location_pk>/sensors/', views.SensorListView.as_view(), name='location_sensors'),
     
     path('<slug:place_slug>/device/<int:device_pk>/sensors/', views.SensorListView.as_view(), name='device_sensors'),
