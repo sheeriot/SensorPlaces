@@ -31,19 +31,25 @@ from icecream import ic
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
+from django.core.exceptions import ImproperlyConfigured
 
 # Add the mixin first, before any classes that use it
 class LocationAnnotationMixin:
     """Mixin to add annotated locations to context data."""
     
     def get_place(self):
-        """Get the place object from the URL kwargs."""
+        """Get the place object from the URL kwargs.
+        
+        Raises:
+            Http404: If place_slug is not in kwargs or Place does not exist
+        """
         if not hasattr(self, '_place'):
             place_slug = self.kwargs.get('place_slug')
-            if place_slug:
-                self._place = get_object_or_404(Place, slug=place_slug)
-            else:
-                self._place = None
+            if not place_slug:
+                raise ImproperlyConfigured(
+                    f"View {self.__class__.__name__} must be called with place_slug in URL kwargs"
+                )
+            self._place = get_object_or_404(Place, slug=place_slug)
         return self._place
     
     def get_location_data(self, location: Location) -> Dict[str, Any]:
@@ -80,29 +86,31 @@ class LocationAnnotationMixin:
             inactive_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
         ).order_by('-is_active', Lower('name'))
 
-    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+    def get_context_data(self, **kwargs):
         """Add location data and place to the template context."""
         context = super().get_context_data(**kwargs)
         
-        # Get place using the new method
+        # Get place - this will always exist or raise an error
         place = self.get_place()
-        if place:
-            locations = self.get_annotated_locations(place)
-            
-            # Convert locations to JSON-serializable format for JavaScript
-            locations_data = [self.get_location_data(loc) for loc in locations]
-            
-            # Add place statistics
-            context.update({
-                'place': place,
-                'locations': locations,  # Full queryset for template
-                'locations_json': json.dumps(locations_data),  # JSON for JavaScript
-                'devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
-                'devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
-                'sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
-                'sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
-            })
-            
+        context['place'] = place
+        context['place_slug'] = place.slug
+        
+        # Get annotated locations for this place
+        locations = self.get_annotated_locations(place)
+        
+        # Convert locations to JSON-serializable format for JavaScript
+        locations_data = [self.get_location_data(loc) for loc in locations]
+        
+        # Add place statistics
+        context.update({
+            'locations': locations,  # Full queryset for template
+            'locations_json': json.dumps(locations_data),  # JSON for JavaScript
+            'devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
+            'devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
+            'sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
+            'sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
+        })
+        
         return context
 
 def calculate_zoom(distance=0):
@@ -1115,6 +1123,12 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         }
         
         return response
+
+    def get_success_url(self):
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self.place.slug,
+            'pk': self.object.pk
+        })
 
 class DeviceDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
     model = Device

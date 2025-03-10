@@ -407,12 +407,12 @@ class DeviceForm(forms.ModelForm):
         self.initial_location = kwargs.pop('initial_location', None)
         
         # Debug initialization parameters
-        ic("DeviceForm - Init:", {
-            'place': self.place.name if self.place else None,
-            'initial_location': self.initial_location.name if self.initial_location else None,
-            'has_instance': bool(kwargs.get('instance')),
-            'instance_location': kwargs.get('instance').location.name if kwargs.get('instance') else None
-        })
+        # ic("DeviceForm - Init:", {
+        #     'place': self.place.name if self.place else None,
+        #     'initial_location': self.initial_location.name if self.initial_location else None,
+        #     'has_instance': bool(kwargs.get('instance')),
+        #     'instance_location': kwargs.get('instance').location.name if kwargs.get('instance') else None
+        # })
         
         super().__init__(*args, **kwargs)
         
@@ -426,10 +426,10 @@ class DeviceForm(forms.ModelForm):
             ).order_by('-is_active', 'name')
             
             # Debug available locations
-            ic("DeviceForm - Locations:", {
-                'count': locations_qs.count(),
-                'locations': [(loc.pk, loc.name, loc.is_active, loc.active_devices_count) for loc in locations_qs]
-            })
+            # ic("DeviceForm - Locations:", {
+            #     'count': locations_qs.count(),
+            #     'locations': [(loc.pk, loc.name, loc.is_active, loc.active_devices_count) for loc in locations_qs]
+            # })
             
             # Create standard choices tuple with data attributes
             attrs = {
@@ -458,10 +458,10 @@ class DeviceForm(forms.ModelForm):
             
             # Only set initial location if this is an existing device
             if self.instance and self.instance.pk:
-                ic("DeviceForm - Setting instance location:", {
-                    'location': self.instance.location.name,
-                    'location_id': self.instance.location.pk
-                })
+                # ic("DeviceForm - Setting instance location:", {
+                #     'location': self.instance.location.name,
+                #     'location_id': self.instance.location.pk
+                # })
                 self.fields['location'].initial = self.instance.location
 
         # Configure field labels and help text
@@ -471,10 +471,10 @@ class DeviceForm(forms.ModelForm):
         self.fields['location'].label = "Location"
         
         # Debug final form state
-        ic("DeviceForm - Final State:", {
-            'location_initial': self.fields['location'].initial.pk if self.fields['location'].initial else None,
-            'location_choices': list(self.fields['location'].choices),
-        })
+        # ic("DeviceForm - Final State:", {
+        #     'location_initial': self.fields['location'].initial.pk if self.fields['location'].initial else None,
+        #     'location_choices': list(self.fields['location'].choices),
+        # })
 
         # Configure crispy form helper
         self.helper = FormHelper()
