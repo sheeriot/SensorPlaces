@@ -220,6 +220,26 @@ const toggleActiveManager = {
                         statusLabel.classList.toggle('text-danger', !data.is_active);
                     }
 
+                    // Handle device detail card if it exists
+                    if (type === 'device') {
+                        const deviceCard = document.getElementById(`deviceCard_${id}`);
+                        if (deviceCard) {
+                            if (data.is_active) {
+                                deviceCard.classList.remove('opacity-75');
+                                deviceCard.querySelectorAll('dd').forEach(dd => {
+                                    dd.style.color = '#212529';
+                                    dd.classList.remove('text-muted');
+                                });
+                            } else {
+                                deviceCard.classList.add('opacity-75');
+                                deviceCard.querySelectorAll('dd').forEach(dd => {
+                                    dd.classList.add('text-muted');
+                                    dd.style.color = '';
+                                });
+                            }
+                        }
+                    }
+
                     // Handle child toggles based on parent type
                     if (type === 'location') {
                         // Find all device toggles within this location

@@ -221,7 +221,7 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             f"Created place <strong>{place.name}</strong><br>"
             f"<small class='text-muted'>"
             f"Location: ({place.latitude}, {place.longitude})<br>"
-            f"Status: {'Active' if place.is_active else 'Inactive'}"
+            f"Status: {'Active' if place.is_active else 'inactive'}"
             f"</small>"
         )
         
@@ -311,7 +311,7 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
             f"Deleted place <strong>{place.name}</strong><br>"
             f"<small class='text-muted'>"
             f"Location: ({place.latitude}, {place.longitude})<br>"
-            f"Status: {'Active' if place.is_active else 'Inactive'}"
+            f"Status: {'Active' if place.is_active else 'inactive'}"
             f"</small>"
         )
         
@@ -440,7 +440,7 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
             f"Created location <strong>{location.name}</strong> in "
             f"<i class='bi bi-house-gear'></i> {place.name}<br>"
             f"<small class='text-muted'>"
-            f"Status: {'Active' if location.is_active else 'Inactive'}"
+            f"Status: {'Active' if location.is_active else 'inactive'}"
             f"</small>"
         )
         
@@ -521,7 +521,7 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
             f"Deleted location <strong>{location.name}</strong> from "
             f"<i class='bi bi-house-gear'></i> {place.name}<br>"
             f"<small class='text-muted'>"
-            f"Status: {'Active' if location.is_active else 'Inactive'}<br>"
+            f"Status: {'Active' if location.is_active else 'inactive'}<br>"
             f"Devices: {location.devices.count()}"
             f"</small>"
         )
@@ -721,7 +721,7 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             f"<small class='text-muted'>"
             f"Type: {device.device_type or '-'}<br>"
             f"Model: {device.model or '-'}<br>"
-            f"Status: {'Active' if device.is_active else 'Inactive'}"
+            f"Status: {'Active' if device.is_active else 'inactive'}"
             f"</small>"
         )
         
@@ -1256,7 +1256,7 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             f"<small class='text-muted'>"
             f"Type: {sensor.sensor_type or '-'}<br>"
             f"Unit: {sensor.unit or '-'}<br>"
-            f"Status: {'Active' if sensor.is_active else 'Inactive'}"
+            f"Status: {'Active' if sensor.is_active else 'inactive'}"
             f"</small>"
         )
 
@@ -1489,7 +1489,7 @@ class SensorDeleteView(LoginRequiredMixin, DeleteView):
             f"Type: {sensor.sensor_type or '-'}<br>"
             f"Unit: {sensor.unit or '-'}<br>"
             f"Data Source: {sensor.data_type}<br>"
-            f"Status: {'Active' if sensor.is_active else 'Inactive'}"
+            f"Status: {'Active' if sensor.is_active else 'inactive'}"
             f"</small>"
         )
         

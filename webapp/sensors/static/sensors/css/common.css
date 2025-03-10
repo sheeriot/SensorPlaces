@@ -371,7 +371,7 @@
     background-color: rgba(13, 110, 253, 0.1) !important;  /* Slightly darker on hover */
 }
 
-/* Inactive state */
+/* inactive state */
 .grouped-list-header.opacity-50 {
     background-color: rgba(108, 117, 125, 0.05) !important;  /* Very subtle gray when inactive */
 }

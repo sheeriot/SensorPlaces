@@ -210,81 +210,72 @@ const createToastSystem = () => {
                 this.updateBadge();
             }
 
-            // Create or get toast container
-            let toastContainer = document.querySelector('.toast-container');
-            if (toastConfig.debug) console.log('[Toast Manager] Looking for toast container:', { found: !!toastContainer });
+            // Use requestAnimationFrame for smooth animation
+            requestAnimationFrame(() => {
+                // Create or get toast container
+                let toastContainer = document.querySelector('.toast-container');
+                if (toastConfig.debug) console.log('[Toast Manager] Looking for toast container:', { found: !!toastContainer });
 
-            if (!toastContainer) {
-                if (toastConfig.debug) console.log('[Toast Manager] Creating new toast container');
-                toastContainer = document.createElement('div');
-                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-                toastContainer.style.zIndex = '1050';
-                document.body.appendChild(toastContainer);
-                
-                const rect = toastContainer.getBoundingClientRect();
-                if (toastConfig.debug) console.log('[Toast Manager] New container created:', {
-                    position: {
-                        top: rect.top,
-                        right: rect.right,
-                        width: rect.width,
-                        height: rect.height
-                    },
-                    styles: {
-                        position: window.getComputedStyle(toastContainer).position,
-                        top: window.getComputedStyle(toastContainer).top,
-                        right: window.getComputedStyle(toastContainer).right,
-                        zIndex: window.getComputedStyle(toastContainer).zIndex
-                    }
-                });
-            }
-
-            // Create toast element with pointer-events enabled
-            const toastEl = document.createElement('div');
-            toastEl.className = `toast text-${toastData.type} show`;
-            toastEl.style.pointerEvents = 'auto'; // Enable interactions for this element
-            toastEl.setAttribute('role', 'alert');
-            toastEl.setAttribute('aria-live', 'assertive');
-            toastEl.setAttribute('aria-atomic', 'true');
-            toastEl.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <div class="toast-body d-flex align-items-center flex-grow-1">
-                        <i class="bi bi-${
-                            toastData.type === 'success' ? 'check-circle' : 
-                            toastData.type === 'danger' ? 'exclamation-circle' :
-                            toastData.type === 'warning' ? 'exclamation-triangle' : 
-                            'info-circle'
-                        } me-2"></i>
-                        <span>${toastData.message}</span>
-                    </div>
-                    <button type="button" class="btn-close me-2" data-bs-dismiss="toast"></button>
-                </div>
-            `;
-
-            toastContainer.insertAdjacentElement('afterbegin', toastEl);
-
-            // Initialize Bootstrap toast
-            if (typeof bootstrap === 'undefined') {
-                if (toastConfig.debug) console.log('[Toast Manager] Error: Bootstrap not loaded!');
-                if (toastConfig.debug) console.groupEnd();
-                return;
-            }
-
-            const toast = new bootstrap.Toast(toastEl, {
-                delay: 5000,
-                autohide: true,
-                animation: true
-            });
-            
-            toast.show();
-            
-            toastEl.addEventListener('shown.bs.toast', () => {
-            });
-
-            toastEl.addEventListener('hidden.bs.toast', () => {
-                toastEl.remove();
-                if (!toastContainer.children.length) {
-                    toastContainer.remove();
+                if (!toastContainer) {
+                    if (toastConfig.debug) console.log('[Toast Manager] Creating new toast container');
+                    toastContainer = document.createElement('div');
+                    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                    toastContainer.style.zIndex = '1050';
+                    document.body.appendChild(toastContainer);
                 }
+
+                // Create toast element with pointer-events enabled
+                const toastEl = document.createElement('div');
+                toastEl.className = `toast text-${toastData.type}`;  // Remove 'show' class
+                toastEl.style.pointerEvents = 'auto';
+                toastEl.setAttribute('role', 'alert');
+                toastEl.setAttribute('aria-live', 'assertive');
+                toastEl.setAttribute('aria-atomic', 'true');
+                toastEl.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <div class="toast-body d-flex align-items-center flex-grow-1">
+                            <i class="bi bi-${
+                                toastData.type === 'success' ? 'check-circle' : 
+                                toastData.type === 'danger' ? 'exclamation-circle' :
+                                toastData.type === 'warning' ? 'exclamation-triangle' : 
+                                'info-circle'
+                            } me-2"></i>
+                            <span>${toastData.message}</span>
+                        </div>
+                        <button type="button" class="btn-close me-2" data-bs-dismiss="toast"></button>
+                    </div>
+                `;
+
+                toastContainer.insertAdjacentElement('afterbegin', toastEl);
+
+                // Initialize Bootstrap toast with a slight delay
+                requestAnimationFrame(() => {
+                    if (typeof bootstrap === 'undefined') {
+                        if (toastConfig.debug) console.log('[Toast Manager] Error: Bootstrap not loaded!');
+                        if (toastConfig.debug) console.groupEnd();
+                        return;
+                    }
+
+                    const toast = new bootstrap.Toast(toastEl, {
+                        delay: 5000,
+                        autohide: true,
+                        animation: true
+                    });
+                    
+                    // Add fade transition
+                    toastEl.style.transition = 'opacity 0.15s linear';
+                    toast.show();
+                    
+                    toastEl.addEventListener('hidden.bs.toast', () => {
+                        toastEl.addEventListener('transitionend', () => {
+                            toastEl.remove();
+                            if (!toastContainer.children.length) {
+                                toastContainer.remove();
+                            }
+                        }, { once: true });
+                        toastEl.style.opacity = '0';
+                    });
+                });
             });
 
             if (toastConfig.debug) console.groupEnd();

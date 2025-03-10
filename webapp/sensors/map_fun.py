@@ -65,7 +65,7 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
             popup_html = f"""
             <div class="place-popup">
                 <h4>{place.name}</h4>
-                <p>Status: {'Active' if place.is_active else 'Inactive'}</p>
+                <p>Status: {'Active' if place.is_active else 'inactive'}</p>
             </div>
             """
             
