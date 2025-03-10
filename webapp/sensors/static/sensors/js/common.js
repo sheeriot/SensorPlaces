@@ -33,6 +33,9 @@ function debugLog(message, data = null) {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    console.group('=== Document Load Processing ===');
+    debugLog('Document loaded and ready');
+
     // Initialize place slug from body data attribute
     window.currentPlaceSlug = document.body.dataset.placeSlug || null;
 
@@ -44,6 +47,12 @@ document.addEventListener('DOMContentLoaded', () => {
         console.group('=== Toast System Initialization ===');
         console.log('Toast system available:', !!window.toastSystem);
         console.groupEnd();
+    }
+
+    // Initialize toast system with unread count
+    if (window.toastSystem) {
+        const unreadCount = document.body.dataset.unreadToasts || '0';
+        document.body.dataset.unreadToasts = unreadCount;
     }
 
     // Initialize toast event listeners
@@ -77,38 +86,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check for server-side toast message
     const serverToastEl = document.getElementById('server-toast-message');
-    if (serverToastEl) {
-        console.group('=== Server Toast Message Found ===');
-        console.log('Server toast element:', serverToastEl);
+    debugLog('Searching for server toast element:', { found: !!serverToastEl });
 
+    if (serverToastEl && !serverToastEl.getAttribute('data-processed')) {
+        console.group('=== Server Toast Message Found ===');
+        debugLog('Found unprocessed server toast message');
+        
         try {
             const toastScript = document.getElementById('toast-message-data');
-            if (toastScript) {
-                console.log('Toast script content:', toastScript.textContent);
+            debugLog('Toast script element found:', { found: !!toastScript });
+            
+            if (toastScript && window.toastSystem) {
+                debugLog('Toast script content:', toastScript.textContent);
                 
-                const toastData = JSON.parse(toastScript.textContent);
-                console.log('Parsed toast data:', toastData);
+                // Remove any HTML entities and parse JSON
+                const rawContent = toastScript.textContent
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#34;/g, '"')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>');
                 
-                if (window.toastSystem) {
-                    console.group('=== Sending Toast to System ===');
-                    console.log('Raw toast data:', toastData);
-                    console.log('Message:', toastData.message);
-                    console.log('Type:', toastData.type);
-                    console.log('Add to history:', toastData.addToHistory);
+                debugLog('Cleaned toast content:', rawContent);
+                const toastData = JSON.parse(rawContent);
+                debugLog('Successfully parsed toast data:', toastData);
+                
+                // For page-load toasts, don't increment the badge count
+                toastData.addToHistory = false;
+                
+                debugLog('Showing toast with data:', toastData);
+                
+                // Delay showing the toast slightly to prevent FOUC
+                requestAnimationFrame(() => {
                     window.toastSystem.show(toastData);
                     serverToastEl.setAttribute('data-processed', 'true');
-                    console.groupEnd(); // End "Sending Toast to System" group
-                } else {
-                    console.warn('Toast system not available for server message');
-                }
+                    debugLog('Toast processed and shown');
+                });
             } else {
-                console.warn('No toast-message-data script element found');
+                debugLog('Missing toast script or toast system');
             }
         } catch (e) {
             console.error('Error processing server toast:', e);
+            debugLog('Toast processing error:', e);
         }
-
-        console.groupEnd(); // End "Server Toast Message Found" group
+        console.groupEnd();
+    } else {
+        debugLog('No unprocessed server toast messages found');
     }
 });
 

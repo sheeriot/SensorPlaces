@@ -3,7 +3,7 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
-from .models import Place, Location, Device, Sensor, SensorReading
+from .models import Place, Location, Device, Sensor, SensorReading, ToastNotification
 from .utils import get_sensor_readings, add_toast_message
 from .forms import SensorForm, PlaceForm, DeviceForm, LocationForm, PlaceDeleteForm
 from .map_fun import place_map_create
@@ -873,46 +873,32 @@ def test_sensor_readings(request, place_slug, sensor_pk):
 
 @method_decorator(csrf_protect, name='dispatch')
 class ToastHistoryView(LoginRequiredMixin, View):
-    """API view for managing toast notification history in the session."""
-    
     def get(self, request):
-        """Retrieve the toast history from the session."""
-        history = request.session.get('toast_history', [])
-        return JsonResponse({'history': history})
-
-    def post(self, request):
-        """Update the toast history in the session."""
-        try:
-            data = json.loads(request.body)
-            history = data.get('history', [])
-            
-            # Ensure history doesn't exceed maximum size (50 items)
-            history = history[:50]
-            
-            # Store in session
-            request.session['toast_history'] = history
-            request.session.modified = True
-            
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Toast history updated successfully'
-            })
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid JSON data'
-            }, status=400)
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            }, status=500)
+        """Retrieve the toast history and mark as read."""
+        # Get database history for current user
+        notifications = ToastNotification.objects.filter(
+            user=request.user
+        ).order_by('-created_at')[:50]
+        
+        # Mark all as read
+        notifications.update(read=True)
+        
+        # Convert to list for JSON response
+        history = list(notifications.values('message', 'type', 'created_at'))
+        
+        return JsonResponse({
+            'history': history
+        })
 
     def delete(self, request):
-        """Clear the toast history from the session."""
+        """Clear the toast history for the current user."""
+        # Clear session history
         if 'toast_history' in request.session:
             del request.session['toast_history']
             request.session.modified = True
+        
+        # Clear database history for current user only
+        ToastNotification.objects.filter(user=request.user).delete()
         
         return JsonResponse({
             'status': 'success',

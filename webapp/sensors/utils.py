@@ -52,8 +52,7 @@ def add_toast_message(request, title: str, message: str, message_type: str = 'in
     
     request.toast_message = {
         'message': message,
-        'type': message_type,
-        'addToHistory': True
+        'type': message_type
     }
     
     ic("Toast message added to request:", request.toast_message) 

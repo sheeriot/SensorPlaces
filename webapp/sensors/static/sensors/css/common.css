@@ -108,8 +108,8 @@
 /* Toast System */
 .toast-container {
     position: fixed;
-    top: 7rem;  /* Increased from 4rem to 7rem to move it down ~70px */
-    right: 1rem;
+    top: 5rem;
+    right: 3rem;
     z-index: 1070;
     width: var(--toast-width);
     max-width: 100%;
@@ -358,66 +358,34 @@
     transition: transform 0.2s ease-out !important;
 }
 
-/* Auth Card Decorations */
-.auth-card {
-    position: relative;
-    overflow: hidden;
-}
-
-.corner-icon {
-    position: absolute;
-    font-size: 1.5rem;
-    opacity: 0.15;
-    color: var(--bs-dark);
-    padding: 1rem;
-}
-
-.corner-icon.top-left {
-    top: 0;
-    left: 0;
-}
-
-.corner-icon.top-right {
-    top: 0;
-    right: 0;
-}
-
-.corner-icon.bottom-left {
-    bottom: 0;
-    left: 0;
-}
-
-.corner-icon.bottom-right {
-    bottom: 0;
-    right: 0;
-}
-
-/* Grouped List Headers - only custom properties that Bootstrap can't handle */
+/* Grouped List Headers */
 .grouped-list-header {
-    background-color: var(--grouped-header-bg) !important;
+    background-color: rgba(13, 110, 253, 0.05) !important;  /* Very subtle blue */
+}
+
+.grouped-list-header th {
+    padding: 0.5rem 1rem !important;
 }
 
 .grouped-list-header:hover {
-    background-color: var(--grouped-header-hover-bg) !important;
+    background-color: rgba(13, 110, 253, 0.1) !important;  /* Slightly darker on hover */
 }
 
+/* Inactive state */
 .grouped-list-header.opacity-50 {
-    background-color: var(--grouped-header-inactive-bg) !important;
+    background-color: rgba(108, 117, 125, 0.05) !important;  /* Very subtle gray when inactive */
 }
 
 .grouped-list-header.opacity-50:hover {
-    background-color: var(--grouped-header-inactive-hover-bg) !important;
-}
+    background-color: rgba(108, 117, 125, 0.1) !important;  /* Slightly darker gray on hover when inactive */
+} 
 
 /* Replace the complex alert handling with this simple rule */
+/* lets see if there are still alerts in the code */
+/* might be used by /admin */
 .alert {
     opacity: var(--alert-static-opacity) !important;
 }
-
-/* Remove the old static-alert class definition */
-/* .alert.static-alert {
-    display: block !important;
-} */
 
 /* Site Plan Editor */
 #siteplan-editor {

@@ -57,7 +57,8 @@
         }
     </style>
 </head>
-<body {% if place %}data-place-slug="{{ place.slug }}"{% endif %}>
+<body data-place-slug="{{ place.slug|default:'' }}" 
+      data-unread-toasts="{{ unread_toast_count|default:0 }}">
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
         <div class="container">
             <div class="d-flex align-items-center flex-grow-1">
@@ -166,8 +167,9 @@
         
         <!-- Toast Message Container -->
         {% if toast_message %}
-            <div id="server-toast-message" data-processed="false"></div>
-            {{ toast_message|json_script:"toast-message-data" }}
+            <div id="server-toast-message" data-processed="false" style="display: none;">
+                {{ toast_message|json_script:"toast-message-data" }}
+            </div>
         {% endif %}
 
         <!-- Breadcrumb and Toast Section -->

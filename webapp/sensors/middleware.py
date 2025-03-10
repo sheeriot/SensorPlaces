@@ -1,38 +1,35 @@
 from icecream import ic
+from .models import ToastNotification
+from django.db.models import Count
 
 class ToastMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Code to be executed for each request before the view
         response = self.get_response(request)
         
-        # Code to be executed for each request/response after the view
-        if hasattr(request, 'toast_message'):
-            ic("ToastMiddleware - Adding toast to history:", request.toast_message)
+        # Only process toast messages for authenticated users
+        if hasattr(request, 'toast_message') and request.user.is_authenticated:
+            toast_msg = request.toast_message
+            ic("ToastMiddleware - Adding toast to history:", toast_msg)
             
-            # Initialize or get existing history
-            toast_history = request.session.get('toast_history', [])
+            # Store current message for immediate display
+            request.session['current_toast'] = toast_msg
             
-            # Add new message to the beginning of the history
-            toast_history.insert(0, request.toast_message)
-            
-            # Limit history to 50 items to prevent session from growing too large
-            toast_history = toast_history[:50]
-            
-            # Store updated history
-            request.session['toast_history'] = toast_history
-            request.session.modified = True
-            
-            # Also store current message for immediate display
-            request.session['current_toast'] = request.toast_message
+            # Database persistence with user
+            ToastNotification.objects.create(
+                user=request.user,
+                message=toast_msg['message'],
+                type=toast_msg['type'],
+                read=False  # New notifications are unread by default
+            )
         
         return response
 
     def process_template_response(self, request, response):
         # Add toast message to template context if it exists
-        if hasattr(response, 'context_data'):
+        if hasattr(response, 'context_data') and request.user.is_authenticated:
             # Handle current toast for immediate display
             if 'current_toast' in request.session:
                 current_toast = request.session.pop('current_toast')
@@ -43,9 +40,22 @@ class ToastMiddleware:
                 })
                 response.context_data['toast_message'] = current_toast
                 request.session.modified = True
-                
-            # Add full history to context
-            toast_history = request.session.get('toast_history', [])
-            response.context_data['toast_history'] = toast_history
+            
+            # Get unread count and add to both context and body data attributes
+            unread_count = ToastNotification.objects.filter(
+                user=request.user,
+                read=False
+            ).count()
+            
+            ic("ToastMiddleware - Setting unread count:", unread_count)
+            
+            # Add to context for template use
+            response.context_data['unread_toast_count'] = unread_count
+            
+            # Add to body data attributes for JavaScript
+            response.context_data['body_data_attributes'] = {
+                'unreadToasts': str(unread_count),  # Changed from unread-toasts to match JS convention
+                **response.context_data.get('body_data_attributes', {})
+            }
             
         return response 

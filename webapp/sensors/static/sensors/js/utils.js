@@ -32,7 +32,7 @@ const utils = {
 
     async fetchWithCSRF(url, options = {}) {
         const defaultOptions = {
-            credentials: 'same-origin',  // Include cookies in the request
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -67,15 +67,53 @@ const utils = {
         
         try {
             const response = await fetch(url, mergedOptions);
+            
+            // Parse JSON response
+            const data = await response.json();
+            
+            // Handle toast messages from API response
+            if (data.toast) {
+                if (window.toastSystem) {
+                    window.toastSystem.show({
+                        message: data.toast.message || data.toast,
+                        type: data.toast.type || 'info',
+                        addToHistory: true
+                    });
+                }
+            }
+
+            // Handle CSRF errors
             if (response.status === 403) {
-                const data = await response.json();
                 if (data.detail && data.detail.includes('CSRF')) {
                     throw new Error('CSRF validation failed. Please refresh the page and try again.');
                 }
             }
-            return response;
+
+            // Handle other error responses
+            if (!response.ok) {
+                // Show error toast if there isn't already a toast message
+                if (!data.toast && window.toastSystem) {
+                    window.toastSystem.show({
+                        message: data.detail || 'An error occurred while processing your request.',
+                        type: 'danger',
+                        addToHistory: true
+                    });
+                }
+                throw new Error(data.detail || 'Request failed');
+            }
+
+            return data;
         } catch (error) {
             console.error('Error in fetchWithCSRF:', error);
+            
+            // Show error toast for network/parsing errors
+            if (window.toastSystem) {
+                window.toastSystem.show({
+                    message: error.message || 'A network error occurred. Please try again.',
+                    type: 'danger',
+                    addToHistory: true
+                });
+            }
             throw error;
         }
     }
