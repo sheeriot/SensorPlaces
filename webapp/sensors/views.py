@@ -229,6 +229,9 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
         
         return response
 
+    def get_success_url(self):
+        return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
+
 class PlaceUpdateView(LoginRequiredMixin, UpdateView):
     model = Place
     form_class = PlaceForm
@@ -299,6 +302,7 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
         place = self.get_object()
         success_url = self.get_success_url()
         
+        # Build message before deletion
         message = (
             f"Deleted place <strong>{place.name}</strong><br>"
             f"<small class='text-muted'>"
@@ -307,13 +311,30 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
             f"</small>"
         )
         
+        # Debug log before deletion
+        ic("PlaceDeleteView - Before delete:", {
+            'place': place.name,
+            'message': message
+        })
+        
+        # Perform deletion
         place.delete()
         
-        self.request.toast_message = {
+        # Set toast message - always set addToHistory to true
+        # The toast-ui-manager will handle the presence/absence of the history button
+        toast_data = {
             'message': message,
             'type': 'danger',
-            'addToHistory': True
+            'addToHistory': True  # Always true - UI will handle appropriately
         }
+        
+        self.request.toast_message = toast_data
+        
+        # Debug log after setting toast
+        ic("PlaceDeleteView - After setting toast:", {
+            'toast_data': toast_data,
+            'success_url': success_url
+        })
         
         return HttpResponseRedirect(success_url)
 
