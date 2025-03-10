@@ -404,40 +404,40 @@ const processServerToast = () => {
         Array.from(serverToastElements).forEach(toastMessage => {
             if (toastConfig.debug) console.log('[Toast Manager] Processing toast message:', toastMessage.outerHTML);
             
-            if (toastMessage.getAttribute('data-processed') === 'false') {
-                if (toastConfig.debug) console.log('[Toast Manager] Not yet processed');    
-                // Look for the script tag within this specific toast message
-                const toastScript = toastMessage.querySelector('script[type="application/json"]');
-                if (toastConfig.debug) console.log('[Toast Manager] Toast data script:', {
-                    found: !!toastScript,
-                    content: toastScript?.textContent,
-                    type: toastScript?.type
-                });
-
-                if (toastScript && window.toastSystem) {
-                    try {
-                        const toastData = JSON.parse(toastScript.textContent);
-                        if (toastConfig.debug) console.log('[Toast Manager] Parsed toast data:', toastData);
-                        
-                        // Server-side page load toasts should NOT update badge
-                        toastData.addToHistory = false;  // Badge count is already in body data-unread-toasts
-                        
-                        requestAnimationFrame(() => {
-                            if (toastConfig.debug) console.log('[Toast Manager] Showing page load toast:', {
-                                ...toastData,
-                                addToHistory: false
-                            });
-                            window.toastSystem.show(toastData);
-                            toastMessage.setAttribute('data-processed', 'true');
-                            if (toastConfig.debug) console.log('[Toast Manager] Page load toast processed');
-                        });
-                    } catch (e) {
-                        if (toastConfig.debug) console.log('[Toast Manager] Error processing toast:', e);
-                    }
-                }
-            }
-            else {
+            // If data-processed is true, skip this toast
+            if (toastMessage.getAttribute('data-processed') === 'true') {
                 if (toastConfig.debug) console.log('[Toast Manager] Toast message already processed');
+                return;
+            }
+
+            // Look for the script tag within this specific toast message
+            const toastScript = toastMessage.querySelector('script[type="application/json"]');
+            if (toastConfig.debug) console.log('[Toast Manager] Toast data script:', {
+                found: !!toastScript,
+                content: toastScript?.textContent,
+                type: toastScript?.type
+            });
+
+            if (toastScript && window.toastSystem) {
+                try {
+                    const toastData = JSON.parse(toastScript.textContent);
+                    if (toastConfig.debug) console.log('[Toast Manager] Parsed toast data:', toastData);
+                    
+                    // Server-side page load toasts should NOT update badge
+                    toastData.addToHistory = false;  // Badge count is already in body data-unread-toasts
+                    
+                    requestAnimationFrame(() => {
+                        if (toastConfig.debug) console.log('[Toast Manager] Showing page load toast:', {
+                            ...toastData,
+                            addToHistory: false
+                        });
+                        window.toastSystem.show(toastData);
+                        toastMessage.setAttribute('data-processed', 'true');
+                        if (toastConfig.debug) console.log('[Toast Manager] Page load toast processed');
+                    });
+                } catch (e) {
+                    if (toastConfig.debug) console.log('[Toast Manager] Error processing toast:', e);
+                }
             }
         });
     }
