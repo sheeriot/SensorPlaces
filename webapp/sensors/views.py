@@ -492,14 +492,12 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         self.request.toast_message = {
             'message': message,
             'type': 'warning',
-            'addToHistory': True
         }
         
         return response
 
     def form_invalid(self, form):
         """Handle form validation errors by displaying them in the form"""
-        # ic("LocationUpdateView - Form Invalid:", form.errors)
         return self.render_to_response(self.get_context_data(form=form))
 
 class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):

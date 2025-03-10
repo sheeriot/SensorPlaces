@@ -12,7 +12,7 @@ class ToastMiddleware:
         # Only process toast messages for authenticated users
         if hasattr(request, 'toast_message') and request.user.is_authenticated:
             toast_msg = request.toast_message
-            ic("ToastMiddleware - Adding toast to history:", toast_msg)
+            # ic("ToastMiddleware - Adding toast to history:", toast_msg)
             
             # Store current message for immediate display
             request.session['current_toast'] = toast_msg
@@ -33,11 +33,11 @@ class ToastMiddleware:
             # Handle current toast for immediate display
             if 'current_toast' in request.session:
                 current_toast = request.session.pop('current_toast')
-                ic("ToastMiddleware - Adding current toast to template context:", {
-                    'current_toast': current_toast,
-                    'has_context_data': hasattr(response, 'context_data'),
-                    'template_name': getattr(response, 'template_name', None)
-                })
+                # ic("ToastMiddleware - Adding current toast to template context:", {
+                #     'current_toast': current_toast,
+                #     'has_context_data': hasattr(response, 'context_data'),
+                #     'template_name': getattr(response, 'template_name', None)
+                # })
                 response.context_data['toast_message'] = current_toast
                 request.session.modified = True
             
@@ -47,7 +47,7 @@ class ToastMiddleware:
                 read=False
             ).count()
             
-            ic("ToastMiddleware - Setting unread count:", unread_count)
+            # ic("ToastMiddleware - Setting unread count:", unread_count)
             
             # Add to context for template use
             response.context_data['unread_toast_count'] = unread_count

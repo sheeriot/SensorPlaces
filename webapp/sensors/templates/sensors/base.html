@@ -46,16 +46,6 @@
     <script src="{% static 'sensors/js/siteplan_view.js' %}"></script>
     <script src="{% static 'sensors/js/siteplan_editor.js' %}"></script>
 
-    <!-- Add Bootstrap 5 utility classes for static alerts -->
-    <style>
-        .alert[data-static="true"] {
-            /* Bootstrap 5 utilities */
-            --bs-alert-margin: 1rem;
-            display: block !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
-    </style>
 </head>
 <body data-place-slug="{{ place.slug|default:'' }}" 
       data-unread-toasts="{{ unread_toast_count|default:0 }}">
@@ -152,34 +142,27 @@
             </div>
         </div>
     </nav>
-<!-- Add this near the top of your base.html, after the <body> tag -->
-    {% if debug %}
-    <div style="display:none">
-        <p>Session contents:</p>
-        <pre>{{ request.session.items|pprint }}</pre>
-        <p>Toast message:</p>
-        <pre>{{ request.session.toast_message|pprint }}</pre>
-    </div>
-    {% endif %}
-    <div class="container my-2">
-        <!-- Toast System Components -->
-        {% include "sensors/partials/toast_history_modal.html" %}
-        
-        <!-- Toast Message Container -->
-        {% if toast_message %}
-            <div id="server-toast-message" data-processed="false" style="display: none;">
-                {{ toast_message|json_script:"toast-message-data" }}
-            </div>
-        {% endif %}
 
-        <!-- Breadcrumb and Toast Section -->
-        <div class="page-header d-flex justify-content-between align-items-start">
-            {% include "sensors/partials/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
-        </div>
+    <div class="container my-2">
+    <!-- Breadcrumb Section -->
+    <div class="page-header d-flex justify-content-between align-items-start">
+        {% include "sensors/partials/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
+    </div>
 
         {% block content %}{% endblock %}
     </div>
+    <!-- Toast System Components -->
 
+    {% include "sensors/partials/toast_history_modal.html" %}
+    
+    <!-- Toast Message Container -->
+    <div id="toast-messages" class="d-none">
+    {% if toast_message %}
+        <div class="server-toast-message" data-processed="false">
+            {{ toast_message|json_script:"toast-message-data" }}
+        </div>
+    {% endif %}
+    </div>
     <footer class="footer mt-auto py-3 bg-light border-top">
         <div class="container">
             <div class="row align-items-center">

@@ -31,112 +31,95 @@ function debugLog(message, data = null) {
     }
 }
 
+// Helper function to wait for toast system
+function waitForToastSystem(maxAttempts = 10, interval = 100) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        
+        const check = () => {
+            debugLog('Checking for toast system availability', {
+                attempt: attempts + 1,
+                maxAttempts,
+                available: !!window.toastSystem
+            });
+
+            if (window.toastSystem) {
+                debugLog('Toast system found');
+                resolve(window.toastSystem);
+            } else if (attempts >= maxAttempts) {
+                debugLog('Toast system not found after maximum attempts');
+                reject(new Error('Toast system not available'));
+            } else {
+                attempts++;
+                setTimeout(check, interval);
+            }
+        };
+
+        check();
+    });
+}
+
+// Initialize toast functionality
+async function initializeToastFunctionality() {
+    debugLog('Initializing toast functionality');
+
+    try {
+        // Wait for toast system to be available
+        const toastSystem = await waitForToastSystem();
+        debugLog('Toast system ready', {
+            initialized: toastSystem.initialized
+        });
+
+        // Initialize toast system with unread count
+        const unreadCount = document.body.dataset.unreadToasts || '0';
+        document.body.dataset.unreadToasts = unreadCount;
+        debugLog('Set initial unread count:', { unreadCount });
+
+        // Initialize toast event listeners
+        document.addEventListener('sensors:toast:show', (event) => {
+            debugLog('Toast event received:', event.detail);
+
+            const { message, type = 'info', addToHistory = true } = event.detail;
+            toastSystem.show(message, type, addToHistory);
+        });
+
+        // Helper function to show toasts
+        window.showToast = function(message, type = 'info', addToHistory = true) {
+            debugLog('showToast called:', { message, type, addToHistory });
+            document.dispatchEvent(new CustomEvent('sensors:toast:show', {
+                detail: { message, type, addToHistory }
+            }));
+        };
+
+        debugLog('Toast functionality initialized successfully');
+
+    } catch (error) {
+        debugLog('Failed to initialize toast functionality:', error);
+    }
+}
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.group('=== Document Load Processing ===');
-    debugLog('Document loaded and ready');
+    debugLog('Document loaded and ready', {
+        readyState: document.readyState,
+        toastAvailable: !!window.toastSystem
+    });
 
     // Initialize place slug from body data attribute
     window.currentPlaceSlug = document.body.dataset.placeSlug || null;
+    debugLog('Place slug initialized:', window.currentPlaceSlug);
 
-    if (commonConfig.debug) {
-        console.group('=== Common System Startup ===');
-        console.log('Current place slug:', window.currentPlaceSlug);
-        console.groupEnd();
-
-        console.group('=== Toast System Initialization ===');
-        console.log('Toast system available:', !!window.toastSystem);
-        console.groupEnd();
-    }
-
-    // Initialize toast system with unread count
-    if (window.toastSystem) {
-        const unreadCount = document.body.dataset.unreadToasts || '0';
-        document.body.dataset.unreadToasts = unreadCount;
-    }
-
-    // Initialize toast event listeners
-    document.addEventListener('sensors:toast:show', (event) => {
-        if (commonConfig.debug) {
-            console.group('=== Toast Message Processing ===');
-            debugLog('Toast event received:', event.detail);
-            debugLog('Toast system available:', !!window.toastSystem);
-        }
-
-        if (window.toastSystem) {
-            const { message, type = 'info', addToHistory = true } = event.detail;
-            debugLog('Showing toast:', { message, type, addToHistory });
-            window.toastSystem.show(message, type, addToHistory);
-        } else {
-            debugLog('Warning: Toast system not available');
-        }
-
-        if (commonConfig.debug) {
-            console.groupEnd();
-        }
+    // Initialize toast functionality
+    initializeToastFunctionality().then(() => {
+        debugLog('Toast initialization complete');
+    }).catch(error => {
+        debugLog('Toast initialization failed:', error);
     });
 
-    // Helper function to show toasts
-    window.showToast = function(message, type = 'info', addToHistory = true) {
-        debugLog('showToast called:', { message, type, addToHistory });
-        document.dispatchEvent(new CustomEvent('sensors:toast:show', {
-            detail: { message, type, addToHistory }
-        }));
+    // Export toast events for other modules
+    window.ToastEvents = {
+        SHOW: 'sensors:toast:show',
+        HISTORY: 'sensors:toast:history',
+        CLEAR: 'sensors:toast:clear'
     };
-
-    // Check for server-side toast message
-    const serverToastEl = document.getElementById('server-toast-message');
-    debugLog('Searching for server toast element:', { found: !!serverToastEl });
-
-    if (serverToastEl && !serverToastEl.getAttribute('data-processed')) {
-        console.group('=== Server Toast Message Found ===');
-        debugLog('Found unprocessed server toast message');
-        
-        try {
-            const toastScript = document.getElementById('toast-message-data');
-            debugLog('Toast script element found:', { found: !!toastScript });
-            
-            if (toastScript && window.toastSystem) {
-                debugLog('Toast script content:', toastScript.textContent);
-                
-                // Remove any HTML entities and parse JSON
-                const rawContent = toastScript.textContent
-                    .replace(/&quot;/g, '"')
-                    .replace(/&#34;/g, '"')
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>');
-                
-                debugLog('Cleaned toast content:', rawContent);
-                const toastData = JSON.parse(rawContent);
-                debugLog('Successfully parsed toast data:', toastData);
-                
-                // For page-load toasts, don't increment the badge count
-                toastData.addToHistory = false;
-                
-                debugLog('Showing toast with data:', toastData);
-                
-                // Delay showing the toast slightly to prevent FOUC
-                requestAnimationFrame(() => {
-                    window.toastSystem.show(toastData);
-                    serverToastEl.setAttribute('data-processed', 'true');
-                    debugLog('Toast processed and shown');
-                });
-            } else {
-                debugLog('Missing toast script or toast system');
-            }
-        } catch (e) {
-            console.error('Error processing server toast:', e);
-            debugLog('Toast processing error:', e);
-        }
-        console.groupEnd();
-    } else {
-        debugLog('No unprocessed server toast messages found');
-    }
 });
-
-// Export toast events for other modules
-window.ToastEvents = {
-    SHOW: 'sensors:toast:show',
-    HISTORY: 'sensors:toast:history',
-    CLEAR: 'sensors:toast:clear'
-};
