@@ -78,41 +78,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check for server-side toast message
     const serverToastEl = document.getElementById('server-toast-message');
     if (serverToastEl) {
-        if (commonConfig.debug) {
-            console.group('=== Server Toast Message Found ===');
-            debugLog('Processing server toast message element:', serverToastEl);
-        }
+        console.group('=== Server Toast Message Found ===');
+        console.log('Server toast element:', serverToastEl);
 
         try {
             const toastScript = document.getElementById('toast-message-data');
             if (toastScript) {
-                debugLog('Found toast script element:', toastScript);
-                debugLog('Toast script content:', toastScript.textContent);
+                console.log('Toast script content:', toastScript.textContent);
                 
                 const toastData = JSON.parse(toastScript.textContent);
-                debugLog('Parsed server toast data:', toastData);
+                console.log('Parsed toast data:', toastData);
                 
                 if (window.toastSystem) {
-                    debugLog('Passing toast to toastSystem.show():', toastData);
+                    console.group('=== Sending Toast to System ===');
+                    console.log('Raw toast data:', toastData);
+                    console.log('Message:', toastData.message);
+                    console.log('Type:', toastData.type);
+                    console.log('Add to history:', toastData.addToHistory);
                     window.toastSystem.show(toastData);
                     serverToastEl.setAttribute('data-processed', 'true');
-                    debugLog('Server toast message handed off to toast system');
+                    console.groupEnd(); // End "Sending Toast to System" group
                 } else {
-                    debugLog('Warning: Toast system not available for server message');
+                    console.warn('Toast system not available for server message');
                 }
             } else {
-                debugLog('No toast-message-data script element found');
-                debugLog('All script elements:', document.getElementsByTagName('script'));
+                console.warn('No toast-message-data script element found');
             }
         } catch (e) {
-            console.error('Error processing server toast message:', e);
-            debugLog('Toast script element:', toastScript);
-            debugLog('Raw toast script content:', toastScript?.textContent);
+            console.error('Error processing server toast:', e);
         }
 
-        if (commonConfig.debug) {
-            console.groupEnd();
-        }
+        console.groupEnd(); // End "Server Toast Message Found" group
     }
 });
 

@@ -176,12 +176,8 @@ class PlaceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Ensure place is in context
-        if 'place' not in context and hasattr(self, 'object'):
-            context['place'] = self.object
-            
-        # Debug locations from LocationAnnotationMixin
+        context['model_name'] = 'place'
+
         if 'locations' in context:
             locations_data = []
             for location in context['locations']:
@@ -312,10 +308,10 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
         )
         
         # Debug log before deletion
-        ic("PlaceDeleteView - Before delete:", {
-            'place': place.name,
-            'message': message
-        })
+        # ic("PlaceDeleteView - Before delete:", {
+        #     'place': place.name,
+        #     'message': message
+        # })
         
         # Perform deletion
         place.delete()
@@ -331,10 +327,10 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
         self.request.toast_message = toast_data
         
         # Debug log after setting toast
-        ic("PlaceDeleteView - After setting toast:", {
-            'toast_data': toast_data,
-            'success_url': success_url
-        })
+        # ic("PlaceDeleteView - After setting toast:", {
+        #     'toast_data': toast_data,
+        #     'success_url': success_url
+        # })
         
         return HttpResponseRedirect(success_url)
 
@@ -410,6 +406,22 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
 
+    def get_success_url(self):
+        return reverse('sensors:location_detail', kwargs={'place_slug': self.kwargs.get('place_slug'), 'pk': self.object.pk})
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial']['place'] = place
+        kwargs['initial']['referrer'] = self.request.GET.get('next', '')
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'location'
+        return context
+
     def form_valid(self, form):
         place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
         form.instance.place = place
@@ -437,16 +449,14 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
 
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
-        ic(initial)
-        return initial
-
     def get_success_url(self):
-        if self.object.pk and 'referrer' in self.request.POST:
-            return self.request.POST['referrer']
-        return reverse('sensors:place_detail', kwargs={'place_slug': self.object.place.slug})
+        return reverse('sensors:location_detail', kwargs={'place_slug': self.kwargs.get('place_slug'), 'pk': self.object.pk})
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial']['referrer'] = self.request.GET.get('next', '')
+        return kwargs
 
     def form_valid(self, form):
         # Validate that place hasn't changed
@@ -489,7 +499,7 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
 
     def form_invalid(self, form):
         """Handle form validation errors by displaying them in the form"""
-        ic("LocationUpdateView - Form Invalid:", form.errors)
+        # ic("LocationUpdateView - Form Invalid:", form.errors)
         return self.render_to_response(self.get_context_data(form=form))
 
 class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
@@ -667,11 +677,11 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         kwargs['initial_location'] = self.location
         
         # Add debug logging
-        ic("DeviceCreateView - get_form_kwargs:", {
-            'place': kwargs['place'].name if kwargs.get('place') else None,
-            'initial_location': kwargs.get('initial_location'),
-            'has_data': bool(kwargs.get('data')),
-        })
+        # ic("DeviceCreateView - get_form_kwargs:", {
+        #     'place': kwargs['place'].name if kwargs.get('place') else None,
+        #     'initial_location': kwargs.get('initial_location'),
+        #     'has_data': bool(kwargs.get('data')),
+        # })
         
         return kwargs
 

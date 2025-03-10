@@ -653,7 +653,6 @@ class LocationForm(forms.ModelForm):
         widget=forms.HiddenInput()
     )
     
-    # Hidden field to store the actual place relationship
     place_id = forms.ModelChoiceField(
         queryset=Place.objects.all(),
         widget=forms.HiddenInput()
@@ -683,27 +682,26 @@ class LocationForm(forms.ModelForm):
         elif self.instance and self.instance.pk:
             self.place = self.instance.place
 
-        if self.place:
-            self.fields['place_id'].initial = self.place
-            self.fields['place_name'].initial = self.place.name
+        self.fields['place_id'].initial = self.place
+        self.fields['place_name'].initial = self.place.name
 
-            # Add inactive styling if place is not active
-            if not self.place.is_active:
-                self.fields['place_name'].widget.attrs.update({
-                    'class': 'form-control-plaintext fs-5 fw-medium text-muted opacity-50'
-                })
-            if self.place.is_active:
-                self.fields['place_name'].label = mark_safe("""Place
-                    <span class="badge ms-1 bg-success-subtle text-success">
-                        Active
-                    </span>
-                """)
-            else:
-                self.fields['place_name'].label = mark_safe("""Place
-                    <span class="badge ms-1 bg-secondary-subtle text-secondary">
-                        inactive
-                    </span>
-                """)
+        # Add inactive styling if place is not active
+        if not self.place.is_active:
+            self.fields['place_name'].widget.attrs.update({
+                'class': 'form-control-plaintext fs-5 fw-medium text-muted opacity-50'
+            })
+        if self.place.is_active:
+            self.fields['place_name'].label = mark_safe("""Place
+                <span class="badge ms-1 bg-success-subtle text-success">
+                    Active
+                </span>
+            """)
+        else:
+            self.fields['place_name'].label = mark_safe("""Place
+                <span class="badge ms-1 bg-secondary-subtle text-secondary">
+                    inactive
+                </span>
+            """)
 
         # Configure field properties
         self.fields['is_active'].label = "Active"
@@ -715,7 +713,7 @@ class LocationForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
 
-        # Custom layout
+        # Update the layout to use referrer for cancel button
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
             Field('place_id', type='hidden'),

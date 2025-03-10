@@ -10,14 +10,32 @@
             </div>
             <div class="modal-body p-0">
                 <div class="toast-history-list" id="toastHistoryList">
-                    <!-- Toast history items will be inserted here by JavaScript -->
+                    {% if toast_history %}
+                        {% for toast in toast_history %}
+                            <div class="toast-history-item p-3 border-bottom">
+                                <div class="text-{{ toast.type }}">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-{% if toast.type == 'success' %}check-circle{% elif toast.type == 'danger' %}exclamation-circle{% elif toast.type == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+                                        <span>{{ toast.message|safe }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                            No notifications yet
+                        </div>
+                    {% endif %}
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-outline-danger" id="clearToastHistory">
-                    <i class="bi bi-trash me-2"></i>Clear History
-                </button>
+                {% if toast_history %}
+                    <button type="button" class="btn btn-outline-danger" id="clearToastHistory">
+                        <i class="bi bi-trash me-2"></i>Clear History
+                    </button>
+                {% endif %}
             </div>
         </div>
     </div>
