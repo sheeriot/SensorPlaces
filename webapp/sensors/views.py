@@ -381,6 +381,35 @@ class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView
     context_object_name = 'location'
     template_name = 'sensors/location_detail.html'
 
+    def get_queryset(self) -> QuerySet[Location]:
+        """Get the location queryset with annotations for device and sensor counts."""
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            base_queryset = super().get_queryset()
+            
+            # Filter and annotate the location with device and sensor counts
+            self._queryset = base_queryset.filter(
+                place=place
+            ).annotate(
+                active_device_count=Count(
+                    'devices',
+                    filter=Q(devices__is_active=True)
+                ),
+                inactive_device_count=Count(
+                    'devices',
+                    filter=Q(devices__is_active=False)
+                ),
+                active_sensors_count=Count(
+                    'devices__sensors',
+                    filter=Q(devices__sensors__is_active=True)
+                ),
+                inactive_sensors_count=Count(
+                    'devices__sensors',
+                    filter=Q(devices__sensors__is_active=False)
+                )
+            ).select_related('place')
+        return self._queryset
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
@@ -399,14 +428,6 @@ class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView
             '-is_active', 
             Lower('name')
         )
-        
-        # Add device and sensor counts
-        context.update({
-            'devices_active': Device.objects.filter(location=self.object, is_active=True).count(),
-            'devices_inactive': Device.objects.filter(location=self.object, is_active=False).count(),
-            'sensors_active': Sensor.objects.filter(device__location=self.object, is_active=True).count(),
-            'sensors_inactive': Sensor.objects.filter(device__location=self.object, is_active=False).count(),
-        })
         
         return context
 
@@ -640,7 +661,6 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         super().setup(request, *args, **kwargs)
         self._place = None
         self._location = None
-        self._locations = None
 
     @property
     def place(self):
@@ -656,47 +676,33 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         if self._location is None:
             location_pk = self.kwargs.get('location_pk')
             if location_pk:
-                self._location = get_object_or_404(Location, pk=location_pk, place=self.place)
-        return self._location
-
-    @property
-    def locations(self):
-        """Cached locations getter with annotations"""
-        if self._locations is None:
-            self._locations = Location.objects.filter(place=self.place).annotate(
-                active_devices_count=Count(
-                    'devices',
-                    filter=Q(devices__is_active=True)
-                ),
-                inactive_devices_count=Count(
-                    'devices',
-                    filter=Q(devices__is_active=False)
+                self._location = get_object_or_404(
+                    Location,
+                    pk=location_pk,
+                    place=self.place
                 )
-            ).select_related('place').prefetch_related(
-                'devices',
-                'devices__device_type'
-            ).order_by('name')
-        return self._locations
+        return self._location
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.place
-        kwargs['initial_location'] = self.location
         
-        # Add debug logging
-        # ic("DeviceCreateView - get_form_kwargs:", {
-        #     'place': kwargs['place'].name if kwargs.get('place') else None,
-        #     'initial_location': kwargs.get('initial_location'),
-        #     'has_data': bool(kwargs.get('data')),
-        # })
+        # Set initial data including location and is_active
+        initial = kwargs.get('initial', {})
         
+        # If we have a location, use it for initial data
+        if self.location:
+            initial['location'] = self.location
+            # Set is_active based on location's status
+            initial['is_active'] = self.location.is_active
+        
+        kwargs['initial'] = initial
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
         context['place'] = self.place
-        context['locations'] = self.locations
         
         if self.location:
             context['location'] = self.location
@@ -1287,7 +1293,7 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             if device_pk:
                 self._device = get_object_or_404(
                     Device.objects.select_related(
-            'location'
+                        'location'
                     ),
                     pk=device_pk,
                     location__place=self.place

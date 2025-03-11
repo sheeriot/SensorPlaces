@@ -554,34 +554,56 @@ class DeviceForm(forms.ModelForm):
                     const deviceActiveSwitch = form.querySelector('#id_is_active');
                     const helpText = form.querySelector('#device-help-inactive');
                     
+                    // Function to update the active status label
+                    function updateActiveLabel(isActive) {
+                        // Find the label within the form-switch div
+                        const switchContainer = deviceActiveSwitch.closest('.form-switch');
+                        if (switchContainer) {
+                            const labelSpan = switchContainer.querySelector('.form-check-label');
+                            if (labelSpan) {
+                                labelSpan.textContent = isActive ? "Active" : "inactive";
+                            }
+                        }
+                    }
+
                     function handleLocationChange(select) {
                         // Get the selected option
                         const selectedOption = select.options[select.selectedIndex];
-                        // Get the location's active status from data attribute
                         const locationId = selectedOption.value;
-                        const isActive = select.getAttribute(`data-is-active-${locationId}`) === 'true';
                         
-                        // Update device active switch
-                        if (!isActive && deviceActiveSwitch.checked) {
+                        // Get the location's active status from data attribute
+                        const isLocationActive = locationSelect.getAttribute(`data-is-active-${locationId}`) === 'true';
+                        
+                        // Update device active switch based on location status
+                        deviceActiveSwitch.disabled = !isLocationActive;
+                        
+                        if (!isLocationActive) {
+                            // If location is inactive, device must be inactive
                             deviceActiveSwitch.checked = false;
-                        }
-                        deviceActiveSwitch.disabled = !isActive;
-                        
-                        // Update help text visibility
-                        if (!isActive) {
                             helpText.textContent = "Device cannot be active when its location is inactive";
                             helpText.style.display = 'block';
                         } else {
+                            // If location is active, set device to active
+                            deviceActiveSwitch.checked = true;
                             helpText.style.display = 'none';
                         }
+                        
+                        // Update the label to match the new state
+                        updateActiveLabel(deviceActiveSwitch.checked);
                     }
                     
                     // Set initial state
                     if (locationSelect) {
                         handleLocationChange(locationSelect);
-                        // Add change listener
+                        
+                        // Listen for location changes
                         locationSelect.addEventListener('change', function() {
                             handleLocationChange(this);
+                        });
+                        
+                        // Listen for switch changes
+                        deviceActiveSwitch.addEventListener('change', function() {
+                            updateActiveLabel(this.checked);
                         });
                     }
                 });
