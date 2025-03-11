@@ -14,6 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 def validate_image_size(image):
     filesize = image.size
@@ -112,7 +113,7 @@ class Location(models.Model):
     )
     is_active: BooleanField = models.BooleanField(
         default=True,
-        help_text="Inactive locations will be hidden by default"
+        help_text="inactive locations will be hidden by default"
     )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
@@ -171,7 +172,7 @@ class Device(models.Model):
     )
     is_active: BooleanField = models.BooleanField(
         default=True,
-        help_text="Inactive devices will be hidden by default"
+        help_text="inactive devices will be hidden by default"
     )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
@@ -250,7 +251,7 @@ class Sensor(models.Model):
     influx_measurement = models.CharField(max_length=100, default='sensor_readings', blank=True)
     is_active: BooleanField = models.BooleanField(
         default=True,
-        help_text="Inactive sensors will be hidden by default"
+        help_text="inactive sensors will be hidden by default"
     )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
@@ -337,3 +338,16 @@ class ToastMessage(models.Model):
         if not self.username and self.user:
             self.username = self.user.username
         super().save(*args, **kwargs)
+
+class ToastNotification(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    message = models.TextField()
+    type = models.CharField(max_length=20)  # success, warning, danger, etc.
+    created_at = models.DateTimeField(auto_now_add=True)
+    read = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"{self.type} notification for {self.user.username} at {self.created_at}"

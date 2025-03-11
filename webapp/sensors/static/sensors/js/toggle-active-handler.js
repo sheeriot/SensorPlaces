@@ -14,9 +14,10 @@
 
 // System Configuration
 const toggleActiveConfig = {
-    debug: false,            // Set to true to enable debug mode
-    logMarkerChanges: true, // Log marker additions and changes
-    logMapEvents: true      // Log map initialization and updates
+    debug: false,
+    logMarkerChanges: true,
+    logMapEvents: true,
+    logStatusChanges: true
 };
 
 // Card structure validator
@@ -163,6 +164,20 @@ function reportCardStatus() {
 
 // Status Management System
 const toggleActiveManager = {
+    // Add getHideInactiveState before toggleStatus
+    getHideInactiveState(type) {
+        const switchEl = document.querySelector(`.hide-inactive-${type}-switch`);
+        if (toggleActiveConfig.debug) {
+            console.debug('Hide Inactive Switch:', {
+                type,
+                switchFound: !!switchEl,
+                switchClass: `hide-inactive-${type}-switch`,
+                state: switchEl?.checked
+            });
+        }
+        return switchEl?.checked || false;
+    },
+
     async toggleStatus(type, id, placeSlug, intendedState) {
         if (toggleActiveConfig.debug) {
             console.group('Toggle Status Request');
@@ -170,7 +185,7 @@ const toggleActiveManager = {
         }
 
         try {
-            const response = await utils.fetchWithCSRF(
+            const data = await utils.fetchWithCSRF(
                 `/api/${placeSlug}/toggle_active/${type}/${id}/`,
                 {
                     method: 'POST',
@@ -178,29 +193,28 @@ const toggleActiveManager = {
                 }
             );
             
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-            
             if (toggleActiveConfig.debug) {
-                console.debug('Response:', data);
+                console.debug('Server Response:', data);
             }
             
-            if (data.status === 'success') {
+            if (data.success || data.status === 'success') {
                 // Find all rows that match this model type and ID
                 const rows = document.querySelectorAll(`[data-${type}-id="${id}"]`);
                 
                 // Find the hideInactive state for this model type
-                const hideInactiveState = window.hideInactiveManager?.getSwitchStateByModel(type) ?? false;
-                
-                if (toggleActiveConfig.debug) {
-                    console.debug('Updating UI elements:', {
-                        rowsFound: rows.length,
-                        hideInactiveState,
-                        type
-                    });
-                }
+                const hideInactiveState = this.getHideInactiveState(type);
                 
                 rows.forEach(row => {
+                    if (toggleActiveConfig.debug) {
+                        console.group('Updating row');
+                        console.debug('Row before update:', {
+                            row,
+                            classes: Array.from(row.classList),
+                            active: row.getAttribute(`data-${type}-active`),
+                            hideInactiveState
+                        });
+                    }
+
                     // Update row attributes to match server state
                     row.setAttribute(`data-${type}-active`, data.is_active.toString());
                     
@@ -209,18 +223,106 @@ const toggleActiveManager = {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
                     } else {
                         row.classList.add('opacity-50', 'text-muted');
-                        // If hideInactive is enabled for this type, also hide the row
+                        
+                        // Check if hideInactive is enabled for this type
                         if (hideInactiveState) {
+                            if (toggleActiveConfig.debug) {
+                                console.debug('Hiding inactive row:', {
+                                    hideInactiveState,
+                                    rowType: type,
+                                    rowId: id
+                                });
+                            }
                             row.classList.add('d-none');
                         }
                     }
 
-                    // Update toggle text
-                    const statusLabel = row.querySelector('.status-label');
+                    // Update toggle text - FIXED SELECTOR
+                    const statusLabel = row.tagName.toLowerCase() === 'input' 
+                        ? row.parentElement.querySelector('.status-label')  // If row is the input, look for sibling label
+                        : row.querySelector('.status-label');              // Otherwise look within the row
+                        
                     if (statusLabel) {
+                        if (toggleActiveConfig.debug) {
+                            console.group('Status Label Update');
+                            console.debug('Found status label:', statusLabel);
+                        }
+
                         statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
                         statusLabel.classList.toggle('text-success', data.is_active);
                         statusLabel.classList.toggle('text-danger', !data.is_active);
+
+                        if (toggleActiveConfig.debug) {
+                            console.debug('Updated to:', {
+                                text: statusLabel.textContent,
+                                classes: Array.from(statusLabel.classList)
+                            });
+                            console.groupEnd();
+                        }
+                    } else if (toggleActiveConfig.debug) {
+                        console.warn('Status label not found for:', {
+                            type,
+                            id,
+                            row,
+                            parentElement: row.parentElement
+                        });
+                    }
+
+                    // Handle device detail card if it exists
+                    if (type === 'device') {
+                        const deviceCard = document.getElementById(`deviceCard_${id}`);
+                        if (deviceCard) {
+                            if (toggleActiveConfig.debug) {
+                                console.group('Device Card Update');
+                                console.debug('Found device card:', deviceCard);
+                            }
+
+                            // Find badge within the device card
+                            const isactiveBadge = deviceCard.querySelector('.isactive-badge span.badge');
+                            if (isactiveBadge) {
+                                if (toggleActiveConfig.debug) {
+                                    console.debug('Found badge:', {
+                                        before: {
+                                            classes: Array.from(isactiveBadge.classList),
+                                            hidden: isactiveBadge.classList.contains('d-none'),
+                                            text: isactiveBadge.textContent
+                                        }
+                                    });
+                                }
+
+                                if (data.is_active) {
+                                    isactiveBadge.classList.add('d-none');
+                                } else {
+                                    isactiveBadge.classList.remove('d-none');
+                                }
+
+                                if (toggleActiveConfig.debug) {
+                                    console.debug('After badge update:', {
+                                        after: {
+                                            classes: Array.from(isactiveBadge.classList),
+                                            hidden: isactiveBadge.classList.contains('d-none'),
+                                            text: isactiveBadge.textContent
+                                        }
+                                    });
+                                }
+                            } else if (toggleActiveConfig.debug) {
+                                console.warn('Badge not found in device card:', {
+                                    deviceCard,
+                                    selector: '.isactive-badge span.badge'
+                                });
+                            }
+
+                            if (toggleActiveConfig.debug) {
+                                console.groupEnd();
+                            }
+
+                            // Update card opacity
+                            if (data.is_active) {
+                                deviceCard.classList.remove('opacity-75');
+                            } else {
+                                deviceCard.classList.add('opacity-75');
+                            }
+                        }
                     }
 
                     // Handle child toggles based on parent type
@@ -241,8 +343,8 @@ const toggleActiveManager = {
                         });
 
                         // Update status badges visibility
-                        const deviceStatusBadges = document.querySelectorAll(`[data-location-id="${id}"] .status-active-badge`);
-                        deviceStatusBadges.forEach(badge => {
+                        const statusBadges = document.querySelectorAll(`[data-location-id="${id}"] .isactive-badge .badge`);
+                        statusBadges.forEach(badge => {
                             if (data.is_active) {
                                 badge.classList.add('d-none');
                             } else {
@@ -266,7 +368,7 @@ const toggleActiveManager = {
                         });
 
                         // Update status badges visibility
-                        const sensorStatusBadges = document.querySelectorAll(`[data-device-id="${id}"] .status-active-badge`);
+                        const sensorStatusBadges = document.querySelectorAll(`[data-device-id="${id}"] .isactive-badge .badge`);
                         sensorStatusBadges.forEach(badge => {
                             if (data.is_active) {
                                 badge.classList.add('d-none');
@@ -280,6 +382,15 @@ const toggleActiveManager = {
                     if (type === 'place') {
                         this.updateMapMarkers(id, data.is_active, hideInactiveState);
                     }
+
+                    if (toggleActiveConfig.debug) {
+                        console.debug('Row after update:', {
+                            classes: Array.from(row.classList),
+                            active: row.getAttribute(`data-${type}-active`),
+                            hidden: row.classList.contains('d-none')
+                        });
+                        console.groupEnd();
+                    }
                 });
 
                 // Find and update all toggle switches for this type/id
@@ -290,23 +401,19 @@ const toggleActiveManager = {
                     }
                 });
 
-                if (data.toast) {
-                    this.showToast(data.toast.message, data.toast.type, true);
-                }
-
-                if (toggleActiveConfig.debug) {
-                    console.debug('UI Update Complete');
-                }
-
                 return data;
             } else if (data.status === 'warning') {
-                // Handle warning status without throwing an error
+                // Handle warning status
                 if (toggleActiveConfig.debug) {
                     console.warn('Toggle Status Warning:', data.message);
                 }
-                if (data.toast) {
-                    this.showToast(data.toast.message, data.toast.type, true);
-                }
+                
+                this.showToast({
+                    message: data.message,
+                    type: 'warning',
+                    addToHistory: true
+                });
+                
                 return data;
             } else {
                 throw new Error(data.message || `Failed to update ${type} status`);
@@ -315,7 +422,11 @@ const toggleActiveManager = {
             if (toggleActiveConfig.debug) {
                 console.error('Toggle Status Error:', error);
             }
-            this.showToast(error.message, 'danger', true);
+            this.showToast({
+                message: error.message,
+                type: 'danger',
+                addToHistory: true
+            });
             return null;
         } finally {
             if (toggleActiveConfig.debug) {
@@ -409,6 +520,20 @@ const toggleActiveManager = {
                     row.classList.add('text-muted', 'opacity-50');
                 } else {
                     row.classList.remove('text-muted', 'opacity-50', 'd-none');
+                }
+
+                // Update toggle switch and status label
+                const toggle = row.querySelector('.toggle-device-active');
+                if (toggle) {
+                    toggle.checked = device.is_active;
+                    toggle.dataset.currentStatus = device.is_active.toString();
+                }
+
+                const statusLabel = row.querySelector('.status-label');
+                if (statusLabel) {
+                    statusLabel.textContent = device.is_active ? 'Active' : 'Inactive';
+                    statusLabel.classList.toggle('text-success', device.is_active);
+                    statusLabel.classList.toggle('text-danger', !device.is_active);
                 }
 
                 // Show toast with affected sensors if any
@@ -557,14 +682,38 @@ const toggleActiveManager = {
 
                 this.checked = !newStatus;
                 
-                modalComponents.messageEl.textContent = newStatus ? 
-                    'Are you sure you want to activate this device? This will allow its sensors to be activated.' : 
-                    'Are you sure you want to deactivate this device? This will disable all its sensors.';
+                if (newStatus) {
+                    modalComponents.messageEl.textContent = 'Are you sure you want to activate this device? This will allow its sensors to be activated.';
+                    showModal();
+                } else {
+                    // Find all active sensors for this device
+                    const activeSensors = Array.from(document.querySelectorAll(`.toggle-sensor-active[data-device-id="${deviceId}"]`))
+                        .filter(sensor => sensor.checked)
+                        .map(sensor => {
+                            const row = sensor.closest('tr');
+                            return row ? row.querySelector('.sensor-name')?.textContent?.trim() : null;
+                        })
+                        .filter(name => name); // Remove any null/undefined entries
 
-                modalComponents.confirmBtn.disabled = false;
-                modalComponents.spinner.classList.add('d-none');
-                
-                modalComponents.modal.show();
+                    let message = 'Are you sure you want to deactivate this device? This will disable all its sensors.';
+                    
+                    if (activeSensors.length > 0) {
+                        message += '<br><br>The following active sensors will be disabled:<ul class="mb-0">';
+                        activeSensors.forEach(sensorName => {
+                            message += `<li>${sensorName}</li>`;
+                        });
+                        message += '</ul>';
+                    }
+                    
+                    modalComponents.messageEl.innerHTML = message;
+                    showModal();
+                }
+
+                function showModal() {
+                    modalComponents.confirmBtn.disabled = false;
+                    modalComponents.spinner.classList.add('d-none');
+                    modalComponents.modal.show();
+                }
 
                 const handleConfirm = async () => {
                     modalComponents.confirmBtn.disabled = true;
@@ -681,11 +830,30 @@ const toggleActiveManager = {
         });
     },
 
-    // Function to show toast using event system
-    showToast(message, type = 'info', addToHistory = true) {
-        document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
-            detail: { message, type, addToHistory }
-        }));
+    // Update showToast method to ensure proper handling
+    showToast(messageOrObject, type = 'info', addToHistory = true) {
+        if (toggleActiveConfig.debug) {
+            console.log('showToast called with:', { messageOrObject, type, addToHistory });
+        }
+
+        const toastData = typeof messageOrObject === 'object' 
+            ? messageOrObject 
+            : { message: messageOrObject, type, addToHistory };
+
+        if (window.toastSystem) {
+            if (toggleActiveConfig.debug) {
+                console.log('Delegating to toast system:', toastData);
+            }
+            window.toastSystem.show(toastData);
+        } else {
+            // Fallback to event dispatch
+            if (toggleActiveConfig.debug) {
+                console.log('Toast system not available, dispatching event');
+            }
+            document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
+                detail: toastData
+            }));
+        }
     }
 };
 

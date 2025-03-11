@@ -46,18 +46,9 @@
     <script src="{% static 'sensors/js/siteplan_view.js' %}"></script>
     <script src="{% static 'sensors/js/siteplan_editor.js' %}"></script>
 
-    <!-- Add Bootstrap 5 utility classes for static alerts -->
-    <style>
-        .alert[data-static="true"] {
-            /* Bootstrap 5 utilities */
-            --bs-alert-margin: 1rem;
-            display: block !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
-    </style>
 </head>
-<body {% if place %}data-place-slug="{{ place.slug }}"{% endif %}>
+<body data-place-slug="{{ place.slug|default:'' }}" 
+      data-unread-toasts="{{ unread_toast_count|default:0 }}">
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
         <div class="container">
             <div class="d-flex align-items-center flex-grow-1">
@@ -95,12 +86,12 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'sensors:place_locations' place_slug=place.slug %}">
+                                    <a class="dropdown-item" href="{% url 'sensors:location_list' place_slug=place.slug %}">
                                         <i class="bi bi-diagram-3"></i> Locations
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'sensors:place_devices' place_slug=place.slug %}">
+                                    <a class="dropdown-item" href="{% url 'sensors:device_list' place_slug=place.slug %}">
                                         <i class="bi bi-hdd-rack"></i> Devices
                                     </a>
                                 </li>
@@ -153,32 +144,25 @@
     </nav>
 
     <div class="container my-2">
-        <!-- Toast System Components -->
-        {% include "sensors/partials/toast_history_modal.html" %}
-        <!-- Debug toast message -->
-        {% if debug %}
-        <div style="display:none">
-            <p>Session contents:</p>
-            <pre>{{ request.session.items|pprint }}</pre>
-            <p>Toast message:</p>
-            <pre>{{ request.session.toast_message|pprint }}</pre>
-        </div>
-        {% endif %}
-        
-        {% if request.session.toast_message %}
-            {{ request.session.toast_message|json_script:"toast-message" }}
-            {% load sensors_tags %}
-            {{ request.session|pop_session_key:'toast_message' }}
-        {% endif %}
-
-        <!-- Breadcrumb and Toast Section -->
-        <div class="page-header d-flex justify-content-between align-items-start">
-            {% include "sensors/partials/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
-        </div>
+    <!-- Breadcrumb Section -->
+    <div class="page-header d-flex justify-content-between align-items-start">
+        {% include "sensors/partials/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
+    </div>
 
         {% block content %}{% endblock %}
     </div>
+    <!-- Toast System Components -->
 
+    {% include "sensors/partials/toast_history_modal.html" %}
+    
+    <!-- Toast Message Container -->
+    <div id="toast-messages" class="d-none">
+    {% if toast_message %}
+        <div class="server-toast-message" data-processed="false">
+            {{ toast_message|json_script:"toast-message-data" }}
+        </div>
+    {% endif %}
+    </div>
     <footer class="footer mt-auto py-3 bg-light border-top">
         <div class="container">
             <div class="row align-items-center">

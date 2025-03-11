@@ -131,7 +131,7 @@ const placeMapPopout = {
                         <div>Lon: ${lon}</div>
                         <div class="mt-1">
                             Status: <span class="badge ${isActive ? 'bg-success' : 'bg-danger'}">
-                                ${isActive ? 'Active' : 'Inactive'}
+                                ${isActive ? 'Active' : 'inactive'}
                             </span>
                         </div>
                     </div>

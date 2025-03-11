@@ -13,15 +13,15 @@
         <i class="bi bi-link text-success fs-6"></i>
 
         {% if place and links %}
-            <a href="{% url 'sensors:place_locations' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-blue">
+            <a href="{% url 'sensors:location_list' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-blue">
                 <i class="bi bi-geo-alt text-light-blue"></i>Locations
             </a>
             <i class="bi bi-link text-success fs-6"></i>
-            <a href="{% url 'sensors:place_devices' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-gold">
+            <a href="{% url 'sensors:device_list' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-gold">
                 <i class="bi bi-hdd-rack text-light-gold"></i>Devices
             </a>
             <i class="bi bi-link text-success fs-6"></i>
-            <a href="{% url 'sensors:place_sensors' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-green">
+            <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}" class="text-decoration-none d-flex align-items-center text-light-green">
                 <i class="bi bi-thermometer text-light-green"></i>Sensors
             </a>
         {% elif links %}

@@ -79,10 +79,10 @@ const sitePlanView = {
             <div class="p-2">
                 <h6 class="mb-1">${location.name}</h6>
                 ${location.description ? `<p class="mb-1 small text-muted">${location.description}</p>` : ''}
-                ${location.active_devices_count ? `
+                ${location.devices_active_count ? `
                     <div class="text-success small">
                         <i class="bi bi-circle-fill me-1"></i>
-                        ${location.active_devices_count} active device${location.active_devices_count !== 1 ? 's' : ''}
+                        ${location.devices_active_count} active device${location.devices_active_count !== 1 ? 's' : ''}
                     </div>
                 ` : ''}
             </div>
@@ -118,7 +118,7 @@ const sitePlanView = {
         return new Promise((resolve) => {
             const container = document.getElementById('siteplan-container');
             if (!container) {
-                this.error('No site plan container found - is the template including siteplan_card.html?');
+                this.log('No site plan container found - is the template including siteplan_card.html?');
                 this.state.initialized = true;
                 resolve();
                 return;
@@ -127,7 +127,7 @@ const sitePlanView = {
             // Get the image URL and locations data
             const imageUrl = container.dataset.imageUrl;
             if (!imageUrl) {
-                this.error('No image URL found - check if place.get_siteplan_url is returning a value');
+                this.log('No siteplan image configured for this place');
                 this.state.initialized = true;
                 resolve();
                 return;
@@ -182,7 +182,7 @@ const sitePlanView = {
                 resolve();
             };
             img.onerror = () => {
-                this.error('Failed to load site plan image');
+                this.log('No siteplan image available or failed to load:', imageUrl);
                 this.state.initialized = true;
                 resolve();
             };

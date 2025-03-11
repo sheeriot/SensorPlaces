@@ -34,7 +34,7 @@
                         <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
                                for="sensorToggle{{ sensor.pk }}"
                                id="sensorStatusLabel_{{ sensor.pk }}">
-                            {% if sensor.is_active %}Active{% else %}Inactive{% endif %}
+                            {% if sensor.is_active %}Active{% else %}inactive{% endif %}
                         </label>
                     </div>
                     {% if not sensor.device.is_active %}

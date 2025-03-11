@@ -8,6 +8,7 @@ from .models import (
     Sensor,
     SensorReading,
     InfluxSource,
+    ToastNotification,
 )
 
 
@@ -120,3 +121,10 @@ class InfluxSourceAdmin(admin.ModelAdmin):
         if obj:  # editing an existing object
             return tuple(self.readonly_fields) + ('read_token',)
         return self.readonly_fields
+
+@admin.register(ToastNotification)
+class ToastNotificationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'message', 'type', 'created_at')
+    list_filter = ('type',)
+    search_fields = ('user__username', 'message')
+    readonly_fields = ('created_at',)

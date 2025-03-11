@@ -9,11 +9,11 @@
 
 {% block content %}
 <div class="container-fluid">
-    {% include 'sensors/partials/place_title_card.html' with place=place %}
+    {% include 'sensors/partials/place_title_card.html' %}
     <div class="row">
         <div class="col-md-4">
-            {% include "sensors/includes/device_details_card.html" with device=device %}
-            {% include "sensors/includes/location_details_card.html" with location=device.location %}
+            {% include "sensors/includes/device_detail_card.html" %}
+            {% include "sensors/includes/location_detail_card.html" %}
         </div>
 
         <div class="col-md-8">

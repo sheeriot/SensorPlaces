@@ -5,7 +5,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
             <i class="bi bi-geo-alt me-2"></i>
-            Locations
+            <a href="{% url 'sensors:location_list' place_slug=place.slug %}">Locations</a>
         </h5>
         <div class="d-flex gap-3 small">
             <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openPlaceMap" 
@@ -37,8 +37,8 @@
                 <div class="d-flex align-items-center">
                     {% if location.is_active %}
                     <span class="device-counts me-2">
-                        <span class="text-success font-monospace fw-bold active-count" id="location-{{ location.pk }}-active">{{ location.active_devices_count }}</span>
-                        (<span class="text-body-secondary font-monospace" id="location-{{ location.pk }}-inactive">{{ location.inactive_devices_count|default:0 }}</span>)
+                        <span class="text-success font-monospace fw-bold active-count" id="location-{{ location.pk }}-active">{{ location.devices_active_count }}</span>
+                        (<span class="text-body-secondary font-monospace" id="location-{{ location.pk }}-inactive">{{ location.devices_inactive_count|default:0 }}</span>)
                     </span>
                     {% endif %}
                     <i class="bi bi-hdd-rack"></i>

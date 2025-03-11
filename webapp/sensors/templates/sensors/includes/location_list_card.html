@@ -1,6 +1,6 @@
 {% comment %}
 This template expects the following context variables:
-- locations: QuerySet of Location objects with active_devices_count and inactive_devices_count annotations
+- locations: QuerySet of Location objects with devices_active_count and devices_inactive_count annotations
 - place: Place object
 - show_inactive: boolean (optional, defaults to True)
 {% endcomment %}
@@ -10,13 +10,13 @@ This template expects the following context variables:
         <div class="d-flex align-items-center gap-3">
             <h5 class="card-title mb-0 d-flex align-items-center gap-2">
                 <i class="bi bi-geo-alt me-2"></i>
-                Locations
+                Locations @ <i class="bi bi-house-gear-fill">{{ place.name }}</i>
             </h5>
-            {% if model_name == "location" %}
+            {% if model_name == "location" or model_name == "place" and locations|length > 0 %}
                 {% include "sensors/partials/hide_inactive_switch.html" with model="location" %}
             {% endif %}
         </div>
-        {% if model_name == "location" %}
+        {% if model_name == "location" or model_name == "place" %}
         <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-geo-alt"></i><i class="bi bi-plus-circle"></i> Add Location
         </a>

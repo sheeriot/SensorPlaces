@@ -8,24 +8,24 @@
 <div class="container-fluid">
 
     <!-- Place Title Card - Spans both columns -->
-    {% include 'sensors/partials/place_title_card.html' with place=place %}
+    {% include 'sensors/partials/place_title_card.html' %}
 
     <div class="row">
         <!-- Left Column -->
         <div class="col-md-4">
             <!-- Place Navigation Card -->
-            {% include 'sensors/includes/place_nav_card.html' with place_slug=place.slug location=location locations=locations current_device=device %}
+            {% include 'sensors/includes/place_nav_card.html'  %}
             <!-- Locations Navigation Card -->
-            {% include 'sensors/includes/device_nav_card.html' with place_slug=place.slug locations=locations location=location active_tab='devices' current_device=device %}
+            {% include 'sensors/includes/device_nav_card.html' %}
         </div>
 
         <!-- Right Column -->
         <div class="col-md-8">
             <!-- Device Details Card -->
-            {% include 'sensors/includes/device_details_card.html' with place_slug=place.slug pk=device.pk %}
+            {% include 'sensors/includes/device_details_card.html' %}
 
             <!-- Sensors Card -->
-            {% include 'sensors/includes/sensor_list_card.html' with place_slug=place.slug location=location device=device sensors=device.sensors.all %}
+            {% include 'sensors/includes/sensor_list_card.html' %}
         </div>
     </div>
 </div>

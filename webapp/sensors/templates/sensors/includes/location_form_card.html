@@ -1,26 +1,41 @@
 {% load crispy_forms_tags %}
-<div class="card rounded-3 shadow-sm border-0">
-    <div class="card-header bg-white py-2">
+{% load static %}
+<div class="card rounded-3 shadow-sm border-0" id="location-form-card">
+    <header class="card-header bg-white py-2">
         <h5 class="card-title mb-0">
             <i class="bi bi-geo-alt me-2"></i>
-            {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
-            {% if place %}
+            {% if object %}Edit Location: {{ location.name }}{% else %}New Location{% endif %}
             <small class="text-body-secondary ms-2">
-                <i class="bi bi-house-gear"></i> {{ place.name }}
+                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-decoration-none">
+                    @ <i class="bi bi-house-gear"></i>
+                    {{ place.name }}
+                </a>
             </small>
-            {% endif %}
         </h5>
-    </div>
+    </header>
     <div class="card-body">
         {% crispy form %}
-
-        {% if place and not place.is_active %}
-            <div class="alert alert-warning static-alert d-flex align-items-center py-2 mt-3" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                <div>
-                    This place is inactive. Any {{ model_name }}s created here will also be inactive.
-                </div>
-            </div>
-        {% endif %}
     </div>
 </div>
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/active_status_checkbox.js' %}" defer></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Log form structure for debugging
+        const form = document.getElementById('location-form');
+        if (form) {
+            console.log('Form found:', form);
+            const checkbox = form.querySelector('[data-active-checkbox]');
+            if (checkbox) {
+                console.log('Checkbox found:', checkbox);
+                console.log('Checkbox container:', checkbox.closest('.location-active-checkbox-container'));
+                console.log('Help text:', form.querySelector('[data-active-checkbox-help]'));
+            }
+        }
+        
+        // Initialize after a small delay
+        setTimeout(initializeActiveStatusCheckbox, 100);
+    });
+</script>
+{% endblock %}

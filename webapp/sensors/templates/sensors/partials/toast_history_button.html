@@ -1,15 +1,15 @@
 <!-- Toast History Button -->
 <button type="button" 
-        id="toastHistoryBtn"
+        id="toast-history-button"
         class="btn btn-outline-secondary position-relative"
         data-bs-toggle="modal" 
-        data-bs-target="#toastHistoryModal"
+        data-bs-target="#toast-history-modal"
+        data-bs-backdrop="static"
+        data-bs-keyboard="true"
         title="Notification History"
         aria-label="Notification History (0 notifications)">
     <i class="bi bi-bell"></i>
     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
-          id="toastHistoryBadge"
-          aria-hidden="true">
-        0
-    </span>
+          id="toast-history-badge"
+          aria-hidden="true"></span>
 </button>

@@ -1,0 +1,71 @@
+<!-- Deactivation Confirmation Modal -->
+<div class="modal fade" id="{{ modal_id }}" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi {{ title_icon }} me-2"></i>{{ title }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>{{ warning_message }}</p>
+                <ul class="list-unstyled mb-0">
+                    {% for item in affected_items %}
+                    <li class="mb-2">
+                        <i class="bi {{ item_icon }} text-muted me-1"></i>
+                        {{ item.name }}
+                        <small class="text-muted">({{ item.count_label }})</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="{{ confirm_button_id }}">
+                    <i class="bi bi-exclamation-triangle me-1"></i>Confirm Deactivation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('{{ form_id }}');
+    const activeSwitch = form ? form.querySelector('#id_is_active') : null;
+    const confirmField = form ? form.querySelector('#id_confirm_deactivate') : null;
+    const modal = new bootstrap.Modal(document.getElementById('{{ modal_id }}'));
+    let originalState = activeSwitch ? activeSwitch.checked : false;
+
+    if (form && activeSwitch && confirmField) {
+        // Store initial state when page loads
+        originalState = activeSwitch.checked;
+
+        // Listen for changes on the active switch
+        activeSwitch.addEventListener('change', function() {
+            if (originalState && !this.checked) {
+                // Show the modal when switching from active to inactive
+                modal.show();
+                // Reset switch state until confirmed
+                this.checked = true;
+            }
+        });
+
+        // Handle modal confirmation
+        document.getElementById('{{ confirm_button_id }}').addEventListener('click', function() {
+            // Update the switch and hidden field
+            activeSwitch.checked = false;
+            confirmField.value = 'true';
+            // Close the modal
+            modal.hide();
+        });
+
+        // When modal is hidden (cancelled), reset the switch
+        document.getElementById('{{ modal_id }}').addEventListener('hidden.bs.modal', function() {
+            activeSwitch.checked = originalState;
+            confirmField.value = 'false';
+        });
+    }
+});
+</script> 

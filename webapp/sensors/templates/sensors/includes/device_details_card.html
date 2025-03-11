@@ -3,19 +3,10 @@
 <div class="card rounded-3 shadow-sm border-0 mb-4 {% if not device.is_active %}opacity-75{% endif %}" id="deviceCard_{{ device.pk }}">
     <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
-            <i class="bi bi-hdd-rack me-2"></i>
-            {% if model_name == 'device' %}Device: {% endif %}
-            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}">{{ device.name }}</a>
+            <i class="bi bi-hdd-rack me-2"></i>Device Details
         </h5>
-        <div class="d-flex align-items-center gap-3">
-            <div class="text-muted small">
-                <i class="bi bi-geo-alt me-1"></i>
-                {{ device.location.name }}
-                <i class="bi bi-house-gear ms-2 me-1"></i>
-                {{ device.location.place.name }}
-            </div>
+        <div class="btn-group">
             {% if model_name == 'device' %}
-            <div class="btn-group">
                 <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" 
                    class="btn btn-warning btn-sm">
                     <i class="bi bi-pencil"></i>
@@ -24,62 +15,63 @@
                    class="btn btn-danger btn-sm">
                     <i class="bi bi-trash"></i>
                 </a>
-            </div>
             {% endif %}
         </div>
     </div>
     <div class="card-body py-2">
-        <div class="row mb-0">
-            <div class="col-sm-6">
-                <dl class="row mb-0">
-                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Name</dt>
-                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.name }}</dd>
-                    
-                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Type</dt>
-                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.device_type.name }}</dd>
-
-                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Status</dt>
-                    <dd class="col-12">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="form-check form-switch mb-0 {% if not device.location.is_active %}d-none{% endif %}">
-                                <input class="form-check-input device-status-toggle" 
-                                       type="checkbox" 
-                                       id="deviceStatus_{{ device.pk }}"
-                                       data-device-id="{{ device.pk }}"
-                                       data-location-id="{{ device.location.pk }}"
-                                       data-place-slug="{{ device.location.place.slug }}"
-                                       {% if device.is_active %}checked{% endif %}
-                                       {% if not device.location.is_active %}disabled{% endif %}>
-                                <label class="form-check-label status-label {% if device.is_active %}text-success{% else %}text-danger{% endif %}" 
-                                       for="deviceStatus_{{ device.pk }}"
-                                       id="deviceStatusLabel_{{ device.pk }}">
-                                    {% if device.is_active %}Active{% else %}Inactive{% endif %}
-                                </label>
-                            </div>
-                            {% if not device.location.is_active %}
-                                {% include "sensors/partials/status_active_badge.html" with object=device show_active=1 %}
-                            {% endif %}
-                        </div>
-                    </dd>
-                </dl>
+        <div class="d-flex flex-column gap-3">
+            <div class="d-flex gap-3">
+                <div>
+                    <div class="text-body-secondary small text-uppercase mb-1">Name</div>
+                    <div class="fs-5">{{ device.name }}</div>
+                </div>
+                <div>
+                    <div class="text-body-secondary small text-uppercase mb-1">Location</div>
+                    <div class="fs-5">
+                        <i class="bi bi-geo-alt me-1"></i>{{ device.location.name }}
+                    </div>
+                </div>
+                <div>
+                    <div class="text-body-secondary small text-uppercase mb-1">Place</div>
+                    <div class="fs-5">
+                        <i class="bi bi-house-gear me-1"></i>{{ device.location.place.name }}
+                    </div>
+                </div>
             </div>
-            <div class="col-sm-6">
-                <dl class="row mb-0">
-                    {% if device.manufacturer %}
-                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Manufacturer</dt>
-                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.manufacturer }}</dd>
-                    {% endif %}
 
-                    {% if device.model %}
-                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Model</dt>
-                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.model }}</dd>
-                    {% endif %}
+            <div>
+                <div class="text-body-secondary small text-uppercase mb-1">Device Type</div>
+                <div class="fs-5">{{ device.device_type.name }}</div>
+            </div>
 
-                    {% if device.serial_number %}
-                    <dt class="col-12 text-body-secondary small text-uppercase" style="font-size: 0.8rem; color: #6c757d;">Serial</dt>
-                    <dd class="col-12" style="font-size: 1.1rem; {% if not device.is_active %}text-muted{% else %}color: #212529{% endif %}">{{ device.serial_number }}</dd>
-                    {% endif %}
-                </dl>
+            <div class="d-flex gap-3">
+                <div>
+                    <div class="text-body-secondary small text-uppercase mb-1">Manufacturer</div>
+                    <div class="fs-5">{{ device.manufacturer|default:"-" }}</div>
+                </div>
+                <div>
+                    <div class="text-body-secondary small text-uppercase mb-1">Model</div>
+                    <div class="fs-5">{{ device.model|default:"-" }}</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="text-body-secondary small text-uppercase mb-1">Serial Number</div>
+                <div class="fs-5">{{ device.serial_number|default:"-" }}</div>
+            </div>
+
+            <div class="d-flex gap-3">
+                <div>
+                    <div class="text-body-secondary small text-uppercase mb-1">Sensor Count</div>
+                    <div class="fs-5">{{ device.sensors.count }}</div>
+                </div>
+                <div>
+                    <div class="text-body-secondary small text-uppercase mb-1">Status</div>
+                    <div class="d-flex align-items-center gap-3">
+                        {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug %}
+                        {% include "sensors/partials/status_active_badge.html" with object=device %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>

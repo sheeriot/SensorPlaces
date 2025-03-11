@@ -1,5 +1,5 @@
 <!-- Toast History Modal -->
-<div class="modal fade" id="toastHistoryModal" tabindex="-1">
+<div class="modal fade" id="toast-history-modal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -10,14 +10,45 @@
             </div>
             <div class="modal-body p-0">
                 <div class="toast-history-list" id="toastHistoryList">
-                    <!-- Toast history items will be inserted here by JavaScript -->
+                    {% if toast_history %}
+                        {% for toast in toast_history %}
+                            <div class="toast-history-item p-3 border-bottom" data-toast-id="{{ toast.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-{{ toast.type }} flex-grow-1">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-{% if toast.type == 'success' %}check-circle{% elif toast.type == 'danger' %}exclamation-circle{% elif toast.type == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+                                            <span>{{ toast.message|safe }}</span>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">{{ toast.created_at|date:"M d, Y H:i" }}</small>
+                                    </div>
+                                    <div class="form-check ms-3">
+                                        <input class="form-check-input toast-read-checkbox" 
+                                               type="checkbox" 
+                                               {% if toast.read %}checked{% endif %}
+                                               data-toast-id="{{ toast.id }}"
+                                               id="toast-{{ toast.id }}-read">
+                                        <label class="form-check-label" for="toast-{{ toast.id }}-read">
+                                            Mark as read
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                            No notifications yet
+                        </div>
+                    {% endif %}
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-outline-danger" id="clearToastHistory">
-                    <i class="bi bi-trash me-2"></i>Clear History
-                </button>
+                {% if toast_history %}
+                    <button type="button" class="btn btn-outline-danger" id="clearToastHistory">
+                        <i class="bi bi-trash me-2"></i>Clear History
+                    </button>
+                {% endif %}
             </div>
         </div>
     </div>
