@@ -642,14 +642,38 @@ const toggleActiveManager = {
 
                 this.checked = !newStatus;
                 
-                modalComponents.messageEl.textContent = newStatus ? 
-                    'Are you sure you want to activate this device? This will allow its sensors to be activated.' : 
-                    'Are you sure you want to deactivate this device? This will disable all its sensors.';
+                if (newStatus) {
+                    modalComponents.messageEl.textContent = 'Are you sure you want to activate this device? This will allow its sensors to be activated.';
+                    showModal();
+                } else {
+                    // Find all active sensors for this device
+                    const activeSensors = Array.from(document.querySelectorAll(`.toggle-sensor-active[data-device-id="${deviceId}"]`))
+                        .filter(sensor => sensor.checked)
+                        .map(sensor => {
+                            const row = sensor.closest('tr');
+                            return row ? row.querySelector('.sensor-name')?.textContent?.trim() : null;
+                        })
+                        .filter(name => name); // Remove any null/undefined entries
 
-                modalComponents.confirmBtn.disabled = false;
-                modalComponents.spinner.classList.add('d-none');
-                
-                modalComponents.modal.show();
+                    let message = 'Are you sure you want to deactivate this device? This will disable all its sensors.';
+                    
+                    if (activeSensors.length > 0) {
+                        message += '<br><br>The following active sensors will be disabled:<ul class="mb-0">';
+                        activeSensors.forEach(sensorName => {
+                            message += `<li>${sensorName}</li>`;
+                        });
+                        message += '</ul>';
+                    }
+                    
+                    modalComponents.messageEl.innerHTML = message;
+                    showModal();
+                }
+
+                function showModal() {
+                    modalComponents.confirmBtn.disabled = false;
+                    modalComponents.spinner.classList.add('d-none');
+                    modalComponents.modal.show();
+                }
 
                 const handleConfirm = async () => {
                     modalComponents.confirmBtn.disabled = true;
