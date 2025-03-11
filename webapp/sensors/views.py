@@ -256,7 +256,7 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
         
         self.request.toast_message = {
             'message': message,
-            'type': 'success',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         
@@ -317,7 +317,7 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
         
         self.request.toast_message = {
             'message': message,
-            'type': 'warning',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         
@@ -465,7 +465,7 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
         
         self.request.toast_message = {
             'message': message,
-            'type': 'success',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         
@@ -549,7 +549,7 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         
         self.request.toast_message = {
             'message': message,
-            'type': 'warning',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         
@@ -796,7 +796,7 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         
         self.request.toast_message = {
             'message': message,
-            'type': 'success',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         
@@ -1146,7 +1146,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             # Set toast message for middleware processing
             request.toast_message = {
                 'message': message,
-                'type': 'warning' if not intended_state else 'success',
+                'type': 'success' if intended_state else 'warning',
                 'addToHistory': True
             }
             
@@ -1269,7 +1269,7 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         
         self.request.toast_message = {
             'message': message,
-            'type': 'warning',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         
@@ -1381,7 +1381,7 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         
         self.request.toast_message = {
             'message': success_message,
-            'type': 'success',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         
@@ -1562,7 +1562,7 @@ class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         
         self.request.toast_message = {
             'message': success_message,
-            'type': 'warning',
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'addToHistory': True
         }
         

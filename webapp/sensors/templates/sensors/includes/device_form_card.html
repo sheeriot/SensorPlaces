@@ -2,7 +2,9 @@
 <div class="card rounded-3 shadow-sm border-0">
     <div class="card-header bg-white py-2">
         <h5 class="card-title mb-0">
-            {% if object %}Edit Device: <i class="bi bi-hdd-rack"></i> {{ device.name }}{% else %}New Device<i class="bi bi-hdd-rack me-2"></i>@ <i class="bi bi-house-gear"></i> {{ place.name }} {% endif %}
+            <i class="bi bi-hdd-rack"></i>
+            {% if object %}Edit Device: {{ device.name }}{% else %}New Device{% endif %}
+            @ <i class="bi bi-house-gear"></i>{{ place.name }} 
         </h5>
     </div>
     <div class="card-body device-form-card" id="device-form-card">
