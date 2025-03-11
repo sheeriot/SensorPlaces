@@ -718,18 +718,6 @@ class LocationForm(forms.ModelForm):
             self.fields['place_name'].widget.attrs.update({
                 'class': 'form-control-plaintext fs-5 fw-medium text-muted opacity-50'
             })
-        if self.place and self.place.is_active:
-            self.fields['place_name'].label = mark_safe("""Place
-                <span class="badge ms-1 bg-success-subtle text-success">
-                    Active
-                </span>
-            """)
-        else:
-            self.fields['place_name'].label = mark_safe("""Place
-                <span class="badge ms-1 bg-secondary-subtle text-secondary">
-                    inactive
-                </span>
-            """)
 
         # Configure field properties
         self.fields['is_active'].label = "Active"
@@ -742,7 +730,7 @@ class LocationForm(forms.ModelForm):
         self.helper.form_class = 'mb-0'
         self.helper.form_id = 'location-form'
 
-        # Update the layout to use referrer for cancel button
+        # Update the layout to use our new active-status-switch partial
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
             Field('place_id', type='hidden'),
@@ -773,7 +761,7 @@ class LocationForm(forms.ModelForm):
                     Div(
                         Field(
                             'is_active',
-                            template='sensors/partials/custom_switch.html'
+                            template='sensors/partials/active-status-switch.html'
                         ),
                         css_class='d-flex align-items-center'
                     ),

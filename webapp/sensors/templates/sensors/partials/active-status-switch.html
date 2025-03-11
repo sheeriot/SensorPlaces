@@ -1,0 +1,131 @@
+{% comment %}
+This template expects:
+- field: The form field (is_active)
+- form_id: The ID of the form containing the switch
+- modal_id: The ID of the confirmation modal
+- confirm_field: The hidden confirmation field name
+{% endcomment %}
+
+<div class="form-check form-switch">
+    {{ field }}
+    <label class="form-check-label" for="{{ field.id_for_label }}">
+        <span class="status-label {% if field.value %}text-success{% else %}text-secondary{% endif %}">
+            {% if field.value %}Active{% else %}inactive{% endif %}
+        </span>
+    </label>
+</div>
+
+{# Confirmation Modal #}
+<div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Confirm Status Change
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-0">
+                    <p class="mb-2" id="statusChangeMessage"></p>
+                    <div id="affectedDevicesContainer" class="d-none mt-3">
+                        <p class="mb-2">The following devices will be affected:</p>
+                        <ul class="mb-0" id="affectedDevicesList"></ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">
+                    <i class="bi bi-check-lg me-1"></i>Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validate required elements exist
+    const formId = '{{ form_id }}';
+    const fieldId = '{{ field.id_for_label }}';
+    const modalId = '{{ modal_id }}';
+    const confirmFieldName = '{{ confirm_field }}';
+    
+    if (!formId || !fieldId || !modalId || !confirmFieldName) {
+        console.error('Missing required template parameters:', {
+            formId,
+            fieldId,
+            modalId,
+            confirmFieldName
+        });
+        return;
+    }
+
+    // Get required elements
+    const form = document.getElementById(formId);
+    if (!form) {
+        console.error(`Form with ID "${formId}" not found`);
+        return;
+    }
+
+    const activeSwitch = document.getElementById(fieldId);
+    if (!activeSwitch) {
+        console.error(`Active switch with ID "${fieldId}" not found`);
+        return;
+    }
+
+    const confirmField = form.querySelector(`[name="${confirmFieldName}"]`);
+    if (!confirmField) {
+        console.error(`Confirm field with name "${confirmFieldName}" not found`);
+        return;
+    }
+
+    const modalElement = document.getElementById(modalId);
+    if (!modalElement) {
+        console.error(`Modal with ID "${modalId}" not found`);
+        return;
+    }
+
+    const modal = new bootstrap.Modal(modalElement);
+    let originalState = activeSwitch.checked;
+
+    // Store initial state when page loads
+    activeSwitch.addEventListener('change', function(e) {
+        if (originalState && !this.checked) {
+            // Prevent immediate change and show confirmation
+            e.preventDefault();
+            this.checked = true;
+            
+            // Update modal content
+            const messageEl = document.getElementById('statusChangeMessage');
+            if (messageEl) {
+                messageEl.textContent = 'Are you sure you want to deactivate this location?';
+            }
+            
+            // Show modal
+            modal.show();
+        }
+    });
+
+    // Handle confirmation
+    const confirmBtn = document.getElementById('confirmStatusChange');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
+            activeSwitch.checked = false;
+            confirmField.value = 'true';
+            modal.hide();
+            form.submit();
+        });
+    }
+
+    // Reset on modal hide
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        activeSwitch.checked = originalState;
+        confirmField.value = 'false';
+    });
+});
+</script> 

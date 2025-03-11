@@ -21,42 +21,48 @@
     {% include "sensors/includes/inactive_cascade_warning.html" %}
 {% endwith %}
 
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('location-form');
-    const activeSwitch = form ? form.querySelector('#id_is_active') : null;
-    const confirmField = form ? form.querySelector('#id_confirm_deactivate') : null;
-    const modal = new bootstrap.Modal(document.getElementById('locationDeactivateModal'));
-    let originalState = activeSwitch ? activeSwitch.checked : false;
+    if (!form) return; // Guard against missing form
+    
+    const activeSwitch = form.querySelector('#id_is_active');
+    const confirmField = form.querySelector('#id_confirm_deactivate');
+    
+    if (!activeSwitch || !confirmField) return; // Guard against missing elements
+    
+    let originalState = activeSwitch.checked;
 
-    if (form && activeSwitch && confirmField) {
-        // Store initial state when page loads
-        originalState = activeSwitch.checked;
+    // Listen for changes on the active switch
+    activeSwitch.addEventListener('change', function(e) {
+        if (originalState && !this.checked) {
+            // Show the modal when switching from active to inactive
+            const modal = new bootstrap.Modal(document.getElementById('locationDeactivateModal'));
+            modal.show();
+            // Reset switch state until confirmed
+            this.checked = true;
+        }
+    });
 
-        // Listen for changes on the active switch
-        activeSwitch.addEventListener('change', function() {
-            if (originalState && !this.checked) {
-                // Show the modal when switching from active to inactive
-                modal.show();
-                // Reset switch state until confirmed
-                this.checked = true;
-            }
-        });
-
-        // Handle modal confirmation
-        document.getElementById('confirmDeactivate').addEventListener('click', function() {
-            // Update the switch and hidden field
+    // Handle modal confirmation
+    const confirmBtn = document.getElementById('confirmDeactivate');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
             activeSwitch.checked = false;
             confirmField.value = 'true';
-            // Close the modal
-            modal.hide();
+            form.submit();
         });
+    }
 
-        // When modal is hidden (cancelled), reset the switch
-        document.getElementById('locationDeactivateModal').addEventListener('hidden.bs.modal', function() {
+    // When modal is hidden (cancelled), reset the switch
+    const modalElement = document.getElementById('locationDeactivateModal');
+    if (modalElement) {
+        modalElement.addEventListener('hidden.bs.modal', function() {
             activeSwitch.checked = originalState;
             confirmField.value = 'false';
         });
     }
 });
 </script>
+{% endblock %}
