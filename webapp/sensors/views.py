@@ -790,23 +790,98 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
-@method_decorator(csrf_protect, name='dispatch')
 @login_required
 @csrf_protect
 def siteplan_update(request, place_slug):
     try:
-        device.objects.filter(location__place=place, is_active=True).count()
+        # Get the place
+        place = get_object_or_404(Place, slug=place_slug)
+        
+        # Parse the incoming JSON data
+        data = json.loads(request.body)
+        changed_locations = data.get('locations', [])
+        
+        if not changed_locations:
+            return JsonResponse({
+                'message': 'No changes to save',
+                'type': 'info'
+            })
+        
+        # Track changes for message
+        location_changes = []
+        
+        # Update each location's position
+        for loc_data in changed_locations:
+            location = get_object_or_404(Location, id=loc_data['id'], place=place)
+            old_x = float(location.x_pos)
+            old_y = float(location.y_pos)
+            new_x = float(loc_data['x_pos'])
+            new_y = float(loc_data['y_pos'])
+            
+            # Only process if position actually changed
+            if abs(old_x - new_x) > 0.01 or abs(old_y - new_y) > 0.01:  # Small threshold for float comparison
+                # Update position
+                location.x_pos = new_x
+                location.y_pos = new_y
+                location.save()
+                
+                # Add to changes list with ID
+                location_changes.append({
+                    'id': location.id,
+                    'name': location.name,
+                    'old_pos': {'x': old_x, 'y': old_y},
+                    'new_pos': {'x': new_x, 'y': new_y}
+                })
+
+        # If no actual changes were made, return early
+        if not location_changes:
+            return JsonResponse({
+                'message': 'No position changes detected',
+                'type': 'info'
+            })
+
+        # Build detailed message
+        message = (
+            f"Updated site plan for <strong><i class='bi bi-house-gear'></i> {place.name}</strong><br>"
+            f"<small class='text-muted'>Changed locations:<ul class='mb-0'>"
+        )
+        
+        for change in location_changes:
+            message += (
+                f"<li><i class='bi bi-geo-alt'></i> {change['name']}<br>"
+                f"Position: ({change['old_pos']['x']:.1f}, {change['old_pos']['y']:.1f}) → "
+                f"({change['new_pos']['x']:.1f}, {change['new_pos']['y']:.1f})</li>"
+            )
+        
+        message += "</ul></small>"
+        
+        # Get updated statistics
+        devices_active = Device.objects.filter(location__place=place, is_active=True).count()
         devices_inactive = Device.objects.filter(location__place=place, is_active=False).count()
         sensors_active = Sensor.objects.filter(device__location__place=place, is_active=True).count()
         sensors_inactive = Sensor.objects.filter(device__location__place=place, is_active=False).count()
         
-        # Get location statistics
+        # Get updated location statistics
         locations = place.locations.annotate(
             active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
             inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
         ).values('id', 'name', 'is_active', 'active_devices_count', 'inactive_devices_count')
         
         return JsonResponse({
+            'message': message,
+            'type': 'warning',
+            'changes': {
+                'locations': [
+                    {
+                        'id': change['id'],
+                        'name': change['name'],
+                        'new_position': {
+                            'x_pos': change['new_pos']['x'],
+                            'y_pos': change['new_pos']['y']
+                        }
+                    } for change in location_changes
+                ]
+            },
             'devices_active': devices_active,
             'devices_inactive': devices_inactive,
             'sensors_active': sensors_active,
@@ -816,13 +891,20 @@ def siteplan_update(request, place_slug):
 
     except json.JSONDecodeError:
         return JsonResponse({
-            'message': 'Invalid JSON data',
+            'message': (
+                f"Invalid data received while updating site plan for "
+                f"<i class='bi bi-house-gear'></i> {place_slug}"
+            ),
             'type': 'danger',
             'tags': 'error layout-update'
         }, status=400)
     except Exception as e:
         return JsonResponse({
-            'message': f'Error updating site plan: {str(e)}',
+            'message': (
+                f"Error updating site plan for "
+                f"<i class='bi bi-house-gear'></i> {place.name if 'place' in locals() else place_slug}<br>"
+                f"<small class='text-muted'>{str(e)}</small>"
+            ),
             'type': 'danger',
             'tags': 'error layout-update'
         }, status=500)
