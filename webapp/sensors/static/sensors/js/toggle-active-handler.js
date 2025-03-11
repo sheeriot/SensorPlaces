@@ -14,10 +14,10 @@
 
 // System Configuration
 const toggleActiveConfig = {
-    debug: false,            // Set to true to enable debug mode
-    logMarkerChanges: true, // Log marker additions and changes
-    logMapEvents: true,     // Log map initialization and updates
-    logStatusChanges: true  // Log status label changes
+    debug: true,            // Set to true
+    logMarkerChanges: true,
+    logMapEvents: true,
+    logStatusChanges: true
 };
 
 // Card structure validator
@@ -164,6 +164,20 @@ function reportCardStatus() {
 
 // Status Management System
 const toggleActiveManager = {
+    // Add getHideInactiveState before toggleStatus
+    getHideInactiveState(type) {
+        const switchEl = document.querySelector(`.hide-inactive-${type}-switch`);
+        if (toggleActiveConfig.debug) {
+            console.debug('Hide Inactive Switch:', {
+                type,
+                switchFound: !!switchEl,
+                switchClass: `hide-inactive-${type}-switch`,
+                state: switchEl?.checked
+            });
+        }
+        return switchEl?.checked || false;
+    },
+
     async toggleStatus(type, id, placeSlug, intendedState) {
         if (toggleActiveConfig.debug) {
             console.group('Toggle Status Request');
@@ -183,22 +197,32 @@ const toggleActiveManager = {
                 console.debug('Server Response:', data);
             }
             
-            if (data.status === 'success') {
+            if (data.success || data.status === 'success') {
                 // Find all rows that match this model type and ID
                 const rows = document.querySelectorAll(`[data-${type}-id="${id}"]`);
                 
                 // Find the hideInactive state for this model type
-                const hideInactiveState = window.hideInactiveManager?.getSwitchStateByModel(type) ?? false;
+                const hideInactiveState = this.getHideInactiveState(type);  // Use this. to reference the method
                 
                 if (toggleActiveConfig.debug) {
-                    console.debug('Updating UI elements:', {
-                        rowsFound: rows.length,
-                        hideInactiveState,
-                        type
+                    console.debug('Hide Inactive State:', {
+                        type,
+                        state: hideInactiveState,
+                        switchFound: !!document.querySelector(`.hide-inactive-${type}-switch`)
                     });
                 }
                 
                 rows.forEach(row => {
+                    if (toggleActiveConfig.debug) {
+                        console.group('Updating row');
+                        console.debug('Row before update:', {
+                            row,
+                            classes: Array.from(row.classList),
+                            active: row.getAttribute(`data-${type}-active`),
+                            hideInactiveState
+                        });
+                    }
+
                     // Update row attributes to match server state
                     row.setAttribute(`data-${type}-active`, data.is_active.toString());
                     
@@ -207,8 +231,17 @@ const toggleActiveManager = {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
                     } else {
                         row.classList.add('opacity-50', 'text-muted');
-                        // If hideInactive is enabled for this type, also hide the row
-                        if (hideInactiveState) {
+                        
+                        // Check if this is a device row and hideInactive is enabled
+                        const isDeviceRow = row.classList.contains('device-row');
+                        if (isDeviceRow && hideInactiveState) {
+                            if (toggleActiveConfig.debug) {
+                                console.debug('Hiding inactive device row:', {
+                                    hideInactiveState,
+                                    rowType: type,
+                                    rowId: id
+                                });
+                            }
                             row.classList.add('d-none');
                         }
                     }
@@ -358,6 +391,15 @@ const toggleActiveManager = {
                     if (type === 'place') {
                         this.updateMapMarkers(id, data.is_active, hideInactiveState);
                     }
+
+                    if (toggleActiveConfig.debug) {
+                        console.debug('Row after update:', {
+                            classes: Array.from(row.classList),
+                            active: row.getAttribute(`data-${type}-active`),
+                            hidden: row.classList.contains('d-none')
+                        });
+                        console.groupEnd();
+                    }
                 });
 
                 // Find and update all toggle switches for this type/id
@@ -370,10 +412,17 @@ const toggleActiveManager = {
 
                 return data;
             } else if (data.status === 'warning') {
-                // Handle warning status without throwing an error
+                // Handle warning status
                 if (toggleActiveConfig.debug) {
                     console.warn('Toggle Status Warning:', data.message);
                 }
+                
+                this.showToast({
+                    message: data.message,
+                    type: 'warning',
+                    addToHistory: true
+                });
+                
                 return data;
             } else {
                 throw new Error(data.message || `Failed to update ${type} status`);
@@ -790,24 +839,26 @@ const toggleActiveManager = {
         });
     },
 
-    // Update showToast to handle both object and parameter formats
+    // Update showToast method to ensure proper handling
     showToast(messageOrObject, type = 'info', addToHistory = true) {
-        let toastData;
-        
-        if (typeof messageOrObject === 'object') {
-            toastData = messageOrObject;
-        } else {
-            toastData = {
-                message: messageOrObject,
-                type: type,
-                addToHistory: addToHistory
-            };
+        if (toggleActiveConfig.debug) {
+            console.log('showToast called with:', { messageOrObject, type, addToHistory });
         }
 
-        // Use the toast system if available, otherwise fallback to event dispatch
+        const toastData = typeof messageOrObject === 'object' 
+            ? messageOrObject 
+            : { message: messageOrObject, type, addToHistory };
+
         if (window.toastSystem) {
+            if (toggleActiveConfig.debug) {
+                console.log('Delegating to toast system:', toastData);
+            }
             window.toastSystem.show(toastData);
         } else {
+            // Fallback to event dispatch
+            if (toggleActiveConfig.debug) {
+                console.log('Toast system not available, dispatching event');
+            }
             document.dispatchEvent(new CustomEvent(ToastEvents.SHOW, {
                 detail: toastData
             }));

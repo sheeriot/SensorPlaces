@@ -13,6 +13,7 @@ This template expects:
            id="toggle-{{ type }}-active-{{ id }}"
            data-{{ type }}-id="{{ id }}"
            data-place-slug="{{ place_slug }}"
+           data-current-status="{{ is_active|lower }}"
            {% if is_active %}checked{% endif %}
            {% if disabled %}disabled{% endif %}>
     <label class="form-check-label status-label {% if is_active %}text-success{% else %}text-danger{% endif %}" 

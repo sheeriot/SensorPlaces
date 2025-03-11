@@ -9,8 +9,10 @@ class ToastMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         
-        # Only process toast messages for authenticated users
-        if hasattr(request, 'toast_message') and request.user.is_authenticated:
+        # Only process toast messages for authenticated users and non-API requests
+        if (hasattr(request, 'toast_message') and 
+            request.user.is_authenticated and 
+            not request.path.startswith('/api/')):
             toast_msg = request.toast_message
             # ic("ToastMiddleware - Adding toast to history:", toast_msg)
             
@@ -28,6 +30,10 @@ class ToastMiddleware:
         return response
 
     def process_template_response(self, request, response):
+        # Skip processing for API requests
+        if request.path.startswith('/api/'):
+            return response
+
         # Add toast message to template context if it exists
         if hasattr(response, 'context_data') and request.user.is_authenticated:
             # Handle current toast for immediate display

@@ -1,9 +1,10 @@
 {% load static %}
 
-<tr class="device-row {% if not device.is_active %}opacity-50 text-muted d-none{% endif %}" 
+<tr class="device-row {% if not device.is_active %}opacity-50 text-muted{% if hide_inactive %}d-none{% endif %}{% endif %}" 
     data-device-active="{{ device.is_active|lower }}" 
     data-device-id="{{ device.pk }}"
-    data-location-active="{{ device.location.is_active|lower }}">
+    data-location-active="{{ device.location.is_active|lower }}"
+    data-location-id="{{ device.location.pk }}">
     <td>
         <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
             <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}

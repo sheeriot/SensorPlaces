@@ -25,7 +25,8 @@
 
 const hideInactiveHandler = {
     config: {
-        switchSelector: '.hideInactive-switch',
+        switchSelector: '.hide-inactive-switch',
+        modelSwitchSelector: (model) => `.hide-inactive-${model}-switch`,
         rowSelectors: {
             place: 'tr.place-row',
             location: 'tr.location-row',

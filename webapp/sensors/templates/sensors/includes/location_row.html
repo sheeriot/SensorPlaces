@@ -7,7 +7,8 @@ This template expects:
     data-location-active="{{ location.is_active|lower }}" 
     data-location-id="{{ location.pk }}"
     data-location-name="{{ location.name }}"
-    data-place-name="{{ place.name }}">
+    data-place-name="{{ place.name }}"
+    data-place-slug="{{ place.slug }}">
     <td>
         <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
            class="btn btn-outline-info text-dark m-0 p-1 small d-flex align-items-center">
