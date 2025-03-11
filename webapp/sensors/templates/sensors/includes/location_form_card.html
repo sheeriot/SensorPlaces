@@ -3,7 +3,7 @@
     <header class="card-header bg-white py-2">
         <h5 class="card-title mb-0">
             <i class="bi bi-geo-alt me-2"></i>
-            {% if object %}Edit {{ model_name|title }}{% else %}New Location{% endif %}
+            {% if object %}Edit Location: {{ location.name }}{% else %}New Location{% endif %}
             <small class="text-body-secondary ms-2">
                 <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-decoration-none">
                     <i class="bi bi-house-gear"></i>
@@ -16,53 +16,3 @@
         {% crispy form %}
     </div>
 </article>
-
-{% with modal_id="locationDeactivateModal" form_id="location-form" confirm_button_id="confirmLocationDeactivate" title_icon="bi-geo-alt" item_icon="bi-hdd-rack" title="Confirm Location Deactivation" warning_message="Setting this location to inactive will also deactivate the following:" affected_items=location_devices %}
-    {% include "sensors/includes/inactive_cascade_warning.html" %}
-{% endwith %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('location-form');
-    if (!form) return; // Guard against missing form
-    
-    const activeSwitch = form.querySelector('#id_is_active');
-    const confirmField = form.querySelector('#id_confirm_deactivate');
-    
-    if (!activeSwitch || !confirmField) return; // Guard against missing elements
-    
-    let originalState = activeSwitch.checked;
-
-    // Listen for changes on the active switch
-    activeSwitch.addEventListener('change', function(e) {
-        if (originalState && !this.checked) {
-            // Show the modal when switching from active to inactive
-            const modal = new bootstrap.Modal(document.getElementById('locationDeactivateModal'));
-            modal.show();
-            // Reset switch state until confirmed
-            this.checked = true;
-        }
-    });
-
-    // Handle modal confirmation
-    const confirmBtn = document.getElementById('confirmDeactivate');
-    if (confirmBtn) {
-        confirmBtn.addEventListener('click', function() {
-            activeSwitch.checked = false;
-            confirmField.value = 'true';
-            form.submit();
-        });
-    }
-
-    // When modal is hidden (cancelled), reset the switch
-    const modalElement = document.getElementById('locationDeactivateModal');
-    if (modalElement) {
-        modalElement.addEventListener('hidden.bs.modal', function() {
-            activeSwitch.checked = originalState;
-            confirmField.value = 'false';
-        });
-    }
-});
-</script>
-{% endblock %}

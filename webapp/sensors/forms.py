@@ -719,9 +719,19 @@ class LocationForm(forms.ModelForm):
                 'class': 'form-control-plaintext fs-5 fw-medium text-muted opacity-50'
             })
 
-        # Configure field properties
+        # Configure active field
         self.fields['is_active'].label = "Active"
-        self.fields['is_active'].help_text = None
+        
+        # Get affected devices if this is an existing active location
+        affected_items = []
+        if self.instance and self.instance.pk and self.instance.is_active:
+            active_devices = self.instance.devices.filter(is_active=True).annotate(
+                sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
+            )
+            affected_items = [{
+                'name': device.name,
+                'count_label': f"{device.sensor_count} active sensors"
+            } for device in active_devices]
 
         # Setup crispy form
         self.helper = FormHelper()
@@ -730,14 +740,14 @@ class LocationForm(forms.ModelForm):
         self.helper.form_class = 'mb-0'
         self.helper.form_id = 'location-form'
 
-        # Update the layout to use our new active-status-switch partial
+        # Update the layout to use our active status switch
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
             Field('place_id', type='hidden'),
             Field('confirm_deactivate', type='hidden'),
             Row(
                 Column(
-                    Field('name'),
+                    Field('name', css_class='form-control'),
                     css_class='col-md-7'
                 ),
                 Column(
@@ -754,26 +764,29 @@ class LocationForm(forms.ModelForm):
                     ),
                     css_class='col-md-5'
                 ),
-                css_class='mb-2'
+                css_class='mb-3'
             ),
             Row(
                 Column(
-                    Div(
-                        Field(
-                            'is_active',
-                            template='sensors/partials/active-status-switch.html'
-                        ),
-                        css_class='d-flex align-items-center'
+                    Field(
+                        'is_active',
+                        template='sensors/partials/active_status_switch.html',
+                        context={'affected_items': affected_items}
                     ),
                     css_class='col-md-4'
                 ),
-                css_class='mb-2'
+                css_class='mb-3'
             ),
             Div(
                 HTML('<hr class="mt-3">'),
                 Div(
                     HTML("""
-                        <a href="{{ form.referrer.value|default:'' }}" 
+                        <a href="{% firstof form.referrer.value %}
+                                {% if not form.referrer.value and object %}
+                                    {% url 'sensors:location_detail' place_slug=place.slug pk=object.pk %}
+                                {% else %}
+                                    {% url 'sensors:place_detail' place_slug=place.slug %}
+                                {% endif %}"
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>

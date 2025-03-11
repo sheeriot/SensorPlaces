@@ -471,45 +471,8 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
         return response
 
 class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
-    model = Location
-    form_class = LocationForm
-    template_name = 'sensors/location_form.html'
-
-    def get_success_url(self):
-        return reverse('sensors:location_detail', kwargs={'place_slug': self.kwargs.get('place_slug'), 'pk': self.object.pk})
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['initial'] = kwargs.get('initial', {})
-        kwargs['initial'].update({
-            'place': self.get_place(),
-            'referrer': self.request.GET.get('referrer', '')
-        })
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Get place and location
-        place = self.get_place()
-        location = self.get_object()
-        
-        # Get active devices with their sensor counts
-        active_devices = location.devices.filter(is_active=True).annotate(
-            sensor_active_count=Count('sensors', filter=Q(sensors__is_active=True))
-        ).select_related('device_type')
-        
-        # Format devices for the template
-        context['location_devices'] = [{
-            'name': device.name,
-            'sensor_active_count': device.sensor_active_count
-        } for device in active_devices]
-        
-        context['model_name'] = 'location'
-        context['place'] = place
-        
-        return context
-
+    """Update an existing location."""
+    
     def form_valid(self, form):
         # Store original values before save
         self._original_values = {
@@ -523,38 +486,13 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         changes = []
         
         # Check what changed
-        if location.name != self._original_values['name']:
-            changes.append(f"Name changed from '{self._original_values['name']}' to '{location.name}'")
+        if hasattr(self, '_original_values'):
+            if self._original_values['name'] != form.cleaned_data['name']:
+                changes.append(f"name: {self._original_values['name']} → {form.cleaned_data['name']}")
+            if self._original_values['is_active'] != form.cleaned_data['is_active']:
+                changes.append(f"active: {self._original_values['is_active']} → {form.cleaned_data['is_active']}")
         
-        if location.is_active != self._original_values['is_active']:
-            status_change = "activated" if location.is_active else "deactivated"
-            changes.append(f"Status {status_change}")
-            
-            # If location was deactivated, deactivate all active devices
-            if not location.is_active:
-                affected_devices = location.devices.filter(is_active=True)
-                affected_devices_count = affected_devices.count()
-                
-                if affected_devices_count > 0:
-                    # Deactivate all devices
-                    affected_devices.update(is_active=False)
-                    
-                    # Get total affected sensors
-                    affected_sensors = Sensor.objects.filter(
-                        device__in=affected_devices,
-                        is_active=True
-                    )
-                    affected_sensors_count = affected_sensors.count()
-                    
-                    # Deactivate all sensors
-                    affected_sensors.update(is_active=False)
-                    
-                    changes.append(
-                        f"Deactivated {affected_devices_count} device{'s' if affected_devices_count != 1 else ''} "
-                        f"and {affected_sensors_count} sensor{'s' if affected_sensors_count != 1 else ''}"
-                    )
-
-        # Build success message
+        # Build message
         message = (
             f"Updated location <strong>{location.name}</strong> in "
             f"<i class='bi bi-house-gear'></i> {place.name}"
@@ -563,6 +501,7 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         if changes:
             message += "<br><small class='text-muted'>" + "<br>".join(changes) + "</small>"
         
+        # Set toast message for middleware processing
         self.request.toast_message = {
             'message': message,
             'type': 'warning',
@@ -570,19 +509,6 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         }
         
         return response
-
-    def form_invalid(self, form):
-        # If this is a validation error due to active devices needing confirmation
-        if (
-            'is_active' in form.errors and 
-            hasattr(form, 'affected_active_devices') and 
-            form.affected_active_devices.exists()
-        ):
-            # Add context for confirmation dialog
-            context = self.get_context_data(form=form)
-            return self.render_to_response(context)
-        
-        return super().form_invalid(form)
 
 class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
     model = Location
@@ -1054,9 +980,9 @@ class ToastHistoryView(LoginRequiredMixin, View):
             'message': 'Toast history cleared successfully'
         })
 
-class ToggleActiveView(View):
-    """Consolidated view for toggling active status of locations, devices, and sensors."""
-    
+class ToggleActiveView(LoginRequiredMixin, View):
+    """Toggle the active status of a model instance."""
+
     def post(self, request: HttpRequest, place_slug: str, model: str, pk: int) -> JsonResponse:
         """Handle POST request to toggle active status.
         
@@ -1135,30 +1061,23 @@ class ToggleActiveView(View):
             # Build status message
             message = self._build_status_message(obj, model, intended_state, affected_items)
             
-            # Prepare response data
-            # Determine message type based on state transition
-            message_type = 'success' if intended_state else 'danger'  # success for activation, danger for deactivation
-            
-            response_data = {
-                'status': 'success',
+            # Set toast message for middleware processing
+            request.toast_message = {
                 'message': message,
-                'is_active': obj.is_active,
-                'type': message_type,
-                'toast': {
-                    'message': message,
-                    'type': message_type,  # Use same type for toast
-                    # 'addToHistory': True
-                }
+                'type': 'warning' if not intended_state else 'success',
+                'addToHistory': True
             }
             
-            # # Build and add toast message
-            # self.request.toast_message = {
-            #     'message': message,
-            #     'type': message_type,
-            #     'addToHistory': True
-            # }
-            
-            return JsonResponse(response_data)
+            # Return JSON response with updated data
+            affected_items_data = {
+                'affected_items': affected_items
+            }
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'is_active': intended_state,
+                'affected_items': affected_items_data
+            })
 
         except json.JSONDecodeError:
             return JsonResponse({

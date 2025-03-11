@@ -4,16 +4,33 @@ This template expects:
 - form_id: The ID of the form containing the switch
 - modal_id: The ID of the confirmation modal
 - confirm_field: The hidden confirmation field name
+- affected_items: List of items that will be affected by deactivation (optional)
 {% endcomment %}
 
-<div class="form-check form-switch">
+<div class="form-check form-switch" data-active-switch-container>
     {{ field }}
     <label class="form-check-label" for="{{ field.id_for_label }}">
-        <span class="status-label {% if field.value %}text-success{% else %}text-secondary{% endif %}">
+        <span class="status-label {% if field.value %}text-body{% else %}text-danger{% endif %}">
             {% if field.value %}Active{% else %}inactive{% endif %}
         </span>
     </label>
 </div>
+
+{% if field.value and affected_items %}
+<div class="form-text text-danger mt-2 d-none" data-active-status-help>
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    Setting this location to inactive will also deactivate:
+    <ul class="list-unstyled mb-0 mt-1 ms-4">
+        {% for item in affected_items %}
+        <li>
+            <i class="bi bi-hdd-rack text-muted me-1"></i>
+            {{ item.name }}
+            <small class="text-muted">({{ item.count_label }})</small>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 
 {# Confirmation Modal #}
 <div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-hidden="true">
@@ -127,5 +144,29 @@ document.addEventListener('DOMContentLoaded', function() {
         activeSwitch.checked = originalState;
         confirmField.value = 'false';
     });
+
+    const container = document.querySelector('[data-active-switch-container]');
+    if (!container) return;
+
+    const statusLabel = container.querySelector('.status-label');
+    const helpText = document.querySelector('[data-active-status-help]');
+    
+    if (!statusLabel) return;
+
+    // Only attach event listener if the switch starts as Active
+    // No need to show warning if starting as inactive
+    if (activeSwitch.checked) {
+        activeSwitch.addEventListener('change', function() {
+            // Update label text and style
+            statusLabel.textContent = this.checked ? 'Active' : 'inactive';
+            statusLabel.classList.toggle('text-body', this.checked);
+            statusLabel.classList.toggle('text-danger', !this.checked);
+            
+            // Show/hide help text when switching from active to inactive
+            if (helpText) {
+                helpText.classList.toggle('d-none', this.checked);
+            }
+        });
+    }
 });
 </script> 
