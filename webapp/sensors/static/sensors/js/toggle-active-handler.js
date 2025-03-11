@@ -16,7 +16,8 @@
 const toggleActiveConfig = {
     debug: false,            // Set to true to enable debug mode
     logMarkerChanges: true, // Log marker additions and changes
-    logMapEvents: true      // Log map initialization and updates
+    logMapEvents: true,     // Log map initialization and updates
+    logStatusChanges: true  // Log status label changes
 };
 
 // Card structure validator
@@ -212,30 +213,90 @@ const toggleActiveManager = {
                         }
                     }
 
-                    // Update toggle text
-                    const statusLabel = row.querySelector('.status-label');
+                    // Update toggle text - FIXED SELECTOR
+                    const statusLabel = row.tagName.toLowerCase() === 'input' 
+                        ? row.parentElement.querySelector('.status-label')  // If row is the input, look for sibling label
+                        : row.querySelector('.status-label');              // Otherwise look within the row
+                        
                     if (statusLabel) {
+                        if (toggleActiveConfig.debug) {
+                            console.group('Status Label Update');
+                            console.debug('Found status label:', statusLabel);
+                        }
+
                         statusLabel.textContent = data.is_active ? 'Active' : 'inactive';
                         statusLabel.classList.toggle('text-success', data.is_active);
                         statusLabel.classList.toggle('text-danger', !data.is_active);
+
+                        if (toggleActiveConfig.debug) {
+                            console.debug('Updated to:', {
+                                text: statusLabel.textContent,
+                                classes: Array.from(statusLabel.classList)
+                            });
+                            console.groupEnd();
+                        }
+                    } else if (toggleActiveConfig.debug) {
+                        console.warn('Status label not found for:', {
+                            type,
+                            id,
+                            row,
+                            parentElement: row.parentElement
+                        });
                     }
 
                     // Handle device detail card if it exists
                     if (type === 'device') {
                         const deviceCard = document.getElementById(`deviceCard_${id}`);
                         if (deviceCard) {
+                            if (toggleActiveConfig.debug) {
+                                console.group('Device Card Update');
+                                console.debug('Found device card:', deviceCard);
+                            }
+
+                            // Find badge within the device card
+                            const isactiveBadge = deviceCard.querySelector('.isactive-badge span.badge');
+                            if (isactiveBadge) {
+                                if (toggleActiveConfig.debug) {
+                                    console.debug('Found badge:', {
+                                        before: {
+                                            classes: Array.from(isactiveBadge.classList),
+                                            hidden: isactiveBadge.classList.contains('d-none'),
+                                            text: isactiveBadge.textContent
+                                        }
+                                    });
+                                }
+
+                                if (data.is_active) {
+                                    isactiveBadge.classList.add('d-none');
+                                } else {
+                                    isactiveBadge.classList.remove('d-none');
+                                }
+
+                                if (toggleActiveConfig.debug) {
+                                    console.debug('After badge update:', {
+                                        after: {
+                                            classes: Array.from(isactiveBadge.classList),
+                                            hidden: isactiveBadge.classList.contains('d-none'),
+                                            text: isactiveBadge.textContent
+                                        }
+                                    });
+                                }
+                            } else if (toggleActiveConfig.debug) {
+                                console.warn('Badge not found in device card:', {
+                                    deviceCard,
+                                    selector: '.isactive-badge span.badge'
+                                });
+                            }
+
+                            if (toggleActiveConfig.debug) {
+                                console.groupEnd();
+                            }
+
+                            // Update card opacity
                             if (data.is_active) {
                                 deviceCard.classList.remove('opacity-75');
-                                deviceCard.querySelectorAll('dd').forEach(dd => {
-                                    dd.style.color = '#212529';
-                                    dd.classList.remove('text-muted');
-                                });
                             } else {
                                 deviceCard.classList.add('opacity-75');
-                                deviceCard.querySelectorAll('dd').forEach(dd => {
-                                    dd.classList.add('text-muted');
-                                    dd.style.color = '';
-                                });
                             }
                         }
                     }
@@ -258,8 +319,8 @@ const toggleActiveManager = {
                         });
 
                         // Update status badges visibility
-                        const deviceStatusBadges = document.querySelectorAll(`[data-location-id="${id}"] .status-active-badge`);
-                        deviceStatusBadges.forEach(badge => {
+                        const statusBadges = document.querySelectorAll(`[data-location-id="${id}"] .isactive-badge .badge`);
+                        statusBadges.forEach(badge => {
                             if (data.is_active) {
                                 badge.classList.add('d-none');
                             } else {
@@ -283,7 +344,7 @@ const toggleActiveManager = {
                         });
 
                         // Update status badges visibility
-                        const sensorStatusBadges = document.querySelectorAll(`[data-device-id="${id}"] .status-active-badge`);
+                        const sensorStatusBadges = document.querySelectorAll(`[data-device-id="${id}"] .isactive-badge .badge`);
                         sensorStatusBadges.forEach(badge => {
                             if (data.is_active) {
                                 badge.classList.add('d-none');
