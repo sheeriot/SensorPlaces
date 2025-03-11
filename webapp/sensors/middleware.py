@@ -33,29 +33,24 @@ class ToastMiddleware:
             # Handle current toast for immediate display
             if 'current_toast' in request.session:
                 current_toast = request.session.pop('current_toast')
-                # ic("ToastMiddleware - Adding current toast to template context:", {
-                #     'current_toast': current_toast,
-                #     'has_context_data': hasattr(response, 'context_data'),
-                #     'template_name': getattr(response, 'template_name', None)
-                # })
                 response.context_data['toast_message'] = current_toast
                 request.session.modified = True
             
-            # Get unread count and add to both context and body data attributes
-            unread_count = ToastNotification.objects.filter(
-                user=request.user,
-                read=False
-            ).count()
+            # Get toast history and unread count
+            toast_history = ToastNotification.objects.filter(
+                user=request.user
+            ).order_by('-created_at')
             
-            # ic("ToastMiddleware - Setting unread count:", unread_count)
+            unread_count = toast_history.filter(read=False).count()
             
             # Add to context for template use
+            response.context_data['toast_history'] = toast_history
             response.context_data['unread_toast_count'] = unread_count
             
             # Add to body data attributes for JavaScript
             response.context_data['body_data_attributes'] = {
-                'unreadToasts': str(unread_count),  # Changed from unread-toasts to match JS convention
+                'unreadToasts': str(unread_count),
                 **response.context_data.get('body_data_attributes', {})
             }
             
-        return response 
+        return response

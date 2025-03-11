@@ -9,7 +9,11 @@
 
 // System Configuration
 const toastConfig = {
-    debug: true  // Set to true to enable debug mode
+    debug: false,  // Set to true to enable debug mode
+    apiEndpoints: {
+        markAsRead: '/api/toasts/mark-read/',
+        clearHistory: '/api/toasts/clear-history/'
+    }
 };
 
 // Create and initialize the system
@@ -93,42 +97,147 @@ const createToastSystem = () => {
                         return;
                     }
 
-                    // Find or create history modal
+                    // Find history modal
                     let historyModal = document.getElementById('toast-history-modal');
                     if (!historyModal) {
-                        if (toastConfig.debug) console.log('[Toast Manager] Creating history modal');
-                        historyModal = document.createElement('div');
-                        historyModal.id = 'toast-history-modal';
-                        historyModal.className = 'modal fade';
-                        historyModal.setAttribute('tabindex', '-1');
-                        historyModal.setAttribute('aria-hidden', 'true');
-                        historyModal.innerHTML = `
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Notification History</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div id="toast-history-list" class="list-group list-group-flush">
-                                            <!-- History items will be inserted here -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        document.body.appendChild(historyModal);
-                        if (toastConfig.debug) console.log('[Toast Manager] History modal created and added to DOM');
+                        if (toastConfig.debug) console.log('[Toast Manager] Error: History modal not found');
+                        return;
                     }
 
-                    // Initialize and show modal
-                    try {
-                        const modal = new bootstrap.Modal(historyModal);
-                        modal.show();
-                        if (toastConfig.debug) console.log('[Toast Manager] History modal shown');
-                    } catch (e) {
-                        if (toastConfig.debug) console.log('[Toast Manager] Error showing history modal:', e);
+                    // Clean up any existing modal backdrops
+                    const existingBackdrop = document.querySelector('.modal-backdrop');
+                    if (existingBackdrop) {
+                        existingBackdrop.remove();
                     }
+
+                    // Initialize modal with proper options
+                    const modal = new bootstrap.Modal(historyModal, {
+                        backdrop: true,
+                        keyboard: true
+                    });
+
+                    // Add modal hidden event listener
+                    historyModal.addEventListener('hidden.bs.modal', function () {
+                        // Remove modal backdrop
+                        const backdrop = document.querySelector('.modal-backdrop');
+                        if (backdrop) {
+                            backdrop.remove();
+                        }
+                        // Remove modal-open class from body
+                        document.body.classList.remove('modal-open');
+                        // Remove inline styles from body
+                        document.body.style.removeProperty('padding-right');
+                        document.body.style.removeProperty('overflow');
+                    });
+
+                    // Set up read checkbox handlers
+                    const checkboxes = historyModal.querySelectorAll('.toast-read-checkbox');
+                    checkboxes.forEach(checkbox => {
+                        if (!checkbox.hasEventListener) {
+                            checkbox.addEventListener('change', async function() {
+                                const toastId = this.dataset.toastId;
+                                const isRead = this.checked;
+                                
+                                if (!toastId) {
+                                    console.error('No toast ID found for checkbox');
+                                    return;
+                                }
+
+                                try {
+                                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                                    const response = await fetch(toastConfig.apiEndpoints.markAsRead, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': csrfToken
+                                        },
+                                        body: JSON.stringify({
+                                            toast_id: parseInt(toastId, 10),
+                                            read: isRead
+                                        })
+                                    });
+
+                                    if (!response.ok) {
+                                        throw new Error('Failed to update read status');
+                                    }
+
+                                    // Update badge count
+                                    const data = await response.json();
+                                    if (data.success) {
+                                        window.toastSystem.toastCount = data.unread_count;
+                                        window.toastSystem.updateBadge();
+                                        
+                                        // Update the toast item appearance
+                                        const toastItem = this.closest('.toast-history-item');
+                                        if (toastItem) {
+                                            if (isRead) {
+                                                toastItem.classList.add('text-muted');
+                                            } else {
+                                                toastItem.classList.remove('text-muted');
+                                            }
+                                        }
+                                    } else {
+                                        throw new Error(data.error || 'Failed to update read status');
+                                    }
+
+                                } catch (error) {
+                                    console.error('Error updating toast read status:', error);
+                                    // Revert checkbox if update failed
+                                    this.checked = !isRead;
+                                    // Show error toast
+                                    window.toastSystem.show({
+                                        message: 'Failed to update notification status',
+                                        type: 'danger',
+                                        addToHistory: false
+                                    });
+                                }
+                            });
+                            checkbox.hasEventListener = true;
+                        }
+                    });
+
+                    // Set up clear history button handler
+                    const clearButton = historyModal.querySelector('#clearToastHistory');
+                    if (clearButton && !clearButton.hasEventListener) {
+                        clearButton.addEventListener('click', async function() {
+                            if (!confirm('Are you sure you want to clear all notifications?')) return;
+
+                            try {
+                                const response = await fetch(toastConfig.apiEndpoints.clearHistory, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                                    }
+                                });
+
+                                if (!response.ok) throw new Error('Failed to clear history');
+
+                                // Update UI
+                                const historyList = document.getElementById('toastHistoryList');
+                                historyList.innerHTML = `
+                                    <div class="text-center text-muted py-5">
+                                        <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                                        No notifications yet
+                                    </div>
+                                `;
+                                
+                                // Update badge
+                                window.toastSystem.toastCount = 0;
+                                window.toastSystem.updateBadge();
+                                
+                                // Hide clear button
+                                this.style.display = 'none';
+
+                            } catch (error) {
+                                console.error('Error clearing toast history:', error);
+                            }
+                        });
+                        clearButton.hasEventListener = true;
+                    }
+
+                    // Show modal
+                    modal.show();
                 });
                 if (toastConfig.debug) console.log('[Toast Manager] History button click handler initialized');
             }

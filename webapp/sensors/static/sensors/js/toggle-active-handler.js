@@ -482,6 +482,20 @@ const toggleActiveManager = {
                     row.classList.remove('text-muted', 'opacity-50', 'd-none');
                 }
 
+                // Update toggle switch and status label
+                const toggle = row.querySelector('.toggle-device-active');
+                if (toggle) {
+                    toggle.checked = device.is_active;
+                    toggle.dataset.currentStatus = device.is_active.toString();
+                }
+
+                const statusLabel = row.querySelector('.status-label');
+                if (statusLabel) {
+                    statusLabel.textContent = device.is_active ? 'Active' : 'Inactive';
+                    statusLabel.classList.toggle('text-success', device.is_active);
+                    statusLabel.classList.toggle('text-danger', !device.is_active);
+                }
+
                 // Show toast with affected sensors if any
                 let message = data.message;
                 if (device.affected_sensors && device.affected_sensors.length > 0) {

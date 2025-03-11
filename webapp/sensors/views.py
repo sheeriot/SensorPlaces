@@ -32,6 +32,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
 from django.core.exceptions import ImproperlyConfigured
+# from .utils import mark_toast_as_read, clear_toast_history
 
 # Add the mixin first, before any classes that use it
 class LocationAnnotationMixin:
@@ -1704,15 +1705,64 @@ def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
         'locations': list(locations)
     })
 
-def get_context_data(self, **kwargs):
-    context = super().get_context_data(**kwargs)
-    # Get place from kwargs or from the device's location
-    if 'place_slug' in self.kwargs:
-        context['place'] = self.get_place()
-    else:
-        # Get place from the device being deleted
-        context['place'] = self.object.location.place
-    
-    # Ensure place_slug is available for URL reversals
-    context['place_slug'] = context['place'].slug
-    return context
+@require_POST
+def mark_toast_read(request):
+    try:
+        data = json.loads(request.body)
+        toast_id = data.get('toast_id')
+        read_status = data.get('read', True)
+        
+        if toast_id is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'Toast ID is required'
+            }, status=400)
+
+        # Update the toast read status
+        toast = ToastNotification.objects.get(id=toast_id, user=request.user)
+        toast.read = read_status
+        toast.save()
+
+        # Get updated unread count
+        unread_count = ToastNotification.objects.filter(
+            user=request.user,
+            read=False
+        ).count()
+
+        return JsonResponse({
+            'success': True,
+            'unread_count': unread_count
+        })
+
+    except ToastNotification.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Toast notification not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@require_POST
+def clear_toast_history(request):
+    try:
+        # Clear all notifications for the current user
+        ToastNotification.objects.filter(user=request.user).delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Toast history cleared successfully',
+            'unread_count': 0
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
