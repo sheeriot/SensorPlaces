@@ -408,9 +408,10 @@ class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView
         context['model_name'] = 'location'
         
         # Use the annotated location data from the mixin
-        context['location'] = self.get_annotated_locations(self.object.place).get(pk=self.object.pk)
+        location = self.get_annotated_locations(self.object.place).get(pk=self.object.pk)
+        context['location'] = location
 
-        # Add annotated devices to context with proper prefetching
+        # Add annotated devices to context
         context['devices'] = Device.objects.filter(
             location=self.object
         ).select_related(
@@ -471,8 +472,57 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
         return response
 
 class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
-    """Update an existing location."""
-    
+    model = Location
+    form_class = LocationForm
+    template_name = 'sensors/location_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self.object and self.object.is_active:
+            # Get active devices for this location
+            devices = self.object.devices.filter(is_active=True).annotate(
+                sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
+            )
+            
+            # Format devices for the form
+            devices_active = [{
+                'name': device.name,
+                'count_label': f'{device.sensor_count} active sensors'
+            } for device in devices]
+            
+            if devices_active:
+                kwargs['initial'] = kwargs.get('initial', {})
+                kwargs['initial']['devices_active'] = devices_active
+                
+                ic("LocationUpdateView - Form kwargs", {
+                    'location': self.object.name,
+                    'devices_count': len(devices_active),
+                    'devices': devices_active
+                })
+        
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        location = self.get_object()
+        
+        # Add all devices to context with annotations
+        context['devices'] = Device.objects.filter(
+            location=location
+        ).select_related(
+            'device_type'
+        ).prefetch_related(
+            'sensors'
+        ).annotate(
+            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True), distinct=True),
+            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False), distinct=True)
+        ).order_by(
+            '-is_active', 
+            Lower('name')
+        )
+        
+        return context
+
     def form_valid(self, form):
         # Store original values before save
         self._original_values = {
@@ -485,23 +535,18 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         place = location.place
         changes = []
         
-        # Check what changed
-        if hasattr(self, '_original_values'):
-            if self._original_values['name'] != form.cleaned_data['name']:
-                changes.append(f"name: {self._original_values['name']} → {form.cleaned_data['name']}")
-            if self._original_values['is_active'] != form.cleaned_data['is_active']:
-                changes.append(f"active: {self._original_values['is_active']} → {form.cleaned_data['is_active']}")
+        if location.name != self._original_values['name']:
+            changes.append(f"Name changed from '{self._original_values['name']}' to '{location.name}'")
         
-        # Build message
+        if location.is_active != self._original_values['is_active']:
+            changes.append(f"Status changed from '{'Active' if self._original_values['is_active'] else 'inactive'}' to '{'Active' if location.is_active else 'inactive'}'")
+        
         message = (
             f"Updated location <strong>{location.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name}"
+            f"<i class='bi bi-house-gear'></i> {place.name}<br>"
+            f"<small class='text-muted'>{'; '.join(changes)}</small>"
         )
         
-        if changes:
-            message += "<br><small class='text-muted'>" + "<br>".join(changes) + "</small>"
-        
-        # Set toast message for middleware processing
         self.request.toast_message = {
             'message': message,
             'type': 'warning',
@@ -510,21 +555,58 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         
         return response
 
+    def get_success_url(self):
+        return reverse('sensors:location_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'pk': self.object.pk
+        })
+
 class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
     model = Location
     template_name = 'sensors/location_confirm_delete.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        location = self.get_object()
+        
+        # Add all devices to context with annotations
+        context['devices'] = Device.objects.filter(
+            location=location
+        ).select_related(
+            'device_type'
+        ).prefetch_related(
+            'sensors'
+        ).annotate(
+            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True), distinct=True),
+            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False), distinct=True)
+        ).order_by(
+            '-is_active', 
+            Lower('name')
+        )
+        
+        return context
 
     def delete(self, request, *args, **kwargs):
         location = self.get_object()
         place = location.place
         success_url = self.get_success_url()
         
+        # Get devices info before deletion
+        devices = Device.objects.filter(
+            location=location
+        ).annotate(
+            sensor_count=Count('sensors')
+        )
+        
+        devices_info = [f"{device.name} ({device.sensor_count} sensors)" 
+                       for device in devices]
+        
         message = (
             f"Deleted location <strong>{location.name}</strong> from "
             f"<i class='bi bi-house-gear'></i> {place.name}<br>"
             f"<small class='text-muted'>"
             f"Status: {'Active' if location.is_active else 'inactive'}<br>"
-            f"Devices: {location.devices.count()}"
+            f"Affected devices:<br>{'; '.join(devices_info)}"
             f"</small>"
         )
         
