@@ -14,7 +14,7 @@
 
 // System Configuration
 const toggleActiveConfig = {
-    debug: true,            // Set to true
+    debug: false,
     logMarkerChanges: true,
     logMapEvents: true,
     logStatusChanges: true
@@ -202,15 +202,7 @@ const toggleActiveManager = {
                 const rows = document.querySelectorAll(`[data-${type}-id="${id}"]`);
                 
                 // Find the hideInactive state for this model type
-                const hideInactiveState = this.getHideInactiveState(type);  // Use this. to reference the method
-                
-                if (toggleActiveConfig.debug) {
-                    console.debug('Hide Inactive State:', {
-                        type,
-                        state: hideInactiveState,
-                        switchFound: !!document.querySelector(`.hide-inactive-${type}-switch`)
-                    });
-                }
+                const hideInactiveState = this.getHideInactiveState(type);
                 
                 rows.forEach(row => {
                     if (toggleActiveConfig.debug) {
@@ -232,11 +224,10 @@ const toggleActiveManager = {
                     } else {
                         row.classList.add('opacity-50', 'text-muted');
                         
-                        // Check if this is a device row and hideInactive is enabled
-                        const isDeviceRow = row.classList.contains('device-row');
-                        if (isDeviceRow && hideInactiveState) {
+                        // Check if hideInactive is enabled for this type
+                        if (hideInactiveState) {
                             if (toggleActiveConfig.debug) {
-                                console.debug('Hiding inactive device row:', {
+                                console.debug('Hiding inactive row:', {
                                     hideInactiveState,
                                     rowType: type,
                                     rowId: id

@@ -695,12 +695,12 @@ class LocationForm(forms.ModelForm):
         initial = kwargs.get('initial', {})
         devices_active = initial.pop('devices_active', None)
         
-        ic("LocationForm init", {
-            'has_instance': bool(kwargs.get('instance')),
-            'instance_pk': kwargs.get('instance').pk if kwargs.get('instance') else None,
-            'devices_active': devices_active,
-            'initial': initial
-        })
+        # ic("LocationForm init", {
+        #     'has_instance': bool(kwargs.get('instance')),
+        #     'instance_pk': kwargs.get('instance').pk if kwargs.get('instance') else None,
+        #     'devices_active': devices_active,
+        #     'initial': initial
+        # })
         
         super().__init__(*args, **kwargs)
         
@@ -720,11 +720,11 @@ class LocationForm(forms.ModelForm):
                 </div>
             """)
             
-            ic("LocationForm - Setting help_text", {
-                'devices_count': len(devices_active),
-                'help_text': help_text,
-                'items_html': items_html
-            })
+            # ic("LocationForm - Setting help_text", {
+            #     'devices_count': len(devices_active),
+            #     'help_text': help_text,
+            #     'items_html': items_html
+            # })
             self.fields['is_active'].help_text = help_text
 
         # Add location-specific ID to checkbox if we have an instance

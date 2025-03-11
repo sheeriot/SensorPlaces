@@ -28,7 +28,7 @@
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
                     This action cannot be undone.
                 </p>
-                <form method="post" data-delete-form>
+                <form method="post">
                     {% csrf_token %}
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'sensors:place_detail' place_slug=place_slug %}" class="btn btn-secondary">

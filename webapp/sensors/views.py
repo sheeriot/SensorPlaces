@@ -331,43 +331,41 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
     slug_field = 'slug'
     form_class = PlaceDeleteForm
 
-    def delete(self, request, *args, **kwargs):
-        place = self.get_object()
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        place = self.object
         success_url = self.get_success_url()
         
-        # Build message before deletion
+        # Get active locations and devices before deletion
+        active_locations = Location.objects.filter(
+            place=place,
+            is_active=True
+        ).annotate(
+            active_devices=Count('devices', filter=Q(devices__is_active=True))
+        )
+        
         message = (
             f"Deleted place <strong>{place.name}</strong><br>"
             f"<small class='text-muted'>"
             f"Location: ({place.latitude}, {place.longitude})<br>"
             f"Status: {'Active' if place.is_active else 'inactive'}"
-            f"</small>"
         )
         
-        # Debug log before deletion
-        # ic("PlaceDeleteView - Before delete:", {
-        #     'place': place.name,
-        #     'message': message
-        # })
+        if active_locations.exists():
+            message += "<br>Affected active locations:<ul class='mb-0'>"
+            for loc in active_locations:
+                message += f"<li>{loc.name} ({loc.active_devices} active devices)</li>"
+            message += "</ul>"
         
-        # Perform deletion
+        message += "</small>"
+        
         place.delete()
         
-        # Set toast message - always set addToHistory to true
-        # The toast-ui-manager will handle the presence/absence of the history button
-        toast_data = {
+        self.request.toast_message = {
             'message': message,
             'type': 'danger',
-            'addToHistory': True  # Always true - UI will handle appropriately
+            'addToHistory': True
         }
-        
-        self.request.toast_message = toast_data
-        
-        # Debug log after setting toast
-        # ic("PlaceDeleteView - After setting toast:", {
-        #     'toast_data': toast_data,
-        #     'success_url': success_url
-        # })
         
         return HttpResponseRedirect(success_url)
 
@@ -494,11 +492,11 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
                 kwargs['initial'] = kwargs.get('initial', {})
                 kwargs['initial']['devices_active'] = devices_active
                 
-                ic("LocationUpdateView - Form kwargs", {
-                    'location': self.object.name,
-                    'devices_count': len(devices_active),
-                    'devices': devices_active
-                })
+                # ic("LocationUpdateView - Form kwargs", {
+                #     'location': self.object.name,
+                #     'devices_count': len(devices_active),
+                #     'devices': devices_active
+                # })
         
         return kwargs
 
@@ -565,50 +563,34 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
     model = Location
     template_name = 'sensors/location_confirm_delete.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        location = self.get_object()
-        
-        # Add all devices to context with annotations
-        context['devices'] = Device.objects.filter(
-            location=location
-        ).select_related(
-            'device_type'
-        ).prefetch_related(
-            'sensors'
-        ).annotate(
-            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True), distinct=True),
-            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False), distinct=True)
-        ).order_by(
-            '-is_active', 
-            Lower('name')
-        )
-        
-        return context
-
-    def delete(self, request, *args, **kwargs):
-        location = self.get_object()
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        location = self.object
         place = location.place
         success_url = self.get_success_url()
         
-        # Get devices info before deletion
-        devices = Device.objects.filter(
-            location=location
+        # Get active devices info before deletion
+        active_devices = Device.objects.filter(
+            location=location,
+            is_active=True
         ).annotate(
-            sensor_count=Count('sensors')
+            sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
         )
         
-        devices_info = [f"{device.name} ({device.sensor_count} sensors)" 
-                       for device in devices]
+        devices_info = [f"{device.name} ({device.sensor_count} active sensors)" 
+                       for device in active_devices]
         
         message = (
             f"Deleted location <strong>{location.name}</strong> from "
             f"<i class='bi bi-house-gear'></i> {place.name}<br>"
             f"<small class='text-muted'>"
-            f"Status: {'Active' if location.is_active else 'inactive'}<br>"
-            f"Affected devices:<br>{'; '.join(devices_info)}"
-            f"</small>"
+            f"Status: {'Active' if location.is_active else 'inactive'}"
         )
+        
+        if devices_info:
+            message += f"<br>Affected devices:<br>{'; '.join(devices_info)}"
+        
+        message += "</small>"
         
         location.delete()
         
@@ -1182,12 +1164,18 @@ class ToggleActiveView(LoginRequiredMixin, View):
                 f"{action} <i class='bi bi-geo-alt'></i> {obj.name} in "
                 f"<i class='bi bi-house-gear'></i> {obj.place.name}"
             )
-            if not is_active and affected_items:  # Only show affected items when deactivating
-                message += "<br><br>Affected devices:<ul class='mb-0'>"
-                for device in affected_items:
-                    message += f"<li><i class='bi bi-hdd-rack'></i> {device}</li>"
-                message += "</ul>"
+            if not is_active:  # Only show affected items when deactivating
+                # Get only active devices with their active sensor counts
+                active_devices = obj.devices.filter(is_active=True).annotate(
+                    sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
+                )
                 
+                if active_devices:  # Only add the section if there are active devices
+                    message += "<br><br>Affected devices:<ul class='mb-0'>"
+                    for device in active_devices:
+                        message += f"<li><i class='bi bi-hdd-rack'></i> {device.name} ({device.sensor_count} active sensors)</li>"
+                    message += "</ul>"
+            
         elif model == 'device':
             message = (
                 f"{action} <i class='bi bi-hdd-rack'></i> {obj.name} in "
@@ -1287,13 +1275,54 @@ class DeviceDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Get place from the device's location
         context['place'] = self.object.location.place
         context['place_slug'] = self.object.location.place.slug
         return context
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        device = self.object
+        location = device.location
+        place = location.place
+        success_url = self.get_success_url()
+        
+        # Get active sensors before deletion
+        active_sensors = device.sensors.filter(is_active=True)
+        sensors_info = [sensor.name for sensor in active_sensors]
+        
+        message = (
+            f"Deleted device <strong>{device.name}</strong> from "
+            f"<i class='bi bi-house-gear'></i> {place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {location.name}<br>"
+            f"<small class='text-muted'>"
+            f"Type: {device.device_type or '-'}<br>"
+            f"Model: {device.model or '-'}<br>"
+            f"Status: {'Active' if device.is_active else 'inactive'}"
+        )
+        
+        # Add affected sensors section if there were any active sensors
+        if sensors_info:
+            message += "<br>Affected sensors:<ul class='mb-0'>"
+            for sensor in sensors_info:
+                message += f"<li><i class='bi bi-thermometer'></i> {sensor}</li>"
+            message += "</ul>"
+        
+        message += "</small>"
+        
+        # Delete the device
+        device.delete()
+        
+        # Add toast message to the request
+        self.request.toast_message = {
+            'message': message,
+            'type': 'danger',
+            'addToHistory': True
+        }
+        
+        # Return response
+        return HttpResponseRedirect(success_url)
+
     def get_success_url(self):
-        # Redirect to place detail page after deletion
         return reverse('sensors:place_detail', 
                       kwargs={'place_slug': self.object.location.place.slug})
 
@@ -1616,19 +1645,19 @@ class SensorDeleteView(LoginRequiredMixin, DeleteView):
     model = Sensor
     template_name = 'sensors/sensor_confirm_delete.html'
 
-    def delete(self, request, *args, **kwargs):
-        sensor = self.get_object()
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        sensor = self.object
         device = sensor.device
         location = device.location
         place = location.place
         success_url = self.get_success_url()
         
         message = (
-            f"Deleted sensor: "
+            f"Deleted sensor <strong>{sensor.name}</strong> from "
             f"<i class='bi bi-house-gear'></i> {place.name} > "
             f"<i class='bi bi-geo-alt'></i> {location.name} > "
-            f"<i class='bi bi-hdd-rack'></i> {device.name}<br> > "
-            f"<i class='bi bi-thermometer'></i> {sensor.name}<br>"
+            f"<i class='bi bi-hdd-rack'></i> {device.name}<br>"
             f"<small class='text-muted'>"
             f"Type: {sensor.sensor_type or '-'}<br>"
             f"Unit: {sensor.unit or '-'}<br>"

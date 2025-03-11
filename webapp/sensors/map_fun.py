@@ -35,7 +35,7 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
         
         # Default to Austin center if no places provided
         if not places:
-            ic("Places Map: No places provided, using Austin center")
+            # ic("Places Map: No places provided, using Austin center")
             m = folium.Map(location=[30.2672, -97.7431], **map_kwargs)
             map_html = m.get_root().render()
             return map_html
@@ -126,7 +126,7 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
             f'class="folium-map" data-map-bounds=\'{json.dumps(bounds_data)}\''
         )
         
-        ic("Generated map HTML length:", len(map_html))
+        # ic("Generated map HTML length:", len(map_html))
         return map_html
     
     except Exception as e:

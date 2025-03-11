@@ -3,7 +3,7 @@ This template expects:
 - location: Location object with devices_active_count and devices_inactive_count annotations
 - place: Place object
 {% endcomment %}
-<tr class="location-row {% if not location.is_active %}opacity-50 text-muted d-none{% endif %}" 
+<tr class="location-row {% if not location.is_active %}opacity-50 text-muted{% if hide_inactive %}d-none{% endif %}{% endif %}" 
     data-location-active="{{ location.is_active|lower }}" 
     data-location-id="{{ location.pk }}"
     data-location-name="{{ location.name }}"

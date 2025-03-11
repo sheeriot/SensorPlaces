@@ -53,11 +53,11 @@ def add_toast_message(request, title: str, message: str, message_type: str = 'in
         message: The main message content
         message_type: Type of message ('success', 'info', 'warning', 'danger')
     """
-    ic("add_toast_message called:", {
-        'title': title,
-        'message': message,
-        'type': message_type
-    })
+    # ic("add_toast_message called:", {
+    #     'title': title,
+    #     'message': message,
+    #     'type': message_type
+    # })
     
     # Ensure message type is valid
     valid_types = ['success', 'info', 'warning', 'danger']
@@ -73,7 +73,7 @@ def add_toast_message(request, title: str, message: str, message_type: str = 'in
         'addToHistory': True  # API responses should be added to history
     }
     
-    ic("Toast message added to request:", request.toast_message)
+    # ic("Toast message added to request:", request.toast_message)
 
 def mark_toast_as_read(request, toast_id, read_status=True):
     """Mark a toast notification as read/unread.
