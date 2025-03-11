@@ -68,7 +68,7 @@ class LocationAnnotationMixin:
             'x_pos': float(location.x_pos) if isinstance(location.x_pos, Decimal) else location.x_pos,
             'y_pos': float(location.y_pos) if isinstance(location.y_pos, Decimal) else location.y_pos,
             'is_active': location.is_active,
-            'active_devices_count': location.active_devices_count
+            'devices_active_count': location.devices_active_count
         }
 
     def get_annotated_locations(self, place: Place) -> QuerySet[Location]:
@@ -81,10 +81,26 @@ class LocationAnnotationMixin:
             QuerySet of Location instances with annotations
         """
         return Location.objects.filter(place=place).annotate(
-            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False)),
-            active_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
-            inactive_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
+            devices_active_count=Count(
+                'devices',
+                filter=Q(devices__is_active=True),
+                distinct=True
+            ),
+            devices_inactive_count=Count(
+                'devices',
+                filter=Q(devices__is_active=False),
+                distinct=True
+            ),
+            sensors_active_count=Count(
+                'devices__sensors',
+                filter=Q(devices__sensors__is_active=True),
+                distinct=True
+            ),
+            sensors_inactive_count=Count(
+                'devices__sensors',
+                filter=Q(devices__sensors__is_active=False),
+                distinct=True
+            )
         ).order_by('-is_active', Lower('name'))
 
     def get_context_data(self, **kwargs):
@@ -102,14 +118,26 @@ class LocationAnnotationMixin:
         # Convert locations to JSON-serializable format for JavaScript
         locations_data = [self.get_location_data(loc) for loc in locations]
         
-        # Add place statistics
+        # Add place statistics using distinct counts
         context.update({
             'locations': locations,  # Full queryset for template
             'locations_json': json.dumps(locations_data),  # JSON for JavaScript
-            'devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
-            'devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
-            'sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
-            'sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
+            'devices_active': Device.objects.filter(
+                location__place=place, 
+                is_active=True
+            ).distinct().count(),
+            'devices_inactive': Device.objects.filter(
+                location__place=place, 
+                is_active=False
+            ).distinct().count(),
+            'sensors_active': Sensor.objects.filter(
+                device__location__place=place, 
+                is_active=True
+            ).distinct().count(),
+            'sensors_inactive': Sensor.objects.filter(
+                device__location__place=place, 
+                is_active=False
+            ).distinct().count(),
         })
         
         return context
@@ -157,7 +185,7 @@ class PlaceListView(LoginRequiredMixin, ListView):
         if not hasattr(self, '_queryset'):
             self._queryset = Place.objects.annotate(
                 active_locations_count=Count('locations', filter=Q(locations__is_active=True)),
-                active_devices_count=Count('locations__devices', filter=Q(locations__devices__is_active=True)),
+                devices_active_count=Count('locations__devices', filter=Q(locations__devices__is_active=True)),
                 active_sensors_count=Count('locations__devices__sensors', filter=Q(locations__devices__sensors__is_active=True))
             ).order_by('-is_active', Lower('name'))
         return self._queryset
@@ -200,7 +228,7 @@ class PlaceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
                     'x_pos': x_pos,  # Match JavaScript property names
                     'y_pos': y_pos,  # Match JavaScript property names
                     'is_active': location.is_active,
-                    'active_devices_count': location.active_devices_count
+                    'devices_active_count': location.devices_active_count
                 })
             context['locations_json'] = json.dumps(locations_data)
             
@@ -352,26 +380,20 @@ class LocationListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
     def get_queryset(self) -> QuerySet[Location]:
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-            self._queryset = Location.objects.filter(place=place).annotate(
-                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False)),
-                active_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
-                inactive_sensors_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
-            ).order_by('-is_active', Lower('name'))
+            self._queryset = self.get_annotated_locations(place)
         return self._queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-        context['place'] = place
+        place = context['place']
 
         # Add place statistics
         context.update({
-            'devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
-            'devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
-            'sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
-            'sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
+            'place_devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
+            'place_devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
+            'place_sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
+            'place_sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
         })
         
         return context
@@ -381,39 +403,13 @@ class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView
     context_object_name = 'location'
     template_name = 'sensors/location_detail.html'
 
-    def get_queryset(self) -> QuerySet[Location]:
-        """Get the location queryset with annotations for device and sensor counts."""
-        if not hasattr(self, '_queryset'):
-            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-            base_queryset = super().get_queryset()
-            
-            # Filter and annotate the location with device and sensor counts
-            self._queryset = base_queryset.filter(
-                place=place
-            ).annotate(
-                active_device_count=Count(
-                    'devices',
-                    filter=Q(devices__is_active=True)
-                ),
-                inactive_device_count=Count(
-                    'devices',
-                    filter=Q(devices__is_active=False)
-                ),
-                active_sensors_count=Count(
-                    'devices__sensors',
-                    filter=Q(devices__sensors__is_active=True)
-                ),
-                inactive_sensors_count=Count(
-                    'devices__sensors',
-                    filter=Q(devices__sensors__is_active=False)
-                )
-            ).select_related('place')
-        return self._queryset
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         
+        # Use the annotated location data from the mixin
+        context['location'] = self.get_annotated_locations(self.object.place).get(pk=self.object.pk)
+
         # Add annotated devices to context with proper prefetching
         context['devices'] = Device.objects.filter(
             location=self.object
@@ -422,8 +418,8 @@ class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView
         ).prefetch_related(
             'sensors'
         ).annotate(
-            active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
-            inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True), distinct=True),
+            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False), distinct=True)
         ).order_by(
             '-is_active', 
             Lower('name')
@@ -485,16 +481,37 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['initial'] = kwargs.get('initial', {})
-        kwargs['initial']['referrer'] = self.request.GET.get('next', '')
+        kwargs['initial'].update({
+            'place': self.get_place(),
+            'referrer': self.request.GET.get('referrer', '')
+        })
         return kwargs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get place and location
+        place = self.get_place()
+        location = self.get_object()
+        
+        # Get active devices with their sensor counts
+        active_devices = location.devices.filter(is_active=True).annotate(
+            sensor_active_count=Count('sensors', filter=Q(sensors__is_active=True))
+        ).select_related('device_type')
+        
+        # Format devices for the template
+        context['location_devices'] = [{
+            'name': device.name,
+            'sensor_active_count': device.sensor_active_count
+        } for device in active_devices]
+        
+        context['model_name'] = 'location'
+        context['place'] = place
+        
+        return context
+
     def form_valid(self, form):
-        # Validate that place hasn't changed
-        original_place_id = self.get_object().place_id
-        if form.instance.place_id != original_place_id:
-            form.add_error(None, "The place field cannot be modified after creation.")
-            return self.form_invalid(form)
-            
+        # Store original values before save
         self._original_values = {
             'name': self.get_object().name,
             'is_active': self.get_object().is_active
@@ -505,30 +522,67 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         place = location.place
         changes = []
         
-        if hasattr(self, '_original_values'):
-            if self._original_values['name'] != form.cleaned_data['name']:
-                changes.append(f"name: {self._original_values['name']} → {form.cleaned_data['name']}")
-            if self._original_values['is_active'] != form.cleaned_data['is_active']:
-                changes.append(f"active: {self._original_values['is_active']} → {form.cleaned_data['is_active']}")
+        # Check what changed
+        if location.name != self._original_values['name']:
+            changes.append(f"Name changed from '{self._original_values['name']}' to '{location.name}'")
         
+        if location.is_active != self._original_values['is_active']:
+            status_change = "activated" if location.is_active else "deactivated"
+            changes.append(f"Status {status_change}")
+            
+            # If location was deactivated, deactivate all active devices
+            if not location.is_active:
+                affected_devices = location.devices.filter(is_active=True)
+                affected_devices_count = affected_devices.count()
+                
+                if affected_devices_count > 0:
+                    # Deactivate all devices
+                    affected_devices.update(is_active=False)
+                    
+                    # Get total affected sensors
+                    affected_sensors = Sensor.objects.filter(
+                        device__in=affected_devices,
+                        is_active=True
+                    )
+                    affected_sensors_count = affected_sensors.count()
+                    
+                    # Deactivate all sensors
+                    affected_sensors.update(is_active=False)
+                    
+                    changes.append(
+                        f"Deactivated {affected_devices_count} device{'s' if affected_devices_count != 1 else ''} "
+                        f"and {affected_sensors_count} sensor{'s' if affected_sensors_count != 1 else ''}"
+                    )
+
+        # Build success message
         message = (
             f"Updated location <strong>{location.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name}<br>"
-            f"<small class='text-muted'>"
-            f"Changes: {', '.join(changes) if changes else 'No changes'}"
-            f"</small>"
+            f"<i class='bi bi-house-gear'></i> {place.name}"
         )
+        
+        if changes:
+            message += "<br><small class='text-muted'>" + "<br>".join(changes) + "</small>"
         
         self.request.toast_message = {
             'message': message,
             'type': 'warning',
+            'addToHistory': True
         }
         
         return response
 
     def form_invalid(self, form):
-        """Handle form validation errors by displaying them in the form"""
-        return self.render_to_response(self.get_context_data(form=form))
+        # If this is a validation error due to active devices needing confirmation
+        if (
+            'is_active' in form.errors and 
+            hasattr(form, 'affected_active_devices') and 
+            form.affected_active_devices.exists()
+        ):
+            # Add context for confirmation dialog
+            context = self.get_context_data(form=form)
+            return self.render_to_response(context)
+        
+        return super().form_invalid(form)
 
 class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
     model = Location
@@ -621,8 +675,8 @@ class DeviceListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
             
             # Get all locations for the place with device counts
             context['locations'] = place.locations.annotate(
-                active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-                inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
+                devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
+                devices_inactive_count=Count('devices', filter=Q(devices__is_active=False))
             ).select_related('place')
             
         return context
@@ -784,7 +838,7 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
                 'new_location_name': new_location.name,
                 'old_location_count': old_location_count,
                 'new_location_count': new_location_count,
-                'active_devices_count': Device.objects.filter(
+                'devices_active_count': Device.objects.filter(
                     location__place=device.location.place,
                     is_active=True
                 ).count()
@@ -869,9 +923,9 @@ def siteplan_update(request, place_slug):
         
         # Get updated location statistics
         locations = place.locations.annotate(
-            active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-            inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-        ).values('id', 'name', 'is_active', 'active_devices_count', 'inactive_devices_count')
+            devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
+            devices_inactive_count=Count('devices', filter=Q(devices__is_active=False))
+        ).values('id', 'name', 'is_active', 'devices_active_count', 'devices_inactive_count')
         
         return JsonResponse({
             'message': message,
@@ -1781,9 +1835,9 @@ def place_stats(request: HttpRequest, place_slug: str) -> JsonResponse:
     
     # Get location statistics
     locations = place.locations.annotate(
-        active_devices_count=Count('devices', filter=Q(devices__is_active=True)),
-        inactive_devices_count=Count('devices', filter=Q(devices__is_active=False))
-    ).values('id', 'name', 'is_active', 'active_devices_count', 'inactive_devices_count')
+        devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
+        devices_inactive_count=Count('devices', filter=Q(devices__is_active=False))
+    ).values('id', 'name', 'is_active', 'devices_active_count', 'devices_inactive_count')
 
     return JsonResponse({
         'devices_active': devices_active.count(),

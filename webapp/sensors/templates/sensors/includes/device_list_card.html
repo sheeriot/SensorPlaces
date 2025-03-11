@@ -58,8 +58,8 @@
                                         </div>
                                         <div class="d-flex align-items-center gap-3">
                                             <div class="d-flex gap-2">
-                                                <span class="badge bg-success" id="location-{{ location.id }}-active">{{ location.active_devices_count }}</span>
-                                                <span class="badge bg-danger" id="location-{{ location.id }}-inactive">{{ location.inactive_devices_count }}</span>
+                                                <span class="badge bg-success" id="location-{{ location.id }}-active">{{ location.devices_active_count }}</span>
+                                                <span class="badge bg-danger" id="location-{{ location.id }}-inactive">{{ location.devices_inactive_count }}</span>
                                             </div>
                                             {% include "sensors/partials/device_new_button.html" with place=place location=location %}
                                         </div>

@@ -422,13 +422,13 @@ class DeviceForm(forms.ModelForm):
             locations_qs = Location.objects.filter(
                 place=self.place
             ).annotate(
-                active_devices_count=Count('devices', filter=Q(devices__is_active=True))
+                devices_active_count=Count('devices', filter=Q(devices__is_active=True))
             ).order_by('-is_active', 'name')
             
             # Debug available locations
             # ic("DeviceForm - Locations:", {
             #     'count': locations_qs.count(),
-            #     'locations': [(loc.pk, loc.name, loc.is_active, loc.active_devices_count) for loc in locations_qs]
+            #     'locations': [(loc.pk, loc.name, loc.is_active, loc.devices_active_count) for loc in locations_qs]
             # })
             
             # Create standard choices tuple with data attributes
@@ -444,7 +444,7 @@ class DeviceForm(forms.ModelForm):
             choices = []
             for location in locations_qs:
                 if location.is_active:
-                    label = f"{location.name} ({location.active_devices_count} active)"
+                    label = f"{location.name} ({location.devices_active_count} active)"
                 else:
                     label = f"{location.name} (inactive)"
                 choices.append((location.pk, label))
@@ -680,6 +680,12 @@ class LocationForm(forms.ModelForm):
         widget=forms.HiddenInput()
     )
     
+    # Add a hidden confirmation field
+    confirm_deactivate = forms.BooleanField(
+        required=False,
+        widget=forms.HiddenInput()
+    )
+    
     # Display-only field for place name
     place_name = forms.CharField(
         label='Place',
@@ -705,14 +711,14 @@ class LocationForm(forms.ModelForm):
             self.place = self.instance.place
 
         self.fields['place_id'].initial = self.place
-        self.fields['place_name'].initial = self.place.name
+        self.fields['place_name'].initial = self.place.name if self.place else ''
 
         # Add inactive styling if place is not active
-        if not self.place.is_active:
+        if self.place and not self.place.is_active:
             self.fields['place_name'].widget.attrs.update({
                 'class': 'form-control-plaintext fs-5 fw-medium text-muted opacity-50'
             })
-        if self.place.is_active:
+        if self.place and self.place.is_active:
             self.fields['place_name'].label = mark_safe("""Place
                 <span class="badge ms-1 bg-success-subtle text-success">
                     Active
@@ -734,11 +740,13 @@ class LocationForm(forms.ModelForm):
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.form_class = 'mb-0'
+        self.helper.form_id = 'location-form'
 
         # Update the layout to use referrer for cancel button
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
             Field('place_id', type='hidden'),
+            Field('confirm_deactivate', type='hidden'),
             Row(
                 Column(
                     Field('name'),
@@ -800,6 +808,33 @@ class LocationForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             if cleaned_data.get('place') != self.instance.place:
                 raise forms.ValidationError("The place field cannot be modified after creation.")
+
+            # Check for active devices when setting location to inactive
+            is_active = cleaned_data.get('is_active')
+            confirm_deactivate = cleaned_data.get('confirm_deactivate')
+            
+            if self.instance.is_active and not is_active:
+                # Get list of active devices that will be affected
+                active_devices = self.instance.devices.filter(is_active=True).annotate(
+                    sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
+                )
+                
+                if active_devices.exists() and not confirm_deactivate:
+                    # Store the active devices in the form for use in the view
+                    self.affected_active_devices = active_devices
+                    device_list = [f"{device.name} ({device.sensor_count} active sensors)" 
+                                 for device in active_devices]
+                    
+                    # Raise confirmation required error
+                    raise forms.ValidationError({
+                        'is_active': forms.ValidationError(
+                            f"Setting this location to inactive will also deactivate "
+                            f"{active_devices.count()} active device(s):\n- " + 
+                            "\n- ".join(device_list),
+                            code='requires_confirmation'
+                        )
+                    })
+        
         return cleaned_data
 
 class PlaceDeleteForm(forms.Form):
@@ -836,8 +871,8 @@ class PlaceDeleteForm(forms.Form):
                             {% for location in locations %}
                             <li>
                                 <i class="bi bi-geo-alt"></i> {{ location.name }}
-                                {% if location.active_devices_count or location.inactive_devices_count %}
-                                ({{ location.active_devices_count|add:location.inactive_devices_count }} devices)
+                                {% if location.devices_active_count or location.devices_inactive_count %}
+                                ({{ location.devices_active_count|add:location.devices_inactive_count }} devices)
                                 {% endif %}
                             </li>
                             {% endfor %}

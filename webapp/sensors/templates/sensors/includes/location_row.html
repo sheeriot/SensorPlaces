@@ -1,6 +1,6 @@
 {% comment %}
 This template expects:
-- location: Location object with active_devices_count and inactive_devices_count annotations
+- location: Location object with devices_active_count and devices_inactive_count annotations
 - place: Place object
 {% endcomment %}
 <tr class="location-row {% if not location.is_active %}opacity-50 text-muted d-none{% endif %}" 
@@ -16,8 +16,8 @@ This template expects:
         </a>
     </td>
     <td>
-        <span class="text-success">{{ location.active_devices_count }}</span>
-        <span class="text-secondary">({{ location.inactive_devices_count }})</span>
+        <span class="text-success">{{ location.devices_active_count }}</span>
+        <span class="text-secondary">({{ location.devices_inactive_count }})</span>
     </td>
     {% if model_name == "location" %}
     <td>

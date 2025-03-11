@@ -79,10 +79,10 @@ const sitePlanView = {
             <div class="p-2">
                 <h6 class="mb-1">${location.name}</h6>
                 ${location.description ? `<p class="mb-1 small text-muted">${location.description}</p>` : ''}
-                ${location.active_devices_count ? `
+                ${location.devices_active_count ? `
                     <div class="text-success small">
                         <i class="bi bi-circle-fill me-1"></i>
-                        ${location.active_devices_count} active device${location.active_devices_count !== 1 ? 's' : ''}
+                        ${location.devices_active_count} active device${location.devices_active_count !== 1 ? 's' : ''}
                     </div>
                 ` : ''}
             </div>
