@@ -421,7 +421,7 @@ def place_stats(request, place_slug):
                 'total': {
                     'locations': {
                         'active': sum(1 for loc in locations if loc['is_active']),
-                        'inactive': sum(1 for loc in locations if not loc['is_active'])
+                                     'inactive': sum(1 for loc in locations if not loc['is_active'])
                     },
                     'devices': {
                         'active': sum(1 for dev in devices if dev['is_active']),
@@ -934,6 +934,15 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
                 )
         return self._location
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        device_pk = self.kwargs.get('device_pk')
+        if device_pk:
+            device = get_object_or_404(Device, pk=device_pk, location__place=self.place)
+            if not device.is_active:
+                form.fields['is_active'].help_text = f"<i class='bi bi-hdd-rack'></i> {device.name} is inactive"
+        return form
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.place
@@ -1288,20 +1297,24 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['initial'] = {
-            'device': self.kwargs.get('device_pk'),
-            'is_active': True
-        }
+        device_pk = self.kwargs.get('device_pk')
+        if device_pk:
+            device = get_object_or_404(Device, pk=device_pk, location__place=self.get_place())
+            kwargs['device'] = device
+            kwargs['initial'] = {
+                'is_active': device.is_active,
+                'device_active': device.is_active  # Pass device active status to form
+            }
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        context['place'] = self.get_place()
         
         device_pk = self.kwargs.get('device_pk')
         if device_pk:
-            device = get_object_or_404(Device, pk=device_pk, location__place=context['place'])
+            device = get_object_or_404(Device, pk=device_pk, location__place=self.get_place())
             context['device'] = device
             context['location'] = device.location
         
@@ -1353,7 +1366,7 @@ class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        context['place'] = self.get_place()
         
         sensor = self.get_object()
         context['device'] = sensor.device
@@ -1422,6 +1435,18 @@ class SensorDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
     model = Sensor
     template_name = 'sensors/sensor_confirm_delete.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sensor = self.get_object()
+        
+        # Add sensor_url for cancel button
+        context['sensor_url'] = reverse('sensors:sensor_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'pk': sensor.pk
+        })
+        
+        return context
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         sensor = self.object
@@ -1458,9 +1483,10 @@ class SensorDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):
+        device = self.object.device
         return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
-            'pk': self.object.device.pk
+            'place_slug': device.location.place.slug,
+            'pk': device.pk
         })
 
 class SensorReadingListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):

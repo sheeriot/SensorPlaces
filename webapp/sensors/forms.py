@@ -16,6 +16,7 @@ from django.template.loader import render_to_string
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+    device_active = forms.BooleanField(required=False, widget=forms.HiddenInput())
     
     class Meta:
         model = Sensor
@@ -46,7 +47,16 @@ class SensorForm(forms.ModelForm):
 
         # Configure field properties
         self.fields['is_active'].label = "Active"
-        self.fields['is_active'].help_text = None
+        
+        # Handle device active status
+        device_active = self.initial.get('device_active', True)
+        if not device_active and device:
+            self.fields['is_active'].disabled = True
+            self.fields['is_active'].initial = False
+            self.fields['is_active'].help_text = (
+                f'<div class="text-warning"><i class="bi bi-hdd-rack"></i> '
+                f'Cannot activate sensor because device {device.name} is inactive</div>'
+            )
         self.fields['data_type'].label = "Reading Source"
         self.fields['influx_source'].required = False
         self.fields['influx_source'].label = "InfluxDB Source"
@@ -66,6 +76,7 @@ class SensorForm(forms.ModelForm):
         self.helper.layout = Layout(
             Field('device', type='hidden'),
             Field('referrer', type='hidden'),
+            Field('device_active', type='hidden'),
             Row(
                 Column('name', css_class='col-md-8'),
                 Column(
@@ -107,11 +118,11 @@ class SensorForm(forms.ModelForm):
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
-                    Submit(
-                        'submit',
-                        mark_safe('<i class="bi bi-thermometer me-1"></i>' + ('Create' if is_new else 'Save')),
-                        css_class='btn btn-success'
-                    ),
+                    HTML("""
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-thermometer me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
+                        </button>
+                    """),
                     css_class='d-flex justify-content-between align-items-center'
                 ),
                 css_class='mt-3'
