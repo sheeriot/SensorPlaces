@@ -65,6 +65,13 @@ const createToastSystem = () => {
                     return;
                 }
 
+                // Get place slug from global variable
+                const placeSlug = window.currentPlaceSlug;
+                if (!placeSlug) {
+                    if (toastConfig.debug) console.log('[Toast Manager] Error: No current place slug found');
+                    return;
+                }
+
                 // Define modal hidden handler first
                 const handleModalHidden = () => {
                     // Return focus to history button
@@ -119,12 +126,6 @@ const createToastSystem = () => {
                 modal.show();
 
                 try {
-                    // Get place slug from data attribute
-                    const placeSlug = this.historyButton.dataset.placeSlug;
-                    if (!placeSlug) {
-                        throw new Error('Place slug not found');
-                    }
-
                     // Initial load of unread notifications only
                     await this.loadToastHistory(placeSlug, false);
 

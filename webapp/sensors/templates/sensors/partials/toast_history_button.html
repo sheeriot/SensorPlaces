@@ -8,9 +8,9 @@
         data-bs-keyboard="true"
         data-place-slug="{{ current_place.slug }}"
         title="Notification History"
-        aria-label="Notification History ({{ toast_unread_count }} notifications)">
+        aria-label="Notification History ({{ toast_unread_count|default:'0' }} notifications)">
     <i class="bi bi-bell"></i>
     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger {% if not toast_unread_count %}d-none{% endif %}"
           id="toast-history-badge"
-          aria-hidden="true">{{ toast_unread_count }}</span>
+          aria-hidden="true">{{ toast_unread_count|default:'0' }}</span>
 </button>
