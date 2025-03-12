@@ -1921,14 +1921,17 @@ class ToggleActiveView(LoginRequiredMixin, View):
                 'type': 'success' if obj.is_active else 'warning'
             }
 
-            return JsonResponse({
+            # Ensure the JSON response includes the toast data
+            response_data = {
                 'success': True,
                 'is_active': obj.is_active,
-                'unread_count': ToastNotification.get_unread_count(
-                    user=request.user,
-                    place=place
-                )
-            })
+                'toast': {
+                    'message': request.toast_message['message'],
+                    'type': request.toast_message['type']
+                }
+            }
+
+            return JsonResponse(response_data)
 
         except json.JSONDecodeError:
             return JsonResponse({

@@ -857,6 +857,14 @@ const toggleActiveManager = {
                 detail: toastData
             }));
         }
+    },
+
+    handleToggleResponse(response) {
+        if (response.toast) {
+            // Trigger the toast display
+            window.toastSystem.showToast(response.toast.message, response.toast.type);
+        }
+        // ... rest of the handler code ...
     }
 };
 
