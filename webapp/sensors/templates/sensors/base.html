@@ -47,7 +47,8 @@
     <script src="{% static 'sensors/js/siteplan_editor.js' %}"></script>
 
 </head>
-<body data-place-slug="{{ place.slug|default:'' }}" 
+<body data-toast-unread-count="{{ toast_unread_count|default:0 }}"
+      {% if current_place %}data-place-slug="{{ current_place.slug }}"{% endif %}
       {% for key, value in body_data_attributes.items %} 
       data-{{ key }}="{{ value }}"
       {% endfor %}>
@@ -159,11 +160,15 @@
     
     <!-- Toast Message Container -->
     <div id="toast-messages" class="d-none">
-    {% if toast_message %}
-        <div class="server-toast-message" data-processed="false">
-            {{ toast_message|json_script:"toast-message-data" }}
-        </div>
-    {% endif %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="server-toast-message" data-processed="false">
+                    <script type="application/json">
+                        {{ message|safe }}
+                    </script>
+                </div>
+            {% endfor %}
+        {% endif %}
     </div>
     <footer class="footer mt-auto py-3 bg-light border-top">
         <div class="container">

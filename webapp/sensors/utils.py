@@ -44,83 +44,83 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
     finally:
         client.close()
 
-def add_toast_message(request, title: str, message: str, message_type: str = 'info'):
-    """Add a toast message directly to the request object.
+# def add_toast_message(request, title: str, message: str, message_type: str = 'info'):
+#     """Add a toast message directly to the request object.
     
-    Args:
-        request: The request object to attach the message to
-        title: The title of the message (may be used in modal views)
-        message: The main message content
-        message_type: Type of message ('success', 'info', 'warning', 'danger')
-    """
-    # ic("add_toast_message called:", {
-    #     'title': title,
-    #     'message': message,
-    #     'type': message_type
-    # })
+#     Args:
+#         request: The request object to attach the message to
+#         title: The title of the message (may be used in modal views)
+#         message: The main message content
+#         message_type: Type of message ('success', 'info', 'warning', 'danger')
+#     """
+#     # ic("add_toast_message called:", {
+#     #     'title': title,
+#     #     'message': message,
+#     #     'type': message_type
+#     # })
     
-    # Ensure message type is valid
-    valid_types = ['success', 'info', 'warning', 'danger']
-    if message_type not in valid_types:
-        message_type = 'info'
+#     # Ensure message type is valid
+#     valid_types = ['success', 'info', 'warning', 'danger']
+#     if message_type not in valid_types:
+#         message_type = 'info'
     
-    # Format the message if title is provided
-    formatted_message = f"{title}: {message}" if title else message
+#     # Format the message if title is provided
+#     formatted_message = f"{title}: {message}" if title else message
     
-    request.toast_message = {
-        'message': formatted_message,
-        'type': message_type,
-        'addToHistory': True  # API responses should be added to history
-    }
+#     request.toast_message = {
+#         'message': formatted_message,
+#         'type': message_type,
+#         'addToHistory': True  # API responses should be added to history
+#     }
     
-    # ic("Toast message added to request:", request.toast_message)
+#     # ic("Toast message added to request:", request.toast_message)
 
-def mark_toast_as_read(request, toast_id, read_status=True):
-    """Mark a toast notification as read/unread.
+# def mark_toast_as_read(request, toast_id, read_status=True):
+#     """Mark a toast notification as read/unread.
     
-    Args:
-        request: The request object
-        toast_id: The ID of the toast to mark
-        read_status: Boolean indicating whether to mark as read (True) or unread (False)
+#     Args:
+#         request: The request object
+#         toast_id: The ID of the toast to mark
+#         read_status: Boolean indicating whether to mark as read (True) or unread (False)
     
-    Returns:
-        JsonResponse with updated unread count
-    """
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
+#     Returns:
+#         JsonResponse with updated unread count
+#     """
+#     if not request.user.is_authenticated:
+#         return JsonResponse({'error': 'Authentication required'}, status=401)
     
-    try:
-        toast = ToastNotification.objects.get(id=toast_id, user=request.user)
-        toast.read = read_status
-        toast.save()
+#     try:
+#         toast = ToastNotification.objects.get(id=toast_id, user=request.user)
+#         toast.read = read_status
+#         toast.save()
         
-        # Get updated unread count
-        unread_count = ToastNotification.objects.filter(
-            user=request.user,
-            read=False
-        ).count()
+#         # Get updated unread count
+#         unread_count = ToastNotification.objects.filter(
+#             user=request.user,
+#             read=False
+#         ).count()
         
-        return JsonResponse({
-            'success': True,
-            'unread_count': unread_count
-        })
-    except ToastNotification.DoesNotExist:
-        return JsonResponse({'error': 'Toast not found'}, status=404)
+#         return JsonResponse({
+#             'success': True,
+#             'unread_count': unread_count
+#         })
+#     except ToastNotification.DoesNotExist:
+#         return JsonResponse({'error': 'Toast not found'}, status=404)
 
-def clear_toast_history(request):
-    """Clear all toast notifications for the current user.
+# def clear_toast_history(request):
+#     """Clear all toast notifications for the current user.
     
-    Args:
-        request: The request object
+#     Args:
+#         request: The request object
     
-    Returns:
-        JsonResponse indicating success/failure
-    """
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Authentication required'}, status=401)
+#     Returns:
+#         JsonResponse indicating success/failure
+#     """
+#     if not request.user.is_authenticated:
+#         return JsonResponse({'error': 'Authentication required'}, status=401)
     
-    try:
-        ToastNotification.objects.filter(user=request.user).delete()
-        return JsonResponse({'success': True})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+#     try:
+#         ToastNotification.objects.filter(user=request.user).delete()
+#         return JsonResponse({'success': True})
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=500)

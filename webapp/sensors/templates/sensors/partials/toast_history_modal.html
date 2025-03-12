@@ -6,11 +6,16 @@
                 <h5 class="modal-title">
                     <i class="bi bi-bell me-2"></i>Notification History
                 </h5>
-                <div class="form-check ms-3">
-                    <input class="form-check-input" type="checkbox" id="showAllToasts">
-                    <label class="form-check-label" for="showAllToasts">
-                        Show read notifications
-                    </label>
+                <div class="d-flex gap-3 align-items-center ms-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="showAllToasts">
+                        <label class="form-check-label" for="showAllToasts">
+                            Show all notifications
+                        </label>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="markAllRead">
+                        <i class="bi bi-check-all me-1"></i>Mark all as read
+                    </button>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -25,8 +30,26 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-outline-danger d-none" id="clearToastHistory">
-                    <i class="bi bi-trash me-2"></i>Clear History
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark All Read Confirmation Modal -->
+<div class="modal fade" id="mark-all-read-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to mark all notifications as read?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmMarkAllRead">
+                    <i class="bi bi-check-all me-1"></i>Mark All as Read
                 </button>
             </div>
         </div>
