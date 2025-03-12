@@ -629,8 +629,11 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
         kwargs = super().get_form_kwargs()
         place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
         kwargs['initial'] = kwargs.get('initial', {})
-        kwargs['initial']['place'] = place
-        kwargs['initial']['referrer'] = self.request.GET.get('next', '')
+        kwargs['initial'].update({
+            'place': place,
+            'is_active': place.is_active,  # Set initial is_active to match place
+            'referrer': self.request.GET.get('next', '')
+        })
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -762,7 +765,8 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
         self.object = self.get_object()
         location = self.object
         place = location.place
-        success_url = self.get_success_url()
+        # Store place_slug before deletion for redirect
+        self.place_slug = place.slug
         
         # Get active devices info before deletion
         active_devices = Device.objects.filter(
@@ -801,11 +805,12 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
             'type': 'danger'
         })
         
-        return HttpResponseRedirect(success_url)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
+        # Use stored place_slug for redirect
         return reverse('sensors:place_detail', 
-                      kwargs={'place_slug': self.object.place.slug})
+                      kwargs={'place_slug': self.place_slug})
 
 # Device Views
 class DeviceListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
