@@ -9,7 +9,7 @@
 
 // System Configuration
 const toastConfig = {
-    debug: false,  // Set to true to enable debug mode
+    debug: true,  // Set to true to enable debug mode
     apiEndpoints: {
         markAsRead: '/api/toasts/mark-read/',
         clearHistory: '/api/toasts/clear-history/'
