@@ -1065,9 +1065,9 @@ def mark_toast_read(request, place_slug=None):
         read_status = data.get('read', True)
         
         if not toast_id:
-                return JsonResponse({
+            return JsonResponse({
                 'error': 'Toast ID is required'
-                }, status=400)
+            }, status=400)
 
         # Get the toast and verify ownership in a single query
         toast = get_object_or_404(
@@ -1078,14 +1078,14 @@ def mark_toast_read(request, place_slug=None):
         
         # Verify place if specified
         if place_slug and toast.place and toast.place.slug != place_slug:
-                    return JsonResponse({
+            return JsonResponse({
                 'error': 'Toast does not belong to this place'
             }, status=403)
 
         # Update read status efficiently
         if read_status:
             ToastReadStatus.objects.get_or_create(
-            user=request.user,
+                user=request.user,
                 toast=toast
             )
         else:
@@ -1101,19 +1101,19 @@ def mark_toast_read(request, place_slug=None):
             place=place
         )
 
-            return JsonResponse({
-                'success': True,
+        return JsonResponse({
+            'success': True,
             'unread_count': unread_count
-            })
+        })
 
     except ToastNotification.DoesNotExist:
-            return JsonResponse({
+        return JsonResponse({
             'error': 'Toast notification not found'
         }, status=404)
-        except Exception as e:
-            return JsonResponse({
+    except Exception as e:
+        return JsonResponse({
             'error': str(e)
-            }, status=500)
+        }, status=500)
 
 @require_POST
 @login_required
@@ -1722,3 +1722,172 @@ class SensorReadingCreateView(LoginRequiredMixin, LocationAnnotationMixin, Creat
             'sensor_pk': self.sensor.pk,
             'pk': self.object.pk
         })
+
+@login_required
+@csrf_protect
+def place_stats(request, place_slug):
+    """Get statistics for a place."""
+    try:
+        # Get the place
+        place = get_object_or_404(Place, slug=place_slug)
+        
+        # Get location statistics
+        locations = Location.objects.filter(place=place).annotate(
+            devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
+            devices_inactive_count=Count('devices', filter=Q(devices__is_active=False)),
+            sensors_active_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
+            sensors_inactive_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
+        ).values(
+            'id', 'name', 'is_active',
+            'devices_active_count', 'devices_inactive_count',
+            'sensors_active_count', 'sensors_inactive_count'
+        )
+        
+        # Get device statistics
+        devices = Device.objects.filter(location__place=place).annotate(
+            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True)),
+            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False))
+        ).values(
+            'id', 'name', 'is_active', 'location_id',
+            'sensors_active_count', 'sensors_inactive_count'
+        )
+        
+        # Get sensor statistics
+        sensors = Sensor.objects.filter(device__location__place=place).values(
+            'id', 'name', 'is_active', 'device_id',
+            'sensor_type', 'data_type', 'unit'
+        )
+        
+        # Get unread toast count
+        unread_count = ToastNotification.get_unread_count(
+            user=request.user,
+            place=place
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'stats': {
+                'locations': list(locations),
+                'devices': list(devices),
+                'sensors': list(sensors),
+                'unread_toast_count': unread_count,
+                'total': {
+                    'locations': {
+                        'active': sum(1 for loc in locations if loc['is_active']),
+                        'inactive': sum(1 for loc in locations if not loc['is_active'])
+                    },
+                    'devices': {
+                        'active': sum(1 for dev in devices if dev['is_active']),
+                        'inactive': sum(1 for dev in devices if not dev['is_active'])
+                    },
+                    'sensors': {
+                        'active': sum(1 for sen in sensors if sen['is_active']),
+                        'inactive': sum(1 for sen in sensors if not sen['is_active'])
+                    }
+                }
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+class ToggleActiveView(LoginRequiredMixin, View):
+    """Generic view to toggle the is_active flag on any model."""
+    
+    def post(self, request, *args, **kwargs):
+        try:
+            # Get model type and validate it
+            model_type = request.POST.get('model_type')
+            if not model_type:
+                return JsonResponse({
+                    'error': 'model_type is required'
+                }, status=400)
+            
+            # Map model types to actual models
+            model_map = {
+                'place': Place,
+                'location': Location,
+                'device': Device,
+                'sensor': Sensor
+            }
+            
+            # Get the model class
+            model_class = model_map.get(model_type.lower())
+            if not model_class:
+                return JsonResponse({
+                    'error': f'Invalid model type: {model_type}'
+                }, status=400)
+            
+            # Get object ID and validate it
+            object_id = request.POST.get('id')
+            if not object_id:
+                return JsonResponse({
+                    'error': 'id is required'
+                }, status=400)
+            
+            # Get the object and validate ownership through place
+            obj = get_object_or_404(model_class, pk=object_id)
+            
+            # Get the place based on model type
+            if model_type == 'place':
+                place = obj
+            elif model_type == 'location':
+                place = obj.place
+            elif model_type == 'device':
+                place = obj.location.place
+            else:  # sensor
+                place = obj.device.location.place
+            
+            # Toggle the active status
+            obj.is_active = not obj.is_active
+            obj.save()
+            
+            # Build success message
+            if model_type == 'place':
+                name_path = f"{obj.name}"
+            elif model_type == 'location':
+                name_path = f"{place.name} > {obj.name}"
+            elif model_type == 'device':
+                name_path = f"{place.name} > {obj.location.name} > {obj.name}"
+            else:  # sensor
+                name_path = f"{place.name} > {obj.device.location.name} > {obj.device.name} > {obj.name}"
+            
+            message = (
+                f"{'Activated' if obj.is_active else 'Deactivated'} {model_type}: "
+                f"<strong>{name_path}</strong>"
+            )
+            
+            # Add toast message
+            request.toast_message = {
+                'message': message,
+                'type': 'success' if obj.is_active else 'warning',
+                'addToHistory': True,
+                'place': place
+            }
+            
+            # Return success response with updated object data
+            return JsonResponse({
+                'success': True,
+                'is_active': obj.is_active,
+                'message': message
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'error': str(e)
+            }, status=500)
+
+
+# class DeviceActiveSensorsView(LoginRequiredMixin, View):
+#     def get(self, request, pk):
+#         device = get_object_or_404(Device, pk=pk)
+#         active_sensors = device.sensors.filter(is_active=True).values('id', 'name', 'sensor_type')
+        
+#         return JsonResponse({
+#             'device_name': device.name,
+#             'active_sensors': list(active_sensors),
+#             'count': active_sensors.count()
+#         })
