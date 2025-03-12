@@ -1014,19 +1014,20 @@ def test_sensor_readings(request, place_slug, sensor_pk):
 class ToastHistoryView(LoginRequiredMixin, View):
     def get(self, request):
         """Retrieve the toast history and mark as read."""
-        # Get database history for current user
+        # Get database history for current user - don't slice yet
         notifications = ToastNotification.objects.filter(
             user=request.user
-        ).order_by('-created_at')[:50]
+        ).order_by('-created_at')
         
-        # Mark all as read
-        notifications.update(read=True)
+        # Now get the last 50 for display, including read status
+        history = list(notifications[:50].values('id', 'message', 'type', 'created_at', 'read'))
         
-        # Convert to list for JSON response
-        history = list(notifications.values('message', 'type', 'created_at'))
+        # Get current unread count
+        unread_count = notifications.filter(read=False).count()
         
         return JsonResponse({
-            'history': history
+            'history': history,
+            'unread_count': unread_count
         })
 
     def delete(self, request):
@@ -1663,7 +1664,6 @@ class SensorDeleteView(LoginRequiredMixin, DeleteView):
             f"Unit: {sensor.unit or '-'}<br>"
             f"Data Source: {sensor.data_type}<br>"
             f"Status: {'Active' if sensor.is_active else 'inactive'}"
-            f"</small>"
         )
         
         sensor.delete()
@@ -1938,3 +1938,17 @@ def clear_toast_history(request):
             'success': False,
             'error': str(e)
         }, status=500)
+
+# Add this to your context processor or base view mixin
+class BaseViewMixin:
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Get unread count for the current user
+        if self.request.user.is_authenticated:
+            context['unread_toast_count'] = ToastNotification.objects.filter(
+                user=self.request.user,
+                read=False
+            ).count()
+        else:
+            context['unread_toast_count'] = 0
+        return context

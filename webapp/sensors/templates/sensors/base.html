@@ -48,7 +48,9 @@
 
 </head>
 <body data-place-slug="{{ place.slug|default:'' }}" 
-      data-unread-toasts="{{ unread_toast_count|default:0 }}">
+      {% for key, value in body_data_attributes.items %} 
+      data-{{ key }}="{{ value }}"
+      {% endfor %}>
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
         <div class="container">
             <div class="d-flex align-items-center flex-grow-1">

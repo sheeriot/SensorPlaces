@@ -24,7 +24,7 @@ const createToastSystem = () => {
         initialized: false,
         historyButton: null,
         historyBadge: null,
-        toastCount: 0,
+        toastUnreadCount: 0,
         pendingMessages: [],
 
         initialize() {
@@ -67,35 +67,21 @@ const createToastSystem = () => {
                 });
             }
 
-            // Initialize unread count from body data attribute
-            const unreadCount = parseInt(document.body.dataset.unreadToasts || '0', 10);
-            if (toastConfig.debug) console.log('[Toast Manager] Reading unread count from body:', {
-                rawValue: document.body.dataset.unreadToasts,
-                parsedValue: unreadCount,
-                bodyAttributes: Object.keys(document.body.dataset)
-            });
-            
-            this.toastCount = unreadCount;
+            // Remove local count initialization - rely on HTML data attribute
+            this.toastUnreadCount = 0;
             
             if (this.historyBadge) {
-                if (toastConfig.debug) console.log('[Toast Manager] Updating badge with count:', this.toastCount);
-                this.updateBadge();
-            } else {
-                if (toastConfig.debug) console.log('[Toast Manager] Cannot update badge - element not found');
+                // Only update visibility based on current badge state
+                const currentCount = parseInt(this.historyBadge.textContent || '0', 10);
+                this.historyBadge.classList.toggle('d-none', currentCount === 0);
             }
 
             // Add history button click handler
             if (this.historyButton) {
                 if (toastConfig.debug) console.log('[Toast Manager] Setting up history button click handler');
-                this.historyButton.addEventListener('click', (event) => {
+                this.historyButton.addEventListener('click', async (event) => {
                     if (toastConfig.debug) console.log('[Toast Manager] History button clicked');
                     event.preventDefault();
-                    
-                    // Check if Bootstrap is available
-                    if (typeof bootstrap === 'undefined') {
-                        if (toastConfig.debug) console.log('[Toast Manager] Error: Bootstrap not loaded');
-                        return;
-                    }
 
                     // Find history modal
                     let historyModal = document.getElementById('toast-history-modal');
@@ -104,140 +90,269 @@ const createToastSystem = () => {
                         return;
                     }
 
-                    // Clean up any existing modal backdrops
-                    const existingBackdrop = document.querySelector('.modal-backdrop');
-                    if (existingBackdrop) {
-                        existingBackdrop.remove();
-                    }
-
-                    // Initialize modal with proper options
-                    const modal = new bootstrap.Modal(historyModal, {
-                        backdrop: true,
-                        keyboard: true
-                    });
-
-                    // Add modal hidden event listener
-                    historyModal.addEventListener('hidden.bs.modal', function () {
-                        // Remove modal backdrop
+                    // Define modal hidden handler first
+                    const handleModalHidden = () => {
+                        // Return focus to history button
+                        this.historyButton.focus();
+                        
+                        // Reset modal content
+                        const historyList = historyModal.querySelector('#toastHistoryList');
+                        if (historyList) {
+                            historyList.innerHTML = `
+                                <div class="text-center text-muted py-5">
+                                    <i class="bi bi-hourglass-split fs-1 d-block mb-3"></i>
+                                    Loading notifications...
+                                </div>`;
+                        }
+                        
+                        // Reset show all checkbox
+                        const showAllCheckbox = historyModal.querySelector('#showAllToasts');
+                        if (showAllCheckbox) {
+                            showAllCheckbox.checked = false;
+                            const newCheckbox = showAllCheckbox.cloneNode(true);
+                            showAllCheckbox.parentNode.replaceChild(newCheckbox, showAllCheckbox);
+                        }
+                        
+                        // Remove modal backdrop if it exists
                         const backdrop = document.querySelector('.modal-backdrop');
                         if (backdrop) {
                             backdrop.remove();
                         }
-                        // Remove modal-open class from body
+                        
+                        // Reset modal state
+                        historyModal.style.display = '';
+                        historyModal.classList.remove('show');
+                        historyModal.removeAttribute('aria-modal');
+                        historyModal.removeAttribute('aria-hidden');
                         document.body.classList.remove('modal-open');
-                        // Remove inline styles from body
                         document.body.style.removeProperty('padding-right');
-                        document.body.style.removeProperty('overflow');
+                    };
+
+                    // Remove previous event listener if it exists
+                    historyModal.removeEventListener('hidden.bs.modal', handleModalHidden);
+                    
+                    // Add new event listener
+                    historyModal.addEventListener('hidden.bs.modal', handleModalHidden);
+
+                    // Show modal with loading state
+                    const modal = new bootstrap.Modal(historyModal, {
+                        backdrop: true,
+                        keyboard: true,
+                        focus: true
                     });
+                    
+                    modal.show();
 
-                    // Set up read checkbox handlers
-                    const checkboxes = historyModal.querySelectorAll('.toast-read-checkbox');
-                    checkboxes.forEach(checkbox => {
-                        if (!checkbox.hasEventListener) {
-                            checkbox.addEventListener('change', async function() {
-                                const toastId = this.dataset.toastId;
-                                const isRead = this.checked;
-                                
-                                if (!toastId) {
-                                    console.error('No toast ID found for checkbox');
-                                    return;
-                                }
-
-                                try {
-                                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                                    const response = await fetch(toastConfig.apiEndpoints.markAsRead, {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-CSRFToken': csrfToken
-                                        },
-                                        body: JSON.stringify({
-                                            toast_id: parseInt(toastId, 10),
-                                            read: isRead
-                                        })
-                                    });
-
-                                    if (!response.ok) {
-                                        throw new Error('Failed to update read status');
-                                    }
-
-                                    // Update badge count
-                                    const data = await response.json();
-                                    if (data.success) {
-                                        window.toastSystem.toastCount = data.unread_count;
-                                        window.toastSystem.updateBadge();
-                                        
-                                        // Update the toast item appearance
-                                        const toastItem = this.closest('.toast-history-item');
-                                        if (toastItem) {
-                                            if (isRead) {
-                                                toastItem.classList.add('text-muted');
-                                            } else {
-                                                toastItem.classList.remove('text-muted');
-                                            }
-                                        }
-                                    } else {
-                                        throw new Error(data.error || 'Failed to update read status');
-                                    }
-
-                                } catch (error) {
-                                    console.error('Error updating toast read status:', error);
-                                    // Revert checkbox if update failed
-                                    this.checked = !isRead;
-                                    // Show error toast
-                                    window.toastSystem.show({
-                                        message: 'Failed to update notification status',
-                                        type: 'danger',
-                                        addToHistory: false
-                                    });
-                                }
-                            });
-                            checkbox.hasEventListener = true;
-                        }
-                    });
-
-                    // Set up clear history button handler
-                    const clearButton = historyModal.querySelector('#clearToastHistory');
-                    if (clearButton && !clearButton.hasEventListener) {
-                        clearButton.addEventListener('click', async function() {
-                            if (!confirm('Are you sure you want to clear all notifications?')) return;
-
-                            try {
-                                const response = await fetch(toastConfig.apiEndpoints.clearHistory, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                                    }
-                                });
-
-                                if (!response.ok) throw new Error('Failed to clear history');
-
-                                // Update UI
-                                const historyList = document.getElementById('toastHistoryList');
-                                historyList.innerHTML = `
+                    try {
+                        // Fetch history using utils.fetchWithCSRF
+                        const data = await window.utils.fetchWithCSRF('/api/toast-history/');
+                        
+                        // Update the modal content with the history data
+                        const historyList = historyModal.querySelector('#toastHistoryList');
+                        if (historyList && data.history) {
+                            let historyHtml = '';
+                            
+                            if (data.history.length === 0) {
+                                if (toastConfig.debug) console.log('[Toast Manager] No history items to display');
+                                historyHtml = `
                                     <div class="text-center text-muted py-5">
                                         <i class="bi bi-inbox fs-1 d-block mb-3"></i>
                                         No notifications yet
-                                    </div>
-                                `;
+                                    </div>`;
+                            } else {
+                                if (toastConfig.debug) {
+                                    console.group('[Toast Manager] Rendering history items');
+                                    console.log('History items count:', data.history.length);
+                                }
                                 
-                                // Update badge
-                                window.toastSystem.toastCount = 0;
-                                window.toastSystem.updateBadge();
-                                
-                                // Hide clear button
-                                this.style.display = 'none';
+                                // Get the template
+                                const template = document.getElementById('toast-history-item-template');
+                                if (!template) {
+                                    console.error('[Toast Manager] Template not found: toast-history-item-template');
+                                    return;
+                                }
+                                if (toastConfig.debug) console.log('[Toast Manager] Template found:', template.innerHTML);
 
-                            } catch (error) {
-                                console.error('Error clearing toast history:', error);
+                                historyHtml = data.history.map(toast => {
+                                    if (toastConfig.debug) {
+                                        console.group(`[Toast Manager] Processing toast ${toast.id}`);
+                                        console.log('Toast data:', toast);
+                                    }
+                                    
+                                    const date = new Date(toast.created_at);
+                                    const timestamp = date.toLocaleString('en-US', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                        hour12: false,
+                                        timeZoneName: 'shortOffset'
+                                    }).replace(',', '');
+                                    
+                                    if (toastConfig.debug) console.log('Formatted timestamp:', timestamp);
+                                    
+                                    // Clone the template content
+                                    const element = template.content.cloneNode(true);
+                                    if (toastConfig.debug) console.log('Cloned template:', element);
+                                    
+                                    const container = element.querySelector('.toast-history-item');
+                                    if (!container) {
+                                        console.error('[Toast Manager] Could not find .toast-history-item in template');
+                                        if (toastConfig.debug) console.groupEnd();
+                                        return '';
+                                    }
+                                    
+                                    // Set data and classes
+                                    container.dataset.toastId = toast.id;
+                                    container.classList.toggle('d-none', toast.read);
+                                    container.classList.add(toast.read ? 'read' : 'unread');
+                                    
+                                    // Set timestamp
+                                    const timestampEl = element.querySelector('.toast-timestamp');
+                                    if (timestampEl) {
+                                        timestampEl.textContent = timestamp;
+                                    } else {
+                                        console.error('[Toast Manager] Could not find .toast-timestamp');
+                                    }
+                                    
+                                    // Set type badge
+                                    const typeBadgeClass = 
+                                        toast.type === 'success' ? 'bg-success' :
+                                        toast.type === 'danger' ? 'bg-danger' :
+                                        toast.type === 'warning' ? 'bg-warning text-dark' :
+                                        'bg-info text-dark';
+                                    
+                                    const typeIcon = 
+                                        toast.type === 'success' ? 'check-circle' :
+                                        toast.type === 'danger' ? 'exclamation-circle' :
+                                        toast.type === 'warning' ? 'exclamation-triangle' :
+                                        'info-circle';
+                                    
+                                    const typeBadgeEl = element.querySelector('.toast-type-badge');
+                                    if (typeBadgeEl) {
+                                        typeBadgeEl.innerHTML = `
+                                            <span class="badge ${typeBadgeClass}">
+                                                <i class="bi bi-${typeIcon} me-1"></i>${toast.type}
+                                            </span>`;
+                                    } else {
+                                        console.error('[Toast Manager] Could not find .toast-type-badge');
+                                    }
+                                    
+                                    // Set checkbox
+                                    const checkbox = element.querySelector('.form-check-input');
+                                    if (checkbox) {
+                                        checkbox.id = `toast-${toast.id}-read`;
+                                        checkbox.checked = toast.read;
+                                        checkbox.dataset.toastId = toast.id;
+                                    } else {
+                                        console.error('[Toast Manager] Could not find .form-check-input');
+                                    }
+                                    
+                                    const label = element.querySelector('.form-check-label');
+                                    if (label) {
+                                        label.setAttribute('for', `toast-${toast.id}-read`);
+                                    } else {
+                                        console.error('[Toast Manager] Could not find .form-check-label');
+                                    }
+                                    
+                                    // Set message
+                                    const messageDiv = element.querySelector('.ms-4');
+                                    if (messageDiv) {
+                                        messageDiv.classList.add(`text-${toast.type}`);
+                                        messageDiv.innerHTML = toast.message;
+                                    } else {
+                                        console.error('[Toast Manager] Could not find message div with .ms-4');
+                                    }
+                                    
+                                    if (toastConfig.debug) {
+                                        console.log('Generated HTML:', container.outerHTML);
+                                        console.groupEnd();
+                                    }
+                                    
+                                    return container.outerHTML;
+                                }).join('');
+                                
+                                if (toastConfig.debug) {
+                                    console.log('Final HTML:', historyHtml);
+                                    console.groupEnd();
+                                }
                             }
-                        });
-                        clearButton.hasEventListener = true;
-                    }
+                            
+                            historyList.innerHTML = historyHtml;
+                            
+                            // Show/hide clear history button based on content
+                            const clearButton = historyModal.querySelector('#clearToastHistory');
+                            if (clearButton) {
+                                clearButton.classList.toggle('d-none', data.history.length === 0);
+                            }
 
-                    // Show modal
-                    modal.show();
+                            // Add event listeners for the show all toggle and read checkboxes
+                            const showAllCheckbox = historyModal.querySelector('#showAllToasts');
+                            const readCheckboxes = historyModal.querySelectorAll('.toast-read-checkbox');
+
+                            // Handle show all toggle
+                            showAllCheckbox.addEventListener('change', (event) => {
+                                const readToasts = historyModal.querySelectorAll('.toast-history-item.read');
+                                readToasts.forEach(toast => {
+                                    toast.classList.toggle('d-none', !event.target.checked);
+                                });
+                            });
+
+                            // Handle read checkbox changes
+                            readCheckboxes.forEach(checkbox => {
+                                checkbox.addEventListener('change', async (event) => {
+                                    const toastId = event.target.dataset.toastId;
+                                    const toastItem = event.target.closest('.toast-history-item');
+                                    
+                                    try {
+                                        const response = await window.utils.fetchWithCSRF('/api/toasts/mark-read/', {
+                                            method: 'POST',
+                                            body: JSON.stringify({
+                                                toast_id: toastId,
+                                                read: event.target.checked
+                                            })
+                                        });
+                                        
+                                        // Update UI
+                                        if (event.target.checked) {
+                                            toastItem.classList.add('read');
+                                            if (!showAllCheckbox.checked) {
+                                                toastItem.classList.add('d-none');
+                                            }
+                                            // Decrement unread count
+                                            this.toastUnreadCount = Math.max(0, this.toastUnreadCount - 1);
+                                        } else {
+                                            toastItem.classList.remove('read', 'd-none');
+                                            // Increment unread count
+                                            this.toastUnreadCount++;
+                                        }
+                                        
+                                        // Update badge with new count from response
+                                        if (response.toast_unread_count !== undefined) {
+                                            this.toastUnreadCount = response.toast_unread_count;
+                                        }
+                                        this.updateBadge();
+                                    } catch (error) {
+                                        console.error('Error updating toast read status:', error);
+                                        // Revert checkbox state on error
+                                        event.target.checked = !event.target.checked;
+                                    }
+                                });
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error loading toast history:', error);
+                        const historyList = historyModal.querySelector('#toastHistoryList');
+                        if (historyList) {
+                                historyList.innerHTML = `
+                                <div class="text-center text-danger py-5">
+                                    <i class="bi bi-exclamation-circle fs-1 d-block mb-3"></i>
+                                    Error loading notifications
+                                </div>`;
+                        }
+                    }
                 });
                 if (toastConfig.debug) console.log('[Toast Manager] History button click handler initialized');
             }
@@ -246,45 +361,31 @@ const createToastSystem = () => {
             if (toastConfig.debug) console.log('[Toast Manager] Initialization complete', {
                 historyButtonFound: !!this.historyButton,
                 historyBadgeFound: !!this.historyBadge,
-                unreadCount: this.toastCount
+                unreadCount: this.toastUnreadCount
             });
             if (toastConfig.debug) console.groupEnd();
             return true;
         },
 
-        updateBadge() {
-            if (!this.historyBadge) {
-                if (toastConfig.debug) console.log('[Toast Manager] No history badge element found to update');
-                return;
+        updateBadge(count) {
+            if (!this.historyBadge) return;
+            
+            // Update internal count if provided
+            if (typeof count === 'number') {
+                this.toastUnreadCount = count;
             }
             
-            if (toastConfig.debug) console.log('[Toast Manager] Updating badge with count:', this.toastCount);
+            if (toastConfig.debug) console.log('[Toast Manager] Updating badge with count:', this.toastUnreadCount);
             
             // Update badge text and visibility
-            this.historyBadge.textContent = this.toastCount || '';
-            
-            // Only show badge if we have notifications
-            if (this.toastCount > 0) {
-                this.historyBadge.classList.remove('d-none');
-                if (toastConfig.debug) console.log('[Toast Manager] Showing badge with count:', this.toastCount);
-            } else {
-                this.historyBadge.classList.add('d-none');
-                if (toastConfig.debug) console.log('[Toast Manager] Hiding badge - no notifications');
-            }
+            this.historyBadge.textContent = this.toastUnreadCount || '';
+            this.historyBadge.classList.toggle('d-none', this.toastUnreadCount === 0);
             
             // Update button aria-label
             if (this.historyButton) {
-                const label = `Notification History (${this.toastCount} notifications)`;
+                const label = `Notification History (${this.toastUnreadCount} notifications)`;
                 this.historyButton.setAttribute('aria-label', label);
-                if (toastConfig.debug) console.log('[Toast Manager] Updated history button aria-label:', label);
             }
-
-            if (toastConfig.debug) console.log('[Toast Manager] Badge update complete:', {
-                count: this.toastCount,
-                visible: !this.historyBadge.classList.contains('d-none'),
-                text: this.historyBadge.textContent,
-                fromHistory: this.toastCount > 0
-            });
         },
 
         showToast(message, type = 'success', addToHistory = true) {
@@ -312,11 +413,9 @@ const createToastSystem = () => {
 
             if (toastConfig.debug) console.log('Created toastData:', toastData);
 
-            // Only increment badge count for API-triggered toasts that should be added to history
-            if (toastData.addToHistory) {
-                this.toastCount++;
-                if (toastConfig.debug) console.log('[Toast Manager] Incrementing badge count for API toast:', this.toastCount);
-                this.updateBadge();
+            // Only increment badge count if server confirms via response
+            if (toastData.toast_unread_count !== undefined) {
+                this.updateBadge(toastData.toast_unread_count);
             }
 
             // Use requestAnimationFrame for smooth animation

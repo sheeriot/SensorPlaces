@@ -166,6 +166,19 @@
     overflow-y: auto;
 }
 
+.toast-header-row {
+    font-size: 0.875rem;
+}
+
+.toast-timestamp {
+    white-space: nowrap;
+    min-width: 240px;
+}
+
+.toast-type-badge {
+    min-width: 80px;
+}
+
 .toast-history-item {
     padding: 0.5rem;
     border-bottom: 1px solid var(--bs-border-color);

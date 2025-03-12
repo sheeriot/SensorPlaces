@@ -7,56 +7,48 @@ class ToastMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # Skip logging for static and media files
+        if not any(path in request.path for path in ['/static/', '/media/']):
+            ic("ToastMiddleware processing request")
+            ic(request.path)
+            ic(request.user.is_authenticated)
+            
+            if hasattr(request, 'toast_message'):
+                ic("Found toast message", request.toast_message)
+        
         response = self.get_response(request)
-        
-        # Only process toast messages for authenticated users and non-API requests
-        if (hasattr(request, 'toast_message') and 
-            request.user.is_authenticated and 
-            not request.path.startswith('/api/')):
-            toast_msg = request.toast_message
-            # ic("ToastMiddleware - Adding toast to history:", toast_msg)
-            
-            # Store current message for immediate display
-            request.session['current_toast'] = toast_msg
-            
-            # Database persistence with user
-            ToastNotification.objects.create(
-                user=request.user,
-                message=toast_msg['message'],
-                type=toast_msg['type'],
-                read=False  # New notifications are unread by default
-            )
-        
         return response
 
     def process_template_response(self, request, response):
-        # Skip processing for API requests
-        if request.path.startswith('/api/'):
+        if request.path.startswith('/api/') or any(path in request.path for path in ['/static/', '/media/']):
             return response
 
-        # Add toast message to template context if it exists
         if hasattr(response, 'context_data') and request.user.is_authenticated:
-            # Handle current toast for immediate display
-            if 'current_toast' in request.session:
-                current_toast = request.session.pop('current_toast')
-                response.context_data['toast_message'] = current_toast
-                request.session.modified = True
+            ic("Processing template response")
+            ic(request.path)
             
-            # Get toast history and unread count
-            toast_history = ToastNotification.objects.filter(
-                user=request.user
-            ).order_by('-created_at')
+            # Get current unread count
+            unread_count = ToastNotification.objects.filter(
+                user=request.user,
+                read=False
+            ).count()
+            ic("Unread toast count", unread_count)
             
-            unread_count = toast_history.filter(read=False).count()
+            # Initialize body_data_attributes if it doesn't exist
+            if 'body_data_attributes' not in response.context_data:
+                response.context_data['body_data_attributes'] = {}
             
-            # Add to context for template use
-            response.context_data['toast_history'] = toast_history
-            response.context_data['unread_toast_count'] = unread_count
+            # Update body data attributes
+            response.context_data['body_data_attributes'].update({
+                'toast-unread-count': str(unread_count)
+            })
             
-            # Add to body data attributes for JavaScript
-            response.context_data['body_data_attributes'] = {
-                'unreadToasts': str(unread_count),
-                **response.context_data.get('body_data_attributes', {})
-            }
+            # Add count directly to context
+            response.context_data['toast_unread_count'] = unread_count
+            
+            ic("Template context", {
+                'toast_unread_count': response.context_data.get('toast_unread_count'),
+                'body_data_attributes': response.context_data.get('body_data_attributes')
+            })
             
         return response
