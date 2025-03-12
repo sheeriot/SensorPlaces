@@ -124,7 +124,7 @@ class InfluxSourceAdmin(admin.ModelAdmin):
 
 @admin.register(ToastNotification)
 class ToastNotificationAdmin(admin.ModelAdmin):
-    list_display = ('user', 'message', 'type', 'created_at')
-    list_filter = ('type',)
-    search_fields = ('user__username', 'message')
-    readonly_fields = ('created_at',)
+    list_display = ('place','user', 'message', 'type', 'created_at')
+    list_filter = ('place', 'user', 'type',)
+    search_fields = ('place__name', 'user__username', 'message')
+    readonly_fields = ('created_at','place','type','user', 'message')

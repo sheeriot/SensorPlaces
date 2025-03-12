@@ -1,6 +1,6 @@
 // Configuration
 const activeStatusConfig = {
-    debug: true
+    debug: false
 };
 console.log('[Active Status Checkbox] Config:', activeStatusConfig);
 

@@ -338,17 +338,17 @@ class ToastNotification(models.Model):
         ]
 
     @classmethod
-    def get_unread_count(cls, user, place=None):
+    def get_unread_count(cls, user, place):
         """
-        Get count of unread notifications for a user, optionally filtered by place.
+        Get count of unread notifications for a user in a specific place.
         Uses a single efficient database query.
         """
-        unread_query = cls.objects.filter(user=user).exclude(
+        return cls.objects.filter(
+            user=user,
+            place=place
+        ).exclude(
             toastreadstatus__user=user
-        )
-        if place:
-            unread_query = unread_query.filter(place=place)
-        return unread_query.count()
+        ).count()
 
     @classmethod
     def get_unread_for_place(cls, user, place):

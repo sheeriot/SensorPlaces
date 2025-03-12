@@ -1,4 +1,5 @@
 {% load static %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,7 +46,16 @@
     <script src="{% static 'sensors/js/place_map_location_picker.js' %}"></script>
     <script src="{% static 'sensors/js/siteplan_view.js' %}"></script>
     <script src="{% static 'sensors/js/siteplan_editor.js' %}"></script>
-
+    <script src="{% static 'sensors/js/active_status_checkbox.js' %}"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize active status checkbox if present
+            if (typeof initializeActiveStatusCheckbox === 'function') {
+                setTimeout(initializeActiveStatusCheckbox, 100);
+            }
+        });
+    </script>
 </head>
 <body data-toast-unread-count="{{ toast_unread_count|default:0 }}"
       {% if current_place %}data-place-slug="{{ current_place.slug }}"{% endif %}
@@ -155,21 +165,11 @@
         {% block content %}{% endblock %}
     </div>
     <!-- Toast System Components -->
-
     {% include "sensors/partials/toast_history_modal.html" %}
     
-    <!-- Toast Message Container -->
-    <div id="toast-messages" class="d-none">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="server-toast-message" data-processed="false">
-                    <script type="application/json">
-                        {{ message|safe }}
-                    </script>
-                </div>
-            {% endfor %}
-        {% endif %}
-    </div>
+    <!-- Include toast message container -->
+    {% include "sensors/partials/toast_container.html" %}
+
     <footer class="footer mt-auto py-3 bg-light border-top">
         <div class="container">
             <div class="row align-items-center">

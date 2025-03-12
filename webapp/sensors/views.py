@@ -254,7 +254,7 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             f"</small>"
         )
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
         }
@@ -314,7 +314,7 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
             f"</small>"
         )
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
         }
@@ -359,7 +359,7 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
         
         place.delete()
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'danger',
         }
@@ -648,7 +648,7 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
             f"</small>"
         )
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
         }
@@ -677,12 +677,6 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
             if devices_active:
                 kwargs['initial'] = kwargs.get('initial', {})
                 kwargs['initial']['devices_active'] = devices_active
-                
-                # ic("LocationUpdateView - Form kwargs", {
-                #     'location': self.object.name,
-                #     'devices_count': len(devices_active),
-                #     'devices': devices_active
-                # })
         
         return kwargs
 
@@ -709,9 +703,10 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
 
     def form_valid(self, form):
         # Store original values before save
-        self._original_values = {
-            'name': self.get_object().name,
-            'is_active': self.get_object().is_active
+        location = self.get_object()
+        original_values = {
+            'name': location.name,
+            'is_active': location.is_active
         }
         
         response = super().form_valid(form)
@@ -719,22 +714,27 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
         place = location.place
         changes = []
         
-        if location.name != self._original_values['name']:
-            changes.append(f"Name changed from '{self._original_values['name']}' to '{location.name}'")
+        # Build list of changes
+        if location.name != original_values['name']:
+            changes.append(f"name: {original_values['name']} → {location.name}")
+        if location.is_active != original_values['is_active']:
+            changes.append(f"status: {'Active' if original_values['is_active'] else 'inactive'} → {'Active' if location.is_active else 'inactive'}")
+
+        message = f"Updated location <strong>{location.name}</strong> in <i class='bi bi-house-gear'></i> {place.name}"
+        if changes:
+            message += f"<br><small class='text-muted'>{'; '.join(changes)}</small>"
         
-        if location.is_active != self._original_values['is_active']:
-            changes.append(f"Status changed from '{'Active' if self._original_values['is_active'] else 'inactive'}' to '{'Active' if location.is_active else 'inactive'}'")
-        
-        message = (
-            f"Updated location <strong>{location.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name}<br>"
-            f"<small class='text-muted'>{'; '.join(changes)}</small>"
-        )
-        
-        self.request.toast_message = {
+        # Store toast message in request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        }
+            'type': 'success' if location.is_active else 'warning'
+        })
+        
+        ic("LocationUpdateView setting toast_message:", {
+            'message': message,
+            'type': 'success' if location.is_active else 'warning',
+            'place_slug': self.kwargs.get('place_slug')
+        })
         
         return response
 
@@ -779,7 +779,7 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
         
         location.delete()
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'danger',
         }
@@ -961,7 +961,7 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             f"</small>"
         )
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
         }
@@ -1018,7 +1018,7 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             'place': device.location.place
         })
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'place': device.location.place
@@ -1064,7 +1064,7 @@ class DeviceDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
         device.delete()
         
         # Add toast message to the request
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'danger',
         }
@@ -1292,7 +1292,7 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             f"</small>"
         )
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
         }
@@ -1354,20 +1354,21 @@ class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             if self._original_values['unit'] != form.cleaned_data['unit']:
                 changes.append(f"unit: {self._original_values['unit']} → {form.cleaned_data['unit']}")
 
-        message = (
-            f"Updated sensor <strong>{sensor.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {location.name} > "
-            f"<i class='bi bi-hdd-rack'></i> {device.name}<br>"
-            f"<small class='text-muted'>"
-            f"Changes: {', '.join(changes) if changes else 'No changes'}"
-            f"</small>"
-        )
+        message = f"Updated location <strong>{sensor.name}</strong> in <i class='bi bi-house-gear'></i> {place.name}"
+        if changes:
+            message += f"<br><small class='text-muted'>{'; '.join(changes)}</small>"
         
-        self.request.toast_message = {
+        # Store toast message in request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        }
+            'type': 'success' if sensor.is_active else 'warning'
+        })
+        
+        ic("LocationUpdateView setting toast_message:", {
+            'message': message,
+            'type': 'success' if sensor.is_active else 'warning',
+            'place_slug': self.kwargs.get('place_slug')
+        })
         
         return response
 
@@ -1403,7 +1404,7 @@ class SensorDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
         
         sensor.delete()
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'danger',
         }
@@ -1573,7 +1574,7 @@ class SensorReadingCreateView(LoginRequiredMixin, LocationAnnotationMixin, Creat
             f"</small>"
         )
         
-        self.request.toast_message = {
+        self.request.session['pending_toast'] = {
             'message': message,
             'type': 'success',
         }
