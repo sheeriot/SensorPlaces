@@ -65,10 +65,10 @@ const createToastSystem = () => {
                     return;
                 }
 
-                // Get place slug from global variable
-                const placeSlug = window.currentPlaceSlug;
+                // Get place slug from global state
+                const placeSlug = window.sensorPlaces?.currentPlaceSlug;
                 if (!placeSlug) {
-                    if (toastConfig.debug) console.log('[Toast Manager] Error: No current place slug found');
+                    if (toastConfig.debug) console.log('[Toast Manager] Error: No current place slug found in global state');
                     return;
                 }
 

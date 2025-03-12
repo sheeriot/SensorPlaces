@@ -38,9 +38,14 @@ from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 class LocationAnnotationMixin:
     """Mixin to add annotated locations to context data."""
     
-    def get_place(self):
+    kwargs: dict
+    
+    def get_place(self) -> Place:
         """Get the place object from the URL kwargs.
         
+        Returns:
+            Place: The place object for this view
+            
         Raises:
             Http404: If place_slug is not in kwargs or Place does not exist
         """
@@ -53,7 +58,7 @@ class LocationAnnotationMixin:
             self._place = get_object_or_404(Place, slug=place_slug)
         return self._place
     
-    def get_location_data(self, location: Location) -> Dict[str, Any]:
+    def get_location_data(self, location: Location) -> dict:
         """Convert a Location instance to a JSON-serializable dictionary.
         
         Args:
@@ -63,12 +68,12 @@ class LocationAnnotationMixin:
             Dict containing the location data for JavaScript
         """
         return {
-            'id': location.id,
-            'name': location.name,
+            'id': str(location.pk),
+            'name': str(location.name),
             'x_pos': float(location.x_pos) if isinstance(location.x_pos, Decimal) else location.x_pos,
             'y_pos': float(location.y_pos) if isinstance(location.y_pos, Decimal) else location.y_pos,
-            'is_active': location.is_active,
-            'devices_active_count': location.devices_active_count
+            'is_active': bool(location.is_active),
+            'devices_active_count': getattr(location, 'devices_active_count', 0)
         }
 
     def get_annotated_locations(self, place: Place) -> QuerySet[Location]:
@@ -103,7 +108,7 @@ class LocationAnnotationMixin:
             )
         ).order_by('-is_active', Lower('name'))
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> dict:
         """Add location data and place to the template context."""
         context = super().get_context_data(**kwargs)
         
@@ -190,13 +195,14 @@ class PlaceListView(LoginRequiredMixin, ListView):
             ).order_by('-is_active', Lower('name'))
         return self._queryset
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
         try:
             map_html = place_map_create(places=self.get_queryset())
             context['place_map_html'] = map_html
         except Exception as e:
+            ic("Error creating place map:", str(e))
             context['place_map_html'] = ""
         
         return context
@@ -211,30 +217,9 @@ class PlaceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
     def get_queryset(self) -> QuerySet[Place]:
         return Place.objects.all()
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
-
-        if 'locations' in context:
-            locations_data = []
-            for location in context['locations']:
-                # Convert Decimal to float for JSON serialization
-                x_pos = float(location.x_pos) if isinstance(location.x_pos, Decimal) else location.x_pos
-                y_pos = float(location.y_pos) if isinstance(location.y_pos, Decimal) else location.y_pos
-                
-                locations_data.append({
-                    'id': location.id,
-                    'name': location.name,
-                    'x_pos': x_pos,  # Match JavaScript property names
-                    'y_pos': y_pos,  # Match JavaScript property names
-                    'is_active': location.is_active,
-                    'devices_active_count': location.devices_active_count
-                })
-            context['locations_json'] = json.dumps(locations_data)
-            
-        else:
-            context['locations_json'] = '[]'
-            
         return context
 
 class PlaceCreateView(LoginRequiredMixin, CreateView):
@@ -242,9 +227,9 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
 
-    def form_valid(self, form):
+    def form_valid(self, form: PlaceForm) -> HttpResponseRedirect:
         response = super().form_valid(form)
-        place = self.object
+        place: Place = self.object
         
         message = (
             f"Created place <strong>{place.name}</strong><br>"
@@ -254,14 +239,20 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             f"</small>"
         )
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        }
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
+        
+        ic("PlaceCreateView setting toast_message:", {
+            'message': message,
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
         
         return response
 
-    def get_success_url(self):
+    def get_success_url(self) -> str:
         return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
 
 class PlaceUpdateView(LoginRequiredMixin, UpdateView):
@@ -270,23 +261,19 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'sensors/place_form.html'
     slug_url_kwarg = 'place_slug'
 
-    def get_initial(self):
+    def get_initial(self) -> dict:
         initial = super().get_initial()
         initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
         return initial
 
-    def get_success_url(self):
-        if 'referrer' in self.request.POST:
-            return self.request.POST['referrer']
-        return reverse('sensors:place_list')
-
-    def form_valid(self, form):
+    def form_valid(self, form: PlaceForm) -> HttpResponseRedirect:
+        place: Place = self.get_object()
         original_values = {
-            'name': self.get_object().name,
-            'is_active': self.get_object().is_active,
-            'latitude': self.get_object().latitude,
-            'longitude': self.get_object().longitude,
-            'siteplan_image': self.get_object().siteplan_image.name if self.get_object().siteplan_image else None
+            'name': place.name,
+            'is_active': place.is_active,
+            'latitude': place.latitude,
+            'longitude': place.longitude,
+            'siteplan_image': place.siteplan_image.name if place.siteplan_image else None
         }
         
         response = super().form_valid(form)
@@ -314,12 +301,23 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
             f"</small>"
         )
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request instead of session
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        }
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
+        
+        ic("PlaceUpdateView setting toast_message:", {
+            'message': message,
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
         
         return response
+
+    def get_success_url(self) -> str:
+        if 'referrer' in self.request.POST:
+            return self.request.POST['referrer']
+        return reverse('sensors:place_list')
 
 class PlaceDeleteView(LoginRequiredMixin, DeleteView):
     model = Place
@@ -357,12 +355,18 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
         
         message += "</small>"
         
-        place.delete()
-        
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(request, 'toast_message', {
             'message': message,
-            'type': 'danger',
-        }
+            'type': 'danger'
+        })
+        
+        ic("PlaceDeleteView setting toast_message:", {
+            'message': message,
+            'type': 'danger'
+        })
+        
+        place.delete()
         
         return HttpResponseRedirect(success_url)
 
@@ -648,10 +652,16 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
             f"</small>"
         )
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        }
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
+        
+        ic("LocationCreateView setting toast_message:", {
+            'message': message,
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
         
         return response
 
@@ -777,12 +787,19 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
         
         message += "</small>"
         
+        # Delete the location
         location.delete()
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(request, 'toast_message', {
             'message': message,
-            'type': 'danger',
-        }
+            'type': 'danger'
+        })
+        
+        ic("LocationDeleteView setting toast_message:", {
+            'message': message,
+            'type': 'danger'
+        })
         
         return HttpResponseRedirect(success_url)
 
@@ -961,10 +978,16 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             f"</small>"
         )
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        }
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
+        
+        ic("DeviceCreateView setting toast_message:", {
+            'message': message,
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
         
         return response
 
@@ -1018,11 +1041,12 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             'place': device.location.place
         })
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
             'place': device.location.place
-        }
+        })
         
         return response
 
@@ -1063,11 +1087,16 @@ class DeviceDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
         # Delete the device
         device.delete()
         
-        # Add toast message to the request
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(request, 'toast_message', {
             'message': message,
-            'type': 'danger',
-        }
+            'type': 'danger'
+        })
+        
+        ic("DeviceDeleteView setting toast_message:", {
+            'message': message,
+            'type': 'danger'
+        })
         
         return HttpResponseRedirect(success_url)
 
@@ -1292,10 +1321,16 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             f"</small>"
         )
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        }
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
+        
+        ic("SensorCreateView setting toast_message:", {
+            'message': message,
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        })
         
         return response
 
@@ -1358,13 +1393,13 @@ class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         if changes:
             message += f"<br><small class='text-muted'>{'; '.join(changes)}</small>"
         
-        # Store toast message in request for middleware
+        # Set toast message in request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if sensor.is_active else 'warning'
         })
         
-        ic("LocationUpdateView setting toast_message:", {
+        ic("SensorUpdateView setting toast_message:", {
             'message': message,
             'type': 'success' if sensor.is_active else 'warning',
             'place_slug': self.kwargs.get('place_slug')
@@ -1404,10 +1439,16 @@ class SensorDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
         
         sensor.delete()
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(request, 'toast_message', {
             'message': message,
-            'type': 'danger',
-        }
+            'type': 'danger'
+        })
+        
+        ic("SensorDeleteView setting toast_message:", {
+            'message': message,
+            'type': 'danger'
+        })
         
         return HttpResponseRedirect(success_url)
 
@@ -1574,10 +1615,16 @@ class SensorReadingCreateView(LoginRequiredMixin, LocationAnnotationMixin, Creat
             f"</small>"
         )
         
-        self.request.session['pending_toast'] = {
+        # Set toast message directly on request for middleware
+        setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success',
-        }
+            'type': 'success'
+        })
+        
+        ic("SensorReadingCreateView setting toast_message:", {
+            'message': message,
+            'type': 'success'
+        })
         
         return response
 
@@ -1782,8 +1829,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             if not model_type or not object_id:
                 return JsonResponse({
                     'success': False,
-                    'message': 'model_type and id are required',
-                    'type': 'danger'
+                    'error': 'model_type and id are required'
                 }, status=400)
 
             # Map model types to actual models
@@ -1798,8 +1844,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             if not model_class:
                 return JsonResponse({
                     'success': False,
-                    'message': f'Invalid model type: {model_type}',
-                    'type': 'danger'
+                    'error': f'Invalid model type: {model_type}'
                 }, status=400)
 
             # Get the object and validate ownership through place
@@ -1819,8 +1864,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             if place.slug != place_slug:
                 return JsonResponse({
                     'success': False,
-                    'message': 'Object does not belong to this place',
-                    'type': 'danger'
+                    'error': 'Object does not belong to this place'
                 }, status=403)
 
             # Toggle the active status
@@ -1837,27 +1881,31 @@ class ToggleActiveView(LoginRequiredMixin, View):
             else:  # sensor
                 name_path = f"{place.name} > {obj.device.location.name} > {obj.device.name} > {obj.name}"
 
-            message = (
-                f"{'Activated' if obj.is_active else 'Deactivated'} {model_type}: "
-                f"<strong>{name_path}</strong>"
-            )
+            # Set toast message using our standard pattern
+            request.toast_message = {
+                'message': (
+                    f"{'Activated' if obj.is_active else 'Deactivated'} {model_type}: "
+                    f"<strong>{name_path}</strong>"
+                ),
+                'type': 'success' if obj.is_active else 'warning'
+            }
 
             return JsonResponse({
                 'success': True,
                 'is_active': obj.is_active,
-                'message': message,
-                'type': 'success' if obj.is_active else 'warning'
+                'unread_count': ToastNotification.get_unread_count(
+                    user=request.user,
+                    place=place
+                )
             })
 
         except json.JSONDecodeError:
             return JsonResponse({
                 'success': False,
-                'message': 'Invalid JSON data',
-                'type': 'danger'
+                'error': 'Invalid JSON data'
             }, status=400)
         except Exception as e:
             return JsonResponse({
                 'success': False,
-                'message': str(e),
-                'type': 'danger'
+                'error': str(e)
             }, status=500)
