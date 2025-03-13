@@ -26,18 +26,36 @@ class ToastMiddleware:
     #                         captured_kwargs={'place_slug': 'carpet'})
 
     def process_response(self, request, response):
-        ic('=======> Toast Middleware process_response', request.path)
+        # ic(vars(request))
+        # ic(vars(response))
+
+        # do not process static files or media files
         if any(path in request.path for path in ['/static/', '/media/']):
             return response
+        
         try:
-            ic(request)      
-            ic(request.resolver_match)
-            ic(request.resolver_match.kwargs)
+            # Get place_slug from URL - source of truth
             place_slug = request.resolver_match.kwargs.get('place_slug', None)
-            if place_slug:
-                place = get_object_or_404(Place, slug=place_slug)
-                ic(place)
-
+            
+            # If we have a TemplateResponse, ensure place_slug is in context
+            if isinstance(response, TemplateResponse):
+                response.context_data['place_slug'] = place_slug or 'none'
+                
+                # Initialize place as None
+                place = None
+                if place_slug:
+                    try:
+                        place = get_object_or_404(Place, slug=place_slug)
+                        # Also add unread count to context
+                        if request.user.is_authenticated:
+                            unread_count = ToastNotification.get_unread_count(
+                                place=place,
+                                user=request.user,
+                            )
+                            response.context_data['toast_unread_count'] = unread_count
+                    except:
+                        ic(f"Toast Middleware: Place not found for slug {place_slug}")
+            
             toast_data = None
             
             # Check for request.toast_message
@@ -45,15 +63,15 @@ class ToastMiddleware:
                 toast_data = request.toast_message
                 ic("Found toast_message in request:", toast_data)
 
-            # Create notification in database if toast_data is available
-            if toast_data:
+            # Create notification in database if toast_data is available and we have both user and place
+            if toast_data and request.user.is_authenticated and place:
                 notification = ToastNotification.objects.create(
                     user=request.user,
                     place=place,
                     message=toast_data['message'],
                     type=toast_data['type']
                 )
-                ic(notification)
+                # ic(notification)
 
             # Handle API responses
             if request.path.startswith('/api/'):
@@ -67,76 +85,78 @@ class ToastMiddleware:
                     user=request.user,
                 )
                 response.context_data['toast_unread_count'] = unread_count
-                ic("Updated unread count:", unread_count)
+                # ic("Updated unread count:", unread_count)
 
                 # Process pending toast
                 if 'pending_toast' in request.session:
+                    ic("Processing pending toast in template:", toast_data)
                     toast_data = request.session.pop('pending_toast')
                     response.context_data['toast_message'] = toast_data
+                    ic("Added toast to template context", toast_data)
 
         except Exception as e:
             ic("Toast Middleware error:", str(e))
 
         return response
 
-    def process_template_response(self, request, response):
-        if request.path.startswith('/api/') or any(path in request.path for path in ['/static/', '/media/']):
-            return response
+    # def process_template_response(self, request, response):
+    #     if request.path.startswith('/api/') or any(path in request.path for path in ['/static/', '/media/']):
+    #         return response
         
-        # ic("** Middleware - Process template response:")
-        # ic(request.path)
-        # ic(place_slug)
-        # if hasattr(response, 'context_data'):
-        #     ic(response.context_data)
-        # if hasattr(request, 'toast_message'):
-        #     ic(request.session.toast_message)
+    #     # ic("** Middleware - Process template response:")
+    #     # ic(request.path)
+    #     # ic(place_slug)
+    #     # if hasattr(response, 'context_data'):
+    #     #     ic(response.context_data)
+    #     # if hasattr(request, 'toast_message'):
+    #     #     ic(request.session.toast_message)
 
-        if hasattr(response, 'context_data') and request.user.is_authenticated:
-            try:
-                # Get place_slug from URL kwargs
-                resolved = resolve(request.path)
-                # ic(request.path, resolved)
-                place_slug = resolved.kwargs.get('place_slug')
+    #     if hasattr(response, 'context_data') and request.user.is_authenticated:
+    #         try:
+    #             # Get place_slug from URL kwargs
+    #             resolved = resolve(request.path)
+    #             # ic(request.path, resolved)
+    #             place_slug = resolved.kwargs.get('place_slug')
 
                 
-                # Add place_slug to context data
-                response.context_data['place_slug'] = place_slug
+    #             # Add place_slug to context data
+    #             response.context_data['place_slug'] = place_slug
                 
-                # Get unread count - only if we have a place
-                if place_slug:
-                    place = get_object_or_404(Place, slug=place_slug)
-                    unread_count = ToastNotification.get_unread_count(
-                        user=request.user,
-                        place=place
-                    )
-                    response.context_data['toast_unread_count'] = unread_count
-                    # ic("Updated unread count for place:", {
-                    #     'place': place.name,
-                    #     'unread_count': unread_count,
-                    #     'place_slug': place_slug  # Log the slug too
-                    # })
+    #             # Get unread count - only if we have a place
+    #             if place_slug:
+    #                 place = get_object_or_404(Place, slug=place_slug)
+    #                 unread_count = ToastNotification.get_unread_count(
+    #                     user=request.user,
+    #                     place=place
+    #                 )
+    #                 response.context_data['toast_unread_count'] = unread_count
+    #                 # ic("Updated unread count for place:", {
+    #                 #     'place': place.name,
+    #                 #     'unread_count': unread_count,
+    #                 #     'place_slug': place_slug  # Log the slug too
+    #                 # })
                 
-                # If there's a pending toast, add it to template context
-                if 'pending_toast' in request.session:
-                    toast_data = request.session.pop('pending_toast')
-                    # ic("Processing pending toast in template:", toast_data)
+    #             # If there's a pending toast, add it to template context
+    #             if 'pending_toast' in request.session:
+    #                 toast_data = request.session.pop('pending_toast')
+    #                 # ic("Processing pending toast in template:", toast_data)
                     
-                    # Add to template context instead of messages
-                    response.context_data['toast_message'] = toast_data
-                    # ic("Added toast to template context:", {
-                        # 'toast_data': toast_data,
-                        # 'context_keys': list(response.context_data.keys())
-                    # })
+    #                 # Add to template context instead of messages
+    #                 response.context_data['toast_message'] = toast_data
+    #                 # ic("Added toast to template context:", {
+    #                     # 'toast_data': toast_data,
+    #                     # 'context_keys': list(response.context_data.keys())
+    #                 # })
                 
-                # ic("Template response context complete:", {
-                #     'has_messages': bool(list(messages.get_messages(request))),
-                #     'context_keys': list(response.context_data.keys())
-                # })
+    #             # ic("Template response context complete:", {
+    #             #     'has_messages': bool(list(messages.get_messages(request))),
+    #             #     'context_keys': list(response.context_data.keys())
+    #             # })
                 
-            except Exception as e:
-                ic("Template response error:", {
-                    'error': str(e),
-                    'path': request.path
-                })
+    #         except Exception as e:
+    #             ic("Template response error:", {
+    #                 'error': str(e),
+    #                 'path': request.path
+    #             })
         
-        return response
+    #     return response

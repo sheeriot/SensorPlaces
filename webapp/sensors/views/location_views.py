@@ -84,10 +84,9 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.get_place()
-        ic(kwargs['place'])
+        # ic(kwargs['place'])
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial'].update({
-            # 'place': place,
             'is_active': kwargs['place'].is_active,  # Set initial is_active to match place
             'referrer': self.request.GET.get('next', '')
         })
@@ -177,11 +176,25 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         response = super().form_valid(form)
         location = self.object
         
+        # Track original values
+        original_values = {
+            'name': location.name,
+            'is_active': location.is_active,
+        }
+        
+        # Build changes list
+        changes = []
+        if original_values['name'] != form.cleaned_data['name']:
+            changes.append(f"Name: {original_values['name']} → {form.cleaned_data['name']}")
+        if original_values['is_active'] != form.cleaned_data['is_active']:
+            changes.append(f"Status: {'active' if original_values['is_active'] else 'inactive'} → {'active' if form.cleaned_data['is_active'] else 'inactive'}")
+
+        # Build toast message
         message = (
             f"Updated location <strong>{location.name}</strong> in "
             f"<i class='bi bi-house-gear'></i> {place.name}<br>"
             f"<small class='text-muted'>"
-            f"Status: {'Active' if location.is_active else 'inactive'}"
+            f"Changes: {', '.join(changes) if changes else 'No changes'}"
             f"</small>"
         )
         

@@ -11,10 +11,16 @@ const commonConfig = {
     debug: true  // Set to true to enable debug mode
 };
 
-// Global state
+// Global state - expanded with body data attributes
 window.sensorPlaces = {
     currentPlaceSlug: null,
-    toastUnreadCount: 0
+    toastUnreadCount: 0,
+    bodyData: {},  // Will hold all data-* attributes from body
+    initialized: {
+        activeStatusCheckbox: false,
+        deviceForm: false,
+        toast: false
+    }
 };
 
 // Add global error handler for uncaught promise rejections
@@ -26,34 +32,23 @@ window.addEventListener('unhandledrejection', event => {
     }
 });
 
-// Debug logging helper
-function debugLog(message, data = null) {
-    if (!commonConfig.debug) return;
-    const caller = new Error().stack.split('\n')[2].trim().split(' ')[1];
-    if (data) {
-        console.debug(`[${caller}]`, message, data);
-    } else {
-        console.debug(`[${caller}]`, message);
-    }
-}
-
 // Helper function to wait for toast system
 function waitForToastSystem(maxAttempts = 10, interval = 100) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
         
         const check = () => {
-            debugLog('Checking for toast system availability', {
+            if (commonConfig.debug) console.log('[check] Checking for toast system availability:', {
                 attempt: attempts + 1,
                 maxAttempts,
                 available: !!window.toastSystem
             });
 
             if (window.toastSystem) {
-                debugLog('Toast system found');
+                if (commonConfig.debug) console.log('[check] Toast system found');
                 resolve(window.toastSystem);
             } else if (attempts >= maxAttempts) {
-                debugLog('Toast system not found after maximum attempts');
+                if (commonConfig.debug) console.log('[check] Toast system not found after maximum attempts');
                 reject(new Error('Toast system not available'));
             } else {
                 attempts++;
@@ -65,39 +60,51 @@ function waitForToastSystem(maxAttempts = 10, interval = 100) {
     });
 }
 
-// Initialize place slug and other global state
+// Initialize body data attributes and global state
 function initializeGlobalState() {
-    // Get place slug from body data attribute
-    window.sensorPlaces.currentPlaceSlug = document.body.dataset.placeSlug || null;
-    window.sensorPlaces.toastUnreadCount = parseInt(document.body.dataset.toastUnreadCount || '0', 10);
+    const body = document.body;
+    if (!body) {
+        if (commonConfig.debug) console.log('[initializeGlobalState] Body not available');
+        return false;
+    }
+
+    // Get all data attributes from body
+    window.sensorPlaces.bodyData = Object.assign({}, body.dataset);
     
-    debugLog('Global state initialized:', {
+    // Set specific commonly used values
+    window.sensorPlaces.currentPlaceSlug = body.dataset.placeSlug || 'none';
+    window.sensorPlaces.toastUnreadCount = parseInt(body.dataset.toastUnreadCount || '0', 10);
+    
+    if (commonConfig.debug) console.log('[initializeGlobalState] Global state initialized:', {
         placeSlug: window.sensorPlaces.currentPlaceSlug,
-        unreadCount: window.sensorPlaces.toastUnreadCount
+        unreadCount: window.sensorPlaces.toastUnreadCount,
+        allBodyData: window.sensorPlaces.bodyData
     });
     
     // For backward compatibility (can be removed later)
     window.currentPlaceSlug = window.sensorPlaces.currentPlaceSlug;
+    
+    return true;
 }
 
 // Initialize toast functionality
 async function initializeToastFunctionality() {
-    debugLog('Initializing toast functionality');
+    if (commonConfig.debug) console.log('[initializeToastFunctionality] Initializing toast functionality');
 
     try {
         // Wait for toast system to be available
         const toastSystem = await waitForToastSystem();
-        debugLog('Toast system ready', {
+        if (commonConfig.debug) console.log('[initializeToastFunctionality] Toast system ready:', {
             initialized: toastSystem.initialized
         });
 
         // Initialize toast system with unread count
         const unreadCount = window.sensorPlaces.toastUnreadCount;
-        debugLog('Set initial unread count:', { unreadCount });
+        if (commonConfig.debug) console.log('[initializeToastFunctionality] Set initial unread count:', { unreadCount });
 
         // Initialize toast event listeners
         document.addEventListener('sensors:toast:show', (event) => {
-            debugLog('Toast event received:', event.detail);
+            if (commonConfig.debug) console.log('[Toast Event] Toast event received:', event.detail);
 
             const { message, type = 'info', addToHistory = true } = event.detail;
             toastSystem.show(message, type, addToHistory);
@@ -105,35 +112,58 @@ async function initializeToastFunctionality() {
 
         // Helper function to show toasts
         window.showToast = function(message, type = 'info', addToHistory = true) {
-            debugLog('showToast called:', { message, type, addToHistory });
+            if (commonConfig.debug) console.log('[showToast] Called with:', { message, type, addToHistory });
             document.dispatchEvent(new CustomEvent('sensors:toast:show', {
                 detail: { message, type, addToHistory }
             }));
         };
 
-        debugLog('Toast functionality initialized successfully');
+        if (commonConfig.debug) console.log('[initializeToastFunctionality] Toast functionality initialized successfully');
 
     } catch (error) {
-        debugLog('Failed to initialize toast functionality:', error);
+        if (commonConfig.debug) console.log('[initializeToastFunctionality] Failed to initialize:', error);
+    }
+}
+
+// Initialize core functionality
+async function initializeCore() {
+    if (commonConfig.debug) console.log('[initializeCore] Starting initialization sequence');
+    
+    // Initialize global state first
+    initializeGlobalState();
+    
+    try {
+        // 1. Initialize active status checkbox system
+        if (window.activeStatusCheckbox?.initialize) {
+            if (commonConfig.debug) console.log('[initializeCore] Initializing active status checkbox');
+            window.activeStatusCheckbox.initialize();
+            window.sensorPlaces.initialized.activeStatusCheckbox = true;
+        }
+
+        // 2. Initialize device form (if present)
+        if (window.deviceForm?.initialize) {
+            if (commonConfig.debug) console.log('[initializeCore] Initializing device form');
+            window.deviceForm.initialize();
+            window.sensorPlaces.initialized.deviceForm = true;
+        }
+
+        // 3. Initialize toast system
+        await initializeToastFunctionality();
+        window.sensorPlaces.initialized.toast = true;
+
+        if (commonConfig.debug) console.log('[initializeCore] Initialization complete:', {
+            initialized: window.sensorPlaces.initialized
+        });
+
+    } catch (error) {
+        if (commonConfig.debug) console.log('[initializeCore] Initialization error:', error);
     }
 }
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    debugLog('Document loaded and ready', {
-        readyState: document.readyState,
-        toastAvailable: !!window.toastSystem
-    });
-
-    // Initialize global state first
-    initializeGlobalState();
-
-    // Initialize toast functionality
-    initializeToastFunctionality().then(() => {
-        debugLog('Toast initialization complete');
-    }).catch(error => {
-        debugLog('Toast initialization failed:', error);
-    });
+    if (commonConfig.debug) console.log('[DOMContentLoaded] Starting initialization');
+    initializeCore();
 
     // Export toast events for other modules
     window.ToastEvents = {
@@ -142,3 +172,8 @@ document.addEventListener('DOMContentLoaded', () => {
         CLEAR: 'sensors:toast:clear'
     };
 });
+
+// Export initialization status checker
+window.sensorPlaces.isInitialized = function(module) {
+    return window.sensorPlaces.initialized[module] || false;
+};

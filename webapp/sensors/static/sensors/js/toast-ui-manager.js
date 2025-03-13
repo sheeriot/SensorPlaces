@@ -9,9 +9,12 @@
 
 // System Configuration
 const toastConfig = {
-    debug: true,  // Set to true to enable debug mode
-    apiEndpoint: (placeSlug) => `/api/${placeSlug}/toasts/`
+    debug: false,  // Set to true to enable debug mode
+    apiEndpoint: (placeSlug) => `/api/${placeSlug}/toasts/`,
 };
+
+// if (toastConfig.debug) 
+console.log('toastConfig.apiEndpoint:', toastConfig.apiEndpoint);
 
 // Create and initialize the system
 const createToastSystem = () => {
@@ -42,13 +45,13 @@ const createToastSystem = () => {
                 return false;
             }
 
-            // Get initial count from badge (already set by template)
-            this.toastUnreadCount = parseInt(this.historyBadge.textContent || '0', 10);
+            // Get initial count from global state
+            this.toastUnreadCount = window.sensorPlaces.toastUnreadCount;
             
             if (toastConfig.debug) {
                 console.log('[Toast Manager] Initial state:', {
                     unreadCount: this.toastUnreadCount,
-                    placeSlug: this.historyButton.dataset.placeSlug,
+                    placeSlug: window.sensorPlaces.currentPlaceSlug,
                     badgeVisible: !this.historyBadge.classList.contains('d-none')
                 });
             }

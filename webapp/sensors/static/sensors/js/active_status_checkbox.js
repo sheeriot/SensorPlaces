@@ -1,6 +1,6 @@
 // Configuration
 const activeStatusConfig = {
-    debug: false
+    debug: true
 };
 
 // Active Status Checkbox functionality
@@ -11,14 +11,6 @@ function initializeActiveStatusCheckbox() {
     const checkboxes = document.querySelectorAll('input[data-active-checkbox]');
     if (activeStatusConfig.debug) {
         console.log('[Active Status Checkbox] Found checkboxes:', checkboxes);
-        checkboxes.forEach(checkbox => {
-            console.log('[Active Status Checkbox] Checkbox details:', {
-                html: checkbox.outerHTML,
-                id: checkbox.id,
-                dataset: checkbox.dataset,
-                parent: checkbox.parentElement?.outerHTML
-            });
-        });
     }
 
     checkboxes.forEach(checkbox => {
@@ -28,6 +20,45 @@ function initializeActiveStatusCheckbox() {
             if (activeStatusConfig.debug) console.log('[Active Status Checkbox] No container found for checkbox:', checkbox);
             return;
         }
+
+        // Listen for location status changes
+        container.addEventListener('locationStatusChanged', function(e) {
+            if (activeStatusConfig.debug) {
+                console.log('[Active Status Checkbox] Location status changed event:', {
+                    detail: e.detail,
+                    checkbox: checkbox.checked,
+                    disabled: checkbox.disabled
+                });
+            }
+            
+            // Update checkbox state based on force-inactive
+            const forceInactive = container.dataset.forceInactive === 'true';
+            checkbox.disabled = forceInactive;
+            
+            if (forceInactive) {
+                checkbox.checked = false;
+                // Update help text if provided
+                const helpText = container.querySelector('[data-active-checkbox-help]');
+                if (helpText && container.dataset.inactiveReason) {
+                    helpText.textContent = container.dataset.inactiveReason;
+                    helpText.classList.remove('d-none');
+                }
+            }
+
+            // Update label text
+            const label = container.querySelector('label');
+            if (label) {
+                label.textContent = checkbox.checked ? 'Active' : 'inactive';
+            }
+
+            if (activeStatusConfig.debug) {
+                console.log('[Active Status Checkbox] Updated state:', {
+                    checked: checkbox.checked,
+                    disabled: checkbox.disabled,
+                    label: label?.textContent
+                });
+            }
+        });
 
         if (activeStatusConfig.debug) {
             console.log('[Active Status Checkbox] Container details:', {
@@ -117,15 +148,34 @@ function initializeActiveStatusCheckbox() {
     return true;
 }
 
-// Initialize immediately since we're being loaded after DOM is ready
+window.activeStatusCheckbox = {
+    config: { debug: true },
+    initialize: initializeActiveStatusCheckbox
+};
 
-initializeActiveStatusCheckbox();
-
-// Add a delayed check to see if any elements were added after initial load
-setTimeout(() => {
-    if (activeStatusConfig.debug) console.log('[Active Status Checkbox] Delayed DOM check:', {
-        checkboxes: document.querySelectorAll('input[data-active-checkbox]'),
-        helpText: document.querySelectorAll('[data-active-checkbox-help]'),
-        formText: document.querySelectorAll('.form-text')
+// Re-initialize on any dynamic content changes
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.addedNodes.length) {
+            if (activeStatusConfig.debug) console.log('[Active Status Checkbox] DOM changed, re-initializing');
+            initializeActiveStatusCheckbox();
+        }
     });
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+
+// Add a delayed check
+setTimeout(() => {
+    if (activeStatusConfig.debug) {
+        console.log('[Active Status Checkbox] Delayed DOM check:', {
+            checkboxes: document.querySelectorAll('input[data-active-checkbox]'),
+            helpText: document.querySelectorAll('[data-active-checkbox-help]'),
+            formText: document.querySelectorAll('.form-text')
+        });
+    }
+    initializeActiveStatusCheckbox();  // One final initialization attempt
 }, 1000);

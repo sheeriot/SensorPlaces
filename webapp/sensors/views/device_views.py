@@ -1,19 +1,18 @@
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
-
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.http import HttpResponseRedirect
 
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet, Prefetch
-from django.urls import reverse
-from django.http import HttpResponseRedirect
 
 from ..models import Place, Location, Device, Sensor
 from ..forms import DeviceForm
 from .mixins import PlaceAnnotationMixin
 
-# from icecream import ic
+from icecream import ic
 
 # Device Views
 class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
@@ -107,62 +106,49 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     object: Device
 
     def setup(self, request, *args, **kwargs):
-        """Cache common values during view setup"""
         super().setup(request, *args, **kwargs)
-        self._place = None
-        self._location = None
+        self.place = self.get_place()
+        location_pk = self.kwargs.get('location_pk', None)
+        if location_pk:
+            self.location = get_object_or_404(Location, pk=location_pk, place=self.place)
 
-    @property
-    def place(self):
-        """Cached place getter"""
-        if self._place is None:
-            place_slug = self.kwargs.get('place_slug')
-            self._place = get_object_or_404(Place, slug=place_slug)
-        return self._place
+    # what is this for?
+    # @property
+    # def place(self):
+    #     """Cached place getter"""
+    #     if self._place is None:
+    #         self._place = self.get_place()
+    #     return self._place
 
-    @property
-    def location(self):
-        """Cached location getter"""
-        if self._location is None:
-            location_pk = self.kwargs.get('location_pk')
-            if location_pk:
-                self._location = get_object_or_404(
-                    Location,
-                    pk=location_pk,
-                    place=self.place
-                )
-        return self._location
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        device_pk = self.kwargs.get('device_pk')
-        if device_pk:
-            device = get_object_or_404(Device, pk=device_pk, location__place=self.place)
-            if not device.is_active:
-                form.fields['is_active'].help_text = f"<i class='bi bi-hdd-rack'></i> {device.name} is inactive"
-        return form
+    # @property
+    # def location(self):
+    #     """Cached location getter"""
+    #     if self._location is None:
+    #         location_pk = self.kwargs.get('location_pk')
+    #         if location_pk:
+    #             self._location = get_object_or_404(
+    #                 Location,
+    #                 pk=location_pk,
+    #                 place=self.place
+    #             )
+    #     return self._location
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.place
-        
-        # Set initial data including location and is_active
-        initial = kwargs.get('initial', {})
-        
-        # If we have a location, use it for initial data
-        if self.location:
-            initial['location'] = self.location
-            # Set is_active based on location's status
-            initial['is_active'] = self.location.is_active
-        
-        kwargs['initial'] = initial
+        kwargs['locations'] = self.get_annotated_locations(self.place)
+        kwargs['initial'] = {
+            'location': self.location,
+            'referrer': self.request.GET.get('next')
+        }
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
         context['place'] = self.place
-        
+        context['location'] = self.location
+        context['locations'] = self.get_annotated_locations(self.place)
         if self.location:
             context['location'] = self.location
         
@@ -209,6 +195,25 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
 
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.place = self.get_place()
+
+    def get_success_url(self):
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self.place.slug,
+            'pk': self.object.pk
+        })
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['place'] = self.place
+        kwargs['locations'] = self.get_annotated_locations(self.place)
+        kwargs['initial'] = {
+            'referrer': self.request.META.get('HTTP_REFERER')
+        }
+        return kwargs
+
     def form_valid(self, form):
         # Store original values before save
         device = self.get_object()
@@ -217,7 +222,8 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             'is_active': device.is_active,
             'location': device.location,
             'device_type': device.device_type,
-            'model': device.model
+            'model': device.model,
+            'serial_number': device.serial_number
         }
         
         response = super().form_valid(form)
@@ -236,6 +242,8 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
                 changes.append(f"type: {self._original_values['device_type']} → {form.cleaned_data['device_type']}")
             if self._original_values['model'] != form.cleaned_data['model']:
                 changes.append(f"model: {self._original_values['model']} → {form.cleaned_data['model']}")
+            if self._original_values['serial_number'] != form.cleaned_data['serial_number']:
+                changes.append(f"serial number: {self._original_values['serial_number']} → {form.cleaned_data['serial_number']}")
 
         # Build toast message
         message = (
@@ -258,9 +266,9 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-            'place': device.location.place
+            'place': self.place
         })
-        
+        ic("added toast_message to request")
         return response
 
 class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
@@ -315,7 +323,7 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
 
     def get_success_url(self):
         return reverse('sensors:place_detail', 
-                      kwargs={'place_slug': self.object.location.place.slug})
+                      kwargs={'place_slug': self.place.slug})
 
 # class DeviceMoveLocationView(LoginRequiredMixin, View):
 

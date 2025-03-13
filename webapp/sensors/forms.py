@@ -13,6 +13,7 @@ from django.db.models import Count, Q
 # from django.template.loader import render_to_string
 
 from icecream import ic
+from django.urls import reverse
 
 
 class PlaceForm(forms.ModelForm):
@@ -267,6 +268,7 @@ class PlaceForm(forms.ModelForm):
         return lon
 
 class PlaceDeleteForm(forms.Form):
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     confirm_name = forms.CharField(
         required=True,
@@ -352,9 +354,10 @@ class PlaceDeleteForm(forms.Form):
         return confirm_name
 
 class LocationForm(forms.ModelForm):
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
     is_active = forms.BooleanField(
         required=False,
-        label='Status',  # Changed to 'Status' since the badge will show Active/inactive
+        label='Active',
         widget=forms.CheckboxInput(attrs={
             'class': 'form-check-input',
             'data-active-checkbox': '',
@@ -375,6 +378,9 @@ class LocationForm(forms.ModelForm):
         fields = ['name', 'is_active', 'confirm_deactivate']
 
     def __init__(self, *args, **kwargs):
+        referrer = kwargs.pop('referrer', None)
+        if referrer:
+            self.fields['referrer'].initial = referrer
         self.place = kwargs.pop('place', None)
         super().__init__(*args, **kwargs)
 
@@ -382,6 +388,7 @@ class LocationForm(forms.ModelForm):
         if self.place and not self.place.is_active:
             self.fields['is_active'].initial = False
             self.fields['is_active'].disabled = True
+            self.fields['is_active'].label = 'inactive'
             self.fields['is_active'].help_text = mark_safe(
                 '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
                 f'<i class="bi bi-house-gear me-2"></i>'
@@ -500,84 +507,67 @@ class DeviceForm(forms.ModelForm):
 
     class Meta:
         model = Device
-        fields = ['name', 'location', 'device_type', 'manufacturer', 'model', 'serial_number', 'is_active']
+        fields = ['name', 'is_active', 'location', 'device_type', 'manufacturer', 'model', 'serial_number']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter device name'}),
-            'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
             'manufacturer': forms.TextInput(attrs={'placeholder': 'Enter manufacturer'}),
-            'model': forms.TextInput(attrs={'placeholder': 'Enter model'})
+            'model': forms.TextInput(attrs={'placeholder': 'Enter model'}),
+            'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'data-active-checkbox': 'true'
+            })
         }
 
     def __init__(self, *args, **kwargs):
-        # Get referrer from kwargs before calling super
-        referrer = kwargs.pop('referrer', None)
-        # Get place from kwargs before calling super
         self.place = kwargs.pop('place', None)
-        self.initial_location = kwargs.pop('initial_location', None)
-        
-        # Debug initialization parameters
-        # ic("DeviceForm - Init:", {
-        #     'place': self.place.name if self.place else None,
-        #     'initial_location': self.initial_location.name if self.initial_location else None,
-        #     'has_instance': bool(kwargs.get('instance')),
-        #     'instance_location': kwargs.get('instance').location.name if kwargs.get('instance') else None
-        # })
-        
+        self.locations = kwargs.pop('locations', None)
         super().__init__(*args, **kwargs)
+            
+        # ic("DeviceForm - Locations:", {
+        #     'count': locations_qs.count(),
+        #     'locations': [(loc.pk, loc.name, loc.is_active, loc.devices_active_count) for loc in locations_qs]
+        # })
+            
+        # Create standard choices tuple with data attributes
+        attrs = {
+            'class': 'form-select',
+        }
+            
+        # Add data attributes for each location's active status
+        for location in self.locations:
+            attrs[f'data-is-active-{location.pk}'] = str(location.is_active).lower()
+        ic(attrs)
+
+        # Create custom choices with status and device counts
+        choices = []
+        for location in self.locations:
+            if location.is_active:
+                label = f"{location.name} ({location.devices_active_count} active)"
+            else:
+                label = f"{location.name} (inactive)"
+            choices.append((location.pk, label))
         
-        # Configure location field based on place
-        if self.place:
-            # Get locations from the place - these will already be annotated by PlaceAnnotationMixin
-            locations_qs = Location.objects.filter(
-                place=self.place
-            ).annotate(
-                devices_active_count=Count('devices', filter=Q(devices__is_active=True))
-            ).order_by('-is_active', 'name')
-            
-            # Debug available locations
-            # ic("DeviceForm - Locations:", {
-            #     'count': locations_qs.count(),
-            #     'locations': [(loc.pk, loc.name, loc.is_active, loc.devices_active_count) for loc in locations_qs]
+        # Set the queryset and custom widget
+        self.fields['location'].queryset = self.locations
+        self.fields['location'].widget = forms.Select(
+            attrs=attrs,
+            choices=[('', '---------')] + choices
+        )
+        
+        # Only set initial location if this is an existing device
+        if self.instance and self.instance.pk:
+            # ic("DeviceForm - Setting instance location:", {
+            #     'location': self.instance.location.name,
+            #     'location_id': self.instance.location.pk
             # })
-            
-            # Create standard choices tuple with data attributes
-            attrs = {
-                'class': 'form-select',
-            }
-            
-            # Add data attributes for each location's active status
-            for location in locations_qs:
-                attrs[f'data-is-active-{location.pk}'] = str(location.is_active).lower()
-            
-            # Create custom choices with status and device counts
-            choices = []
-            for location in locations_qs:
-                if location.is_active:
-                    label = f"{location.name} ({location.devices_active_count} active)"
-                else:
-                    label = f"{location.name} (inactive)"
-                choices.append((location.pk, label))
-            
-            # Set the queryset and custom widget
-            self.fields['location'].queryset = locations_qs
-            self.fields['location'].widget = forms.Select(
-                attrs=attrs,
-                choices=[('', '---------')] + choices
-            )
-            
-            # Only set initial location if this is an existing device
-            if self.instance and self.instance.pk:
-                # ic("DeviceForm - Setting instance location:", {
-                #     'location': self.instance.location.name,
-                #     'location_id': self.instance.location.pk
-                # })
-                self.fields['location'].initial = self.instance.location
+            self.fields['location'].initial = self.instance.location
 
         # Configure field labels and help text
         self.fields['is_active'].label = "Active"
         self.fields['is_active'].help_text = ""
-        self.fields['device_type'].label = "Device Type"
-        self.fields['location'].label = "Location"
+        # self.fields['device_type'].label = "Device Type"
+        # self.fields['location'].label = "Location"
         
         # Debug final form state
         # ic("DeviceForm - Final State:", {
@@ -587,32 +577,48 @@ class DeviceForm(forms.ModelForm):
 
         # Configure crispy form helper
         self.helper = FormHelper()
-        self.helper.form_tag = True
-        self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'
-        self.helper.form_show_errors = True
-        self.helper.error_text_inline = True
-        self.helper.help_text_inline = True
         self.helper.form_id = 'device-form'
 
+        # self.helper.form_tag = True
+        # self.helper.form_method = 'post'
+        # self.helper.form_class = 'm-0 p-0'
+        # self.helper.form_show_errors = True
+        # self.helper.error_text_inline = True
+        # self.helper.help_text_inline = True
+
+        # Get the device instance if this is an update form
+        instance = kwargs.get('instance')
+        
+        # Create the cancel URL - if we have an instance, go to device detail
+        cancel_fallback_url = ''
+        if instance:
+            cancel_fallback_url = reverse('sensors:device_detail', kwargs={
+                'place_slug': self.place.slug,
+                'pk': instance.pk
+            })
+        elif self.instance:
+            # Fallback to location detail if no device instance
+            cancel_fallback_url = reverse('sensors:device_list', kwargs={
+                'place_slug': self.place.slug,
+            })
         # Simple crispy layout using Bootstrap 5 grid
         self.helper.layout = Layout(
             Row(
-                Column('name', css_class='col-md-6'),
-                Column('device_type', css_class='col-md-6'),
+                Column('name', css_class='col-auto'),
+                Column('device_type', css_class='col-auto'),
                 css_class='mb-3'
             ),
             Row(
-                Column('location', css_class='col-12'),
+                Column('location', css_class='col-auto'),
                 css_class='mb-3'
             ),
             Row(
-                Column('manufacturer', css_class='col-md-6'),
-                Column('model', css_class='col-md-6'),
+                Column('manufacturer', css_class='col-auto'),
+                Column('model', css_class='col-auto'),
                 css_class='mb-3'
             ),
             Row(
-                Column('serial_number', css_class='col-12'),
+                Column('serial_number', css_class='col-auto'),
                 css_class='mb-3'
             ),
             Row(
@@ -629,7 +635,7 @@ class DeviceForm(forms.ModelForm):
                         ),
                         css_class='d-flex'
                     ),
-                    css_class='col-md-12'
+                    css_class='col-auto'
                 ),
                 css_class='mb-3'
             ),
@@ -637,8 +643,8 @@ class DeviceForm(forms.ModelForm):
             Div(
                 HTML('<hr class="mt-3">'),
                 Div(
-                    HTML("""
-                        <a href="{{ form.referrer.value|default:'' }}" 
+                    HTML(f"""
+                        <a href="{{{{ form.referrer.value|default:'{cancel_fallback_url}' }}}}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
@@ -652,72 +658,72 @@ class DeviceForm(forms.ModelForm):
                 ),
                 css_class='mt-3'
             ),
-            HTML("""
-                <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    // Get the form element
-                    const form = document.getElementById('device-form');
+            # HTML("""
+            #     <script>
+            #     document.addEventListener('DOMContentLoaded', function() {
+            #         // Get the form element
+            #         const form = document.getElementById('device-form');
                     
-                    // Scope all queries to this form
-                    const locationSelect = form.querySelector('#id_location');
-                    const deviceActiveSwitch = form.querySelector('#id_is_active');
-                    const helpText = form.querySelector('#device-help-inactive');
+            #         // Scope all queries to this form
+            #         const locationSelect = form.querySelector('#id_location');
+            #         const deviceActiveSwitch = form.querySelector('#id_is_active');
+            #         const helpText = form.querySelector('#device-help-inactive');
                     
-                    // Function to update the active status label
-                    function updateActiveLabel(isActive) {
-                        // Find the label within the form-switch div
-                        const switchContainer = deviceActiveSwitch.closest('.form-switch');
-                        if (switchContainer) {
-                            const labelSpan = switchContainer.querySelector('.form-check-label');
-                            if (labelSpan) {
-                                labelSpan.textContent = isActive ? "Active" : "inactive";
-                            }
-                        }
-                    }
+            #         // Function to update the active status label
+            #         function updateActiveLabel(isActive) {
+            #             // Find the label within the form-switch div
+            #             const switchContainer = deviceActiveSwitch.closest('.form-switch');
+            #             if (switchContainer) {
+            #                 const labelSpan = switchContainer.querySelector('.form-check-label');
+            #                 if (labelSpan) {
+            #                     labelSpan.textContent = isActive ? "Active" : "inactive";
+            #                 }
+            #             }
+            #         }
 
-                    function handleLocationChange(select) {
-                        // Get the selected option
-                        const selectedOption = select.options[select.selectedIndex];
-                        const locationId = selectedOption.value;
+            #         function handleLocationChange(select) {
+            #             // Get the selected option
+            #             const selectedOption = select.options[select.selectedIndex];
+            #             const locationId = selectedOption.value;
                         
-                        // Get the location's active status from data attribute
-                        const isLocationActive = locationSelect.getAttribute(`data-is-active-${locationId}`) === 'true';
+            #             // Get the location's active status from data attribute
+            #             const isLocationActive = locationSelect.getAttribute(`data-is-active-${locationId}`) === 'true';
                         
-                        // Update device active switch based on location status
-                        deviceActiveSwitch.disabled = !isLocationActive;
+            #             // Update device active switch based on location status
+            #             deviceActiveSwitch.disabled = !isLocationActive;
                         
-                        if (!isLocationActive) {
-                            // If location is inactive, device must be inactive
-                            deviceActiveSwitch.checked = false;
-                            helpText.textContent = "Device cannot be active when its location is inactive";
-                            helpText.style.display = 'block';
-                        } else {
-                            // If location is active, set device to active
-                            deviceActiveSwitch.checked = true;
-                            helpText.style.display = 'none';
-                        }
+            #             if (!isLocationActive) {
+            #                 // If location is inactive, device must be inactive
+            #                 deviceActiveSwitch.checked = false;
+            #                 helpText.textContent = "Device cannot be active when its location is inactive";
+            #                 helpText.style.display = 'block';
+            #             } else {
+            #                 // If location is active, set device to active
+            #                 deviceActiveSwitch.checked = true;
+            #                 helpText.style.display = 'none';
+            #             }
                         
-                        // Update the label to match the new state
-                        updateActiveLabel(deviceActiveSwitch.checked);
-                    }
+            #             // Update the label to match the new state
+            #             updateActiveLabel(deviceActiveSwitch.checked);
+            #         }
                     
-                    // Set initial state
-                    if (locationSelect) {
-                        handleLocationChange(locationSelect);
+            #         // Set initial state
+            #         if (locationSelect) {
+            #             handleLocationChange(locationSelect);
                         
-                        // Listen for location changes
-                        locationSelect.addEventListener('change', function() {
-                            handleLocationChange(this);
-                        });
+            #             // Listen for location changes
+            #             locationSelect.addEventListener('change', function() {
+            #                 handleLocationChange(this);
+            #             });
                         
-                        // Listen for switch changes
-                        deviceActiveSwitch.addEventListener('change', function() {
-                            updateActiveLabel(this.checked);
-                        });
-                    }
-                });
-                </script>
-            """)
+            #             // Listen for switch changes
+            #             deviceActiveSwitch.addEventListener('change', function() {
+            #                 updateActiveLabel(this.checked);
+            #             });
+            #         }
+            #     });
+            #     </script>
+            # """)
         )
 
     def clean(self):
@@ -837,7 +843,12 @@ class SensorForm(forms.ModelForm):
         # Determine if this is a new sensor or editing existing
         is_new = not bool(kwargs.get('instance'))
 
-        # Custom layout with Bootstrap grid
+        # Configure is_active field to use standard template
+        self.fields['is_active'].widget.attrs.update({
+            'data-active-checkbox': 'true',
+            'class': 'form-check-input'
+        })
+
         self.helper.layout = Layout(
             Field('device', type='hidden'),
             Field('referrer', type='hidden'),
@@ -846,7 +857,12 @@ class SensorForm(forms.ModelForm):
                 Column('name', css_class='col-md-8'),
                 Column(
                     Div(
-                        Field('is_active', wrapper_class='form-check form-switch'),
+                        HTML("""
+                            {% include "sensors/partials/active_status_checkbox.html" with 
+                                field=form.is_active 
+                                model_name="device"
+                                instance=form.instance %}
+                        """),
                         css_class='d-flex align-items-center h-100'
                     ),
                     css_class='col-md-4'

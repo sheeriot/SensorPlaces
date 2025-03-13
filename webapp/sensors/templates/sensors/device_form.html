@@ -9,23 +9,23 @@
 {% block content %}
 <div class="row g-4">
     <!-- Place Title Card -->
-    {% include 'sensors/partials/place_title_card.html' with place=place %}
+    {% include 'sensors/partials/place_title_card.html' %}
     
     <div class="col-md-4">
         <!-- Place Navigation -->
-        {% include 'sensors/includes/place_nav_card.html' with place=place locations=locations current_location=location %}
+        {% include 'sensors/includes/place_nav_card.html' %}
 
         {% if location %}
             <!-- Location Details when specific location -->
-            {% include 'sensors/includes/location_detail_card.html' with place=place location=location %}
+            {% include 'sensors/includes/location_detail_card.html' %}
         {% else %}
             <!-- Locations List when choosing location -->
-            {% include 'sensors/includes/location_list_card.html' with place=place locations=locations %}
+            {% include 'sensors/includes/location_list_card.html' %}
         {% endif %}
     </div>
 
     <div class="col-md-8">
-        {% include "sensors/includes/device_form_card.html" with device=device %}
+        {% include "sensors/includes/device_form_card.html" %}
     </div>
 </div>
 {% endblock %} 
