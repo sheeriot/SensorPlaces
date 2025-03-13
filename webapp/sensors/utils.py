@@ -44,6 +44,41 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
     finally:
         client.close()
 
+
+# def calculate_zoom(distance=0):
+#     """Calculate appropriate zoom level based on distance in kilometers"""
+#     if distance <= 0.4:
+#         return 16
+#     if distance <= 1:
+#         return 15
+#     if distance <= 2:
+#         return 14
+#     elif distance <= 4:
+#         return 13
+#     elif distance <= 10:
+#         return 12
+#     elif distance <= 17:
+#         return 11
+#     elif distance <= 30:
+#         return 10
+#     elif distance <= 60:
+#         return 9
+#     elif distance <= 120:
+#         return 8
+#     elif distance <= 250:
+#         return 7
+#     elif distance <= 550:
+#         return 6
+#     elif distance <= 1100:
+#         return 5
+#     elif distance <= 2000:
+#         return 4
+#     elif distance <= 5000:
+#         return 3
+#     else:
+#         return 2
+
+
 # def add_toast_message(request, title: str, message: str, message_type: str = 'info'):
 #     """Add a toast message directly to the request object.
     
