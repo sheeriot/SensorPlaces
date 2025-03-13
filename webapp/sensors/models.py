@@ -304,7 +304,7 @@ class SensorReading(models.Model):
     class Meta:
         verbose_name_plural = '5. Sensor Readings'
 
-class ToastMessage(models.Model):
+class ToastNotification(models.Model):
     """Persistent storage for toast notifications"""
     TOAST_TYPES = [
         ('success', 'Success'),
@@ -315,39 +315,62 @@ class ToastMessage(models.Model):
     ]
 
     user = models.ForeignKey(
-        get_user_model(),
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='toast_messages'
+        related_name='toast_notifications'
     )
-    username = models.CharField(max_length=150)  # Match User model username max_length
     message = models.TextField()
-    type = models.CharField(max_length=10, choices=TOAST_TYPES)
-    tags = models.CharField(max_length=50)  # For additional styling/behavior flags
-    timestamp = models.DateTimeField(auto_now_add=True)
-    read = models.BooleanField(default=False)
-    
-    class Meta:
-        ordering = ['-timestamp']
-        indexes = [
-            models.Index(fields=['-timestamp']),
-            models.Index(fields=['user', '-timestamp']),
-            models.Index(fields=['username', '-timestamp']),
-        ]
-
-    def save(self, *args, **kwargs):
-        if not self.username and self.user:
-            self.username = self.user.username
-        super().save(*args, **kwargs)
-
-class ToastNotification(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    message = models.TextField()
-    type = models.CharField(max_length=20)  # success, warning, danger, etc.
+    type = models.CharField(max_length=20, choices=TOAST_TYPES)
     created_at = models.DateTimeField(auto_now_add=True)
-    read = models.BooleanField(default=False)
-    
+    place = models.ForeignKey(
+        'Place',
+        on_delete=models.CASCADE,
+        null=True,
+        related_name='toast_notifications'
+    )
+
     class Meta:
         ordering = ['-created_at']
-        
-    def __str__(self):
-        return f"{self.type} notification for {self.user.username} at {self.created_at}"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['place', '-created_at']),
+            models.Index(fields=['user', 'place', '-created_at']),
+        ]
+
+    @classmethod
+    def get_unread_count(cls, user, place):
+        """
+        Get count of unread notifications for a user in a specific place.
+        Uses a single efficient database query.
+        """
+        return cls.objects.filter(
+            user=user,
+            place=place
+        ).exclude(
+            toastreadstatus__user=user
+        ).count()
+
+    @classmethod
+    def get_unread_for_place(cls, user, place):
+        """
+        Get all unread notifications for a user in a specific place.
+        Uses a single efficient database query with annotations.
+        """
+        return cls.objects.filter(
+            user=user,
+            place=place
+        ).exclude(
+            toastreadstatus__user=user
+        ).select_related('place').order_by('-created_at')
+
+class ToastReadStatus(models.Model):
+    """Tracks which toasts have been read by which users"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    toast = models.ForeignKey(ToastNotification, on_delete=models.CASCADE)
+    read_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'toast']
+        indexes = [
+            models.Index(fields=['user', 'toast']),
+        ]

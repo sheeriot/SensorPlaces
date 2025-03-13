@@ -20,11 +20,19 @@
     <div class="card rounded-3 shadow-sm border-0">
         <div class="card-header bg-white py-2">
             <h5 class="card-title mb-0">
-                <i class="bi bi-trash me-2"></i>Delete {{ model_name|title }}
+                <i class="bi bi-trash me-2"></i>Delete Sensor <i class="bi bi-thermometer"></i>{{ object.name }} from Device <i class="bi bi-hdd-rack"></i> {{ object.device.name }}?
             </h5>
         </div>
         <div class="card-body">
-            <p>Are you sure you want to delete the {{ model_name }} "{{ object.name }}"?</p>
+            <p class="mb-3">
+                <strong><i class="bi bi-thermometer"></i> {{ object.name }}</strong> 
+                <i class="bi bi-chevron-right text-muted"></i> 
+                <i class="bi bi-hdd-rack"></i> {{ object.device.name }}
+                <i class="bi bi-chevron-right text-muted"></i> 
+                <i class="bi bi-geo-alt"></i> {{ object.device.location.name }}
+                <i class="bi bi-chevron-right text-muted"></i> 
+                <i class="bi bi-house-gear"></i> {{ object.device.location.place.name }}
+            </p>
             <p class="text-danger">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
                 This action cannot be undone. All readings from this {{ model_name }} will also be deleted.

@@ -11,6 +11,12 @@ const commonConfig = {
     debug: true  // Set to true to enable debug mode
 };
 
+// Global state
+window.sensorPlaces = {
+    currentPlaceSlug: null,
+    toastUnreadCount: 0
+};
+
 // Add global error handler for uncaught promise rejections
 window.addEventListener('unhandledrejection', event => {
     // Only suppress the specific extension-related error
@@ -59,6 +65,21 @@ function waitForToastSystem(maxAttempts = 10, interval = 100) {
     });
 }
 
+// Initialize place slug and other global state
+function initializeGlobalState() {
+    // Get place slug from body data attribute
+    window.sensorPlaces.currentPlaceSlug = document.body.dataset.placeSlug || null;
+    window.sensorPlaces.toastUnreadCount = parseInt(document.body.dataset.toastUnreadCount || '0', 10);
+    
+    debugLog('Global state initialized:', {
+        placeSlug: window.sensorPlaces.currentPlaceSlug,
+        unreadCount: window.sensorPlaces.toastUnreadCount
+    });
+    
+    // For backward compatibility (can be removed later)
+    window.currentPlaceSlug = window.sensorPlaces.currentPlaceSlug;
+}
+
 // Initialize toast functionality
 async function initializeToastFunctionality() {
     debugLog('Initializing toast functionality');
@@ -71,8 +92,7 @@ async function initializeToastFunctionality() {
         });
 
         // Initialize toast system with unread count
-        const unreadCount = document.body.dataset.unreadToasts || '0';
-        document.body.dataset.unreadToasts = unreadCount;
+        const unreadCount = window.sensorPlaces.toastUnreadCount;
         debugLog('Set initial unread count:', { unreadCount });
 
         // Initialize toast event listeners
@@ -105,9 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
         toastAvailable: !!window.toastSystem
     });
 
-    // Initialize place slug from body data attribute
-    window.currentPlaceSlug = document.body.dataset.placeSlug || null;
-    debugLog('Place slug initialized:', window.currentPlaceSlug);
+    // Initialize global state first
+    initializeGlobalState();
 
     // Initialize toast functionality
     initializeToastFunctionality().then(() => {

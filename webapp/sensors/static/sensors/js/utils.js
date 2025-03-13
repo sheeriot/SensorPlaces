@@ -1,6 +1,6 @@
 // System Configuration
 const utilsConfig = {
-    debug: false,  // Set to true to enable debug mode
+    debug: true,  // Set to true to enable debug mode
     logCSRF: true,
     logFetch: true,
     logToasts: true
