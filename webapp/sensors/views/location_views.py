@@ -172,39 +172,27 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         return context
 
     def form_valid(self, form):
-        # Store original values before save
-        location = self.get_object()
-        original_values = {
-            'name': location.name,
-            'is_active': location.is_active
-        }
-        
+        place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
+        form.instance.place = place
         response = super().form_valid(form)
         location = self.object
-        place = location.place
-        changes = []
         
-        # Build list of changes
-        if location.name != original_values['name']:
-            changes.append(f"name: {original_values['name']} → {location.name}")
-        if location.is_active != original_values['is_active']:
-            changes.append(f"status: {'Active' if original_values['is_active'] else 'inactive'} → {'Active' if location.is_active else 'inactive'}")
-
-        message = f"Updated location <strong>{location.name}</strong> in <i class='bi bi-house-gear'></i> {place.name}"
-        if changes:
-            message += f"<br><small class='text-muted'>{'; '.join(changes)}</small>"
+        message = (
+            f"Updated location <strong>{location.name}</strong> in "
+            f"<i class='bi bi-house-gear'></i> {place.name}<br>"
+            f"<small class='text-muted'>"
+            f"Status: {'Active' if location.is_active else 'inactive'}"
+            f"</small>"
+        )
         
-        # Store toast message in request for middleware
+        # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if location.is_active else 'warning'
+            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
         
-        # ic("LocationUpdateView setting toast_message:", {
-        #     'message': message,
-        #     'type': 'success' if location.is_active else 'warning',
-        #     'place_slug': self.kwargs.get('place_slug')
-        # })
+        # Store the toast message in session for redirect
+        self.request.session['pending_toast'] = self.request.toast_message
         
         return response
 

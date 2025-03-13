@@ -28,7 +28,7 @@ class PlaceAnnotationMixin:
             Http404: If place_slug is not in kwargs or Place does not exist
         """
         place_slug = self.kwargs.get('place_slug', None)
-        ic('   ==>PlaceMixin', "place_slug:", place_slug)
+        ic('=======> PlaceMixin', place_slug)
         if not place_slug:
             raise ImproperlyConfigured(
                 f"View {self.__class__.__name__} must be called with place_slug in URL kwargs"
