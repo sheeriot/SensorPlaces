@@ -10,14 +10,14 @@ from django.db.models.query import QuerySet
 
 from ..models import Place, Location, Device, Sensor
 from ..forms import LocationForm
-from .mixins import LocationAnnotationMixin
+from .mixins import PlaceAnnotationMixin
 
 import json
 from decimal import Decimal
-# from icecream import ic
+from icecream import ic
 
 # Location Views
-class LocationListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
+class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = Location
     context_object_name = 'locations'
     template_name = 'sensors/location_list.html'
@@ -43,7 +43,7 @@ class LocationListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
         
         return context
 
-class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
+class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Location
     context_object_name = 'location'
     template_name = 'sensors/location_detail.html'
@@ -73,7 +73,7 @@ class LocationDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView
         
         return context
 
-class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
+class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
@@ -83,11 +83,12 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
+        kwargs['place'] = self.get_place()
+        ic(kwargs['place'])
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial'].update({
-            'place': place,
-            'is_active': place.is_active,  # Set initial is_active to match place
+            # 'place': place,
+            'is_active': kwargs['place'].is_active,  # Set initial is_active to match place
             'referrer': self.request.GET.get('next', '')
         })
         return kwargs
@@ -124,7 +125,7 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
         
         return response
 
-class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
+class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
@@ -213,7 +214,7 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
             'pk': self.object.pk
         })
 
-class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
+class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Location
     template_name = 'sensors/location_confirm_delete.html'
 

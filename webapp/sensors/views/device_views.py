@@ -11,12 +11,12 @@ from django.http import HttpResponseRedirect
 
 from ..models import Place, Location, Device, Sensor
 from ..forms import DeviceForm
-from .mixins import LocationAnnotationMixin
+from .mixins import PlaceAnnotationMixin
 
 # from icecream import ic
 
 # Device Views
-class DeviceListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
+class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = Device
     context_object_name = 'devices'
     template_name = 'sensors/device_list.html'
@@ -75,7 +75,7 @@ class DeviceListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
         
         return context
 
-class DeviceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
+class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Device
     context_object_name = 'device'
     template_name = 'sensors/device_detail.html'
@@ -100,7 +100,7 @@ class DeviceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
         context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
         return context
 
-class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
+class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
@@ -204,7 +204,7 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
         
         return response
 
-class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
+class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
@@ -263,7 +263,7 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         
         return response
 
-class DeviceDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
+class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Device
     template_name = 'sensors/device_confirm_delete.html'
 

@@ -15,12 +15,12 @@ from datetime import datetime
 from ..models import Place, Location, Device, Sensor, SensorReading
 from ..forms import SensorForm
 from ..utils import get_sensor_readings
-from .mixins import LocationAnnotationMixin
+from .mixins import PlaceAnnotationMixin
 
 import json
 # from icecream import ic
 
-class SensorListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
+class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = Sensor
     context_object_name = 'sensors'
     template_name = 'sensors/sensor_list.html'
@@ -70,7 +70,7 @@ class SensorListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
         
         return context
 
-class SensorDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
+class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Sensor
     context_object_name = 'sensor'
     template_name = 'sensors/sensor_detail.html'
@@ -136,7 +136,7 @@ class SensorDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
         
         return context
 
-class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
+class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     model = Sensor
     form_class = SensorForm
     template_name = 'sensors/sensor_form.html'
@@ -204,7 +204,7 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             'pk': self.object.pk
         })
 
-class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
+class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Sensor
     form_class = SensorForm
     template_name = 'sensors/sensor_form.html'
@@ -277,7 +277,7 @@ class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             'pk': self.object.pk
         })
 
-class SensorDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
+class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Sensor
     template_name = 'sensors/sensor_confirm_delete.html'
 
@@ -335,7 +335,7 @@ class SensorDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView):
             'pk': device.pk
         })
 
-class SensorReadingListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
+class SensorReadingListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = SensorReading
     context_object_name = 'readings'
     template_name = 'sensors/sensor_reading_list.html'
@@ -390,7 +390,7 @@ class SensorReadingListView(LoginRequiredMixin, LocationAnnotationMixin, ListVie
 
         return context
 
-class SensorReadingDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
+class SensorReadingDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = SensorReading
     context_object_name = 'reading'
     template_name = 'sensors/sensor_reading_detail.html'
@@ -417,7 +417,7 @@ class SensorReadingDetailView(LoginRequiredMixin, LocationAnnotationMixin, Detai
 
         return context
 
-class SensorReadingCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
+class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     model = SensorReading
     fields = ['value', 'timestamp']
     template_name = 'sensors/sensor_reading_form.html'

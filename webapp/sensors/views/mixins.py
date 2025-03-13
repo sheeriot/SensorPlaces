@@ -1,22 +1,23 @@
-from django.shortcuts import get_object_or_404
-
-from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
+from django.shortcuts import get_object_or_404
+from django.core.exceptions import ImproperlyConfigured
 
 from ..models import Place, Location, Device, Sensor
 
 import json
 from decimal import Decimal
 
+from icecream import ic
+
 
 # First the Mixin that makes summarizes Locations data for all Place views.
-class LocationAnnotationMixin:
+class PlaceAnnotationMixin:
     """Mixin to add annotated locations to context data."""
     
     kwargs: dict
-    
+
     def get_place(self) -> Place:
         """Get the place object from the URL kwargs.
         
@@ -26,14 +27,18 @@ class LocationAnnotationMixin:
         Raises:
             Http404: If place_slug is not in kwargs or Place does not exist
         """
-        if not hasattr(self, '_place'):
-            place_slug = self.kwargs.get('place_slug')
-            if not place_slug:
-                raise ImproperlyConfigured(
-                    f"View {self.__class__.__name__} must be called with place_slug in URL kwargs"
-                )
-            self._place = get_object_or_404(Place, slug=place_slug)
-        return self._place
+        place_slug = self.kwargs.get('place_slug', None)
+        ic('   ==>PlaceMixin', "place_slug:", place_slug)
+        if not place_slug:
+            raise ImproperlyConfigured(
+                f"View {self.__class__.__name__} must be called with place_slug in URL kwargs"
+            )
+        try:
+            self.place = get_object_or_404(Place, slug=place_slug)
+        except Exception as e:
+            ic('-get place error:', e)
+            raise ValueError(f"Place with slug {place_slug} not found")
+        return self.place
     
     def get_location_data(self, location: Location) -> dict:
         """Convert a Location instance to a JSON-serializable dictionary.
@@ -86,13 +91,12 @@ class LocationAnnotationMixin:
         ).order_by('-is_active', Lower('name'))
 
     def get_context_data(self, **kwargs) -> dict:
-        """Add location data and place to the template context."""
+        """Add place and location_annotatoins and count data to the template context."""
         context = super().get_context_data(**kwargs)
         
         # Get place - this will always exist or raise an error
         place = self.get_place()
         context['place'] = place
-        context['place_slug'] = place.slug
         
         # Get annotated locations for this place
         locations = self.get_annotated_locations(place)
@@ -104,19 +108,19 @@ class LocationAnnotationMixin:
         context.update({
             'locations': locations,  # Full queryset for template
             'locations_json': json.dumps(locations_data),  # JSON for JavaScript
-            'devices_active': Device.objects.filter(
+            'devices_active_count': Device.objects.filter(
                 location__place=place, 
                 is_active=True
             ).distinct().count(),
-            'devices_inactive': Device.objects.filter(
+            'devices_inactive_count': Device.objects.filter(
                 location__place=place, 
                 is_active=False
             ).distinct().count(),
-            'sensors_active': Sensor.objects.filter(
+            'sensors_active_count': Sensor.objects.filter(
                 device__location__place=place, 
                 is_active=True
             ).distinct().count(),
-            'sensors_inactive': Sensor.objects.filter(
+            'sensors_inactive_count': Sensor.objects.filter(
                 device__location__place=place, 
                 is_active=False
             ).distinct().count(),

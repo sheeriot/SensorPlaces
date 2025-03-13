@@ -14,139 +14,6 @@ from django.db.models import Count, Q
 
 from icecream import ic
 
-class SensorForm(forms.ModelForm):
-    device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
-    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
-    device_active = forms.BooleanField(required=False, widget=forms.HiddenInput())
-    
-    class Meta:
-        model = Sensor
-        fields = ['device', 'name', 'sensor_type', 'unit', 'data_type', 'influx_source', 'influx_measurement', 'is_active']
-
-    def __init__(self, *args, **kwargs):
-        device = kwargs.pop('device', None)
-        referrer = kwargs.pop('referrer', None)
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_tag = True
-        self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
-        self.helper.form_action = ''  # Empty string means submit to same URL
-        self.helper.form_id = 'sensor-form'
-        self.helper.form_show_errors = True
-        self.helper.error_text_inline = False
-        self.helper.help_text_inline = False
-
-        if device:
-            self.fields['device'].initial = device
-            self.fields['device'].widget.attrs['readonly'] = True
-            # Set the queryset to only include this device
-            self.fields['device'].queryset = Device.objects.filter(pk=device.pk)
-        
-        if referrer:
-            self.fields['referrer'].initial = referrer
-
-        # Configure field properties
-        self.fields['is_active'].label = "Active"
-        
-        # Handle device active status
-        device_active = self.initial.get('device_active', True)
-        if not device_active and device:
-            self.fields['is_active'].disabled = True
-            self.fields['is_active'].initial = False
-            self.fields['is_active'].help_text = (
-                f'<div class="text-warning"><i class="bi bi-hdd-rack"></i> '
-                f'Cannot activate sensor because device {device.name} is inactive</div>'
-            )
-        self.fields['data_type'].label = "Reading Source"
-        self.fields['influx_source'].required = False
-        self.fields['influx_source'].label = "InfluxDB Source"
-        self.fields['influx_measurement'].required = False
-        self.fields['influx_measurement'].label = "Measurement Name"
-        self.fields['influx_measurement'].help_text = "The measurement name in InfluxDB where readings are stored"
-
-        # Add Bootstrap classes to all fields
-        for field in self.fields.values():
-            if not isinstance(field.widget, forms.HiddenInput):
-                field.widget.attrs['class'] = 'form-control'
-
-        # Determine if this is a new sensor or editing existing
-        is_new = not bool(kwargs.get('instance'))
-
-        # Custom layout with Bootstrap grid
-        self.helper.layout = Layout(
-            Field('device', type='hidden'),
-            Field('referrer', type='hidden'),
-            Field('device_active', type='hidden'),
-            Row(
-                Column('name', css_class='col-md-8'),
-                Column(
-                    Div(
-                        Field('is_active', wrapper_class='form-check form-switch'),
-                        css_class='d-flex align-items-center h-100'
-                    ),
-                    css_class='col-md-4'
-                ),
-                css_class='mb-3'
-            ),
-            Row(
-                Column('sensor_type', css_class='col-md-6'),
-                Column('unit', css_class='col-md-6'),
-                css_class='mb-3'
-            ),
-            Row(
-                Column('data_type', css_class='col-md-12'),
-                css_class='mb-3'
-            ),
-            Div(
-                Row(
-                    Column('influx_source', css_class='col-md-12'),
-                    css_class='mb-3'
-                ),
-                Row(
-                    Column('influx_measurement', css_class='col-md-12'),
-                    css_class='mb-3'
-                ),
-                css_class='influx-fields',
-                style='display: none;'
-            ),
-            Div(
-                HTML('<hr class="mt-4">'),
-                Div(
-                    HTML("""
-                        <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug pk=device.pk %}" 
-                           class="btn btn-outline-secondary">
-                            <i class="bi bi-x-lg me-1"></i>Cancel
-                        </a>
-                    """),
-                    HTML("""
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-thermometer me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
-                        </button>
-                    """),
-                    css_class='d-flex justify-content-between align-items-center'
-                ),
-                css_class='mt-3'
-            )
-        )
-
-    def clean(self):
-        cleaned_data = super().clean()
-        data_type = cleaned_data.get('data_type')
-        influx_source = cleaned_data.get('influx_source')
-        influx_measurement = cleaned_data.get('influx_measurement')
-        device = cleaned_data.get('device')
-
-        if not device:
-            raise forms.ValidationError("Device is required")
-
-        if data_type == 'INFLUX':
-            if not influx_source:
-                self.add_error('influx_source', "InfluxDB source is required when data type is InfluxDB")
-            if not influx_measurement:
-                self.add_error('influx_measurement', "InfluxDB measurement is required when data type is InfluxDB")
-
-        return cleaned_data
 
 class PlaceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -399,6 +266,235 @@ class PlaceForm(forms.ModelForm):
                 raise forms.ValidationError("Longitude must be between -180 and 180 degrees")
         return lon
 
+class PlaceDeleteForm(forms.Form):
+
+    confirm_name = forms.CharField(
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Type the place name here'
+        })
+    )
+
+    def __init__(self, *args, place=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.place = place
+        
+        # Setup crispy form
+        self.helper = FormHelper()
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
+        self.helper.form_class = 'mb-0'
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = False
+        self.helper.help_text_inline = False
+        
+        # Custom layout
+        self.helper.layout = Layout(
+            # Warning about locations - add static-alert class
+            HTML("""
+                <div class="alert alert-warning mb-3 static-alert">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This will delete the following locations:
+                    <div class="mt-2">
+                        <ul class="mb-0">
+                            {% for location in locations %}
+                            <li>
+                                <i class="bi bi-geo-alt"></i> {{ location.name }}
+                                {% if location.devices_active_count or location.devices_inactive_count %}
+                                ({{ location.devices_active_count|add:location.devices_inactive_count }} devices)
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            """),
+            # Confirmation input - add static-alert class
+            Div(
+                HTML("""
+                    <p class="mb-2">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        This action cannot be undone. Please type <strong>{{ place.name }}</strong> to confirm.
+                    </p>
+                """),
+                Field('confirm_name'),
+                css_class='alert alert-danger static-alert'
+            ),
+            # Buttons
+            Div(
+                HTML('<hr class="mt-4">'),
+                Div(
+                    HTML("""
+                        <a href="{% url 'sensors:place_list' %}" 
+                           class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                    """),
+                    HTML("""
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    """),
+                    css_class='d-flex justify-content-between align-items-center'
+                ),
+                css_class='mt-3'
+            )
+        )
+
+    def clean_confirm_name(self):
+        confirm_name = self.cleaned_data.get('confirm_name')
+        if self.place and confirm_name != self.place.name:
+            raise forms.ValidationError(
+                f'Confirmation name "{confirm_name}" does not match the place name "{self.place.name}". '
+                'Please try again.'
+            )
+        return confirm_name
+
+class LocationForm(forms.ModelForm):
+    is_active = forms.BooleanField(
+        required=False,
+        label='Status',  # Changed to 'Status' since the badge will show Active/inactive
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'data-active-checkbox': '',
+            'data-active-label': 'Active',
+            'data-inactive-label': 'inactive'
+        })
+    )
+    confirm_deactivate = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Type the number of active devices'
+        })
+    )
+
+    class Meta:
+        model = Location
+        fields = ['name', 'is_active', 'confirm_deactivate']
+
+    def __init__(self, *args, **kwargs):
+        self.place = kwargs.pop('place', None)
+        super().__init__(*args, **kwargs)
+
+        # Handle place-based activation constraints
+        if self.place and not self.place.is_active:
+            self.fields['is_active'].initial = False
+            self.fields['is_active'].disabled = True
+            self.fields['is_active'].help_text = mark_safe(
+                '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
+                f'<i class="bi bi-house-gear me-2"></i>'
+                f'{self.place.name} is inactive.'
+                '</div>'
+            )
+        
+        # Handle existing location with active devices
+        elif self.instance and self.instance.pk:
+            active_devices = self.instance.devices.filter(is_active=True)
+            device_count = active_devices.count()
+            
+            if device_count > 0:
+                devices_list = ''.join([
+                    f'<li><i class="bi bi-hdd-rack text-muted me-1"></i>{device.name} '
+                    f'<small class="text-muted">({device.sensors.filter(is_active=True).count()} active sensors)</small></li>'
+                    for device in active_devices.prefetch_related('sensors')
+                ])
+                
+                self.fields['is_active'].help_text = mark_safe(
+                    '<div class="form-text text-warning-emphasis mt-2" data-active-checkbox-help>'
+                    f'<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'This location has {device_count} active device{"s" if device_count > 1 else ""}:'
+                    f'<ul class="list-unstyled mb-0 mt-1 ms-4">{devices_list}</ul>'
+                    '</div>'
+                )
+
+            # Add location-specific ID
+            self.fields['is_active'].widget.attrs.update({
+                'id': f'location-active-{self.instance.pk}',
+                'data-location-id': str(self.instance.pk)
+            })
+
+        # Setup crispy form
+        self.helper = FormHelper()
+        self.helper.form_id = 'location-form'
+        self.helper.form_class = 'mb-0'
+        self.helper.help_text_inline = True
+
+        # Updated layout with status badge
+        self.helper.layout = Layout(
+            Row(
+                Column('name'),
+                css_class='mb-3'
+            ),
+            Row(
+                Column(
+                    Div(
+                        Div(
+                            Field(
+                                'is_active',
+                                wrapper_class='form-check location-active-checkbox-container'
+                            ),
+                            css_class='me-2'
+                        ),
+                        css_class='d-flex align-items-center'
+                    ),
+                ),
+                css_class='mb-3'
+            ),
+            Div(
+                Field('confirm_deactivate'),
+                css_class='mb-3 d-none',
+                css_id='confirm-deactivate-container'
+            ),
+            Div(
+                HTML('<hr class="mt-4">'),
+                Div(
+                    HTML("""
+                        <a href="{% url 'sensors:place_detail' place_slug=view.kwargs.place_slug %}"
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Cancel
+                        </a>
+                    """),
+                    HTML("""
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-geo-alt me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
+                        </button>
+                    """),
+                    css_class='d-flex justify-content-between align-items-center'
+                ),
+                css_class='mt-3'
+            )
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        is_active = cleaned_data.get('is_active')
+        confirm_deactivate = cleaned_data.get('confirm_deactivate')
+        
+        if self.instance and self.instance.pk and self.instance.is_active and not is_active:
+            # Count active devices
+            active_device_count = self.instance.devices.filter(is_active=True).count()
+            
+            # Only require confirmation if there are active devices
+            if active_device_count > 0:
+                if not confirm_deactivate:
+                    raise forms.ValidationError({
+                        'confirm_deactivate': f"Please type {active_device_count} to confirm deactivation of {active_device_count} active device(s)."
+                    })
+                
+                try:
+                    if int(confirm_deactivate) != active_device_count:
+                        raise forms.ValidationError({
+                            'confirm_deactivate': f"Incorrect confirmation number. Please type {active_device_count} to confirm."
+                        })
+                except ValueError:
+                    raise forms.ValidationError({
+                        'confirm_deactivate': "Please enter a valid number."
+                    })
+        
+        return cleaned_data
+
 class DeviceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
 
@@ -431,7 +527,7 @@ class DeviceForm(forms.ModelForm):
         
         # Configure location field based on place
         if self.place:
-            # Get locations from the place - these will already be annotated by LocationAnnotationMixin
+            # Get locations from the place - these will already be annotated by PlaceAnnotationMixin
             locations_qs = Location.objects.filter(
                 place=self.place
             ).annotate(
@@ -682,236 +778,114 @@ class DeviceForm(forms.ModelForm):
     def get_warnings(self):
         return getattr(self, '_warnings', {})
 
-class LocationForm(forms.ModelForm):
-    is_active = forms.BooleanField(
-        required=False,
-        label='Active',
-        widget=forms.CheckboxInput(attrs={
-            'class': 'form-check-input',
-            'data-active-checkbox': ''
-        })
-    )
-    confirm_deactivate = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Type the number of active devices'
-        })
-    )
-
+class SensorForm(forms.ModelForm):
+    device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+    device_active = forms.BooleanField(required=False, widget=forms.HiddenInput())
+    
     class Meta:
-        model = Location
-        fields = ['name', 'is_active', 'confirm_deactivate']
+        model = Sensor
+        fields = ['device', 'name', 'sensor_type', 'unit', 'data_type', 'influx_source', 'influx_measurement', 'is_active']
 
     def __init__(self, *args, **kwargs):
-        initial = kwargs.get('initial', {})
-        devices_active = initial.pop('devices_active', None)
-        
-        # ic("LocationForm init", {
-        #     'has_instance': bool(kwargs.get('instance')),
-        #     'instance_pk': kwargs.get('instance').pk if kwargs.get('instance') else None,
-        #     'devices_active': devices_active,
-        #     'initial': initial
-        # })
-        
+        device = kwargs.pop('device', None)
+        referrer = kwargs.pop('referrer', None)
         super().__init__(*args, **kwargs)
-        
-        # Add help text if we have devices
-        if devices_active:
-            items_html = ''.join([
-                f'<li><i class="bi bi-hdd-rack text-muted me-1"></i>{device["name"]} '
-                f'<small class="text-muted">({device["count_label"]})</small></li>'
-                for device in devices_active
-            ])
-            
-            help_text = mark_safe(f"""
-                <div class="form-text text-warning-emphasis mt-2" data-active-checkbox-help>
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    Setting this location to inactive will also deactivate:
-                    <ul class="list-unstyled mb-0 mt-1 ms-4">{items_html}</ul>
-                </div>
-            """)
-            
-            # ic("LocationForm - Setting help_text", {
-            #     'devices_count': len(devices_active),
-            #     'help_text': help_text,
-            #     'items_html': items_html
-            # })
-            self.fields['is_active'].help_text = help_text
-
-        # Add location-specific ID to checkbox if we have an instance
-        if self.instance and self.instance.pk:
-            self.fields['is_active'].widget.attrs.update({
-                'id': f'location-active-{self.instance.pk}',
-                'data-location-id': str(self.instance.pk)
-            })
-
-        # Setup crispy form
         self.helper = FormHelper()
-        self.helper.form_id = 'location-form'
-        self.helper.form_class = 'mb-0'
-        self.helper.help_text_inline = True
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
+        self.helper.form_class = 'mb-0'  # Remove bottom margin as card has padding
+        self.helper.form_action = ''  # Empty string means submit to same URL
+        self.helper.form_id = 'sensor-form'
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = False
+        self.helper.help_text_inline = False
 
-        # Updated layout without forced column widths
+        if device:
+            self.fields['device'].initial = device
+            self.fields['device'].widget.attrs['readonly'] = True
+            # Set the queryset to only include this device
+            self.fields['device'].queryset = Device.objects.filter(pk=device.pk)
+        
+        if referrer:
+            self.fields['referrer'].initial = referrer
+
+        # Configure field properties
+        self.fields['is_active'].label = "Active"
+        
+        # Handle device active status
+        device_active = self.initial.get('device_active', True)
+        if not device_active and device:
+            self.fields['is_active'].disabled = True
+            self.fields['is_active'].initial = False
+            self.fields['is_active'].help_text = (
+                f'<div class="text-warning"><i class="bi bi-hdd-rack"></i> '
+                f'Cannot activate sensor because device {device.name} is inactive</div>'
+            )
+        self.fields['data_type'].label = "Reading Source"
+        self.fields['influx_source'].required = False
+        self.fields['influx_source'].label = "InfluxDB Source"
+        self.fields['influx_measurement'].required = False
+        self.fields['influx_measurement'].label = "Measurement Name"
+        self.fields['influx_measurement'].help_text = "The measurement name in InfluxDB where readings are stored"
+
+        # Add Bootstrap classes to all fields
+        for field in self.fields.values():
+            if not isinstance(field.widget, forms.HiddenInput):
+                field.widget.attrs['class'] = 'form-control'
+
+        # Determine if this is a new sensor or editing existing
+        is_new = not bool(kwargs.get('instance'))
+
+        # Custom layout with Bootstrap grid
         self.helper.layout = Layout(
+            Field('device', type='hidden'),
+            Field('referrer', type='hidden'),
+            Field('device_active', type='hidden'),
             Row(
-                Column('name'),
-                css_class='mb-3'
-            ),
-            Row(
+                Column('name', css_class='col-md-8'),
                 Column(
                     Div(
-                        Field(
-                            'is_active',
-                            wrapper_class='form-check location-active-checkbox-container'
-                        ),
-                        css_class='d-flex align-items-center'
+                        Field('is_active', wrapper_class='form-check form-switch'),
+                        css_class='d-flex align-items-center h-100'
                     ),
+                    css_class='col-md-4'
                 ),
                 css_class='mb-3'
             ),
+            Row(
+                Column('sensor_type', css_class='col-md-6'),
+                Column('unit', css_class='col-md-6'),
+                css_class='mb-3'
+            ),
+            Row(
+                Column('data_type', css_class='col-md-12'),
+                css_class='mb-3'
+            ),
             Div(
-                Field('confirm_deactivate'),
-                css_class='mb-3 d-none',
-                css_id='confirm-deactivate-container'
+                Row(
+                    Column('influx_source', css_class='col-md-12'),
+                    css_class='mb-3'
+                ),
+                Row(
+                    Column('influx_measurement', css_class='col-md-12'),
+                    css_class='mb-3'
+                ),
+                css_class='influx-fields',
+                style='display: none;'
             ),
             Div(
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML("""
-                        <a href="{% url 'sensors:place_detail' place_slug=view.kwargs.place_slug %}"
+                        <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug pk=device.pk %}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
-                    Submit(
-                        'submit',
-                        'Save' if kwargs.get('instance') else 'Create',
-                        css_class='btn btn-success',
-                        prepend_html='<i class="bi bi-geo-alt me-1"></i>'
-                    ),
-                    css_class='d-flex justify-content-between align-items-center'
-                ),
-                css_class='mt-3'
-            ),
-            HTML("""
-                <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    const activeCheckbox = document.querySelector('[data-active-checkbox]');
-                    const confirmContainer = document.getElementById('confirm-deactivate-container');
-                    const confirmInput = document.getElementById('id_confirm_deactivate');
-                    
-                    if (activeCheckbox && confirmContainer && confirmInput) {
-                        activeCheckbox.addEventListener('change', function() {
-                            if (!this.checked) {
-                                confirmContainer.classList.remove('d-none');
-                                confirmInput.focus();
-                            } else {
-                                confirmContainer.classList.add('d-none');
-                                confirmInput.value = '';
-                            }
-                        });
-                    }
-                });
-                </script>
-            """)
-        )
-
-    def clean(self):
-        cleaned_data = super().clean()
-        is_active = cleaned_data.get('is_active')
-        confirm_deactivate = cleaned_data.get('confirm_deactivate')
-        
-        if self.instance and self.instance.pk and self.instance.is_active and not is_active:
-            # Count active devices
-            active_device_count = self.instance.devices.filter(is_active=True).count()
-            
-            # Only require confirmation if there are active devices
-            if active_device_count > 0:
-                if not confirm_deactivate:
-                    raise forms.ValidationError({
-                        'confirm_deactivate': f"Please type {active_device_count} to confirm deactivation of {active_device_count} active device(s)."
-                    })
-                
-                try:
-                    if int(confirm_deactivate) != active_device_count:
-                        raise forms.ValidationError({
-                            'confirm_deactivate': f"Incorrect confirmation number. Please type {active_device_count} to confirm."
-                        })
-                except ValueError:
-                    raise forms.ValidationError({
-                        'confirm_deactivate': "Please enter a valid number."
-                    })
-        
-        return cleaned_data
-
-class PlaceDeleteForm(forms.Form):
-    confirm_name = forms.CharField(
-        required=True,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Type the place name here'
-        })
-    )
-
-    def __init__(self, *args, place=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.place = place
-        
-        # Setup crispy form
-        self.helper = FormHelper()
-        self.helper.form_tag = True
-        self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'
-        self.helper.form_show_errors = True
-        self.helper.error_text_inline = False
-        self.helper.help_text_inline = False
-        
-        # Custom layout
-        self.helper.layout = Layout(
-            # Warning about locations - add static-alert class
-            HTML("""
-                <div class="alert alert-warning mb-3 static-alert">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <strong>Warning:</strong> This will delete the following locations:
-                    <div class="mt-2">
-                        <ul class="mb-0">
-                            {% for location in locations %}
-                            <li>
-                                <i class="bi bi-geo-alt"></i> {{ location.name }}
-                                {% if location.devices_active_count or location.devices_inactive_count %}
-                                ({{ location.devices_active_count|add:location.devices_inactive_count }} devices)
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-            """),
-            # Confirmation input - add static-alert class
-            Div(
-                HTML("""
-                    <p class="mb-2">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        This action cannot be undone. Please type <strong>{{ place.name }}</strong> to confirm.
-                    </p>
-                """),
-                Field('confirm_name'),
-                css_class='alert alert-danger static-alert'
-            ),
-            # Buttons
-            Div(
-                HTML('<hr class="mt-4">'),
-                Div(
                     HTML("""
-                        <a href="{% url 'sensors:place_list' %}" 
-                           class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Cancel
-                        </a>
-                    """),
-                    HTML("""
-                        <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash"></i> Delete
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-thermometer me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
                         </button>
                     """),
                     css_class='d-flex justify-content-between align-items-center'
@@ -920,11 +894,20 @@ class PlaceDeleteForm(forms.Form):
             )
         )
 
-    def clean_confirm_name(self):
-        confirm_name = self.cleaned_data.get('confirm_name')
-        if self.place and confirm_name != self.place.name:
-            raise forms.ValidationError(
-                f'Confirmation name "{confirm_name}" does not match the place name "{self.place.name}". '
-                'Please try again.'
-            )
-        return confirm_name
+    def clean(self):
+        cleaned_data = super().clean()
+        data_type = cleaned_data.get('data_type')
+        influx_source = cleaned_data.get('influx_source')
+        influx_measurement = cleaned_data.get('influx_measurement')
+        device = cleaned_data.get('device')
+
+        if not device:
+            raise forms.ValidationError("Device is required")
+
+        if data_type == 'INFLUX':
+            if not influx_source:
+                self.add_error('influx_source', "InfluxDB source is required when data type is InfluxDB")
+            if not influx_measurement:
+                self.add_error('influx_measurement', "InfluxDB measurement is required when data type is InfluxDB")
+
+        return cleaned_data

@@ -14,7 +14,7 @@ from django.db.models.query import QuerySet
 from ..models import Place, Location, Device, Sensor, ToastNotification
 from ..forms import PlaceForm, PlaceDeleteForm
 from ..map_fun import place_map_create
-from .mixins import LocationAnnotationMixin
+from .mixins import PlaceAnnotationMixin
 
 # utility
 import json
@@ -49,7 +49,7 @@ class PlaceListView(LoginRequiredMixin, ListView):
         
         return context
 
-class PlaceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
+class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Place
     context_object_name = 'place'
     template_name = 'sensors/place_detail.html'
