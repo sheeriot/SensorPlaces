@@ -10,6 +10,7 @@ from django.db.models import Count, Q, Exists, OuterRef, Subquery
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.utils import timezone
+from datetime import datetime
 
 from ..models import Place, Location, Device, Sensor, SensorReading
 from ..forms import SensorForm
@@ -130,7 +131,7 @@ class SensorDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
                     }
                     context['recent_readings'] = readings[:10]  # Last 10 readings
             except Exception as e:
-                ic(f"Error getting sensor readings: {str(e)}")
+                # ic(f"Error getting sensor readings: {str(e)}")
                 context['readings_error'] = str(e)
         
         return context
@@ -190,10 +191,10 @@ class SensorCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
         
-        ic("SensorCreateView setting toast_message:", {
-            'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        })
+        # ic("SensorCreateView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        # })
         
         return response
 
@@ -262,11 +263,11 @@ class SensorUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
             'type': 'success' if sensor.is_active else 'warning'
         })
         
-        ic("SensorUpdateView setting toast_message:", {
-            'message': message,
-            'type': 'success' if sensor.is_active else 'warning',
-            'place_slug': self.kwargs.get('place_slug')
-        })
+        # ic("SensorUpdateView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'success' if sensor.is_active else 'warning',
+        #     'place_slug': self.kwargs.get('place_slug')
+        # })
         
         return response
 
@@ -497,10 +498,10 @@ class SensorReadingCreateView(LoginRequiredMixin, LocationAnnotationMixin, Creat
             'type': 'success'
         })
         
-        ic("SensorReadingCreateView setting toast_message:", {
-            'message': message,
-            'type': 'success'
-        })
+        # ic("SensorReadingCreateView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'success'
+        # })
         
         return response
 

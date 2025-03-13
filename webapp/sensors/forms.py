@@ -1,17 +1,18 @@
 from django import forms
-from .models import Sensor, InfluxSource, Place, Device, Location
+from .models import Sensor, Place, Device, Location  # InfluxSource,
 from PIL import Image
 from decimal import Decimal, ROUND_HALF_UP
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit, TemplateNameMixin
-from crispy_forms.bootstrap import PrependedText, FormActions
+from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit  # TemplateNameMixin
+# from crispy_forms.bootstrap import PrependedText, FormActions
 from django.db import models
-from icecream import ic
-from django.db.models import Count, Q
-from django.template.loader import render_to_string
 
+from django.db.models import Count, Q
+# from django.template.loader import render_to_string
+
+from icecream import ic
 
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())

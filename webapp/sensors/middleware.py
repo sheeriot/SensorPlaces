@@ -133,7 +133,7 @@ class ToastMiddleware:
                         place=place
                     )
                     response.context_data['toast_unread_count'] = unread_count
-                    ic("Updated unread count:", unread_count)
+                    # ic("Updated unread count:", unread_count)
 
                     # Process pending toast
                     if 'pending_toast' in request.session:

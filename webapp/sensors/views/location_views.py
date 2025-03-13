@@ -117,10 +117,10 @@ class LocationCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
         
-        ic("LocationCreateView setting toast_message:", {
-            'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        })
+        # ic("LocationCreateView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        # })
         
         return response
 
@@ -199,11 +199,11 @@ class LocationUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView
             'type': 'success' if location.is_active else 'warning'
         })
         
-        ic("LocationUpdateView setting toast_message:", {
-            'message': message,
-            'type': 'success' if location.is_active else 'warning',
-            'place_slug': self.kwargs.get('place_slug')
-        })
+        # ic("LocationUpdateView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'success' if location.is_active else 'warning',
+        #     'place_slug': self.kwargs.get('place_slug')
+        # })
         
         return response
 
@@ -256,10 +256,10 @@ class LocationDeleteView(LoginRequiredMixin, LocationAnnotationMixin, DeleteView
             'type': 'danger'
         })
         
-        ic("LocationDeleteView setting toast_message:", {
-            'message': message,
-            'type': 'danger'
-        })
+        # ic("LocationDeleteView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'danger'
+        # })
         
         return HttpResponseRedirect(self.get_success_url())
 

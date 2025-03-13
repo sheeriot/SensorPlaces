@@ -20,7 +20,7 @@ from .mixins import LocationAnnotationMixin
 import json
 from decimal import Decimal
 
-# from icecream import ic
+from icecream import ic
 
 # Place Views
 class PlaceListView(LoginRequiredMixin, ListView):

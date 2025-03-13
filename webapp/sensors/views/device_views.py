@@ -1,19 +1,18 @@
-from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.views import View
-from django.urls import reverse
-from django.http import JsonResponse, HttpResponseRedirect
 from django.contrib.auth.mixins import LoginRequiredMixin
+
+from django.shortcuts import get_object_or_404
+
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet, Prefetch
-from django.core.exceptions import PermissionDenied
+from django.urls import reverse
+from django.http import HttpResponseRedirect
 
 from ..models import Place, Location, Device, Sensor
 from ..forms import DeviceForm
 from .mixins import LocationAnnotationMixin
 
-import json
 # from icecream import ic
 
 # Device Views
@@ -56,12 +55,6 @@ class DeviceListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Clear any stale toast messages for this view
-        if hasattr(self.request, '_messages'):
-            storage = messages.get_messages(self.request)
-            # Iterate through messages to clear them
-            for _ in storage:
-                pass  # Simply iterating clears the storage
         
         # Add place to context
         place_slug = self.kwargs.get('place_slug')
@@ -79,13 +72,14 @@ class DeviceListView(LoginRequiredMixin, LocationAnnotationMixin, ListView):
                 devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
                 devices_inactive_count=Count('devices', filter=Q(devices__is_active=False))
             ).select_related('place')
-            
+        
         return context
 
 class DeviceDetailView(LoginRequiredMixin, LocationAnnotationMixin, DetailView):
     model = Device
     context_object_name = 'device'
     template_name = 'sensors/device_detail.html'
+    object: Device
 
     def get_queryset(self) -> QuerySet[Device]:
         if not hasattr(self, '_queryset'):
@@ -110,6 +104,7 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
+    object: Device
 
     def setup(self, request, *args, **kwargs):
         """Cache common values during view setup"""
@@ -202,10 +197,10 @@ class DeviceCreateView(LoginRequiredMixin, LocationAnnotationMixin, CreateView):
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
         
-        ic("DeviceCreateView setting toast_message:", {
-            'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        })
+        # ic("DeviceCreateView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        # })
         
         return response
 
@@ -253,11 +248,11 @@ class DeviceUpdateView(LoginRequiredMixin, LocationAnnotationMixin, UpdateView):
         )
         
         # Add debug logging
-        ic("DeviceUpdateView toast message:", {
-            'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-            'place': device.location.place
-        })
+        # ic("DeviceUpdateView toast message:", {
+        #     'message': message,
+        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning',
+        #     'place': device.location.place
+        # })
         
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
