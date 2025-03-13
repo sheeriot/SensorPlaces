@@ -58,7 +58,7 @@
     </script>
 </head>
 <body data-toast-unread-count="{{ toast_unread_count|default:0 }}"
-      {% if current_place %}data-place-slug="{{ current_place.slug }}"{% endif %}
+      data-place-slug="{{ current_place_slug|default:'' }}"
       {% for key, value in body_data_attributes.items %} 
       data-{{ key }}="{{ value }}"
       {% endfor %}>

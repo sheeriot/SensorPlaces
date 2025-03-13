@@ -173,6 +173,9 @@ class ToastMiddleware:
                     'has_pending_toast': 'pending_toast' in request.session
                 })
                 
+                # Add place_slug to context data
+                response.context_data['current_place_slug'] = place_slug
+                
                 # Get unread count - only if we have a place
                 if place_slug:
                     place = Place.objects.get(slug=place_slug)
@@ -183,7 +186,8 @@ class ToastMiddleware:
                     response.context_data['toast_unread_count'] = unread_count
                     ic("Updated unread count for place:", {
                         'place': place.name,
-                        'unread_count': unread_count
+                        'unread_count': unread_count,
+                        'place_slug': place_slug  # Log the slug too
                     })
                 
                 # If there's a pending toast, add it to template context

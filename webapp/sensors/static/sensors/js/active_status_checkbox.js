@@ -2,7 +2,6 @@
 const activeStatusConfig = {
     debug: false
 };
-console.log('[Active Status Checkbox] Config:', activeStatusConfig);
 
 // Active Status Checkbox functionality
 function initializeActiveStatusCheckbox() {
@@ -119,12 +118,12 @@ function initializeActiveStatusCheckbox() {
 }
 
 // Initialize immediately since we're being loaded after DOM is ready
-console.log('[Active Status Checkbox] Script loaded');
+
 initializeActiveStatusCheckbox();
 
 // Add a delayed check to see if any elements were added after initial load
 setTimeout(() => {
-    console.log('[Active Status Checkbox] Delayed DOM check:', {
+    if (activeStatusConfig.debug) console.log('[Active Status Checkbox] Delayed DOM check:', {
         checkboxes: document.querySelectorAll('input[data-active-checkbox]'),
         helpText: document.querySelectorAll('[data-active-checkbox-help]'),
         formText: document.querySelectorAll('.form-text')
