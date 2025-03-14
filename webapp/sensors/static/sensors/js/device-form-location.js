@@ -14,7 +14,6 @@ function initializeDeviceForm() {
     
     const locationSelect = form.querySelector('#id_location');
     const activeCheckbox = form.querySelector('#id_is_active');
-    const helpText = form.querySelector('.form-text');
     
     if (!locationSelect || !activeCheckbox) {
         if (deviceFormConfig.debug) console.log('[Device Form] Missing required elements');
@@ -34,28 +33,27 @@ function initializeDeviceForm() {
             });
         }
 
-        // Update checkbox based on location status
-        activeCheckbox.disabled = !isLocationActive;
-        
-        if (!isLocationActive) {
-            activeCheckbox.checked = false;
-            if (helpText) {
-                helpText.textContent = "Device cannot be active when its location is inactive";
-                helpText.classList.remove('d-none');
-            }
-        } else {
-            activeCheckbox.checked = true;
-            if (helpText) {
-                helpText.classList.add('d-none');
-            }
-        }
+        // Get the checkbox container
+        const container = activeCheckbox.closest('.form-check');
+        if (!container) return;
 
-        // Update label text
-        const label = activeCheckbox.nextElementSibling;
-        if (label) {
-            label.textContent = activeCheckbox.checked ? 'Active' : 'inactive';
-        }
+        // Update data attributes on container
+        container.dataset.forceInactive = (!isLocationActive).toString();
+        container.dataset.inactiveReason = isLocationActive ? '' : 
+            `Device cannot be active when its location is inactive`;
+
+        // Dispatch custom event for active-status-checkbox.js to handle
+        const event = new CustomEvent('locationStatusChanged', {
+            detail: {
+                isLocationActive,
+                originalState: activeCheckbox.dataset.originalState === 'true'
+            }
+        });
+        container.dispatchEvent(event);
     }
+    
+    // Store original state when form initializes
+    activeCheckbox.dataset.originalState = activeCheckbox.checked;
     
     // Set initial state and add listener
     handleLocationChange(locationSelect);

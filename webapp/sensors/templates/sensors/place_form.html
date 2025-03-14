@@ -11,9 +11,6 @@
     {% if object %}Edit {{ object.name }}{% else %}New Place{% endif %}
 {% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-{% endblock %}
 
 {% block content %}
 {% if object %}
@@ -25,4 +22,8 @@
         {% include "sensors/includes/place_form_card.html" %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/place-map-location-picker.js' %}"></script>
 {% endblock %}

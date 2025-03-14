@@ -20,6 +20,14 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     context_object_name = 'devices'
     template_name = 'sensors/device_list.html'
 
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.place = self.get_place()
+        location_pk = self.kwargs.get('location_pk', None)
+        if location_pk:
+            self.location = get_object_or_404(Location, pk=location_pk, place=self.place)
+        self.locations = self.get_annotated_locations(self.place)
+
     def get_queryset(self) -> QuerySet[Device]:
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
@@ -54,24 +62,19 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
+        context['model_name'] = 'device'
+        ic('device_list_context', context)
+
         # Add place to context
-        place_slug = self.kwargs.get('place_slug')
-        if place_slug:
-            place = get_object_or_404(Place, slug=place_slug)
-            context['place'] = place
-            
-            # Get location if specified
-            location_pk = self.request.GET.get('location')
-            if location_pk:
-                context['location'] = get_object_or_404(Location, pk=location_pk, place=place)
-            
-            # Get all locations for the place with device counts
-            context['locations'] = place.locations.annotate(
-                devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
-                devices_inactive_count=Count('devices', filter=Q(devices__is_active=False))
-            ).select_related('place')
+        place = self.get_place()
+        context['place'] = place
         
+        # Get location if specified
+        location_pk = self.request.GET.get('location', None)
+        if location_pk:
+            context['location'] = get_object_or_404(Location, pk=location_pk, place=place)
+            
+        context['locations'] = self.get_annotated_locations(place)
         return context
 
 class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
@@ -111,32 +114,12 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         location_pk = self.kwargs.get('location_pk', None)
         if location_pk:
             self.location = get_object_or_404(Location, pk=location_pk, place=self.place)
-
-    # what is this for?
-    # @property
-    # def place(self):
-    #     """Cached place getter"""
-    #     if self._place is None:
-    #         self._place = self.get_place()
-    #     return self._place
-
-    # @property
-    # def location(self):
-    #     """Cached location getter"""
-    #     if self._location is None:
-    #         location_pk = self.kwargs.get('location_pk')
-    #         if location_pk:
-    #             self._location = get_object_or_404(
-    #                 Location,
-    #                 pk=location_pk,
-    #                 place=self.place
-    #             )
-    #     return self._location
+        self.locations = self.get_annotated_locations(self.place)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.place
-        kwargs['locations'] = self.get_annotated_locations(self.place)
+        kwargs['locations'] = self.locations
         kwargs['initial'] = {
             'location': self.location,
             'referrer': self.request.GET.get('next')
@@ -147,11 +130,9 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
         context['place'] = self.place
-        context['location'] = self.location
-        context['locations'] = self.get_annotated_locations(self.place)
         if self.location:
             context['location'] = self.location
-        
+        context['locations'] = self.locations
         return context
 
     def get_success_url(self):

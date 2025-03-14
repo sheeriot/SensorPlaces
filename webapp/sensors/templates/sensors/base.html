@@ -179,20 +179,17 @@
 
     <!-- Application Feature JavaScript -->
     <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
-    <script src="{% static 'sensors/js/active-status-checkbox.js' %}"></script>
     <script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
-    <script src="{% static 'sensors/js/device-form-location.js' %}"></script>
 
     <!-- Map JavaScript -->
     <script src="{% static 'sensors/js/place-map-popout.js' %}"></script>
-    <script src="{% static 'sensors/js/places-map-folium.js' %}"></script>
     <script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
-    <script src="{% static 'sensors/js/siteplan-editor.js' %}"></script>
+
 
     <!-- Utilities -->
-
     <script src="{% static 'sensors/js/time-display.js' %}"></script>
 
-    {% block extra_js %}{% endblock %}
+    {% block extra_js %}
+    {% endblock %}
 </body>
 </html> 
