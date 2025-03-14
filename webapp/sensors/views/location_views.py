@@ -78,12 +78,19 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
 
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # ic(kwargs)
+        self.place = self.get_place()
+        self.locations = self.get_annotated_locations(self.place)
+
     def get_success_url(self):
         return reverse('sensors:location_detail', kwargs={'place_slug': self.kwargs.get('place_slug'), 'pk': self.object.pk})
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self.get_place()
+        kwargs['place'] = self.place
+        kwargs['locations'] = self.locations
         # ic(kwargs['place'])
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial'].update({
@@ -129,24 +136,21 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
 
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # ic(kwargs)
+        self.place = self.get_place()
+        self.locations = self.get_annotated_locations(self.place)
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
+        kwargs['place'] = self.place
+        kwargs['locations'] = self.locations
         if self.object and self.object.is_active:
             # Get active devices for this location
-            devices = self.object.devices.filter(is_active=True).annotate(
+            kwargs['devices_active'] = self.object.devices.filter(is_active=True).annotate(
                 sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
             )
-            
-            # Format devices for the form
-            devices_active = [{
-                'name': device.name,
-                'count_label': f'{device.sensor_count} active sensors'
-            } for device in devices]
-            
-            if devices_active:
-                kwargs['initial'] = kwargs.get('initial', {})
-                kwargs['initial']['devices_active'] = devices_active
-        
         return kwargs
 
     def get_context_data(self, **kwargs):

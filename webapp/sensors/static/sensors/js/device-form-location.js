@@ -12,12 +12,20 @@ function initializeDeviceForm() {
         return;
     }
     
-    const locationSelect = form.querySelector('#id_location');
-    const activeCheckbox = form.querySelector('#id_is_active');
+    const locationSelect = form.querySelector('.id_location');
+    const activeCheckbox = form.querySelector('.id_is_active');
     
     if (!locationSelect || !activeCheckbox) {
-        if (deviceFormConfig.debug) console.log('[Device Form] Missing required elements');
+        if (deviceFormConfig.debug) console.log('[Device Form] Missing required elements, locationSelect:', locationSelect, 'activeCheckbox:', activeCheckbox);
         return;
+    } else {
+        if (deviceFormConfig.debug) {
+            console.log(
+                '[Device Form] Found required elements,',
+                'locationSelect:', locationSelect,
+                'activeCheckbox:', activeCheckbox
+            );
+        }
     }
 
     function handleLocationChange(select) {
@@ -36,6 +44,10 @@ function initializeDeviceForm() {
         // Get the checkbox container
         const container = activeCheckbox.closest('.form-check');
         if (!container) return;
+
+        if (deviceFormConfig.debug) {
+            console.log('[Device Form] Container Dataset:', container.dataset);
+        }
 
         // Update data attributes on container
         container.dataset.forceInactive = (!isLocationActive).toString();

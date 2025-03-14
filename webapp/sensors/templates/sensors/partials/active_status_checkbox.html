@@ -6,33 +6,8 @@ This template expects:
 - affected_items: List of items that will be affected by deactivation (optional)
 {% endcomment %}
 
-<div class="form-check {{ model_name }}-active-checkbox-container-{{ instance.pk }}">
-    {{ field }}
-    <label class="form-check-label" for="{{ field.id_for_label }}">
-        {% if field.value %}Active{% else %}inactive{% endif %}
-    </label>
-    {% if field.help_text %}
-    <div class="form-text">
-        <div class="form-text text-warning mt-2 d-none" data-active-checkbox-help>
-            <i class="bi bi-exclamation-triangle me-2"></i>
-            {{ field.help_text|safe }}
-        </div>
-    </div>
-    {% endif %}
+{% load crispy_forms_field %}
 
-    {% if field.value and affected_items %}
-    <div class="form-text text-danger mt-2 d-none" data-active-checkbox-help>
-        <i class="bi bi-exclamation-triangle me-2"></i>
-        Setting this {{ model_name }} to inactive will also deactivate:
-        <ul class="list-unstyled mb-0 mt-1 ms-4">
-            {% for item in affected_items %}
-            <li>
-                <i class="bi bi-hdd-rack text-muted me-1"></i>
-                {{ item.name }}
-                <small class="text-muted">({{ item.count_label }})</small>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
+<div id="div_{{ field.auto_id }}" class="form-check d-flex align-items-center gap-3 {{ wrapper_class }}">
+    {% crispy_field field %}
 </div>
