@@ -359,17 +359,17 @@ class LocationForm(forms.ModelForm):
         required=False,
         label='Active',
         widget=forms.CheckboxInput(attrs={
-            'class': 'form-check-input',
-            'data-active-checkbox': '',
+            'class': 'form-check-input active-checkbox',
+            'data-active-checkbox': 'true',
             'data-active-label': 'Active',
             'data-inactive-label': 'inactive'
         })
     )
     confirm_deactivate = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={
+        widget=forms.TextInput(attrs={  
             'class': 'form-control',
-            'placeholder': 'Type the number of active devices'
+            'placeholder': 'Type the number of active devices:'
         })
     )
 
@@ -378,31 +378,33 @@ class LocationForm(forms.ModelForm):
         fields = ['name', 'is_active', 'confirm_deactivate']
 
     def __init__(self, *args, **kwargs):
-        referrer = kwargs.pop('referrer', None)
-        if referrer:
-            self.fields['referrer'].initial = referrer
+        ic(kwargs)
         self.place = kwargs.pop('place', None)
+        self.locations = kwargs.pop('locations', None)
+        self.devices_active = kwargs.pop('devices_active', None)
         super().__init__(*args, **kwargs)
+        ic(vars(self))
 
         # Handle place-based activation constraints
-        if self.place and not self.place.is_active:
+        if not self.place.is_active:
             self.fields['is_active'].initial = False
             self.fields['is_active'].disabled = True
             self.fields['is_active'].label = 'inactive'
+            # note help test will be rendered when the checkbox is disabled due to parent being inactive
             self.fields['is_active'].help_text = mark_safe(
                 '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
                 f'<i class="bi bi-house-gear me-2"></i>'
-                f'{self.place.name} is inactive.'
+                f'Place ({self.place.name}) is inactive.'
                 '</div>'
             )
         
         # Handle existing location with active devices
         elif self.instance and self.instance.pk:
             active_devices = self.instance.devices.filter(is_active=True)
-            device_count = active_devices.count()
+            active_device_count = active_devices.count()
             
-            if device_count > 0:
-                devices_list = ''.join([
+            if active_device_count > 0:
+                active_devices_list = ''.join([
                     f'<li><i class="bi bi-hdd-rack text-muted me-1"></i>{device.name} '
                     f'<small class="text-muted">({device.sensors.filter(is_active=True).count()} active sensors)</small></li>'
                     for device in active_devices.prefetch_related('sensors')
@@ -411,8 +413,8 @@ class LocationForm(forms.ModelForm):
                 self.fields['is_active'].help_text = mark_safe(
                     '<div class="form-text text-warning-emphasis mt-2" data-active-checkbox-help>'
                     f'<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This location has {device_count} active device{"s" if device_count > 1 else ""}:'
-                    f'<ul class="list-unstyled mb-0 mt-1 ms-4">{devices_list}</ul>'
+                    f'This location has {active_device_count} active device{"s" if active_device_count > 1 else ""}:'
+                    f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_devices_list}</ul>'
                     '</div>'
                 )
 
@@ -425,7 +427,7 @@ class LocationForm(forms.ModelForm):
         # Setup crispy form
         self.helper = FormHelper()
         self.helper.form_id = 'location-form'
-        self.helper.form_class = 'mb-0'
+        self.helper.form_class = 'model-form'
         self.helper.help_text_inline = True
 
         # Updated layout with status badge
@@ -440,7 +442,7 @@ class LocationForm(forms.ModelForm):
                         Div(
                             Field(
                                 'is_active',
-                                wrapper_class='form-check location-active-checkbox-container'
+                                # wrapper_class='form-check active-checkbox'
                             ),
                             css_class='me-2'
                         ),
@@ -530,6 +532,7 @@ class DeviceForm(forms.ModelForm):
         # Configure crispy form helper
         self.helper = FormHelper()
         self.helper.form_id = 'device-form'
+        self.helper.form_class = 'model-form is-active-form'
 
         initial = kwargs.get('initial', {})
         location_initial = initial.get('location', None)
@@ -543,7 +546,7 @@ class DeviceForm(forms.ModelForm):
                 self['is_active'].help_text = mark_safe(
                     '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
                         f'<i class="bi bi-geo-alt me-2"></i>'
-                        f'Location: {location_initial.name} is inactive.'
+                        f'Location ({location_initial.name}) is inactive.'
                     '</div>'
                 )
         """Configure the location select field with active state and device counts"""
@@ -607,19 +610,13 @@ class DeviceForm(forms.ModelForm):
             Row(
                 Column(
                     Div(
-                        HTML(
-                            mark_safe(
-                                render_to_string(
-                                    'sensors/partials/active_status_checkbox.html',
-                                    {
-                                        'field': self['is_active'],
-                                        'model_name': 'device',
-                                        'instance': self.instance
-                                    }
-                                )
-                            )
+                        Field(
+                            'is_active',
+                            template='sensors/partials/active_status_checkbox.html',
+                            wrapper_class='form-check d-flex align-items-center gap-3',
+                            css_class='me-2'
                         ),
-                        css_class='d-flex align-items-center h-100'
+                        css_class='d-flex align-items-center'
                     ),
                     css_class='col-md-4'
                 ),
@@ -704,13 +701,13 @@ class DeviceForm(forms.ModelForm):
     def get_warnings(self):
         return getattr(self, '_warnings', {})
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['initial'] = {
-            'location': self.location,  # Assuming you have self.location set
-            'is_active': True  # Default to active for new devices
-        }
-        return kwargs
+    # def get_form_kwargs(self):
+    #     kwargs = super().get_form_kwargs()
+    #     kwargs['initial'] = {
+    #         'location': self.location,  # Assuming you have self.location set
+    #         'is_active': True  # Default to active for new devices
+    #     }
+    #     return kwargs
 
 class SensorForm(forms.ModelForm):
     device = forms.ModelChoiceField(queryset=Device.objects.all(), widget=forms.HiddenInput())
