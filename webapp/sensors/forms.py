@@ -521,72 +521,69 @@ class DeviceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.place = kwargs.pop('place', None)
-        self.locations = kwargs.pop('locations', None)
-        
-        # Get initial location before super() call
-        initial_location = kwargs.get('initial', {}).get('location')
-        
+        self.locations = kwargs.pop('locations', None)        
         super().__init__(*args, **kwargs)
         
-        if initial_location:
-            self.location = initial_location  # Set the form's location
-            self.fields['location'].initial = initial_location  # Set the field's initial value
-            
+        # Get the device instance if this is an update form
+        self.instance = kwargs.get('instance', None)
+
+        # Configure crispy form helper
+        self.helper = FormHelper()
+        self.helper.form_id = 'device-form'
+
+        initial = kwargs.get('initial', {})
+        location_initial = initial.get('location', None)
+        if location_initial:
+            self.location = location_initial  # Set the form's location            
             # Handle location-based activation constraints
-            if not initial_location.is_active:
+            if not location_initial.is_active:
                 self['is_active'].initial = False
                 self['is_active'].disabled = True
                 self['is_active'].label = 'inactive'
                 self['is_active'].help_text = mark_safe(
                     '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
                         f'<i class="bi bi-geo-alt me-2"></i>'
-                        f'{initial_location.name} is inactive.'
+                        f'Location: {location_initial.name} is inactive.'
                     '</div>'
                 )
+        """Configure the location select field with active state and device counts"""
+        if self.locations:
+            # Build location choices with status indicators
+            choices = [('', '---------')]
+            for location in self.locations:
+                if location.is_active:
+                    label = f"{location.name} ({location.devices_active_count} active)"
+                else:
+                    label = f"{location.name} (inactive)"
+                choices.append((location.pk, label))            
+            # Configure the select widget with data attributes for active states
+            select_attrs = {
+                'class': 'form-select',
+                **{
+                    f'data-is-active-{loc.pk}': str(loc.is_active).lower() 
+                    for loc in self.locations
+                }
+            }
+            # Update the location field
+            self.fields['location'].queryset = self.locations
+            self.fields['location'].widget = forms.Select(
+                attrs=select_attrs,
+                choices=choices
+            )
 
-        attrs = {
-            'class': 'form-select',
-        }           
-        # Add data attributes for each location's active status
-        for location in self.locations:
-            attrs[f'data-is-active-{location.pk}'] = str(location.is_active).lower()
-        ic('Device form is_active attrs:', attrs)
-
-        # Create custom choices with status and device counts
-        choices = []
-        for location in self.locations:
-            if location.is_active:
-                label = f"{location.name} ({location.devices_active_count} active)"
-            else:
-                label = f"{location.name} (inactive)"
-            choices.append((location.pk, label))
         
-        # Set the queryset and custom widget
-        self.fields['location'].queryset = self.locations
-        self.fields['location'].widget = forms.Select(
-            attrs=attrs,
-            choices=[('', '---------')] + choices
-        )
-        
-        # Configure crispy form helper
-        self.helper = FormHelper()
-        self.helper.form_id = 'device-form'
-
-        # Get the device instance if this is an update form
-        instance = kwargs.get('instance')
-        
-        # Create the cancel URL - if we have an instance, go to device detail
-        cancel_fallback_url = ''
-        if instance:
-            cancel_fallback_url = reverse('sensors:device_detail', kwargs={
-                'place_slug': self.place.slug,
-                'pk': instance.pk
-            })
-        elif self.instance:
-            # Fallback to location detail if no device instance
-            cancel_fallback_url = reverse('sensors:device_list', kwargs={
-                'place_slug': self.place.slug,
-            })
+        # # Create the cancel URL - if we have an instance, go to device detail
+        # # cancel_fallback_url = ''
+        # if self.instance:
+        #     cancel_fallback_url = reverse('sensors:device_detail', kwargs={
+        #         'place_slug': self.place.slug,
+        #         'pk': self.instance.pk
+        #     })
+        # elif self.instance:
+        #     # Fallback to location detail if no device instance
+        #     cancel_fallback_url = reverse('sensors:device_list', kwargs={
+        #         'place_slug': self.place.slug,
+        #     })
         # Simple crispy layout using Bootstrap 5 grid
         self.helper.layout = Layout(
             Row(
@@ -633,7 +630,7 @@ class DeviceForm(forms.ModelForm):
                 HTML('<hr class="mt-3">'),
                 Div(
                     HTML(f"""
-                        <a href="{{{{ form.referrer.value|default:'{cancel_fallback_url}' }}}}" 
+                        <a href="{{ form.referrer.value|default:cancel_fallback_url }}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
