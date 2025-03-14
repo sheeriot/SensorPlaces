@@ -8,7 +8,7 @@
 
 // System Configuration
 const commonConfig = {
-    debug: true  // Set to true to enable debug mode
+    debug: false  // Set to true to enable debug mode
 };
 
 // Global state - expanded with body data attributes

@@ -10,11 +10,11 @@
 // System Configuration
 const toastConfig = {
     debug: false,  // Set to true to enable debug mode
-    apiEndpoint: (placeSlug) => `/api/${placeSlug}/toasts/`,
+    // apiEndpoint: (placeSlug) => `/api/${placeSlug}/toasts/`,
 };
 
 // if (toastConfig.debug) 
-console.log('toastConfig.apiEndpoint:', toastConfig.apiEndpoint);
+// console.log('toastConfig.apiEndpoint:', toastConfig.apiEndpoint);
 
 // Create and initialize the system
 const createToastSystem = () => {

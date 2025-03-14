@@ -33,7 +33,7 @@ class PlaceAnnotationMixin:
             raise ImproperlyConfigured(
                 f"View {self.__class__.__name__} must be called with place_slug in URL kwargs"
             )
-        ic(type(place_slug))
+
         try:
             self.place = get_object_or_404(Place, slug=place_slug)
         except Exception as e:

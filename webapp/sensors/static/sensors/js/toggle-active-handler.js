@@ -20,6 +20,8 @@ const toggleActiveConfig = {
     logStatusChanges: true
 };
 
+// console.log('toggleActiveConfig:', toggleActiveConfig);
+
 // Card structure validator
 function validateCardStructure(card, index) {
     const issues = [];

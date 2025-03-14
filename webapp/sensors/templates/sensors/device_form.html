@@ -3,7 +3,8 @@
 {% load crispy_forms_tags %}
 
 {% block title %}
-    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
+    SensorPlaces:
+    {% if object %}Edit Device: {{ object.name }}{% else %}New Device{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -16,16 +17,17 @@
         {% include 'sensors/includes/place_nav_card.html' %}
 
         {% if location %}
-            <!-- Location Details when specific location -->
             {% include 'sensors/includes/location_detail_card.html' %}
-        {% else %}
-            <!-- Locations List when choosing location -->
-            {% include 'sensors/includes/location_list_card.html' %}
         {% endif %}
     </div>
 
     <div class="col-md-8">
         {% include "sensors/includes/device_form_card.html" %}
+        {% include "sensors/includes/sensor_list_card.html" %}
     </div>
 </div>
-{% endblock %} 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/place-map-location-picker.js' %}"></script>
+{% endblock %}

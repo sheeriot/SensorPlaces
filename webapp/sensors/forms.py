@@ -10,7 +10,7 @@ from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit  #
 from django.db import models
 
 from django.db.models import Count, Q
-# from django.template.loader import render_to_string
+from django.template.loader import render_to_string
 
 from icecream import ic
 from django.urls import reverse
@@ -624,22 +624,25 @@ class DeviceForm(forms.ModelForm):
             Row(
                 Column(
                     Div(
-                        Div(
-                            Field('is_active', wrapper_class='form-check form-switch'),
-                            HTML("""
-                                <small id="device-help-inactive" class="form-text text-muted ms-3" style="display: none;">
-                                    Device cannot be active when its location is inactive
-                                </small>
-                            """),
-                            css_class='d-flex align-items-center'
+                        HTML(
+                            mark_safe(
+                                render_to_string(
+                                    'sensors/partials/active_status_checkbox.html',
+                                    {
+                                        'field': self['is_active'],
+                                        'model_name': 'device',
+                                        'instance': self.instance
+                                    }
+                                )
+                            )
                         ),
-                        css_class='d-flex'
+                        css_class='d-flex align-items-center h-100'
                     ),
-                    css_class='col-auto'
+                    css_class='col-md-4'
                 ),
+                Field('referrer', type='hidden'),
                 css_class='mb-3'
             ),
-            Field('referrer', type='hidden'),
             Div(
                 HTML('<hr class="mt-3">'),
                 Div(
@@ -860,7 +863,7 @@ class SensorForm(forms.ModelForm):
                         HTML("""
                             {% include "sensors/partials/active_status_checkbox.html" with 
                                 field=form.is_active 
-                                model_name="device"
+                                model_name="sensor"
                                 instance=form.instance %}
                         """),
                         css_class='d-flex align-items-center h-100'
