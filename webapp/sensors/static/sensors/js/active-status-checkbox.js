@@ -104,13 +104,20 @@ function updateCheckboxUI(container, checkbox) {
     // Update label text
     const label = container.querySelector('label');
     if (label) {
-        label.textContent = checkbox.checked ? 'Active' : 'inactive';
+        label.textContent = checkbox.checked ? 
+            checkbox.dataset.activeLabel : 
+            checkbox.dataset.inactiveLabel;
     }
 
-    // Update help text visibility
+    // Update help text visibility and content
     const helpText = container.querySelector('[data-active-checkbox-help]');
     if (helpText) {
+        const helpMessage = checkbox.checked ? 
+            checkbox.dataset.activeHelpText : 
+            checkbox.dataset.inactiveHelpText;
+            
         if (!checkbox.checked || checkbox.disabled) {
+            helpText.innerHTML = helpMessage;
             helpText.classList.remove('d-none');
         } else {
             helpText.classList.add('d-none');

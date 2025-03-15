@@ -8,6 +8,8 @@ This template expects:
 
 {% load crispy_forms_field %}
 
-<div id="div_{{ field.auto_id }}" class="form-check d-flex align-items-center gap-3 {{ wrapper_class }}">
-    {% crispy_field field %}
+<div id="div_{{ field.auto_id }}" class="form-check d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center">
+        {% crispy_field field %}
+    </div>
 </div>

@@ -362,9 +362,12 @@ class LocationForm(forms.ModelForm):
             'class': 'form-check-input active-checkbox',
             'data-active-checkbox': 'true',
             'data-active-label': 'Active',
-            'data-inactive-label': 'inactive'
+            'data-inactive-label': 'inactive',
+            'data-active-help-text': ('This place is active. The new location will be active.'),
+            'data-inactive-help-text': ('This place is inactive. The new location will be inactive.')
         })
     )
+
     confirm_deactivate = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={  
@@ -375,7 +378,7 @@ class LocationForm(forms.ModelForm):
 
     class Meta:
         model = Location
-        fields = ['name', 'is_active', 'confirm_deactivate']
+        fields = ['name', 'confirm_deactivate']  # Remove is_active from here
 
     def __init__(self, *args, **kwargs):
         ic(kwargs)
@@ -383,23 +386,23 @@ class LocationForm(forms.ModelForm):
         self.locations = kwargs.pop('locations', None)
         self.devices_active = kwargs.pop('devices_active', None)
         super().__init__(*args, **kwargs)
-        ic(vars(self))
+        # ic(vars(self))
 
         # Handle place-based activation constraints
         if not self.place.is_active:
-            self.fields['is_active'].initial = False
-            self.fields['is_active'].disabled = True
-            self.fields['is_active'].label = 'inactive'
+            self['is_active'].initial = False
+            self['is_active'].disabled = True
+            self['is_active'].label = 'inactive'
             # note help test will be rendered when the checkbox is disabled due to parent being inactive
             self.fields['is_active'].help_text = mark_safe(
                 '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
                 f'<i class="bi bi-house-gear me-2"></i>'
-                f'Place ({self.place.name}) is inactive.'
+                f'Place ({self.place.name}) is inactive.XXXXXXX'
                 '</div>'
             )
-        
         # Handle existing location with active devices
         elif self.instance and self.instance.pk:
+            self['is_active'].initial = self.instance.is_active
             active_devices = self.instance.devices.filter(is_active=True)
             active_device_count = active_devices.count()
             
