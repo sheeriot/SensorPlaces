@@ -354,20 +354,8 @@ class PlaceDeleteForm(forms.Form):
         return confirm_name
 
 class LocationForm(forms.ModelForm):
+    # Form-specific fields (not in model) - no need to include these in Meta.fields
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
-    is_active = forms.BooleanField(
-        required=False,
-        label='Active',
-        widget=forms.CheckboxInput(attrs={
-            'class': 'form-check-input active-checkbox',
-            'data-active-checkbox': 'true',
-            'data-active-label': 'Active',
-            'data-inactive-label': 'inactive',
-            'data-active-help-text': ('This place is active. The new location will be active.'),
-            'data-inactive-help-text': ('This place is inactive. The new location will be inactive.')
-        })
-    )
-
     confirm_deactivate = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={  
@@ -378,33 +366,55 @@ class LocationForm(forms.ModelForm):
 
     class Meta:
         model = Location
-        fields = ['name', 'confirm_deactivate']  # Remove is_active from here
+        # Only include model fields here
+        fields = ['name', 'place', 'is_active']  # removed confirm_deactivate
+        widgets = {
+            'place': forms.HiddenInput(),
+            'is_active': forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input active-checkbox',
+                    'data-active-checkbox': 'true',
+                    'data-active-label': 'Active',
+                    'data-inactive-label': 'inactive'
+            })
+        }
 
     def __init__(self, *args, **kwargs):
-        ic(kwargs)
         self.place = kwargs.pop('place', None)
         self.locations = kwargs.pop('locations', None)
         self.devices_active = kwargs.pop('devices_active', None)
         super().__init__(*args, **kwargs)
-        # ic(vars(self))
+
+        self.fields['is_active'].label = 'Active'
+
+        # Set initial data for place if this is a new location
+        if self.place and not kwargs.get('instance'):
+            kwargs.setdefault('initial', {})
+            kwargs['initial']['place'] = self.place
 
         # Handle place-based activation constraints
         if not self.place.is_active:
-            self['is_active'].initial = False
-            self['is_active'].disabled = True
-            self['is_active'].label = 'inactive'
-            # note help test will be rendered when the checkbox is disabled due to parent being inactive
+            self.fields['is_active'].initial = False
+            self.fields['is_active'].disabled = True
+            self.fields['is_active'].label = 'inactive'
             self.fields['is_active'].help_text = mark_safe(
                 '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
                 f'<i class="bi bi-house-gear me-2"></i>'
-                f'Place ({self.place.name}) is inactive.XXXXXXX'
+                f'Cannot activate: Place "{self.place.name}" is inactive'
                 '</div>'
             )
-        # Handle existing location with active devices
-        elif self.instance and self.instance.pk:
-            self['is_active'].initial = self.instance.is_active
-            active_devices = self.instance.devices.filter(is_active=True)
-            active_device_count = active_devices.count()
+        # Handle existing location
+        elif self.instance.pk:
+            # Add location-specific ID
+            self.fields['is_active'].widget.attrs.update({
+                'id': f'location-active-{self.instance.pk}',
+                'data-location-id': str(self.instance.pk)
+            })
+            if not self.instance.is_active:
+                self.fields['is_active'].label = 'inactive'
+
+            active_devices = self.devices_active
+            active_device_count = self.devices_active.count()
             
             if active_device_count > 0:
                 active_devices_list = ''.join([
@@ -413,7 +423,7 @@ class LocationForm(forms.ModelForm):
                     for device in active_devices.prefetch_related('sensors')
                 ])
                 
-                self.fields['is_active'].help_text = mark_safe(
+                self['is_active'].help_text = mark_safe(
                     '<div class="form-text text-warning-emphasis mt-2" data-active-checkbox-help>'
                     f'<i class="bi bi-exclamation-triangle me-2"></i>'
                     f'This location has {active_device_count} active device{"s" if active_device_count > 1 else ""}:'
@@ -421,11 +431,6 @@ class LocationForm(forms.ModelForm):
                     '</div>'
                 )
 
-            # Add location-specific ID
-            self.fields['is_active'].widget.attrs.update({
-                'id': f'location-active-{self.instance.pk}',
-                'data-location-id': str(self.instance.pk)
-            })
 
         # Setup crispy form
         self.helper = FormHelper()

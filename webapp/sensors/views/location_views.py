@@ -94,7 +94,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         # ic(kwargs['place'])
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial'].update({
-            'is_active': kwargs['place'].is_active,  # Set initial is_active to match place
+            'is_active': kwargs['place'].is_active,
             'referrer': self.request.GET.get('next', '')
         })
         return kwargs
@@ -102,19 +102,21 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
+        context['place'] = self.place
+        context['locations'] = self.locations
         return context
 
     def form_valid(self, form):
-        place = get_object_or_404(Place, slug=self.kwargs.get('place_slug'))
-        form.instance.place = place
+        # place = self.place
+        # form.instance.place = place
         response = super().form_valid(form)
-        location = self.object
+        ic('LocationCreateView form_valid')
         
         message = (
-            f"Created location <strong>{location.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name}<br>"
+            f"Created location <strong>{self.object.name}</strong> in "
+            f"<i class='bi bi-house-gear'></i> {self.place.name}<br>"
             f"<small class='text-muted'>"
-            f"Status: {'Active' if location.is_active else 'inactive'}"
+            f"Status: {'Active' if self.object.is_active else 'inactive'}"
             f"</small>"
         )
         
@@ -123,7 +125,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
-        
+
         # ic("LocationCreateView setting toast_message:", {
         #     'message': message,
         #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'

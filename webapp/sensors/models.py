@@ -113,7 +113,7 @@ class Location(models.Model):
     )
     is_active: BooleanField = models.BooleanField(
         default=True,
-        help_text="inactive locations will be hidden by default"
+        # help_text="inactive locations will be hidden by default"
     )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
