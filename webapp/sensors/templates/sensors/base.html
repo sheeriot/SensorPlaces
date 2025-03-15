@@ -21,44 +21,9 @@
     <link rel="stylesheet" href="{% static 'sensors/css/common.css' %}">
     {% block extra_css %}{% endblock %}
 
-    <!-- Core JavaScript Dependencies -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    
-    <!-- Leaflet and plugins JavaScript -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.min.js"></script>
-
-    <!-- Third-party Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-
-    <!-- Application Core JavaScript -->
-    <script src="{% static 'sensors/js/utils.js' %}"></script>
-    <script src="{% static 'sensors/js/common.js' %}"></script>
-    <script src="{% static 'sensors/js/toast-ui-manager.js' %}"></script>
-
-    <!-- Application Feature JavaScript -->
-    <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
-    <script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
-    <script src="{% static 'sensors/js/place_map_popout.js' %}"></script>
-    <script src="{% static 'sensors/js/places_map_folium.js' %}"></script>
-    <script src="{% static 'sensors/js/place_map_location_picker.js' %}"></script>
-    <script src="{% static 'sensors/js/siteplan_view.js' %}"></script>
-    <script src="{% static 'sensors/js/siteplan_editor.js' %}"></script>
-    <script src="{% static 'sensors/js/active_status_checkbox.js' %}"></script>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize active status checkbox if present
-            if (typeof initializeActiveStatusCheckbox === 'function') {
-                setTimeout(initializeActiveStatusCheckbox, 100);
-            }
-        });
-    </script>
 </head>
 <body data-toast-unread-count="{{ toast_unread_count|default:0 }}"
-      data-place-slug="{{ current_place_slug|default:'' }}"
+      data-place-slug="{{ place.slug|default:'none' }}"
       {% for key, value in body_data_attributes.items %} 
       data-{{ key }}="{{ value }}"
       {% endfor %}>
@@ -194,6 +159,37 @@
         </div>
     </footer>
 
-    {% block extra_js %}{% endblock %}
+
+    <!-- Core JavaScript Dependencies -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- Leaflet and plugins JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.min.js"></script>
+
+    <!-- Third-party Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+    <!-- Application Core JavaScript -->
+    <script src="{% static 'sensors/js/utils.js' %}"></script>
+    <script src="{% static 'sensors/js/common.js' %}"></script>
+    <script src="{% static 'sensors/js/toast-ui-manager.js' %}"></script>
+
+    <!-- Application Feature JavaScript -->
+    <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
+    <script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
+
+    <!-- Map JavaScript -->
+    <script src="{% static 'sensors/js/place-map-popout.js' %}"></script>
+    <script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+
+
+    <!-- Utilities -->
+    <script src="{% static 'sensors/js/time-display.js' %}"></script>
+
+    {% block extra_js %}
+    {% endblock %}
 </body>
 </html> 

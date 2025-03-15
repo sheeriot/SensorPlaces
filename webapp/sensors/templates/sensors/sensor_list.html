@@ -5,22 +5,26 @@
 {% block content %}
 <div class="row">
     <div class="col-12 mb-1">
-        {% include "sensors/partials/place_title_card.html" with place=place location=location locations=locations %}
+        {% include "sensors/partials/place_title_card.html" %}
     </div>
 
     <!-- Two Column Layout for Locations and Devices -->
     <div class="row">
         <div class="col-md-4">
-            {% include "sensors/includes/place_nav_card.html" with place=place location=location device=device locations=locations %}
+            {% include "sensors/includes/place_nav_card.html" %}
+            {% include "sensors/includes/device_list_card.html" %}
         </div>
+
         <!-- right column -->
         <div class="col-md-8">
             {% if device %}
-                <div class="mb-3">Device: {{ device.name }}</div>
-                {% include "sensors/includes/sensor_list_card.html" with place=place device=device location=location locations=locations sensors=sensors %}
+                {% include "sensors/includes/device_detail_card.html" %}
+                {% include "sensors/includes/sensor_list_card.html" %}
             {% else %}
-                {% include "sensors/includes/sensor_list_card.html" with place=place devices=devices locations=locations sensors=sensors %}
+                {% include "sensors/includes/sensor_list_card.html" %}
             {% endif %}
+        </div>
+
         </div>
     </div>
 </div>

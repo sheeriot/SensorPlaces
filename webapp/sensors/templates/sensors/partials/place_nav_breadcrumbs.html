@@ -2,23 +2,62 @@
 <nav class="d-flex align-items-center gap-4">
     <div class="text-body-secondary">
         <small>
-            {% if model_name == 'location' %}
-                <i class="bi bi-house-gear"></i> {{ place.name }} >
-                <i class="bi bi-geo-alt"></i> {{ location.name }}
-            {% elif model_name == 'device' %}
-                <i class="bi bi-house-gear"></i> {{ place.name }} >
-                <i class="bi bi-geo-alt"></i> {{ device.location.name }} >
-                <i class="bi bi-hdd-rack"></i> {{ device.name }}
-            {% elif model_name == 'sensor' %}
-                <i class="bi bi-house-gear"></i> {{ place.name }} >
-                <i class="bi bi-geo-alt"></i> {{ sensor.device.location.name }} >
-                <i class="bi bi-hdd-rack"></i> {{ sensor.device.name }} >
-                <i class="bi bi-thermometer"></i> {{ sensor.name }}
+            {% if not model_name %}
+                <a href="{% url 'sensors:place_list' %}" class="text-decoration-none text-reset">
+                    <i class="bi bi-compass"></i> SensorPlaces
+                </a>
             {% else %}
-                <i class="bi bi-house-gear"></i> {{ place.name }}
+                {% if place %}
+                    <a href="{% url 'sensors:place_detail' place.slug %}" class="text-decoration-none text-reset">
+                        <i class="bi bi-house-gear"></i> {{ place.name }}
+                    </a>
+                {% else %}
+                    <a href="{% url 'sensors:place_list' %}" class="text-decoration-none text-reset">
+                        <i class="bi bi-house-gear"></i> Places
+                    </a>
+                {% endif %}
+
+                {% if model_name != 'place' %}
+                    <i class="bi bi-chevron-right"></i>
+                    {% if location %}
+                        <a href="{% url 'sensors:location_detail' place.slug location.pk %}" class="text-decoration-none text-reset">
+                            <i class="bi bi-geo-alt"></i> {{ location.name }}
+                        </a>
+                    {% else %}
+                        <a href="{% url 'sensors:location_list' place.slug %}" class="text-decoration-none text-reset">
+                            <i class="bi bi-geo-alt"></i> Locations
+                        </a>
+                    {% endif %}
+                {% endif %}
+
+                {% if model_name not in 'place,location' %}
+                    <i class="bi bi-chevron-right"></i>
+                    {% if device %}
+                        <a href="{% url 'sensors:device_detail' place.slug device.pk %}" class="text-decoration-none text-reset">
+                            <i class="bi bi-hdd-rack"></i> {{ device.name }}
+                        </a>
+                    {% else %}
+                        <a href="{% url 'sensors:device_list' place.slug %}" class="text-decoration-none text-reset">
+                            <i class="bi bi-hdd-rack"></i> Devices
+                        </a>
+                    {% endif %}
+                {% endif %}
+
+                {% if model_name not in 'place,location,device' %}
+                    <i class="bi bi-chevron-right"></i>
+                    {% if sensor %}
+                        <a href="{% url 'sensors:sensor_detail' place.slug sensor.pk %}" class="text-decoration-none text-reset">
+                            <i class="bi bi-thermometer"></i> {{ sensor.name }}
+                        </a>
+                    {% else %}
+                        <a href="{% url 'sensors:sensor_list' place.slug %}" class="text-decoration-none text-reset">
+                            <i class="bi bi-thermometer"></i> Sensors
+                        </a>
+                    {% endif %}
+                {% endif %}
             {% endif %}
         </small>
     </div>
-    {% include "sensors/partials/place_nav_header_buttons.html" with place=place model_name=model_name %}
+    {% include "sensors/partials/place_nav_header_buttons.html" %}
 </nav>
 {% endif %} 

@@ -3,46 +3,45 @@
  * Handles the interactive map for selecting place locations
  */
 
+// Add config object at the top
+const placePickerConfig = {
+    debug: false,
+    mapContainerId: 'place-form-map',
+    latInputId: 'id_latitude',
+    lngInputId: 'id_longitude',
+    defaultLat: 30.26715,
+    defaultLng: -97.74306,
+    zoom: 13
+};
+// console.log(placePickerConfig);
+
 const PlaceMapLocationPicker = {
     initialize(options = {}) {
-        const {
-            mapContainerId = 'place-form-map',
-            latInputId = 'id_latitude',
-            lngInputId = 'id_longitude',
-            defaultLat = 30.26715,
-            defaultLng = -97.74306,
-            zoom = 13,
-            debug = false
-        } = options;
+        // Merge options with default config
+        Object.assign(placePickerConfig, options);
 
-        if (debug) {
-            console.group('Place Map Location Picker');
-            console.log('Initializing with options:', options);
-        }
+        if (placePickerConfig.debug) console.group('Place Map Location Picker');
+        if (placePickerConfig.debug) console.log('Initializing with options:', options);
 
-        const mapContainer = document.getElementById(mapContainerId);
-        const latInput = document.getElementById(latInputId);
-        const lngInput = document.getElementById(lngInputId);
+        const mapContainer = document.getElementById(placePickerConfig.mapContainerId);
+        const latInput = document.getElementById(placePickerConfig.latInputId);
+        const lngInput = document.getElementById(placePickerConfig.lngInputId);
 
         if (!mapContainer || !latInput || !lngInput) {
-            if (debug) {
-                console.error('Required elements not found:', { mapContainer, latInput, lngInput });
-                this.showToast('Map initialization failed: Required elements not found', 'danger');
-                console.groupEnd();
+            if (placePickerConfig.debug) {
+                console.log('Map Picker Container not found:', { mapContainer, latInput, lngInput });
             }
             return null;
         }
 
         // Get initial coordinates
-        const initialLat = parseFloat(latInput.value) || defaultLat;
-        const initialLng = parseFloat(lngInput.value) || defaultLng;
+        const initialLat = parseFloat(latInput.value) || placePickerConfig.defaultLat;
+        const initialLng = parseFloat(lngInput.value) || placePickerConfig.defaultLng;
 
-        if (debug) {
-            console.log('Initial coordinates:', { initialLat, initialLng });
-        }
+        if (placePickerConfig.debug) console.log('Initial coordinates:', { initialLat, initialLng });
 
         // Initialize map
-        const map = L.map(mapContainerId).setView([initialLat, initialLng], zoom);
+        const map = L.map(placePickerConfig.mapContainerId).setView([initialLat, initialLng], placePickerConfig.zoom);
         
         // Add tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -60,7 +59,7 @@ const PlaceMapLocationPicker = {
         marker.on('dragend', (e) => {
             const position = e.target.getLatLng();
             this.updateCoordinates(position.lat, position.lng, latInput, lngInput);
-            if (debug) console.log('Marker dragged to:', position);
+            if (placePickerConfig.debug) console.log('Marker dragged to:', position);
         });
 
         // Update marker when coordinates are manually entered
@@ -70,7 +69,7 @@ const PlaceMapLocationPicker = {
             if (!isNaN(lat) && !isNaN(lng)) {
                 marker.setLatLng([lat, lng]);
                 map.setView([lat, lng]);
-                if (debug) console.log('Marker updated from inputs:', { lat, lng });
+                if (placePickerConfig.debug) console.log('Marker updated from inputs:', { lat, lng });
             }
         };
 
@@ -84,13 +83,13 @@ const PlaceMapLocationPicker = {
         map.on('click', (e) => {
             marker.setLatLng(e.latlng);
             this.updateCoordinates(e.latlng.lat, e.latlng.lng, latInput, lngInput);
-            if (debug) console.log('Map clicked at:', e.latlng);
+            if (placePickerConfig.debug) console.log('Map clicked at:', e.latlng);
         });
 
         // Add map instructions if not present
         this.addMapInstructions(mapContainer);
 
-        if (debug) {
+        if (placePickerConfig.debug) {
             console.log('Map initialization complete');
             console.groupEnd();
         }
@@ -134,7 +133,5 @@ const PlaceMapLocationPicker = {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    PlaceMapLocationPicker.initialize({
-        debug: false  // Set to true to enable debug logging
-    });
+    PlaceMapLocationPicker.initialize();
 }); 

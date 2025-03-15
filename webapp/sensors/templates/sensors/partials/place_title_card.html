@@ -5,9 +5,13 @@
     <div class="card-header bg-white py-2">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">
-                <i class="bi bi-house-gear me-2"></i>Place:
-                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-secondary fw-normal">{{ place.name }}</a>
-                {% include "sensors/partials/status_active_badge.html" with object=place %}
+                <div class="d-flex justify-content-left align-items-center">
+                    <i class="bi bi-house-gear me-2"></i>
+                    Place:&nbsp;
+                    <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-secondary fw-normal">{{ place.name }}</a>
+                    &nbsp;&nbsp;
+                    {% include "sensors/partials/status_active_badge.html" with object=place %}
+                </div>
             </h5>
             <div class="d-flex align-items-center gap-3 small">
                 <span>
@@ -17,13 +21,13 @@
                     <i class="bi bi-geo-alt me-1"></i>{{ place.latitude }}, {{ place.longitude }}
                 </span>
                 <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openPlaceMap" 
-                   data-place-map-popout="true"
-                   data-bs-toggle="modal" 
-                   data-bs-target="#placeMapModal" 
-                   data-place-lat="{{ place.latitude }}"
-                   data-place-lon="{{ place.longitude }}"
-                   data-place-name="{{ place.name }}"
-                   data-place-slug="{{ place.slug }}">
+                    data-place-map-popout="true"
+                    data-bs-toggle="modal" 
+                    data-bs-target="#placeMapModal" 
+                    data-place-lat="{{ place.latitude }}"
+                    data-place-lon="{{ place.longitude }}"
+                    data-place-name="{{ place.name }}"
+                    data-place-slug="{{ place.slug }}">
                     <i class="bi bi-globe"></i>
                 </a>
             </div>

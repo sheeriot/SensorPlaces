@@ -1,13 +1,13 @@
 // Time Display System Configuration
 const timeDisplayConfig = {
-    debug: true
+    debug: false
 };
 
-// Initialize debug mode from URL parameter
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('debug') === 'true') {
-    timeDisplayConfig.debug = true;
-}
+// // Initialize debug mode from URL parameter
+// const urlParams = new URLSearchParams(window.location.search);
+// if (urlParams.get('debug') === 'true') {
+//     timeDisplayConfig.debug = true;
+// }
 
 // Time Display System
 const timeDisplay = {
