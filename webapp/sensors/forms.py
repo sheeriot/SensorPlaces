@@ -409,9 +409,12 @@ class LocationForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        # Pop special parameters before calling parent __init__
         self.place = kwargs.pop('place', None)
         self.locations = kwargs.pop('locations', None)
         self.devices_active = kwargs.pop('devices_active', None)
+        inactive_help_text = kwargs.pop('inactive_help_text', None)
+        
         super().__init__(*args, **kwargs)
 
         # Set initial data for place if this is a new location
@@ -419,10 +422,28 @@ class LocationForm(forms.ModelForm):
             self.initial['place'] = self.place.pk  # Use the primary key
             # Also set it on the instance to ensure it's available during validation
             self.instance.place = self.place
-        ic(self.initial)
+        
+        # Setup form ID and classes
+        self.helper = FormHelper()
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
+        self.helper.form_class = 'mb-0 model-form'
+        self.helper.form_id = f"location-form-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
+        self.helper.form_show_errors = True
+        self.helper.error_text_inline = True
+        self.helper.help_text_inline = True
+        
         # Default label and help text
         self.fields['is_active'].label = 'Active'
         self.fields['is_active'].help_text = ''
+        
+        # Configure field properties
+        # Setup Active field with proper ID and label
+        checkbox_id = f"location-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
+        self.fields['is_active'].widget.attrs.update({
+            'id': checkbox_id,
+            'data-location-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
+        })
         
         # For both new and existing locations, if place is inactive, force location to be inactive
         if self.place and not self.place.is_active:
@@ -447,43 +468,20 @@ class LocationForm(forms.ModelForm):
         
         # Handle existing location with active devices
         elif self.instance and self.instance.pk:
-            # Add location-specific ID attributes to the html element
-            self.fields['is_active'].widget.attrs.update({
-                'id': f'location-form-active-{self.instance.pk}',
-                'data-location-id': str(self.instance.pk)
-            })
-            ic(self.fields['is_active'].widget.attrs)
-            # change label to inactive if location is inactive
+            # Set the label based on the current state
             if not self.instance.is_active:
                 self.fields['is_active'].label = 'inactive'
             
-            # Check for active devices
-            active_device_count = self.devices_active.count() if self.devices_active else 0
-            
-            if active_device_count > 0:
-                active_devices_list = ''.join([
-                    f'<li><i class="bi bi-hdd-rack text-muted me-1"></i>{device.name} '
-                    f'<small class="text-muted">({device.sensors.filter(is_active=True).count()} active sensors <i class="bi bi-thermometer text-muted me-1">)</small></li>'
-                    for device in self.devices_active.prefetch_related('sensors')
-                ])
-                
-                help_text_inactive = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
-                    f'<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This location has {active_device_count} active device{"s" if active_device_count > 1 else ""}:'
-                    f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_devices_list}</ul>'
-                    '</div>'
-                )
-                self.fields['is_active'].help_text = help_text_inactive
+            # We don't need to generate our own help_text here
+            # Just use what comes from the view via inactive_help_text
         
         # For new locations at active places, set default help text if needed
         else:
             self.fields['is_active'].initial = True
-        # Setup crispy form
-        self.helper = FormHelper()
-        self.helper.form_id = 'location-form'
-        self.helper.form_class = "model-form"
-        self.helper.help_text_inline = True
+        
+        # Set help text for inactive state if provided from view
+        if inactive_help_text:
+            self.fields['is_active'].help_text = inactive_help_text
 
         # First, define a cancel_url variable
         cancel_url = "{% url 'sensors:location_detail' place_slug=place.slug pk=object.pk %}"
@@ -555,7 +553,6 @@ class LocationForm(forms.ModelForm):
         )
 
     def clean(self):
-        ic('LocationForm clean')
         cleaned_data = super().clean()
         
         # Ensure place is in cleaned_data
@@ -564,13 +561,9 @@ class LocationForm(forms.ModelForm):
             # Also set it on the instance
             self.instance.place = self.place
         
-        ic(vars(self.instance))
-        
         # Get is_active value, defaulting to False if not present
         is_active = cleaned_data.get('is_active', False)
         confirm_deactivate = cleaned_data.get('confirm_deactivate')
-        ic(f"is_active from cleaned_data: {is_active}")
-        ic(confirm_deactivate)
 
         # Ensure location is inactive if place is inactive
         if is_active and self.place and not self.place.is_active:
@@ -581,29 +574,24 @@ class LocationForm(forms.ModelForm):
         if self.instance and self.instance.pk and self.instance.is_active and not is_active:
             # Count active devices
             active_device_count = self.instance.devices.filter(is_active=True).count()
-            ic(f"Active device count: {active_device_count}")
             
             # Only require confirmation if there are active devices
             if active_device_count > 0:
                 if not confirm_deactivate:
-                    ic("Missing confirmation for deactivation")
                     raise forms.ValidationError({
                         'confirm_deactivate': f"Please type {active_device_count} to confirm deactivation of {active_device_count} active device(s)."
                     })
                 
                 try:
-                    ic(f"Confirmation value: {confirm_deactivate}, Expected: {active_device_count}")
                     if int(confirm_deactivate) != active_device_count:
                         raise forms.ValidationError({
                             'confirm_deactivate': f"Incorrect confirmation number. Please type {active_device_count} to confirm."
                         })
                 except ValueError:
-                    ic("Invalid confirmation value (not a number)")
                     raise forms.ValidationError({
                         'confirm_deactivate': "Please enter a valid number."
                     })
         
-        ic("LocationForm clean completed successfully")
         return cleaned_data
 
     def is_valid(self):
