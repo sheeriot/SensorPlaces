@@ -1,0 +1,197 @@
+[
+{
+  "model": "sensors.device",
+  "pk": 1,
+  "fields": {
+    "name": "Kona1",
+    "model": "yyz",
+    "manufacturer": "xx",
+    "serial_number": "12345",
+    "location": 1,
+    "device_type": 1,
+    "is_active": false,
+    "created_at": "2025-02-25T22:43:25.306Z",
+    "updated_at": "2025-03-12T16:44:58.415Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 9,
+  "fields": {
+    "name": "catnip",
+    "model": "woolen",
+    "manufacturer": "farmers",
+    "serial_number": "yy",
+    "location": 3,
+    "device_type": 6,
+    "is_active": false,
+    "created_at": "2025-02-27T01:13:54.898Z",
+    "updated_at": "2025-03-12T20:46:23.633Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 13,
+  "fields": {
+    "name": "Frogg",
+    "model": "Amphibian",
+    "manufacturer": "God",
+    "serial_number": "yy",
+    "location": 1,
+    "device_type": 1,
+    "is_active": false,
+    "created_at": "2025-02-27T23:33:21.277Z",
+    "updated_at": "2025-03-11T22:47:30.740Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 14,
+  "fields": {
+    "name": "TrashCan",
+    "model": "KT101",
+    "manufacturer": "Tektelic",
+    "serial_number": "aaa",
+    "location": 1,
+    "device_type": 6,
+    "is_active": false,
+    "created_at": "2025-02-28T11:12:12.730Z",
+    "updated_at": "2025-03-12T16:48:16.350Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 16,
+  "fields": {
+    "name": "Truck",
+    "model": "",
+    "manufacturer": "",
+    "serial_number": null,
+    "location": 1,
+    "device_type": 4,
+    "is_active": false,
+    "created_at": "2025-03-05T03:54:05.204Z",
+    "updated_at": "2025-03-11T21:34:38.602Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 30,
+  "fields": {
+    "name": "testy",
+    "model": null,
+    "manufacturer": "aa",
+    "serial_number": null,
+    "location": 1,
+    "device_type": 4,
+    "is_active": false,
+    "created_at": "2025-03-11T14:38:20.601Z",
+    "updated_at": "2025-03-12T16:48:08.236Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 32,
+  "fields": {
+    "name": "adfs",
+    "model": null,
+    "manufacturer": null,
+    "serial_number": null,
+    "location": 1,
+    "device_type": 4,
+    "is_active": false,
+    "created_at": "2025-03-11T22:01:57.789Z",
+    "updated_at": "2025-03-12T16:41:02.877Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 34,
+  "fields": {
+    "name": "duck",
+    "model": null,
+    "manufacturer": null,
+    "serial_number": null,
+    "location": 23,
+    "device_type": 4,
+    "is_active": false,
+    "created_at": "2025-03-12T22:47:28.766Z",
+    "updated_at": "2025-03-12T22:47:28.766Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 35,
+  "fields": {
+    "name": "Kona",
+    "model": null,
+    "manufacturer": null,
+    "serial_number": null,
+    "location": 27,
+    "device_type": 9,
+    "is_active": false,
+    "created_at": "2025-03-13T20:25:14.032Z",
+    "updated_at": "2025-03-13T20:42:59.057Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 36,
+  "fields": {
+    "name": "worksmore",
+    "model": null,
+    "manufacturer": null,
+    "serial_number": null,
+    "location": 28,
+    "device_type": 4,
+    "is_active": false,
+    "created_at": "2025-03-13T22:00:29.059Z",
+    "updated_at": "2025-03-13T23:43:15.069Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 37,
+  "fields": {
+    "name": "PoolSalt",
+    "model": null,
+    "manufacturer": null,
+    "serial_number": null,
+    "location": 23,
+    "device_type": 9,
+    "is_active": false,
+    "created_at": "2025-03-14T12:53:08.893Z",
+    "updated_at": "2025-03-14T12:55:22.484Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 38,
+  "fields": {
+    "name": "beerwatcher",
+    "model": null,
+    "manufacturer": null,
+    "serial_number": null,
+    "location": 23,
+    "device_type": 7,
+    "is_active": false,
+    "created_at": "2025-03-14T15:18:43.084Z",
+    "updated_at": "2025-03-14T15:19:22.539Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 39,
+  "fields": {
+    "name": "Shirt",
+    "model": null,
+    "manufacturer": null,
+    "serial_number": null,
+    "location": 23,
+    "device_type": 4,
+    "is_active": true,
+    "created_at": "2025-03-14T15:20:10.089Z",
+    "updated_at": "2025-03-14T15:21:38.280Z"
+  }
+}
+]

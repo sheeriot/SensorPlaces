@@ -110,7 +110,6 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         # place = self.place
         # form.instance.place = place
         response = super().form_valid(form)
-        ic('LocationCreateView form_valid')
         
         message = (
             f"Created location <strong>{self.object.name}</strong> in "

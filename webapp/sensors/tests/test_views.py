@@ -4,15 +4,18 @@ from django.contrib.auth import get_user_model
 from sensors.models import Place, Location, Device, Sensor, SensorReading
 from django.core.files.uploadedfile import SimpleUploadedFile
 import json
+import os
 
 class SensorsViewTestCase(TestCase):
+    # Specify the full path to fixtures
     fixtures = [
-        'test_users.json',
-        'test_places.json',
-        'test_locations.json',
-        'test_devices.json',
-        'test_sensors.json',
-        'test_readings.json',
+        'sensors/tests/fixtures/test_users.json',
+        'sensors/tests/fixtures/test_places.json',
+        'sensors/tests/fixtures/test_locations.json',
+        'sensors/tests/fixtures/test_devices.json',
+        'sensors/tests/fixtures/test_influxsources.json',
+        'sensors/tests/fixtures/test_sensors.json',
+        'sensors/tests/fixtures/test_readings.json',
     ]
 
     def setUp(self):

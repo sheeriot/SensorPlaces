@@ -1,0 +1,158 @@
+[
+{
+  "model": "sensors.location",
+  "pk": 1,
+  "fields": {
+    "name": "ArkCovenant",
+    "place": 1,
+    "x_pos": "71.01",
+    "y_pos": "81.72",
+    "is_active": false,
+    "created_at": "2025-02-25T22:42:12.924Z",
+    "updated_at": "2025-03-14T17:27:07.159Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 3,
+  "fields": {
+    "name": "Aardvark",
+    "place": 1,
+    "x_pos": "35.78",
+    "y_pos": "58.37",
+    "is_active": true,
+    "created_at": "2025-02-26T17:42:24.941Z",
+    "updated_at": "2025-03-14T17:27:07.154Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 8,
+  "fields": {
+    "name": "Saloon",
+    "place": 1,
+    "x_pos": "26.77",
+    "y_pos": "31.96",
+    "is_active": true,
+    "created_at": "2025-03-04T19:30:07.840Z",
+    "updated_at": "2025-03-14T17:27:07.157Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 11,
+  "fields": {
+    "name": "cubby",
+    "place": 5,
+    "x_pos": "22.91",
+    "y_pos": "33.08",
+    "is_active": true,
+    "created_at": "2025-03-08T18:31:35.209Z",
+    "updated_at": "2025-03-09T00:04:57.212Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 13,
+  "fields": {
+    "name": "burnt",
+    "place": 5,
+    "x_pos": "63.01",
+    "y_pos": "76.70",
+    "is_active": true,
+    "created_at": "2025-03-08T22:45:17.257Z",
+    "updated_at": "2025-03-14T17:52:49.169Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 23,
+  "fields": {
+    "name": "Matych",
+    "place": 10,
+    "x_pos": "31.69",
+    "y_pos": "79.54",
+    "is_active": true,
+    "created_at": "2025-03-12T22:46:47.706Z",
+    "updated_at": "2025-03-14T17:32:04.460Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 24,
+  "fields": {
+    "name": "Closet",
+    "place": 10,
+    "x_pos": "71.47",
+    "y_pos": "19.41",
+    "is_active": true,
+    "created_at": "2025-03-13T10:03:42.308Z",
+    "updated_at": "2025-03-14T17:33:10.177Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 27,
+  "fields": {
+    "name": "Shangster",
+    "place": 11,
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-03-13T19:19:41.862Z",
+    "updated_at": "2025-03-13T21:58:35.303Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 28,
+  "fields": {
+    "name": "Darkroom",
+    "place": 11,
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-03-13T21:58:03.753Z",
+    "updated_at": "2025-03-13T21:59:47.627Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 29,
+  "fields": {
+    "name": "asdf11gh5555sadfrg",
+    "place": 11,
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-03-14T01:19:24.814Z",
+    "updated_at": "2025-03-14T01:57:37.505Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 30,
+  "fields": {
+    "name": "hidden-room",
+    "place": 10,
+    "x_pos": "76.02",
+    "y_pos": "68.67",
+    "is_active": true,
+    "created_at": "2025-03-14T15:44:17.035Z",
+    "updated_at": "2025-03-14T17:33:10.180Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "pk": 31,
+  "fields": {
+    "name": "door",
+    "place": 11,
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-03-14T19:29:53.983Z",
+    "updated_at": "2025-03-14T19:34:08.634Z"
+  }
+}
+]

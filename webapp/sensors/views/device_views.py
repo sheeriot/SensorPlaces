@@ -63,7 +63,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
-        ic('device_list_context', context)
+        # ic('device_list_context', context)
 
         # Add place to context
         place = self.get_place()

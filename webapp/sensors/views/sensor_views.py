@@ -6,19 +6,19 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
-from django.db.models import Count, Q, Exists, OuterRef, Subquery
+from django.db.models import OuterRef, Subquery  # Count, Q, Exists
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from datetime import datetime
 
-from ..models import Place, Location, Device, Sensor, SensorReading
+from ..models import Place, Device, Sensor, SensorReading
 from ..forms import SensorForm
 from ..utils import get_sensor_readings
 from .mixins import PlaceAnnotationMixin
 
-import json
-# from icecream import ic
+# import json
+from icecream import ic
 
 class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = Sensor
@@ -141,29 +141,32 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     form_class = SensorForm
     template_name = 'sensors/sensor_form.html'
 
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self._place = self.get_place()
+        self._locations = self.get_annotated_locations(self._place)
+        self._device = get_object_or_404(Device, pk=self.kwargs.get('device_pk'), location__place=self._place)
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        device_pk = self.kwargs.get('device_pk')
-        if device_pk:
-            device = get_object_or_404(Device, pk=device_pk, location__place=self.get_place())
-            kwargs['device'] = device
-            kwargs['initial'] = {
-                'is_active': device.is_active,
-                'device_active': device.is_active  # Pass device active status to form
-            }
+        kwargs['place'] = self._place
+        kwargs['locations'] = self._locations
+        # this looks like it is first brining in any existing 'initial' values.
+        kwargs['initial'] = kwargs.get('initial', {})
+        # ic(self._device)
+        kwargs['initial'].update({
+            'device': self._device,
+            'referrer': self.request.GET.get('next', '')
+        })
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # enrich the context with the place, locations, and device
         context['model_name'] = 'sensor'
-        context['place'] = self.get_place()
-        
-        device_pk = self.kwargs.get('device_pk')
-        if device_pk:
-            device = get_object_or_404(Device, pk=device_pk, location__place=self.get_place())
-            context['device'] = device
-            context['location'] = device.location
-        
+        context['place'] = self._place
+        context['locations'] = self._locations
+        context['device'] = self._device
         return context
 
     def form_valid(self, form):

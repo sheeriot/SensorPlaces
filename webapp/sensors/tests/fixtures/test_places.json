@@ -1,0 +1,62 @@
+[
+{
+  "model": "sensors.place",
+  "pk": 1,
+  "fields": {
+    "name": "5702HB",
+    "slug": "5702hb",
+    "address": "5702 Hudson Bend Rd, Austin, TX 78734",
+    "latitude": "35.464580",
+    "longitude": "-82.507320",
+    "is_active": true,
+    "siteplan_image": "siteplan_images/5702hb-siteplan_sJ7vPfm.png",
+    "created_at": "2025-02-25T22:30:59.021Z",
+    "updated_at": "2025-03-14T17:25:07.410Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "pk": 5,
+  "fields": {
+    "name": "Opeongo Pointy",
+    "slug": "opeongo-point",
+    "address": "1849 Opeongo Point Rd",
+    "latitude": "35.234890",
+    "longitude": "-75.531010",
+    "is_active": false,
+    "siteplan_image": "siteplan_images/3bedroom-converted_4jAR5Sr.jpeg",
+    "created_at": "2025-03-08T18:13:57.132Z",
+    "updated_at": "2025-03-14T17:52:39.497Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "pk": 10,
+  "fields": {
+    "name": "Shedy",
+    "slug": "shed",
+    "address": "",
+    "latitude": "30.423800",
+    "longitude": "-97.932100",
+    "is_active": true,
+    "siteplan_image": "siteplan_images/3bedroom-converted_E6I8pxF.jpeg",
+    "created_at": "2025-03-12T21:10:22.040Z",
+    "updated_at": "2025-03-14T22:56:06.339Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "pk": 11,
+  "fields": {
+    "name": "Heaven",
+    "slug": "carpet",
+    "address": "",
+    "latitude": "31.300850",
+    "longitude": "-106.501460",
+    "is_active": false,
+    "siteplan_image": "",
+    "created_at": "2025-03-12T21:12:15.147Z",
+    "updated_at": "2025-03-14T19:29:04.355Z"
+  }
+}
+]

@@ -86,11 +86,12 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
+        ic("Toast: PlaceCreateView:", self.request.toast_message)
         
-        ic("PlaceCreateView setting toast_message:", {
-            'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        })
+        # ic("Toast: PlaceCreateView:", {
+        #     'message': message,
+        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        # })
         
         return response
 
