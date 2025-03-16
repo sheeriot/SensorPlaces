@@ -479,7 +479,6 @@ class LocationForm(forms.ModelForm):
         # For new locations at active places, set default help text if needed
         else:
             self.fields['is_active'].initial = True
-
         # Setup crispy form
         self.helper = FormHelper()
         self.helper.form_id = 'location-form'
@@ -493,18 +492,37 @@ class LocationForm(forms.ModelForm):
 
         # Then update the layout
         self.helper.layout = Layout(
-            Row(
-                Column('name', css_class='col-md-6'),
-                Column(
-                    Field(
-                        'is_active',
-                        template='sensors/partials/active_status_checkbox.html',
-                        model_name='location',
-                        instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
+            Div(
+                Div(
+                    Div('name', css_class='col-md-6'),
+                    Div(
+                        Field(
+                            'is_active',
+                            template='sensors/partials/active_status_checkbox.html',
+                            model_name='location',
+                            instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
+                        ),
+                        css_class='col-md-6 d-flex align-items-center'
                     ),
-                    css_class='col-md-6'
+                    css_class='row mb-3'
                 ),
-                css_class='mb-3'
+                css_class='form-group'
+            ),
+            # Static display of Place name
+            Div(
+                Div(
+                    HTML(f"""
+                        <div class="form-group">
+                            <label class="form-label">Place</label>
+                            <div class="form-control-static">
+                                <i class="bi bi-house-gear me-1"></i>
+                                {self.place.name if self.place else 'Unknown'}
+                            </div>
+                        </div>
+                    """),
+                    css_class='col-12'
+                ),
+                css_class='row mb-3'
             ),
             Div(
                 Field('referrer', type='hidden'),
@@ -521,7 +539,7 @@ class LocationForm(forms.ModelForm):
                 Div(
                     HTML(f"""
                         <a href="{cancel_url}" 
-                           class="btn btn-outline-secondary">
+                        class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
