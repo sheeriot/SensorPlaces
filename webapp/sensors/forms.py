@@ -370,13 +370,12 @@ class LocationForm(forms.ModelForm):
         fields = ['name', 'place', 'is_active']
         widgets = {
             'place': forms.HiddenInput(),
-            # 'is_active': forms.CheckboxInput(
-            #     attrs={
-            #         'class': 'form-check-input active-checkbox',
-            #         'data-active-checkbox': 'true',
-            #         'data-active-label': 'Active',
-            #         'data-inactive-label': 'inactive'
-            # })
+            'is_active': forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input active-checkbox',
+                    'data-active-label': 'Active',
+                    'data-inactive-label': 'inactive'
+            })
         }
 
     def __init__(self, *args, **kwargs):
@@ -388,14 +387,6 @@ class LocationForm(forms.ModelForm):
         # Set initial data for place if this is a new location
         if self.place and not kwargs.get('instance'):
             self.initial['place'] = self.place
-
-        # Configure is_active field with proper attributes
-        self.fields['is_active'].widget.attrs.update({
-            'class': 'form-check-input active-checkbox',
-            'data-active-checkbox': 'true',
-            'data-active-label': 'Active',
-            'data-inactive-label': 'inactive'
-        })
         
         # Default label and help text
         self.fields['is_active'].label = 'Active'
@@ -410,7 +401,6 @@ class LocationForm(forms.ModelForm):
                 self.instance.save()
             
             # Force location to be inactive if place is inactive
-            self.initial['is_active'] = False
             self.fields['is_active'].initial = False  # This is important!
             self.fields['is_active'].widget.attrs['disabled'] = True
             self.fields['is_active'].label = 'inactive'
@@ -418,7 +408,7 @@ class LocationForm(forms.ModelForm):
             help_text_inactive = mark_safe(
                 '<div class="form-text text-muted mt-2">'
                 f'<i class="bi bi-house-gear me-2"></i>'
-                f'Cannot activate: Place "{self.place.name}" is inactive'
+                f'Cannot activate: Place {self.place.name} is inactive'
                 '</div>'
             )
             self.fields['is_active'].help_text = help_text_inactive
@@ -430,7 +420,8 @@ class LocationForm(forms.ModelForm):
                 'id': f'location-form-active-{self.instance.pk}',
                 'data-location-id': str(self.instance.pk)
             })
-            
+            ic(self.fields['is_active'].widget.attrs)
+            # change label to inactive if location is inactive
             if not self.instance.is_active:
                 self.fields['is_active'].label = 'inactive'
             
@@ -456,9 +447,6 @@ class LocationForm(forms.ModelForm):
         # For new locations at active places, set default help text if needed
         else:
             self.fields['is_active'].initial = True
-            self.fields['is_active'].label = 'Active'
-            # You can set a default help text for new locations if desired
-            # self.fields['is_active'].help_text = mark_safe('<div class="form-text">New location will be active</div>')
 
         # Setup crispy form
         self.helper = FormHelper()
