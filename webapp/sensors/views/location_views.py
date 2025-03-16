@@ -77,6 +77,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
+    object: Location
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
@@ -91,12 +92,15 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.place
         kwargs['locations'] = self.locations
-        # ic(kwargs['place'])
+        
+        # Set initial data properly
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial'].update({
-            'is_active': kwargs['place'].is_active,
+            'is_active': self.place.is_active,
+            'place': self.place.pk,  # Use the primary key, not the object
             'referrer': self.request.GET.get('next', '')
         })
+        
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -107,10 +111,10 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         return context
 
     def form_valid(self, form):
-        # place = self.place
-        # form.instance.place = place
+        # Explicitly set the place on the form instance
+        form.instance.place = self.place
         response = super().form_valid(form)
-        
+        ic(vars(form.instance))
         message = (
             f"Created location <strong>{self.object.name}</strong> in "
             f"<i class='bi bi-house-gear'></i> {self.place.name}<br>"
@@ -124,13 +128,45 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
-
-        # ic("LocationCreateView setting toast_message:", {
-        #     'message': message,
-        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        # })
-        
         return response
+    
+    def form_invalid(self, form):
+        """Override form_invalid to debug form errors"""
+        ic("Form is invalid, errors:", form.errors)
+        ic("Form data:", form.data)
+        
+        # Try to manually create the object to see if it works
+        try:
+            location = Location(
+                name=form.instance.name,
+                place_id=form.instance.place_id,
+                is_active=form.instance.is_active,
+                x_pos=form.instance.x_pos,
+                y_pos=form.instance.y_pos
+            )
+            location.save()
+            ic("Manually created location:", location)
+            
+            # Redirect to the success URL
+            return HttpResponseRedirect(self.get_success_url())
+        except Exception as e:
+            ic("Error creating location manually:", str(e))
+        
+        return super().form_invalid(form)
+
+    def post(self, request, *args, **kwargs):
+        """Override post to debug form validation"""
+        form = self.get_form()
+        ic("LocationCreateView.post - checking form validity")
+        if form.is_valid():
+            ic("Form is valid, calling form_valid")
+            return self.form_valid(form)
+        else:
+            ic("Form is invalid, errors:", form.errors)
+            ic("Form data:", form.data)
+            ic("Form instance:", vars(form.instance))
+            ic("Form fields:", form.fields)
+            return self.form_invalid(form)
 
 class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Location
@@ -152,6 +188,9 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             kwargs['devices_active'] = self.object.devices.filter(is_active=True).annotate(
                 sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
             )
+        if self.place and not kwargs.get('instance'):
+            kwargs['initial'] = kwargs.get('initial', {})
+            kwargs['initial']['place'] = self.place
         return kwargs
 
     def get_context_data(self, **kwargs):

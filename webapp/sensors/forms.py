@@ -129,6 +129,7 @@ class PlaceForm(forms.ModelForm):
         self.helper.layout = Layout(
             Field('slug', type='hidden'),
             Field('referrer', type='hidden'),
+            Field('place', type='hidden'),
             Row(
                 Column('name', css_class='col-md-8'),
                 Column(
@@ -385,9 +386,11 @@ class LocationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # Set initial data for place if this is a new location
-        if self.place and not kwargs.get('instance'):
-            self.initial['place'] = self.place
-        
+        if self.place and not self.instance.pk:
+            self.initial['place'] = self.place.pk  # Use the primary key
+            # Also set it on the instance to ensure it's available during validation
+            self.instance.place = self.place
+        ic(self.initial)
         # Default label and help text
         self.fields['is_active'].label = 'Active'
         self.fields['is_active'].help_text = ''
@@ -456,6 +459,7 @@ class LocationForm(forms.ModelForm):
 
         # Updated layout with active_status_checkbox template
         self.helper.layout = Layout(
+            Field('place', type='hidden'),
             Row(
                 Column('name'),
                 css_class='mb-3'
@@ -499,38 +503,63 @@ class LocationForm(forms.ModelForm):
         )
 
     def clean(self):
+        ic('LocationForm clean')
         cleaned_data = super().clean()
-        is_active = cleaned_data.get('is_active')
-        confirm_deactivate = cleaned_data.get('confirm_deactivate')
         
+        # Ensure place is in cleaned_data
+        if self.place and 'place' not in cleaned_data:
+            cleaned_data['place'] = self.place
+            # Also set it on the instance
+            self.instance.place = self.place
+        
+        ic(vars(self.instance))
+        
+        # Get is_active value, defaulting to False if not present
+        is_active = cleaned_data.get('is_active', False)
+        confirm_deactivate = cleaned_data.get('confirm_deactivate')
+        ic(f"is_active from cleaned_data: {is_active}")
+        ic(confirm_deactivate)
+
         # Ensure location is inactive if place is inactive
         if is_active and self.place and not self.place.is_active:
             cleaned_data['is_active'] = False
             self.add_error('is_active', "Location cannot be active when its place is inactive.")
         
-        # Handle deactivation confirmation
+        # Handle deactivation confirmation - check if we're changing from active to inactive
         if self.instance and self.instance.pk and self.instance.is_active and not is_active:
             # Count active devices
             active_device_count = self.instance.devices.filter(is_active=True).count()
+            ic(f"Active device count: {active_device_count}")
             
             # Only require confirmation if there are active devices
             if active_device_count > 0:
                 if not confirm_deactivate:
+                    ic("Missing confirmation for deactivation")
                     raise forms.ValidationError({
                         'confirm_deactivate': f"Please type {active_device_count} to confirm deactivation of {active_device_count} active device(s)."
                     })
                 
                 try:
+                    ic(f"Confirmation value: {confirm_deactivate}, Expected: {active_device_count}")
                     if int(confirm_deactivate) != active_device_count:
                         raise forms.ValidationError({
                             'confirm_deactivate': f"Incorrect confirmation number. Please type {active_device_count} to confirm."
                         })
                 except ValueError:
+                    ic("Invalid confirmation value (not a number)")
                     raise forms.ValidationError({
                         'confirm_deactivate': "Please enter a valid number."
                     })
         
+        ic("LocationForm clean completed successfully")
         return cleaned_data
+
+    def is_valid(self):
+        # Ensure place is set on the instance before validation
+        if self.place and not self.instance.place_id:
+            self.instance.place = self.place
+        
+        return super().is_valid()
 
 class DeviceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -852,6 +881,7 @@ class SensorForm(forms.ModelForm):
         # is_new = not bool(kwargs.get('instance'))
 
         self.helper.layout = Layout(
+            Field('place', type='hidden'),
             Field('referrer', type='hidden'),
             Row(
                 Column('device', css_class='col-md-6'),
@@ -926,3 +956,10 @@ class SensorForm(forms.ModelForm):
                 self.add_error('influx_measurement', "InfluxDB measurement is required when data type is InfluxDB")
 
         return cleaned_data
+
+    def is_valid(self):
+        # Ensure place is set on the instance before validation
+        if self.place and not self.instance.place_id:
+            self.instance.place = self.place
+        
+        return super().is_valid()
