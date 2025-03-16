@@ -108,6 +108,18 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         context['model_name'] = 'location'
         context['place'] = self.place
         context['locations'] = self.locations
+        
+        # Add a fallback cancel URL
+        if self.object and self.object.pk:
+            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
+                'place_slug': self.place.slug,
+                'pk': self.object.pk
+            })
+        else:
+            context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
+                'place_slug': self.place.slug
+            })
+        
         return context
 
     def form_valid(self, form):

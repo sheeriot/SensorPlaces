@@ -457,9 +457,13 @@ class LocationForm(forms.ModelForm):
         self.helper.form_class = "model-form"
         self.helper.help_text_inline = True
 
-        # Updated layout with active_status_checkbox template
+        # First, define a cancel_url variable
+        cancel_url = "{% url 'sensors:location_detail' place_slug=place.slug pk=object.pk %}"
+        if not self.instance.pk:
+            cancel_url = "{% url 'sensors:place_detail' place_slug=place.slug %}"
+
+        # Then update the layout
         self.helper.layout = Layout(
-            Field('place', type='hidden'),
             Row(
                 Column('name'),
                 css_class='mb-3'
@@ -475,6 +479,7 @@ class LocationForm(forms.ModelForm):
             ),
             Div(
                 Field('referrer', type='hidden'),
+                Field('place', type='hidden'),  # Make sure place is included
                 css_class='mb-3'
             ),
             Div(
@@ -486,7 +491,7 @@ class LocationForm(forms.ModelForm):
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML(f"""
-                        <a href="{{ form.referrer.value|default:cancel_fallback_url }}" 
+                        <a href="{cancel_url}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
