@@ -1,4 +1,5 @@
-<div class="card" id="device-list-card">
+<div id="device-list-card"
+     class="card {% if not location.is_active %}opacity-50 text-muted{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center">
         {% if location %}
             {# Single location view #}

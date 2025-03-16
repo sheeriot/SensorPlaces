@@ -710,6 +710,7 @@ class DeviceForm(forms.ModelForm):
         cleaned_data = super().clean()
         location = cleaned_data.get('location')
         is_active = cleaned_data.get('is_active')
+        name = cleaned_data.get('name')
 
         if not location:
             self.add_error('location', 'Please select a location for the device.')
@@ -722,6 +723,27 @@ class DeviceForm(forms.ModelForm):
         # Validate active status based on location
         if location and not location.is_active and is_active:
             self.add_error('is_active', 'Device cannot be active when its location is inactive.')
+        
+        # Check for duplicate device names within the same place
+        if name and location and location.place:
+            # Query for devices with the same name in any location of this place
+            duplicate_query = Device.objects.filter(
+                location__place=location.place,
+                name__iexact=name  # Case-insensitive comparison
+            )
+            
+            # Exclude the current instance if we're editing
+            if self.instance and self.instance.pk:
+                duplicate_query = duplicate_query.exclude(pk=self.instance.pk)
+            
+            # If we found any duplicates, raise a validation error
+            if duplicate_query.exists():
+                duplicate = duplicate_query.first()
+                self.add_error('name', (
+                    f"A device named '{name}' already exists in this place "
+                    f"(in location '{duplicate.location.name}'). "
+                    f"Please choose a different name."
+                ))
         
         return cleaned_data
 

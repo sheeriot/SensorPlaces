@@ -1,5 +1,6 @@
 {% load widget_tweaks %}
-<div class="card" id="sensors-card">
+<div id="sensors-card"
+     class="card {% if not device.is_active %}opacity-50 text-muted{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
             <h5 class="card-title mb-0">
@@ -9,9 +10,7 @@
             {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
         </div>
         {% if device %}
-        <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.pk %}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-thermometer"></i><i class="bi bi-plus-circle"></i> Add Sensor
-        </a>
+            {% include "sensors/partials/sensor_new_button.html" with device=device %}
         {% endif %}
     </div>
     <div class="card-body p-0">
