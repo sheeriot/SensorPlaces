@@ -613,24 +613,40 @@ class DeviceForm(forms.ModelForm):
             'model': forms.TextInput(attrs={'placeholder': 'Enter model'}),
             'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
             'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input',
-                'data-active-checkbox': 'true'
+                'class': 'form-check-input active-checkbox',
+                'data-active-label': 'Active',
+                'data-inactive-label': 'inactive'
             })
         }
 
     def __init__(self, *args, **kwargs):
         self.place = kwargs.pop('place', None)
-        self.locations = kwargs.pop('locations', None)        
+        self.locations = kwargs.pop('locations', None)
+        self.devices_active = kwargs.pop('devices_active', None)
+        inactive_help_text = kwargs.pop('inactive_help_text', None)
         super().__init__(*args, **kwargs)
         
-        # Get the device instance if this is an update form
-        # self.instance is already set by ModelForm, don't override it
-        # self.instance = kwargs.get('instance', None)
-
         # Configure crispy form helper
         self.helper = FormHelper()
         self.helper.form_id = 'device-form'
         self.helper.form_class = 'model-form'
+
+        # Setup Active field with proper ID and label
+        checkbox_id = f"device-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
+        self.fields['is_active'].widget.attrs.update({
+            'id': checkbox_id,
+            'data-device-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
+        })
+        
+        # Set the label based on the current state
+        if self.instance and self.instance.pk and not self.instance.is_active:
+            self.fields['is_active'].label = 'inactive'
+        else:
+            self.fields['is_active'].label = 'Active'
+        
+        # Set help text for inactive state if provided from view
+        if inactive_help_text:
+            self.fields['is_active'].help_text = inactive_help_text
 
         initial = kwargs.get('initial', {})
         location_initial = initial.get('location', None)
@@ -641,12 +657,15 @@ class DeviceForm(forms.ModelForm):
                 self.fields['is_active'].initial = False
                 self.fields['is_active'].widget.attrs['disabled'] = True
                 self.fields['is_active'].label = 'inactive'
-                self.fields['is_active'].help_text = mark_safe(
-                    '<div class="form-text text-muted mt-2 d-none" data-parent-inactive-help>'
-                        f'<i class="bi bi-geo-alt me-2"></i>'
-                        f'Location ({location_initial.name}) is inactive.'
-                    '</div>'
-                )
+                
+                # Only set help text if not already provided from view
+                if not inactive_help_text:
+                    self.fields['is_active'].help_text = mark_safe(
+                        '<div class="form-text text-warning-emphasis mt-2">'
+                            f'<i class="bi bi-geo-alt me-2"></i>'
+                            f'Device cannot be active because Location "{location_initial.name}" is inactive.'
+                        '</div>'
+                    )
         """Configure the location select field with active state and device counts"""
         if self.locations:
             # Build location choices with status indicators
@@ -672,20 +691,6 @@ class DeviceForm(forms.ModelForm):
                 choices=choices
             )
 
-        
-        # # Create the cancel URL - if we have an instance, go to device detail
-        # # cancel_fallback_url = ''
-        # if self.instance:
-        #     cancel_fallback_url = reverse('sensors:device_detail', kwargs={
-        #         'place_slug': self.place.slug,
-        #         'pk': self.instance.pk
-        #     })
-        # elif self.instance:
-        #     # Fallback to location detail if no device instance
-        #     cancel_fallback_url = reverse('sensors:device_list', kwargs={
-        #         'place_slug': self.place.slug,
-        #     })
-        # Simple crispy layout using Bootstrap 5 grid
         self.helper.layout = Layout(
             Row(
                 Column('name', css_class='col-auto'),
@@ -821,14 +826,6 @@ class DeviceForm(forms.ModelForm):
     def get_warnings(self):
         return getattr(self, '_warnings', {})
 
-    # def get_form_kwargs(self):
-    #     kwargs = super().get_form_kwargs()
-    #     kwargs['initial'] = {
-    #         'location': self.location,  # Assuming you have self.location set
-    #         'is_active': True  # Default to active for new devices
-    #     }
-    #     return kwargs
-
 class SensorForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
 
@@ -837,117 +834,89 @@ class SensorForm(forms.ModelForm):
         fields = ['device', 'name', 'is_active', 'sensor_type', 'unit', 'data_type', 'influx_source', 'influx_measurement']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter sensor name'}),
-        #     'manufacturer': forms.TextInput(attrs={'placeholder': 'Enter manufacturer'}),
-        #     'model': forms.TextInput(attrs={'placeholder': 'Enter model'}),
-        #     'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
+            'device': forms.HiddenInput(),
             'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input',
-                'data-active-checkbox': 'true'
+                'class': 'form-check-input active-checkbox',
+                'data-active-label': 'Active',
+                'data-inactive-label': 'inactive'
             })
         }
 
     def __init__(self, *args, **kwargs):
         self.place = kwargs.pop('place', None)
-        self.locations = kwargs.pop('locations', None)
+        self.device = kwargs.pop('device', None)
+        inactive_help_text = kwargs.pop('inactive_help_text', None)
         super().__init__(*args, **kwargs)
-        initial = kwargs.get('initial', {})
-        self.device = initial.get('device', None)
-        # # Set initial data for sensor for device
-        # if not kwargs.get('instance'):
-        #     kwargs.setdefault('initial', {})
-        #     ic(kwargs['initial'])
-
-        # # Set initial data for place if this is a new location
-        # if self.device and not kwargs.get('instance'):
-        #     kwargs.setdefault('initial', {})
-        #     kwargs['initial']['device'] = self.device
-
-        if not self.instance.pk and not self.device.is_active:
-            ic('new sensor, inactive due to parent device')
-            self.fields['is_active'].initial = False
-            self.fields['is_active'].label = 'inactive'
-            self.fields['is_active'].css_class = 'form-check-input active-checkbox'
-            # self.fields['is_active'].disabled = True
-            self.fields['is_active'].widget.attrs['disabled'] = True
-            self.fields['is_active'].help_text = mark_safe(
-                '<div class="form-text text-muted mt-2" data-parent-inactive-help>'
-                f'<i class="bi bi-hdd-rack me-2"></i>'
-                f'Cannot activate sensor because device {self.device.name} is inactive'
-                '</div>'
-            )
-
-        # Configure is_active field to use standard template
-        self.fields['is_active'].widget.attrs.update({
-            'data-active-checkbox': 'true',
-            'class': 'form-check-input'
-        })
-
+        
+        # Configure crispy form helper
         self.helper = FormHelper()
         self.helper.form_id = 'sensor-form'
         self.helper.form_class = 'model-form'
-        ic(self.device)
-        self.fields['device'].disabled = True
-        # Add this line to make the disabled field look normal
-        self.fields['device'].widget.attrs['class'] = 'form-control form-control-disabled'
-        if self.device.is_active:
-            self.fields['is_active'].initial = True
-            self.fields['is_active'].disabled = False
-            self.fields['is_active'].label = 'Active'
-            # Set active help text if needed
-            self.fields['is_active'].widget.attrs['data-active-help-text'] = ''
-            self.fields['is_active'].widget.attrs['data-inactive-help-text'] = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
-                f'<i class="bi bi-exclamation-triangle me-2"></i>'
-                f'This sensor will be inactive and will not collect data'
-                '</div>'
-            )
-        else:
-            self.fields['is_active'].initial = False
-            self.fields['is_active'].disabled = True
-            self.fields['is_active'].label = 'inactive'
-            inactive_help_text = mark_safe(
-                '<div class="form-text text-muted mt-2">'
-                f'<i class="bi bi-hdd-rack me-2"></i>'
-                f'Cannot activate sensor because device {self.device.name} is inactive'
-                '</div>'
-            )
-            self.fields['is_active'].help_text = inactive_help_text
-            self.fields['is_active'].widget.attrs['data_active_help_text'] = ''
-            self.fields['is_active'].widget.attrs['data_inactive_help_text'] = inactive_help_text
-        ic(vars(self.fields['is_active']))
-        # # Configure field properties
-        # self.fields['is_active'].label = "Active"
+
+        # Setup Active field with proper ID and label
+        checkbox_id = f"sensor-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
+        self.fields['is_active'].widget.attrs.update({
+            'id': checkbox_id,
+            'data-sensor-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
+        })
         
-        # # Handle device active status
-        # device_active = self.initial.get('device_active', True)
-        # if not device_active and device:
-        #     self.fields['is_active'].disabled = True
-        #     self.fields['is_active'].initial = False
-        #     self.fields['is_active'].help_text = (
-        #         f'<div class="text-warning"><i class="bi bi-hdd-rack"></i> '
-        #         f' Cannot activate sensor because device {device.name} is inactive</div>'
-        #     )
-        # self.fields['data_type'].label = "Reading Source"
-        # self.fields['influx_source'].required = False
-        # self.fields['influx_source'].label = "InfluxDB Source"
-        # self.fields['influx_measurement'].required = False
-        # self.fields['influx_measurement'].label = "Measurement Name"
-        # self.fields['influx_measurement'].help_text = "The measurement name in InfluxDB where readings are stored"
+        # Set the label based on the current state
+        if self.instance and self.instance.pk and not self.instance.is_active:
+            self.fields['is_active'].label = 'inactive'
+        else:
+            self.fields['is_active'].label = 'Active'
+        
+        # Set help text for inactive state if provided from view
+        if inactive_help_text:
+            self.fields['is_active'].help_text = inactive_help_text
 
-        # # Add Bootstrap classes to all fields
-        # for field in self.fields.values():
-        #     if not isinstance(field.widget, forms.HiddenInput):
-        #         field.widget.attrs['class'] = 'form-control'
+        # If we have a device (either from kwargs or from instance), use it
+        if not self.device and self.instance and self.instance.pk and self.instance.device:
+            self.device = self.instance.device
 
-        # # Determine if this is a new sensor or editing existing
-        # is_new = not bool(kwargs.get('instance'))
+        # If we have a device, handle device-based activation constraints
+        if self.device:
+            # Set the device field to the provided device
+            self.initial['device'] = self.device
+            self.fields['device'].initial = self.device
+            
+            # If device is inactive, sensor must be inactive
+            if not self.device.is_active:
+                self.fields['is_active'].initial = False
+                self.fields['is_active'].widget.attrs['disabled'] = True
+                self.fields['is_active'].label = 'inactive'
+                
+                # Only set help text if not already provided from view
+                if not inactive_help_text:
+                    self.fields['is_active'].help_text = mark_safe(
+                        '<div class="form-text text-warning-emphasis mt-2">'
+                        f'<i class="bi bi-hdd-rack me-2"></i>'
+                        f'Sensor cannot be active because Device "{self.device.name}" is inactive.'
+                        '</div>'
+                    )
 
+        # Layout with crispy forms
         self.helper.layout = Layout(
-            Field('place', type='hidden'),
+            Field('device', type='hidden'),
             Field('referrer', type='hidden'),
+            # Static display of Device name
+            Div(
+                Div(
+                    HTML(f"""
+                        <div class="form-group">
+                            <label class="form-label">Device</label>
+                            <div class="form-control-static">
+                                <i class="bi bi-hdd-rack me-1"></i>
+                                {self.device.name if self.device else 'Unknown'}
+                            </div>
+                        </div>
+                    """),
+                    css_class='col-12'
+                ),
+                css_class='row mb-3'
+            ),
             Row(
-                Column('device', css_class='col-md-6'),
-                Column('name', css_class='col-md-6'),
+                Column('name', css_class='col-md-12'),
                 css_class='mb-3'
             ),
             Row(
@@ -955,8 +924,7 @@ class SensorForm(forms.ModelForm):
                     'is_active',
                     template='sensors/partials/active_status_checkbox.html',
                     model_name='sensor',
-                    instance_pk='{{ object.pk|default:"new" }}',
-                    # css_class='active-checkbox'
+                    instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
                 ),
                 css_class='mb-3'
             ),
@@ -979,13 +947,13 @@ class SensorForm(forms.ModelForm):
                     css_class='mb-3'
                 ),
                 css_class='influx-fields',
-                style='display: none;'
+                id='influx-fields'
             ),
             Div(
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML("""
-                        <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug pk=device.pk %}" 
+                        <a href="{{ form.referrer.value|default:cancel_fallback_url }}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
@@ -1008,9 +976,21 @@ class SensorForm(forms.ModelForm):
         influx_measurement = cleaned_data.get('influx_measurement')
         device = cleaned_data.get('device')
 
+        # Ensure device is set
+        if not device and self.device:
+            cleaned_data['device'] = self.device
+            self.instance.device = self.device
+
+        # Validate device is provided
         if not device:
             raise forms.ValidationError("Device is required")
 
+        # Ensure sensor is inactive if device is inactive
+        if device and not device.is_active and cleaned_data.get('is_active', False):
+            cleaned_data['is_active'] = False
+            self.add_error('is_active', "Sensor cannot be active when its device is inactive.")
+
+        # Validate InfluxDB fields if data type is INFLUX
         if data_type == 'INFLUX':
             if not influx_source:
                 self.add_error('influx_source', "InfluxDB source is required when data type is InfluxDB")

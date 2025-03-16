@@ -7,6 +7,7 @@ from django.http import HttpResponseRedirect
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet, Prefetch
+from django.utils.safestring import mark_safe
 
 from ..models import Place, Location, Device, Sensor
 from ..forms import DeviceForm
@@ -110,29 +111,65 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        self.place = self.get_place()
+        # Get and cache place and locations
+        self._place = self.get_place()
+        self._locations = self.get_annotated_locations(self._place)
+        
+        # Initialize location and inactive_help_text
+        self._location = None
+        self._inactive_help_text = None
+        
+        # Get location if specified in URL
         location_pk = self.kwargs.get('location_pk', None)
         if location_pk:
-            self.location = get_object_or_404(Location, pk=location_pk, place=self.place)
-        self.locations = self.get_annotated_locations(self.place)
+            self._location = get_object_or_404(Location, pk=location_pk, place=self._place)
+            
+            # If location is inactive, create help text about that
+            if self._location and not self._location.is_active:
+                self._inactive_help_text = mark_safe(
+                    '<div class="form-text text-warning-emphasis mt-2">'
+                    '<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'This device will be inactive because Location "{self._location.name}" is inactive.'
+                    '</div>'
+                )
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self.place
-        kwargs['locations'] = self.locations
-        kwargs['initial'] = {
-            'location': self.location,
-            'referrer': self.request.GET.get('next')
-        }
+        kwargs['place'] = self._place
+        kwargs['locations'] = self._locations
+        kwargs['inactive_help_text'] = self._inactive_help_text
+        
+        # Set initial data properly
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial'].update({
+            'location': self._location,
+            'referrer': self.request.GET.get('next', '')
+        })
+        
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
-        context['place'] = self.place
-        if self.location:
-            context['location'] = self.location
-        context['locations'] = self.locations
+        context['place'] = self._place
+        if self._location:
+            context['location'] = self._location
+        context['locations'] = self._locations
+        
+        # Add a fallback cancel URL based on whether we have a location_pk
+        location_pk = self.kwargs.get('location_pk', None)
+        if location_pk:
+            # If we have a location_pk, go to location_detail
+            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
+                'place_slug': self._place.slug,
+                'pk': location_pk
+            })
+        else:
+            # If no location_pk, go to device_list
+            context['cancel_fallback_url'] = reverse('sensors:device_list', kwargs={
+                'place_slug': self._place.slug
+            })
+        
         return context
 
     def get_success_url(self):
@@ -142,7 +179,8 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         })
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        # Save the form to get the object
+        self.object = form.save()
         device = self.object
         location = device.location
         place = location.place
@@ -158,42 +196,147 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             f"</small>"
         )
         
+        # Add inactive warning to message if device is inactive
+        if not device.is_active and self._inactive_help_text:
+            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
+        
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
         
-        # ic("DeviceCreateView setting toast_message:", {
-        #     'message': message,
-        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        # })
-        
-        return response
+        # Get the success URL and return HttpResponseRedirect
+        success_url = self.get_success_url()
+        return HttpResponseRedirect(success_url)
 
 class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
+    object: Device
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        self.place = self.get_place()
+        # Get and cache place and locations
+        self._place = self.get_place()
+        self._locations = self.get_annotated_locations(self._place)
+        
+        # Default inactive_help_text to None
+        self._inactive_help_text = None
+        self._sensors_active = []
+        
+        try:
+            # Try to get the device if we're updating
+            device = self.get_object()
+            location = device.location
+            
+            # If location is inactive, create help text about that
+            if location and not location.is_active:
+                # Check if device is active when it shouldn't be
+                if device and device.is_active:
+                    # Get the list of affected sensors before fixing
+                    self._sensors_active = list(device.sensors.filter(is_active=True).annotate(
+                        reading_count=Count('readings')
+                    ).prefetch_related('sensors'))
+                    
+                    # Fix the inconsistency - set device to inactive
+                    device.is_active = False
+                    device.save()
+                    
+                    # Just log the inconsistency with ic
+                    ic(f"Fixed inconsistency: Device {device.id} ({device.name}) was active "
+                       f"but its Location {location.id} ({location.name}) is inactive.")
+                    ic(f"Affected sensors: {len(self._sensors_active)}")
+                
+                # Standard message for inactive location
+                self._inactive_help_text = mark_safe(
+                    '<div class="form-text text-warning-emphasis mt-2">'
+                    '<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'This device will be inactive because Location "{location.name}" is inactive.'
+                    '</div>'
+                )
+            # Remove place.is_active check - we only care about the parent location
+            # If device is active, check for active sensors
+            elif device and device.is_active:
+                # Get active sensors with reading counts
+                self._sensors_active = list(device.sensors.filter(is_active=True).annotate(
+                    reading_count=Count('readings')
+                ).prefetch_related('sensors'))
+                
+                active_sensor_count = len(self._sensors_active)
+                
+                if active_sensor_count > 0:
+                    # Generate the list of active sensors with their reading counts
+                    active_sensors_list = ''.join([
+                        f'<li><i class="bi bi-thermometer text-muted me-1"></i>{sensor.name} '
+                        f'<small class="text-muted">({sensor.reading_count} readings)</small></li>'
+                        for sensor in self._sensors_active
+                    ])
+                    
+                    self._inactive_help_text = mark_safe(
+                        '<div class="form-text text-warning-emphasis mt-2">'
+                        f'<i class="bi bi-exclamation-triangle me-2"></i>'
+                        f'This device has {active_sensor_count} active sensor{"s" if active_sensor_count > 1 else ""}:'
+                        f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_sensors_list}</ul>'
+                        '</div>'
+                    )
+        except Exception as e:
+            # If we can't get the object yet (e.g., in a GET request before the object exists)
+            ic(f"Error in DeviceUpdateView.setup: {str(e)}")
 
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.place.slug,
-            'pk': self.object.pk
-        })
+    def get_initial(self):
+        initial = super().get_initial()
+        # Set the referrer in initial data
+        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
+        return initial
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self.place
-        kwargs['locations'] = self.get_annotated_locations(self.place)
-        kwargs['initial'] = {
-            'referrer': self.request.META.get('HTTP_REFERER')
-        }
+        kwargs['place'] = self._place
+        kwargs['locations'] = self._locations
+        kwargs['inactive_help_text'] = self._inactive_help_text
+        
         return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'device'
+        context['place'] = self._place
+        device = self.get_object()
+        
+        # Add location to context
+        if device and device.location:
+            context['location'] = device.location
+        
+        # Add a fallback cancel URL based on whether we have a location_pk
+        location_pk = self.kwargs.get('location_pk', None)
+        if location_pk:
+            # If we have a location_pk, go to location_detail
+            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
+                'place_slug': self._place.slug,
+                'pk': location_pk
+            })
+        else:
+            # If no location_pk, go to device_list
+            context['cancel_fallback_url'] = reverse('sensors:device_list', kwargs={
+                'place_slug': self._place.slug
+            })
+        
+        return context
+
+    def get_success_url(self):
+        # Use cleaned_data from the form instead of request.POST
+        if hasattr(self, 'object') and hasattr(self.object, 'referrer') and self.object.referrer:
+            return self.object.referrer
+        # Or check form's cleaned_data
+        elif hasattr(self, 'form') and 'referrer' in self.form.cleaned_data and self.form.cleaned_data['referrer']:
+            return self.form.cleaned_data['referrer']
+        # Fallback to default URL
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self._place.slug,
+            'pk': self.object.pk
+        })
 
     def form_valid(self, form):
         # Store original values before save
@@ -207,7 +350,8 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             'serial_number': device.serial_number
         }
         
-        response = super().form_valid(form)
+        # Save the form
+        self.object = form.save()
         device = self.object
         changes = []
         
@@ -236,25 +380,48 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             f"</small>"
         )
         
-        # Add debug logging
-        # ic("DeviceUpdateView toast message:", {
-        #     'message': message,
-        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-        #     'place': device.location.place
-        # })
+        # Add inactive warning to message if device is inactive
+        if not device.is_active and self._inactive_help_text:
+            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
         
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-            'place': self.place
+            'place': self._place
         })
-        ic("added toast_message to request")
-        return response
+        
+        # Get the success URL and return HttpResponseRedirect
+        success_url = self.get_success_url()
+        return HttpResponseRedirect(success_url)
 
 class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Device
     template_name = 'sensors/device_confirm_delete.html'
+    object: Device
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # Get and cache place
+        self._place = self.get_place()
+        
+        # Create inactive help text to be used in form and toast messages
+        try:
+            device = self.get_object()
+            location = device.location
+            
+            if location and not location.is_active:
+                self._inactive_help_text = mark_safe(
+                    '<div class="form-text text-warning-emphasis mt-2">'
+                    '<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'This device is inactive because Location "{location.name}" is inactive.'
+                    '</div>'
+                )
+            else:
+                self._inactive_help_text = None
+        except Exception as e:
+            ic(f"Error in DeviceDeleteView.setup: {str(e)}")
+            self._inactive_help_text = None
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -286,6 +453,10 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         
         message += "</small>"
         
+        # Add inactive warning to message if device is inactive
+        if not device.is_active and self._inactive_help_text:
+            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
+        
         # Delete the device
         device.delete()
         
@@ -295,16 +466,11 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             'type': 'danger'
         })
         
-        ic("DeviceDeleteView setting toast_message:", {
-            'message': message,
-            'type': 'danger'
-        })
-        
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):
         return reverse('sensors:place_detail', 
-                      kwargs={'place_slug': self.place.slug})
+                      kwargs={'place_slug': self._place.slug})
 
 # class DeviceMoveLocationView(LoginRequiredMixin, View):
 

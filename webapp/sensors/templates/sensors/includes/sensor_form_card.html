@@ -11,12 +11,12 @@
                     {{ device.name }}
                 </a> 
                 <i class="bi bi-chevron-right"></i>
-                <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=device.location.pk %}">
-                    <i class="bi bi-house-gear"></i>
-                    {{ location.name }}
-                </a> 
-                <i class="bi bi-chevron-right"></i>
-                <a href="{% url 'sensors:place_detail' place.slug %}">
+        <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=device.location.pk %}">
+            <i class="bi bi-geo-alt-fill"></i>
+            {{ location.name }}
+        </a> 
+        <i class="bi bi-chevron-right"></i>
+        <a href="{% url 'sensors:place_detail' place.slug %}">
                     <i class="bi bi-house-gear"></i>
                     {{ place.name }}
                 </a> 
