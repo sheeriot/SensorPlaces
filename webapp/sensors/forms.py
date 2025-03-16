@@ -34,6 +34,13 @@ class PlaceForm(forms.ModelForm):
         model = Place
         fields = ['name', 'is_active', 'latitude', 'longitude', 'slug', 'siteplan_image']
         widgets = {
+            'is_active': forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input active-checkbox',
+                    'data-active-label': 'Active',
+                    'data-inactive-label': 'inactive'
+                }
+            ),
             'latitude': forms.NumberInput(attrs={
                 'step': '0.00001',
                 'class': 'form-control form-control-sm',
@@ -55,37 +62,39 @@ class PlaceForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        referrer = kwargs.pop('referrer', None)
+        inactive_help_text = kwargs.pop('inactive_help_text', None)
+        # Remove the referrer pop - we'll handle it through initial data instead
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = True
         self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'
+        self.helper.form_class = 'mb-0 model-form'
+        self.helper.form_id = f"place-form-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
         self.helper.form_show_errors = True
         self.helper.error_text_inline = True
         self.helper.help_text_inline = True
         
-        if referrer:
-            self.fields['referrer'].initial = referrer
-
         # If this is an existing Place, preserve its slug
         if self.instance and self.instance.pk:
             self.fields['slug'].initial = self.instance.slug
         
         # Configure field properties
-        # setup Active field
-        # if self.instance and self.instance.is_active:
-        #     self.fields['is_active'].label = mark_safe("""
-        #         <span class="badge ms-1 bg-success-subtle text-success">
-        #             Active
-        #         </span>
-        #     """)
-        # else:
-        #     self.fields['is_active'].label = mark_safe("""
-        #         <span class="badge ms-1 bg-secondary-subtle text-secondary">
-        #             inactive
-        #         </span>
-        #     """)
+        # Setup Active field with proper ID and label
+        checkbox_id = f"place-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
+        self.fields['is_active'].widget.attrs.update({
+            'id': checkbox_id,
+            'data-place-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
+        })
+        
+        # Set the label based on the current state
+        if self.instance and self.instance.pk and not self.instance.is_active:
+            self.fields['is_active'].label = 'inactive'
+        else:
+            self.fields['is_active'].label = 'Active'
+        
+        # Set help text for inactive state if provided
+        if inactive_help_text:
+            self.fields['is_active'].help_text = inactive_help_text
         
         self.fields['latitude'].label = None
         self.fields['longitude'].label = None
@@ -130,19 +139,21 @@ class PlaceForm(forms.ModelForm):
             Field('slug', type='hidden'),
             Field('referrer', type='hidden'),
             Field('place', type='hidden'),
-            Row(
-                Column('name', css_class='col-md-8'),
-                Column(
+            Div(
+                Div(
+                    Div('name', css_class='col-md-6'),
                     Div(
                         Field(
                             'is_active',
-                            template='sensors/partials/custom_switch.html'
+                            template='sensors/partials/active_status_checkbox.html',
+                            model_name='place',  # or 'location' for LocationForm
+                            instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
                         ),
-                        css_class='d-flex align-items-center h-100'
+                        css_class='col-md-6 d-flex align-items-center'
                     ),
-                    css_class='col-md-4'
+                    css_class='row mb-3'
                 ),
-                css_class='mb-3'
+                css_class='form-group'
             ),
             # Fieldset for coordinates and map
             Div(
@@ -272,71 +283,92 @@ class PlaceDeleteForm(forms.Form):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     confirm_name = forms.CharField(
-        required=True,
+        label='Confirm deletion',
+        help_text='Type the name of the place to confirm deletion',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Type the place name here'
+            'placeholder': 'Type the place name to confirm'
         })
     )
 
-    def __init__(self, *args, place=None, **kwargs):
+    def __init__(self, *args, place=None, inactive_help_text=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.place = place
+        self.inactive_help_text = inactive_help_text
         
         # Setup crispy form
         self.helper = FormHelper()
-        self.helper.form_tag = True
+        self.helper.form_id = 'place-delete-form'
+        self.helper.form_class = 'model-form'
         self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0'
-        self.helper.form_show_errors = True
-        self.helper.error_text_inline = False
-        self.helper.help_text_inline = False
         
-        # Custom layout
+        # Update help text if place has active locations
+        if place:
+            active_locations = place.locations.filter(is_active=True)
+            active_location_count = active_locations.count()
+            
+            if active_location_count > 0:
+                # Get active devices count
+                active_devices_count = 0
+                active_locations_list = []
+                
+                for location in active_locations:
+                    location_active_devices = location.devices.filter(is_active=True).count()
+                    active_devices_count += location_active_devices
+                    active_locations_list.append(
+                        f'<li><i class="bi bi-geo-alt text-muted me-1"></i>{location.name} '
+                        f'<small class="text-muted">({location_active_devices} active devices)</small></li>'
+                    )
+                
+                warning_text = mark_safe(
+                    '<div class="alert alert-warning">'
+                    f'<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'<strong>Warning:</strong> This place has {active_location_count} active '
+                    f'location{"s" if active_location_count > 1 else ""} with {active_devices_count} '
+                    f'active device{"s" if active_devices_count > 1 else ""}.'
+                    f'<ul class="list-unstyled mb-0 mt-2 ms-3">{"".join(active_locations_list)}</ul>'
+                    '</div>'
+                )
+                
+                self.fields['confirm_name'].help_text = mark_safe(
+                    f'{warning_text}<p class="text-danger mt-2">Type <strong>{place.name}</strong> to confirm deletion</p>'
+                )
+            else:
+                self.fields['confirm_name'].help_text = mark_safe(
+                    f'Type <strong>{place.name}</strong> to confirm deletion'
+                )
+            
+            # Add the inactive help text if provided
+            if self.inactive_help_text:
+                self.fields['confirm_name'].help_text = mark_safe(
+                    f'{self.fields["confirm_name"].help_text}<div class="mt-2">{self.inactive_help_text}</div>'
+                )
+        
+        # Set up the form layout
         self.helper.layout = Layout(
-            # Warning about locations - add static-alert class
-            HTML("""
-                <div class="alert alert-warning mb-3 static-alert">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <strong>Warning:</strong> This will delete the following locations:
-                    <div class="mt-2">
-                        <ul class="mb-0">
-                            {% for location in locations %}
-                            <li>
-                                <i class="bi bi-geo-alt"></i> {{ location.name }}
-                                {% if location.devices_active_count or location.devices_inactive_count %}
-                                ({{ location.devices_active_count|add:location.devices_inactive_count }} devices)
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-            """),
-            # Confirmation input - add static-alert class
+            Field('referrer', type='hidden'),
             Div(
                 HTML("""
-                    <p class="mb-2">
+                    <div class="alert alert-danger">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        This action cannot be undone. Please type <strong>{{ place.name }}</strong> to confirm.
-                    </p>
+                        <strong>Warning:</strong> This action cannot be undone!
+                    </div>
                 """),
-                Field('confirm_name'),
-                css_class='alert alert-danger static-alert'
+                css_class='mb-3'
             ),
-            # Buttons
+            'confirm_name',
             Div(
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML("""
-                        <a href="{% url 'sensors:place_list' %}" 
-                           class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Cancel
+                        <a href="{% if referrer %}{{ referrer }}{% else %}{% url 'sensors:place_detail' place_slug=place.slug %}{% endif %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
                     HTML("""
                         <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash"></i> Delete
+                            <i class="bi bi-trash me-1"></i>Delete Place
                         </button>
                     """),
                     css_class='d-flex justify-content-between align-items-center'
@@ -348,10 +380,7 @@ class PlaceDeleteForm(forms.Form):
     def clean_confirm_name(self):
         confirm_name = self.cleaned_data.get('confirm_name')
         if self.place and confirm_name != self.place.name:
-            raise forms.ValidationError(
-                f'Confirmation name "{confirm_name}" does not match the place name "{self.place.name}". '
-                'Please try again.'
-            )
+            raise forms.ValidationError(f"The name you entered doesn't match the place name. Please type '{self.place.name}' to confirm.")
         return confirm_name
 
 class LocationForm(forms.ModelForm):
@@ -465,15 +494,15 @@ class LocationForm(forms.ModelForm):
         # Then update the layout
         self.helper.layout = Layout(
             Row(
-                Column('name'),
-                css_class='mb-3'
-            ),
-            Row(
-                Field(
-                    'is_active',
-                    template='sensors/partials/active_status_checkbox.html',
-                    model_name='location',
-                    instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
+                Column('name', css_class='col-md-6'),
+                Column(
+                    Field(
+                        'is_active',
+                        template='sensors/partials/active_status_checkbox.html',
+                        model_name='location',
+                        instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
+                    ),
+                    css_class='col-md-6'
                 ),
                 css_class='mb-3'
             ),
@@ -708,42 +737,42 @@ class DeviceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        location = cleaned_data.get('location')
-        is_active = cleaned_data.get('is_active')
         name = cleaned_data.get('name')
-
-        if not location:
-            self.add_error('location', 'Please select a location for the device.')
-            return cleaned_data
-
-        # Ensure location belongs to the correct place
-        if self.place and location.place != self.place:
-            self.add_error('location', 'Selected location does not belong to the current place.')
+        location = cleaned_data.get('location')
         
-        # Validate active status based on location
-        if location and not location.is_active and is_active:
-            self.add_error('is_active', 'Device cannot be active when its location is inactive.')
+        # Ensure location is set
+        if not location and self.location:
+            cleaned_data['location'] = self.location
+            self.instance.location = self.location
         
-        # Check for duplicate device names within the same place
-        if name and location and location.place:
-            # Query for devices with the same name in any location of this place
+        # Check for duplicate device names in the same place
+        if name and location:
+            # Get the place from the location
+            place = location.place
+            
+            # Check for duplicates in the same place
             duplicate_query = Device.objects.filter(
-                location__place=location.place,
-                name__iexact=name  # Case-insensitive comparison
+                location__place=place,
+                name__iexact=name
             )
             
-            # Exclude the current instance if we're editing
+            # Exclude self when checking for duplicates
             if self.instance and self.instance.pk:
                 duplicate_query = duplicate_query.exclude(pk=self.instance.pk)
             
-            # If we found any duplicates, raise a validation error
-            if duplicate_query.exists():
-                duplicate = duplicate_query.first()
+            duplicate = duplicate_query.first()
+            
+            if duplicate:
                 self.add_error('name', (
                     f"A device named '{name}' already exists in this place "
-                    f"(in location '{duplicate.location.name}'). "
+                    f"(in location '{duplicate.location.name if duplicate.location else 'Unknown'}')."
                     f"Please choose a different name."
                 ))
+        
+        # Ensure device is inactive if location is inactive
+        if location and not location.is_active and cleaned_data.get('is_active', False):
+            cleaned_data['is_active'] = False
+            self.add_error('is_active', "Device cannot be active when its location is inactive.")
         
         return cleaned_data
 
