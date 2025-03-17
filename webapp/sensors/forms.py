@@ -635,7 +635,10 @@ class DeviceForm(forms.ModelForm):
         checkbox_id = f"device-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
         self.fields['is_active'].widget.attrs.update({
             'id': checkbox_id,
-            'data-device-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
+            'class': 'form-check-input active-checkbox',
+            'data-device-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new',
+            'data-active-label': 'Active',
+            'data-inactive-label': 'inactive'
         })
         
         # Set the label based on the current state
@@ -679,6 +682,7 @@ class DeviceForm(forms.ModelForm):
             # Configure the select widget with data attributes for active states
             select_attrs = {
                 'class': 'form-select',
+                'id': 'id_location',  # Ensure consistent ID
                 **{
                     f'data-is-active-{loc.pk}': str(loc.is_active).lower() 
                     for loc in self.locations
@@ -698,7 +702,7 @@ class DeviceForm(forms.ModelForm):
                 css_class='mb-3'
             ),
             Row(
-                Column('location', css_class='col-auto'),
+                Column('location', css_class='col-auto', css_id='div_id_location'),
                 css_class='mb-3'
             ),
             Row(
@@ -717,11 +721,13 @@ class DeviceForm(forms.ModelForm):
                             'is_active',
                             template='sensors/partials/active_status_checkbox.html',
                             wrapper_class='form-check d-flex align-items-center gap-3',
-                            css_class='me-2'
+                            css_class='me-2',
+                            css_id='div_id_is_active'
                         ),
-                        css_class='d-flex align-items-center'
+                        css_class='d-flex align-items-center',
+                        css_id='div_id_is_active_container'
                     ),
-                    css_class='col-md-4'
+                    css_class='col-12'
                 ),
                 Field('referrer', type='hidden'),
                 css_class='mb-3'

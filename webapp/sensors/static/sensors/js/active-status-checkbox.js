@@ -1,125 +1,97 @@
 // Configuration
 const activeStatusConfig = {
-    debug: true
+    debug: true  // Set to false to disable verbose logging
 };
 
 function initializeActiveStatusCheckbox() {
     const forms = document.querySelectorAll('.model-form');
-    console.log('[Active Status Checkbox Forms] Found', forms.length, 'forms');
     
     // Create a table for form data if debug is enabled
     if (activeStatusConfig.debug) {
-        console.log('%c[Active Status] Forms Found', 'background: #f0f0f0; color: #333; padding: 3px 5px; border-radius: 3px; font-weight: bold;');
+        console.log('[Active Status] Found', forms.length, 'forms');
         console.table(Array.from(forms).map(form => ({
             'Form ID': form.id || '(no id)',
-            'Form Classes': form.className,
-            'Form Action': form.action || '(no action)'
+            'Form Classes': form.className
         })));
     }
     
-    const formData = [];
     const checkboxData = [];
 
     forms.forEach(form => {
-        // Find active checkbox container
-        const activeCheckboxContainer = form.querySelector('.active-checkbox');
+        // Try multiple strategies to find the active checkbox
+        let activeCheckboxContainer = form.querySelector('.active-checkbox');
+        
         if (!activeCheckboxContainer) {
-            console.log(
-                '[Active Status Checkbox] No active checkbox container found on form',
-                form.id
-            );
+            // Try finding by input name
+            activeCheckboxContainer = form.querySelector('input[name="is_active"]');
+        }
+        
+        if (!activeCheckboxContainer) {
+            // Try finding by ID pattern
+            activeCheckboxContainer = form.querySelector('input[id*="active-checkbox"]');
+        }
+        
+        if (!activeCheckboxContainer) {
+            if (activeStatusConfig.debug) {
+                console.log('[Active Status] No checkbox found on form', form.id);
+            }
             return;
         }
 
         // Find form check element
-        const formCheck = activeCheckboxContainer.closest('.active-checkbox');
+        const formCheck = activeCheckboxContainer.closest('.form-check');
         if (!formCheck) {
             if (activeStatusConfig.debug) {
-                console.log(
-                    '[Active Status Checkbox] EXIT - No form-check found on form',
-                    form.id
-                );
+                console.log('[Active Status] No form-check container found for checkbox');
             }
             return;
-        } else {
-            if (activeStatusConfig.debug) {
-                console.log('[Active Status Checkbox] formCheck:', formCheck);
-                console.log('[Active Status Checkbox] formCheck outerHTML:', formCheck.outerHTML);
-            }
         }
 
-        // Find closest card if it exists
-        const card = form.closest('.card');
-
-        // Work with attributes
-        const dataActiveHelpText = formCheck.querySelector('[data-active-checkbox-help]');
-        if (activeStatusConfig.debug) {
-            console.log('[Active Status Checkbox] Data Active Help Text:', dataActiveHelpText);
-            console.log('[Active Status Checkbox] Dataset:', formCheck.dataset);
-        }
-
-        // Collect data for reporting
-        const formCheckData = {
-            'Form ID': form.id || '(no id)',
-            'Card ID': card ? card.id || '(no id)' : 'Not in card',
-            'Checkbox ID': formCheck.id,
-            'Is Disabled': formCheck.disabled,
-            'Current State': formCheck.checked ? 'Active' : 'inactive',
-            'Container Classes': formCheck.className
-        };
-        
         // Add to checkbox data array for table display
-        checkboxData.push({
-            'Form ID': form.id || '(no id)',
-            'Checkbox ID': formCheck.id || '(no id)',
-            'Current State': formCheck.checked ? 'Active' : 'inactive',
-            'Expected Label': formCheck.checked ? 
-                (formCheck.dataset.activeLabel || 'Active') : 
-                (formCheck.dataset.inactiveLabel || 'inactive'),
-            'Actual Label': form.querySelector('label[for="' + formCheck.id + '"]')?.textContent.trim() || '(no label)',
-            'Is Correct': form.querySelector('label[for="' + formCheck.id + '"]')?.textContent.trim() === 
-                (formCheck.checked ? 
-                    (formCheck.dataset.activeLabel || 'Active') : 
-                    (formCheck.dataset.inactiveLabel || 'inactive')) ? 'Yes' : 'No',
-            'Is Disabled': formCheck.disabled ? 'Yes' : 'No'
-        });
-        
         if (activeStatusConfig.debug) {
-            console.log('[Active Status Checkbox] formCheck:', formCheckData);
+            checkboxData.push({
+                'Form': form.id || '(no id)',
+                'Checkbox ID': activeCheckboxContainer.id || '(no id)',
+                'State': activeCheckboxContainer.checked ? 'Active' : 'Inactive',
+                'Disabled': activeCheckboxContainer.disabled ? 'Yes' : 'No'
+            });
         }
 
         // Set up event listeners
-        watchCheckbox(formCheck);
+        watchCheckbox(activeCheckboxContainer);
     });
     
     // Display checkbox data table if debug is enabled
     if (activeStatusConfig.debug && checkboxData.length > 0) {
-        console.log('%c[Active Status] Checkboxes Found', 'background: #e6f7ff; color: #0066cc; padding: 3px 5px; border-radius: 3px; font-weight: bold;');
+        console.log('[Active Status] Checkboxes found:');
         console.table(checkboxData);
     }
 }
 
 function watchCheckbox(checkbox) {
-    const checkboxContainer = checkbox.closest('.form-check')
-    if (checkboxContainer) {
-        if (activeStatusConfig.debug) console.log('[Active Status Checkbox] Watching Container:', checkboxContainer)
-    } else {
-        if (activeStatusConfig.debug) console.log('[Active Status Checkbox] No checkbox to watch')
-        return
-    }
-
-    // Do NOT set initial UI state based on Django-provided template. Do check for bad settings.
-    // updateCheckboxUI(checkboxContainer, checkbox);
+    // Find the container for this checkbox
+    const checkboxContainer = checkbox.closest('.form-check');
+    if (!checkboxContainer) return;
 
     // Listen for location status changes
-    // checkboxContainer.addEventListener('locationStatusChanged', function(e) {
-    //     const forceInactive = checkboxContainer.dataset.forceInactive === 'true';
-    //     checkbox.disabled = forceInactive;
-    //     if (forceInactive) {
-    //         checkbox.checked = false;
-    //     }
-    //     updateCheckboxUI(container, checkbox);
-    // });
+    checkboxContainer.addEventListener('locationStatusChanged', function(e) {
+        if (activeStatusConfig.debug) {
+            console.log('[Active Status] Location status changed:', {
+                isLocationActive: e.detail.isLocationActive,
+                checkboxState: e.detail.checkboxState ? 'Active' : 'Inactive'
+            });
+        }
+        
+        // Store inactive reason if provided
+        if (e.detail.inactiveReason) {
+            checkboxContainer.dataset.inactiveReason = e.detail.inactiveReason;
+        } else {
+            delete checkboxContainer.dataset.inactiveReason;
+        }
+        
+        // Update the UI to match the checkbox state
+        updateCheckboxUI(checkboxContainer, checkbox);
+    });
 
     // Handle checkbox change by another script or by user
     checkbox.addEventListener('change', function() {
@@ -127,28 +99,16 @@ function watchCheckbox(checkbox) {
         
         // Log change event if debug is enabled
         if (activeStatusConfig.debug) {
-            console.log('%c[Active Status] Checkbox Changed', 'background: #e8f5e9; color: #2e7d32; padding: 3px 5px; border-radius: 3px;');
-            console.table({
-                'Checkbox ID': checkbox.id || '(no id)',
-                'New State': checkbox.checked ? 'Active' : 'inactive',
-                'Expected Label': checkbox.checked ? 
-                    (checkbox.dataset.activeLabel || 'Active') : 
-                    (checkbox.dataset.inactiveLabel || 'inactive'),
-                'Is Disabled': checkbox.disabled ? 'Yes' : 'No'
+            console.log('[Active Status] Checkbox changed:', {
+                'ID': checkbox.id || '(no id)',
+                'New State': checkbox.checked ? 'Active' : 'Inactive',
+                'Disabled': checkbox.disabled ? 'Yes' : 'No'
             });
         }
     });
 }
 
 function updateCheckboxUI(container, checkbox) {
-    if (activeStatusConfig.debug) {
-        console.log('[Active Status Checkbox] Updating UI:', {
-            checked: checkbox.checked,
-            disabled: checkbox.disabled,
-            container: container
-        });
-    }
-
     // Update label text
     const label = container.querySelector('label');
     if (label) {
@@ -157,18 +117,9 @@ function updateCheckboxUI(container, checkbox) {
             checkbox.dataset.inactiveLabel || 'inactive';
             
         label.textContent = newLabelText;
-        
-        if (activeStatusConfig.debug) {
-            console.log('[Active Status Checkbox] Label updated:', {
-                'Checkbox ID': checkbox.id || '(no id)',
-                'Old Text': label.textContent,
-                'New Text': newLabelText,
-                'Success': label.textContent === newLabelText ? 'Yes' : 'No'
-            });
-        }
     }
 
-    // Update help text visibility
+    // Update help text visibility and content
     const helpText = container.querySelector('[data-help-text-container]');
     if (helpText) {
         if (checkbox.checked) {
@@ -177,13 +128,12 @@ function updateCheckboxUI(container, checkbox) {
         } else {
             // Show help text when inactive
             helpText.classList.remove('d-none');
-        }
-        
-        if (activeStatusConfig.debug) {
-            console.log('[Active Status Checkbox] Help text visibility updated:', {
-                'Checkbox ID': checkbox.id || '(no id)',
-                'Help Text Visible': !checkbox.checked ? 'Yes' : 'No'
-            });
+            
+            // Update help text content if we have a reason
+            const helpTextContent = helpText.querySelector('.form-text');
+            if (helpTextContent && container.dataset.inactiveReason) {
+                helpTextContent.textContent = container.dataset.inactiveReason;
+            }
         }
     }
 
@@ -192,10 +142,11 @@ function updateCheckboxUI(container, checkbox) {
     container.classList.toggle('text-muted', checkbox.disabled);
     
     if (activeStatusConfig.debug) {
-        console.log('[Active Status Checkbox] Container styles updated:', {
-            'Checkbox ID': checkbox.id || '(no id)',
-            'Opacity Applied': checkbox.disabled ? 'Yes' : 'No',
-            'Text Muted Applied': checkbox.disabled ? 'Yes' : 'No'
+        console.log('[Active Status] UI updated:', {
+            'State': checkbox.checked ? 'Active' : 'Inactive',
+            'Disabled': checkbox.disabled ? 'Yes' : 'No',
+            'Label': label ? label.textContent : '(no label)',
+            'Help Text': helpText ? (checkbox.checked ? 'Hidden' : 'Visible') : '(no help text)'
         });
     }
 }

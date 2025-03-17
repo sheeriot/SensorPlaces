@@ -8,8 +8,10 @@ This template expects:
 
 {% load crispy_forms_field %}
 
-<div id="div_{{ model_name }}_{{ instance_pk }}_{{ field.pk }}" 
-     class="form-check d-flex align-items-center gap-3">
+<div id="div_{{ field.html_name }}" 
+     class="form-check d-flex align-items-center gap-3"
+     data-field-name="{{ field.html_name }}"
+     data-model-name="{{ model_name|default:'unknown' }}">
     <div class="d-flex align-items-center flex-shrink-0" style="min-width: 80px;">
         <div class="form-check-input-container" style="width: 20px; height: 20px; flex-shrink: 0;">
             {% crispy_field field %}
