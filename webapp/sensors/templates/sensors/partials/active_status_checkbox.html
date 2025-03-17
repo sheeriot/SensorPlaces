@@ -8,8 +8,21 @@ This template expects:
 
 {% load crispy_forms_field %}
 
-<div id="div_{{ field.auto_id }}" class="form-check d-flex align-items-center gap-3">
-    <div class="d-flex align-items-center">
-        {% crispy_field field %}
+<div id="div_{{ field.html_name }}" 
+     class="form-check d-flex align-items-center gap-3 {% if not field.value %}opacity-50 text-muted{% endif %}"
+     data-field-name="{{ field.html_name }}"
+     data-model-name="{{ model_name|default:'unknown' }}">
+    <div class="d-flex align-items-center flex-shrink-0" style="min-width: 80px;">
+        <div class="form-check-input-container" style="width: 20px; height: 20px; flex-shrink: 0;">
+            {% crispy_field field %}
+        </div>
+        <label for="{{ field.id_for_label }}" class="form-check-label ms-2 mb-0" style="flex-shrink: 0;">
+            {{ field.label }}
+        </label>
     </div>
+    {% if field.help_text %}
+    <div class="flex-grow-1 {% if field.value %}d-none{% endif %} form-text text-warning-emphasis mt-2" data-help-text-container>
+        {{ field.help_text|safe }}
+    </div>
+    {% endif %}
 </div>

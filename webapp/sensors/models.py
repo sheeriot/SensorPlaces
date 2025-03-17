@@ -251,7 +251,7 @@ class Sensor(models.Model):
     influx_measurement = models.CharField(max_length=100, default='sensor_readings', blank=True)
     is_active: BooleanField = models.BooleanField(
         default=True,
-        help_text="inactive sensors will be hidden by default"
+        # help_text="inactive sensors will be hidden by default"
     )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)

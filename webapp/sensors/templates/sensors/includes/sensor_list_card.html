@@ -1,17 +1,18 @@
 {% load widget_tweaks %}
-<div class="card" id="sensors-card">
+<div id="sensors-card"
+     class="card {% if not device.is_active %}opacity-50 text-muted{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
             <h5 class="card-title mb-0">
                 <i class="bi bi-thermometer me-2"></i>
                 Sensors
             </h5>
-            {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
+            {% if place.is_active %}
+                {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
+            {% endif %}
         </div>
         {% if device %}
-        <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.pk %}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-thermometer"></i><i class="bi bi-plus-circle"></i> Add Sensor
-        </a>
+            {% include "sensors/partials/sensor_new_button.html" with device=device %}
         {% endif %}
     </div>
     <div class="card-body p-0">
@@ -28,7 +29,11 @@
                 <tbody>
                     {% if device %}
                         {% for sensor in sensors %}
-                            {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
+                            {% if place.is_active %}
+                                {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
+                            {% else %}
+                                {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor show_inactive=True %}
+                            {% endif %}
                         {% empty %}
                             <tr>
                                 <td colspan="4" class="text-center small py-3">
@@ -46,8 +51,8 @@
                             </tr>
                             {% regroup location.list by device as device_list %}
                             {% for device in device_list %}
-                                {% if device.grouper.is_active or not hideInactiveSwitch.checked %}
-                                    <tr class="table-light {% if not device.grouper.is_active %}text-muted opacity-50 d-none{% endif %}">
+                                {% if device.grouper.is_active or not hideInactiveSwitch.checked or not place.is_active %}
+                                    <tr class="table-light {% if not device.grouper.is_active and place.is_active %}text-muted opacity-50 d-none{% elif not device.grouper.is_active %}text-muted opacity-50{% endif %}">
                                         <td>
                                             <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
                                         </td>
@@ -68,7 +73,11 @@
                                     </tr>
                                 {% endif %}
                                 {% for sensor in device.list %}
-                                    {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
+                                    {% if place.is_active %}
+                                        {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
+                                    {% else %}
+                                        {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" show_inactive=True %}
+                                    {% endif %}
                                 {% endfor %}
                             {% endfor %}
                         {% empty %}

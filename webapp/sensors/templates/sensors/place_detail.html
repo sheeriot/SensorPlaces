@@ -16,17 +16,17 @@
     <div class="col-md-4">
         
         <!-- Place Details Card -->
-        {% include "sensors/includes/place_details_card.html" with place=place place_map_html=place_map_html %}
- 
-        <!-- Include the live counts partial -->
-        {% include 'sensors/includes/live_counts_card.html' %}
+        {% include "sensors/includes/place_detail_card.html" %}
+        {% if place.is_active %}
+            <!-- Include the live counts partial -->
+            {% include 'sensors/includes/live_counts_card.html' %}
+        {% endif %}
     </div>
 
     <!-- Right Column: Locations and Site Plan/Map -->
     <div class="col-md-8">
         <!-- Locations Table Card -->
         {% include "sensors/includes/location_list_card.html" %}
-
         <!-- Site Plan Card -->
         {% if place.siteplan_image %}
             <div class="mt-3">

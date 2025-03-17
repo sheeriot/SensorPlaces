@@ -11,18 +11,22 @@
     <!-- Two Column Layout for Locations and Devices -->
     <div class="row">
         <div class="col-md-4">
+        <!-- Place Navigation Card -->
+        {% if place.is_active %}
             {% include "sensors/includes/place_nav_card.html" %}
+        {% else %}
+            {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+        {% endif %}
+        {% if device %}
+            {% include "sensors/includes/device_detail_card.html" %}
+        {% else %}
             {% include "sensors/includes/device_list_card.html" %}
+        {% endif %}
         </div>
 
         <!-- right column -->
         <div class="col-md-8">
-            {% if device %}
-                {% include "sensors/includes/device_detail_card.html" %}
-                {% include "sensors/includes/sensor_list_card.html" %}
-            {% else %}
-                {% include "sensors/includes/sensor_list_card.html" %}
-            {% endif %}
+            {% include "sensors/includes/sensor_list_card.html" %}
         </div>
 
         </div>

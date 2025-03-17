@@ -12,8 +12,12 @@
 
     <!-- Left Column -->
     <div class="col-md-4">
-        <!-- PlaceNavigation Card -->
+    <!-- Place Navigation Card -->
+    {% if not place.is_active %}
         {% include "sensors/includes/place_nav_card.html" %}
+    {% else %}
+        {% include "sensors/includes/place_nav_card.html" %}
+    {% endif %}
         <!-- Include Site Plan Card -->
         {% include "sensors/includes/siteplan_card.html" %}
 

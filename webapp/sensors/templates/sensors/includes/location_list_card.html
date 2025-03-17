@@ -2,17 +2,18 @@
 This template expects the following context variables:
 - locations: QuerySet of Location objects with devices_active_count and devices_inactive_count annotations
 - place: Place object
-- show_inactive: boolean (optional, defaults to True)
+- show_inactive: boolean (optional, defaults to False)
 {% endcomment %}
 
-<div class="card" id="location-list-card">
+<div id="location-list-card"
+     class="card {% if not place.is_active %}opacity-50 text-muted{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
             <h5 class="card-title mb-0 d-flex align-items-center gap-2">
                 <i class="bi bi-geo-alt me-2"></i>
                 Locations @ <i class="bi bi-house-gear-fill">{{ place.name }}</i>
             </h5>
-            {% if model_name == "location" or model_name == "place" and locations|length > 0 %}
+            {% if place.is_active and model_name == "location" or model_name == "place" and locations|length > 0 %}
                 {% include "sensors/partials/hide_inactive_switch.html" with model="location" %}
             {% endif %}
         </div>
@@ -37,7 +38,11 @@ This template expects the following context variables:
                 </thead>
                 <tbody>
                     {% for location in locations %}
-                        {% include "sensors/includes/location_row.html" with place=place location=location %}
+                        {% if place.is_active %}
+                            {% include "sensors/includes/location_row.html" with place=place location=location %}
+                        {% else %}
+                            {% include "sensors/includes/location_row.html" with place=place location=location show_inactive=True %}
+                        {% endif %}
                     {% empty %}
                     <tr>
                         <td colspan="4" class="text-center p-3">No locations found.</td>

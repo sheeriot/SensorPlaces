@@ -10,8 +10,13 @@
     <!-- Two Column Layout for Locations and Devices -->
     <div class="row">
         <div class="col-md-4">
-            {% include "sensors/includes/place_nav_card.html" with place=place location=locations locations=locations.all %}
-            {% include "sensors/includes/live_counts_card.html" with place=place %}
+        <!-- Place Navigation Card -->
+        {% if place.is_active %}
+            {% include "sensors/includes/place_nav_card.html" %}
+        {% else %}
+            {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+        {% endif %}
+           {% include "sensors/includes/live_counts_card.html" %}
         </div>
 
         <!-- right column -->

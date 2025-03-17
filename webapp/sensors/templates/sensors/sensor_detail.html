@@ -1,32 +1,33 @@
 {% extends "sensors/base.html" %}
-{% block title %}{{ sensor.name }}{% endblock %}
+
+{% block title %}Sensor Details - {{ sensor.name }}{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12 mb-4">
-        <div class="d-flex align-items-center gap-3">
-            <div>
-                <h1 class="mb-0">Sensor: {{ sensor.name }}</h1>
-            </div>
-            <div class="btn-group ms-auto">
-                <a href="{% url 'sensors:sensor_update' place_slug=sensor.device.location.place.slug pk=sensor.pk %}" class="btn btn-warning">
-                    <i class="bi bi-pencil"></i> Edit
-                </a>
-                <a href="{% url 'sensors:sensor_delete' place_slug=sensor.device.location.place.slug pk=sensor.pk %}" class="btn btn-danger">
-                    <i class="bi bi-trash"></i> Delete
-                </a>
-            </div>
+<div class="container-fluid">
+
+    <!-- Place Title Card - Spans both columns -->
+    {% include 'sensors/partials/place_title_card.html' %}
+
+    <div class="row">
+        <!-- Left Column -->
+        <div class="col-md-4">
+            <!-- Place Navigation Card -->
+            {% if place.is_active %}
+                {% include "sensors/includes/place_nav_card.html" %}
+            {% else %}
+                {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+            {% endif %}
+            {% if device %}
+                {% include "sensors/includes/device_detail_card.html" %}
+            {% endif %}
         </div>
-    </div>
 
-    <div class="col-md-4">
-        {% include "sensors/includes/place_nav_card.html" with place_slug=sensor.device.location.place.slug %}
-        {% include "sensors/includes/device_detail_card.html" with device=sensor.device %}
-    </div>
-
-    <div class="col-md-8">
-        {% include "sensors/includes/sensor_detail_card.html" with sensor=sensor %}
-        {% include "sensors/includes/sensor_readings_card.html" with sensor=sensor %}
+        <!-- Right Column -->
+        <div class="col-md-8">
+            {% include "sensors/includes/sensor_detail_card.html" with sensor=sensor %}
+            {% if sensor.is_active %}
+                {% include "sensors/includes/sensor_readings_card.html" with sensor=sensor %}
+            {% endif %}
     </div>
 </div>
 {% endblock %} 

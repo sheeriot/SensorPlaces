@@ -8,8 +8,15 @@
 {% block content %}
 <div class="row">
     {% include 'sensors/partials/place_title_card.html' %}
+    <!-- Left Column -->
     <div class="col-md-4">
-        {% include 'sensors/includes/place_nav_card.html' with show_hidden=True %}
+        <!-- Place Navigation Card -->
+        {% if place.is_active %}
+            {% include "sensors/includes/place_nav_card.html" %}
+        {% else %}
+            {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+        {% endif %}
+        {% include "sensors/includes/live_counts_card.html %}
     </div>
     <div class="col-md-8">
         {% include 'sensors/includes/location_form_card.html' %}
