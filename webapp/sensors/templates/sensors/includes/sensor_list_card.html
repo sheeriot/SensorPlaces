@@ -7,7 +7,9 @@
                 <i class="bi bi-thermometer me-2"></i>
                 Sensors
             </h5>
-            {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
+            {% if place.is_active %}
+                {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
+            {% endif %}
         </div>
         {% if device %}
             {% include "sensors/partials/sensor_new_button.html" with device=device %}
@@ -27,7 +29,11 @@
                 <tbody>
                     {% if device %}
                         {% for sensor in sensors %}
-                            {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
+                            {% if place.is_active %}
+                                {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
+                            {% else %}
+                                {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor show_inactive=True %}
+                            {% endif %}
                         {% empty %}
                             <tr>
                                 <td colspan="4" class="text-center small py-3">
@@ -45,8 +51,8 @@
                             </tr>
                             {% regroup location.list by device as device_list %}
                             {% for device in device_list %}
-                                {% if device.grouper.is_active or not hideInactiveSwitch.checked %}
-                                    <tr class="table-light {% if not device.grouper.is_active %}text-muted opacity-50 d-none{% endif %}">
+                                {% if device.grouper.is_active or not hideInactiveSwitch.checked or not place.is_active %}
+                                    <tr class="table-light {% if not device.grouper.is_active and place.is_active %}text-muted opacity-50 d-none{% elif not device.grouper.is_active %}text-muted opacity-50{% endif %}">
                                         <td>
                                             <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
                                         </td>
@@ -67,7 +73,11 @@
                                     </tr>
                                 {% endif %}
                                 {% for sensor in device.list %}
-                                    {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
+                                    {% if place.is_active %}
+                                        {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
+                                    {% else %}
+                                        {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" show_inactive=True %}
+                                    {% endif %}
                                 {% endfor %}
                             {% endfor %}
                         {% empty %}

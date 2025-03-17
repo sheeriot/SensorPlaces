@@ -13,7 +13,12 @@
 <div class="row">
     <!-- Two Column Layout -->
     <div class="col-md-4">
-        {% include "sensors/includes/place_nav_card.html" with place=place locations=locations location=location %}
+            <!-- Place Navigation Card -->
+            {% if not place.is_active %}
+                {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+            {% else %}
+                {% include "sensors/includes/place_nav_card.html" %}
+            {% endif %}
     </div>
     <div class="col-md-8">
         <div class="card rounded-3 shadow-sm border-0">

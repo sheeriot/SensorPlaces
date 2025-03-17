@@ -1006,8 +1006,7 @@ class SensorForm(forms.ModelForm):
         return cleaned_data
 
     def is_valid(self):
-        # Ensure place is set on the instance before validation
-        if self.place and not self.instance.place_id:
-            self.instance.place = self.place
-        
+        # Ensure device is set on the instance before validation
+        if hasattr(self, 'device') and self.device and not self.instance.device_id:
+            self.instance.device = self.device
         return super().is_valid()

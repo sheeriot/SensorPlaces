@@ -8,7 +8,9 @@
                     <i class="bi bi-hdd-rack me-1"></i> 
                     Devices @ <i class="bi bi-geo-alt me-1"></i>{{ location.name }}
                 </h5>
-                {% include "sensors/partials/hide_inactive_switch.html" with model="device" %}
+                {% if place.is_active %}
+                    {% include "sensors/partials/hide_inactive_switch.html" with model="device" %}
+                {% endif %}
             </div>
             {% include "sensors/partials/device_new_button.html" with place=place location=location %}
         {% else %}
@@ -18,7 +20,9 @@
                     <i class="bi bi-hdd-rack me-1"></i> 
                     Devices - All
                 </h5>
-                {% include "sensors/partials/hide_inactive_switch.html" with model="device" %}
+                {% if place.is_active %}
+                    {% include "sensors/partials/hide_inactive_switch.html" with model="device" %}
+                {% endif %}
             </div>
         {% endif %}
     </div>
@@ -39,13 +43,17 @@
                     {% if location %}
                         {# Single location view - direct device list #}
                         {% for device in devices %}
-                            {% include "sensors/includes/device_row.html" with place=place location=location device=device %}
+                            {% if place.is_active %}
+                                {% include "sensors/includes/device_row.html" with place=place location=location device=device %}
+                            {% else %}
+                                {% include "sensors/includes/device_row.html" with place=place location=location device=device show_inactive=True %}
+                            {% endif %}
                         {% endfor %}
                     {% else %}
                         {# All locations view - grouped by location #}
                         {% regroup devices by location as device_list %}
                         {% for location in locations %}
-                            <tr class="grouped-list-header device-location-list location-row {% if not location.is_active %}opacity-50 text-muted d-none{% endif %}"
+                            <tr class="grouped-list-header device-location-list location-row {% if not location.is_active and place.is_active %}opacity-50 text-muted d-none{% elif not location.is_active %}opacity-50 text-muted{% endif %}"
                                 data-location-active="{{ location.is_active|lower }}"
                                 data-location-id="{{ location.pk }}"
                                 data-location-name="{{ location.name }}"
@@ -70,7 +78,11 @@
                             {% for device_group in device_list %}
                                 {% if device_group.grouper == location %}
                                     {% for device in device_group.list %}
-                                        {% include "sensors/includes/device_row.html" with place=place location=location device=device %}
+                                        {% if place.is_active %}
+                                            {% include "sensors/includes/device_row.html" with place=place location=location device=device %}
+                                        {% else %}
+                                            {% include "sensors/includes/device_row.html" with place=place location=location device=device show_inactive=True %}
+                                        {% endif %}
                                     {% endfor %}
                                 {% endif %}
                             {% endfor %}

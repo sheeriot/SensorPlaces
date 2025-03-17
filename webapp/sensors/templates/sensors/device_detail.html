@@ -14,16 +14,18 @@
         <!-- Left Column -->
         <div class="col-md-4">
             <!-- Place Navigation Card -->
-            {% include 'sensors/includes/place_nav_card.html'  %}
-            <!-- Locations Navigation Card -->
-            {% include 'sensors/includes/device_nav_card.html' %}
+            {% if place.is_active %}
+                {% include "sensors/includes/place_nav_card.html" %}
+            {% else %}
+                {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+            {% endif %}
+            {% include "sensors/includes/live_counts_card.html %}
         </div>
 
         <!-- Right Column -->
         <div class="col-md-8">
             <!-- Device Details Card -->
             {% include 'sensors/includes/device_detail_card.html' %}
-
             <!-- Sensors Card -->
             {% include 'sensors/includes/sensor_list_card.html' %}
         </div>

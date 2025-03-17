@@ -84,6 +84,17 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     template_name = 'sensors/device_detail.html'
     object: Device
 
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # Get and cache place
+        self._place = self.get_place()
+        
+        # Don't try to access self.object here - it doesn't exist yet
+        # We'll set location in get_context_data instead
+        
+        # Initialize other attributes
+        self._inactive_help_text = None
+
     def get_queryset(self) -> QuerySet[Device]:
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
@@ -99,8 +110,17 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        # Now self.object is available, so we can access location
+        self._location = self.object.location
+        
         context['model_name'] = 'device'
-        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        context['place'] = self._place
+        context['location'] = self._location
+        
+        # Rest of your context data setup
+        # ...
+        
         return context
 
 class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):

@@ -4,7 +4,7 @@
 {% load static %}
 
 {% block title %}
-    {% if object %}Edit {{ model_name|title }}{% else %}New {{ model_name|title }}{% endif %}
+    {% if object %}Edit Sensor: {{ sensor.name }}{% else %}New Sensor{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -12,7 +12,14 @@
     {% include 'sensors/partials/place_title_card.html' %}
     <div class="row">
         <div class="col-md-4">
+        <!-- Place Navigation Card -->
+        {% if place.is_active %}
             {% include "sensors/includes/place_nav_card.html" %}
+        {% else %}
+            {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+        {% endif %}
+            {% include "sensors/includes/live_counts_card.html %}
+        </div>
             {% include "sensors/includes/device_detail_card.html" %}
         </div>
 
