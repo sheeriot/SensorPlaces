@@ -613,7 +613,7 @@ class DeviceForm(forms.ModelForm):
             'model': forms.TextInput(attrs={'placeholder': 'Enter model'}),
             'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
             'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input active-checkbox',
+                'class': 'me-2 checkboxinput active-checkbox',
                 'data-active-label': 'Active',
                 'data-inactive-label': 'inactive'
             })
@@ -635,11 +635,14 @@ class DeviceForm(forms.ModelForm):
         checkbox_id = f"device-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
         self.fields['is_active'].widget.attrs.update({
             'id': checkbox_id,
-            'class': 'form-check-input active-checkbox',
             'data-device-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new',
-            'data-active-label': 'Active',
-            'data-inactive-label': 'inactive'
         })
+        
+        # Store original state for JavaScript
+        if self.instance and self.instance.pk:
+            self.fields['is_active'].widget.attrs['data-isactive-original'] = str(self.instance.is_active).lower()
+            if self.instance.location:
+                self.fields['is_active'].widget.attrs['data-location-original'] = str(self.instance.location.pk)
         
         # Set the label based on the current state
         if self.instance and self.instance.pk and not self.instance.is_active:
@@ -649,7 +652,17 @@ class DeviceForm(forms.ModelForm):
         
         # Set help text for inactive state if provided from view
         if inactive_help_text:
-            self.fields['is_active'].help_text = inactive_help_text
+            # Ensure help text doesn't have nested form-text divs
+            if '<div class="form-text' in inactive_help_text:
+                # Extract the inner content if it's wrapped in a form-text div
+                import re
+                inner_content = re.search(r'<div class="form-text.*?>(.*?)</div>', inactive_help_text, re.DOTALL)
+                if inner_content:
+                    self.fields['is_active'].help_text = mark_safe(inner_content.group(1))
+                else:
+                    self.fields['is_active'].help_text = inactive_help_text
+            else:
+                self.fields['is_active'].help_text = inactive_help_text
 
         initial = kwargs.get('initial', {})
         location_initial = initial.get('location', None)
@@ -664,10 +677,8 @@ class DeviceForm(forms.ModelForm):
                 # Only set help text if not already provided from view
                 if not inactive_help_text:
                     self.fields['is_active'].help_text = mark_safe(
-                        '<div class="form-text text-warning-emphasis mt-2">'
-                            f'<i class="bi bi-geo-alt me-2"></i>'
-                            f'Device cannot be active because Location "{location_initial.name}" is inactive.'
-                        '</div>'
+                        f'<i class="bi bi-exclamation-triangle me-2"></i>'
+                        f'Device cannot be active because Location "{location_initial.name}" is inactive.'
                     )
         """Configure the location select field with active state and device counts"""
         if self.locations:
@@ -683,11 +694,11 @@ class DeviceForm(forms.ModelForm):
             select_attrs = {
                 'class': 'form-select',
                 'id': 'id_location',  # Ensure consistent ID
-                **{
-                    f'data-is-active-{loc.pk}': str(loc.is_active).lower() 
-                    for loc in self.locations
-                }
             }
+            # Add data attributes for each location
+            for loc in self.locations:
+                select_attrs[f'data-isactive-{loc.pk}'] = str(loc.is_active).lower()
+                select_attrs[f'data-locationname-{loc.pk}'] = loc.name
             # Update the location field
             self.fields['location'].queryset = self.locations
             self.fields['location'].widget = forms.Select(
@@ -697,44 +708,38 @@ class DeviceForm(forms.ModelForm):
 
         self.helper.layout = Layout(
             Row(
-                Column('name', css_class='col-auto'),
-                Column('device_type', css_class='col-auto'),
-                css_class='mb-3'
+                Column('name', css_class='col-6'),
+                Column('device_type', css_class='col-4'),
+                css_class='mb-2'
             ),
             Row(
-                Column('location', css_class='col-auto', css_id='div_id_location'),
-                css_class='mb-3'
+                Column(
+                    Field(
+                        'is_active',
+                        template='sensors/partials/active_status_checkbox.html',
+                        css_id='div_id_is_active'
+                    ),
+                    css_class='col-12'
+                ),
+                css_class='mb-2'
+            ),
+            Row(
+                Column('location', css_class='col-4', css_id='div_id_location'),
+                css_class='mb-2'
             ),
             Row(
                 Column('manufacturer', css_class='col-auto'),
                 Column('model', css_class='col-auto'),
-                css_class='mb-3'
+                css_class='mb-1'
             ),
             Row(
                 Column('serial_number', css_class='col-auto'),
-                css_class='mb-3'
-            ),
-            Row(
-                Column(
-                    Div(
-                        Field(
-                            'is_active',
-                            template='sensors/partials/active_status_checkbox.html',
-                            wrapper_class='form-check d-flex align-items-center gap-3',
-                            css_class='me-2',
-                            css_id='div_id_is_active'
-                        ),
-                        css_class='d-flex align-items-center',
-                        css_id='div_id_is_active_container'
-                    ),
-                    css_class='col-12'
-                ),
-                Field('referrer', type='hidden'),
-                css_class='mb-3'
+                css_class='mb-2'
             ),
             Div(
-                HTML('<hr class="mt-3">'),
+                HTML('<hr class="mt-1">'),
                 Div(
+                    Field('referrer', type='hidden'),
                     HTML(f"""
                         <a href="{{ form.referrer.value|default:cancel_fallback_url }}" 
                            class="btn btn-outline-secondary">

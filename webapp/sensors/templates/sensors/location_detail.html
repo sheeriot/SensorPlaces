@@ -14,7 +14,7 @@
     <div class="col-md-4">
     <!-- Place Navigation Card -->
     {% if not place.is_active %}
-        {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+        {% include "sensors/includes/place_nav_card.html" %}
     {% else %}
         {% include "sensors/includes/place_nav_card.html" %}
     {% endif %}

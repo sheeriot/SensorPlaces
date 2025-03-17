@@ -1,6 +1,6 @@
 {% extends "sensors/base.html" %}
-{% load widget_tweaks %}
-{% load crispy_forms_tags %}
+{# {% load widget_tweaks %} #}
+{# {% load crispy_forms_tags %} #}
 
 {% block title %}
     SensorPlaces:
@@ -14,11 +14,18 @@
     
     <div class="col-md-4">
         <!-- Place Navigation -->
-        {% include 'sensors/includes/place_nav_card.html' %}
+        {% if place.is_active %}
+            {% include "sensors/includes/place_nav_card.html" %}
+        {% else %}
+            {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+        {% endif %}
 
         {% if location %}
             {% include 'sensors/includes/location_detail_card.html' %}
+        {% else %}
+            {% include 'sensors/includes/device_nav_card.html' %}
         {% endif %}
+
     </div>
 
     <div class="col-md-8">

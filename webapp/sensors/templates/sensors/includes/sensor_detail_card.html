@@ -1,58 +1,84 @@
 {% load widget_tweaks %}
 
-<div class="card rounded-3 shadow-sm border-0">
-    <div class="card-header bg-white py-2">
+<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not sensor.is_active %}opacity-50{% endif %}" id="sensor-card-{{ device.pk }}">
+
+    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
             <i class="bi bi-thermometer me-2"></i>
             Sensor Details
         </h5>
+        <div class="btn-group">
+            {% if model_name == 'sensor' %}
+                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" 
+                   class="btn btn-warning btn-sm">
+                    <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}" 
+                   class="btn btn-danger btn-sm">
+                    <i class="bi bi-trash"></i>
+                </a>
+            {% endif %}
+        </div>
     </div>
     <div class="card-body py-2">
-        <dl class="row mb-0">
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">Name</dt>
-            <dd class="col-sm-8">{{ sensor.name }}</dd>
-            
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">Type</dt>
-            <dd class="col-sm-8">{{ sensor.get_sensor_type_display }}</dd>
+        <!-- First Row: Name and Device -->
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <label class="text-body-secondary small text-uppercase d-block">Name</label>
+                <div>{{ sensor.name }}</div>
+            </div>
+            <div class="col-6">
+                <label class="text-body-secondary small text-uppercase d-block">Device</label>
+                <div>{{ device.name }}</div>
+            </div>
+        </div>
 
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">Unit</dt>
-            <dd class="col-sm-8">{{ sensor.get_unit_display }}</dd>
-
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">Status</dt>
-            <dd class="col-sm-8">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="form-check form-switch {% if not sensor.device.is_active %}d-none{% endif %}">
-                        <input class="form-check-input sensor-status-toggle" 
-                               type="checkbox" 
-                               role="switch"
-                               id="sensorToggle{{ sensor.pk }}"
-                               data-sensor-id="{{ sensor.pk }}"
-                               data-device-id="{{ sensor.device.pk }}"
-                               data-place-slug="{{ sensor.device.location.place.slug }}"
-                               {% if sensor.is_active %}checked{% endif %}
-                               {% if not sensor.device.is_active %}disabled{% endif %}>
-                        <label class="form-check-label status-label {% if sensor.is_active %}text-success{% else %}text-danger{% endif %}" 
-                               for="sensorToggle{{ sensor.pk }}"
-                               id="sensorStatusLabel_{{ sensor.pk }}">
-                            {% if sensor.is_active %}Active{% else %}inactive{% endif %}
-                        </label>
+        <!-- Second Row: Status -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <label class="text-body-secondary small text-uppercase d-block">Status</label>
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        {% include "sensors/partials/toggle_active_button.html" with place_slug=place.slug type="sensor" id=sensor.pk is_active=sensor.is_active %}
                     </div>
-                    {% if not sensor.device.is_active %}
-                        {% include "sensors/partials/status_active_badge.html" with object=sensor show_active=true %}
-                    {% endif %}
+                    {% include "sensors/partials/status_active_badge.html" with object=sensor %}
+
                 </div>
-            </dd>
+            </div>
+        </div>
 
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">Data Source</dt>
-            <dd class="col-sm-8">{{ sensor.get_data_type_display }}</dd>
+        <!-- Third Row: Type and Unit -->
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <label class="text-body-secondary small text-uppercase d-block">Type</label>
+                <div>{{ sensor.sensor_type }}</div>
+            </div>
+            <div class="col-6">
+                <label class="text-body-secondary small text-uppercase d-block">Unit</label>
+                <div>{{ sensor.unit }}</div>
+            </div>
+        </div>
 
-            {% if sensor.data_type == 'INFLUX' and sensor.influx_source %}
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">InfluxDB</dt>
-            <dd class="col-sm-8">{{ sensor.influx_source.name }}</dd>
+        <!-- Fourth Row: Data Source -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <label class="text-body-secondary small text-uppercase d-block">Data Source</label>
+                <div>{{ sensor.get_data_type_display }}</div>
+            </div>
+        </div>
 
-            <dt class="col-sm-4 text-body-secondary small text-uppercase">Measurement</dt>
-            <dd class="col-sm-8">{{ sensor.influx_measurement }}</dd>
-            {% endif %}
-        </dl>
+        {% if sensor.data_type == 'INFLUX' and sensor.influx_source %}
+        <!-- Additional InfluxDB info -->
+        <div class="row g-3">
+            <div class="col-6">
+                <label class="text-body-secondary small text-uppercase d-block">InfluxDB</label>
+                <div>{{ sensor.influx_source.name }}</div>
+            </div>
+            <div class="col-6">
+                <label class="text-body-secondary small text-uppercase d-block">Measurement</label>
+                <div>{{ sensor.influx_measurement }}</div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div> 

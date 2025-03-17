@@ -148,8 +148,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             if self._location and not self._location.is_active:
                 self._inactive_help_text = mark_safe(
                     '<div class="form-text text-warning-emphasis mt-2">'
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This device will be inactive because Location "{self._location.name}" is inactive.'
+                    '<i class="bi bi-exclamation-triangle me-2"></i>This device will be inactive because Location "{self._location.name}" is inactive.'
                     '</div>'
                 )
 

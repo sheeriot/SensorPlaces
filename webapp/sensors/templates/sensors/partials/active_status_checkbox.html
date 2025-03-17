@@ -9,7 +9,7 @@ This template expects:
 {% load crispy_forms_field %}
 
 <div id="div_{{ field.html_name }}" 
-     class="form-check d-flex align-items-center gap-3"
+     class="form-check d-flex align-items-center gap-3 {% if not field.value %}opacity-50 text-muted{% endif %}"
      data-field-name="{{ field.html_name }}"
      data-model-name="{{ model_name|default:'unknown' }}">
     <div class="d-flex align-items-center flex-shrink-0" style="min-width: 80px;">
@@ -21,7 +21,7 @@ This template expects:
         </label>
     </div>
     {% if field.help_text %}
-    <div class="form-text flex-grow-1 d-flex align-items-center {% if field.value %}d-none{% endif %}" data-help-text-container>
+    <div class="flex-grow-1 {% if field.value %}d-none{% endif %} form-text text-warning-emphasis mt-2" data-help-text-container>
         {{ field.help_text|safe }}
     </div>
     {% endif %}

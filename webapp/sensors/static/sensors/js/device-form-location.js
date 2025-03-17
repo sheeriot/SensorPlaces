@@ -47,8 +47,8 @@ function initializeDeviceForm() {
         const locationId = select.value;
         if (!locationId) return;
 
-        const isLocationActive = select.getAttribute(`data-is-active-${locationId}`) === 'true';
-        const locationName = select.options[select.selectedIndex].text;
+        const isLocationActive = select.getAttribute(`data-isactive-${locationId}`) === 'true';
+        const locationName = select.getAttribute(`data-locationname-${locationId}`);
         
         if (deviceFormConfig.debug) {
             console.log('[Device Form] Location selected:', {
@@ -65,34 +65,43 @@ function initializeDeviceForm() {
         // Store location active state as data attribute
         container.dataset.locationActive = isLocationActive.toString();
         
+        let inactiveReason;
         // Only modify the checkbox state (checked/unchecked and enabled/disabled)
         if (!isLocationActive) {
             // If location is inactive, force checkbox to be unchecked and disabled
             activeCheckbox.checked = false;
             activeCheckbox.disabled = true;
+            inactiveReason = `<i class="bi bi-exclamation-triangle me-2"></i>This device will be inactive because Location "${locationName}" is inactive.`;
             
             if (deviceFormConfig.debug) {
                 console.log('[Device Form] Location inactive - disabling checkbox');
             }
         } else {
-            // If location is active, enable the checkbox and restore original state
+            // If location is active, enable the checkbox
             activeCheckbox.disabled = false;
             
-            // Only restore the original state if we're coming from an inactive location
-            if (container.dataset.previousLocationActive === 'false') {
-                // Use the original state we saved when form initialized
-                activeCheckbox.checked = activeCheckbox.dataset.originalState === 'true';
-                
+            // Check if we're returning to original location
+            const isOriginalLocation = locationId === activeCheckbox.getAttribute('data-location-original');
+            const originalIsActive = activeCheckbox.getAttribute('data-isactive-original') === 'true';
+            
+            if (isOriginalLocation) {
+                // Restore to original state if we're back at original location
+                activeCheckbox.checked = originalIsActive;
                 if (deviceFormConfig.debug) {
-                    console.log('[Device Form] Restoring checkbox state:', {
+                    console.log('[Device Form] Restored to original state:', {
                         location: locationName,
-                        originalState: activeCheckbox.dataset.originalState === 'true',
-                        checked: activeCheckbox.checked
+                        originalIsActive: originalIsActive
                     });
                 }
             }
+            
+            // Set inactiveReason if checkbox is unchecked
+            if (!activeCheckbox.checked) {
+                inactiveReason = `<i class="bi bi-exclamation-triangle me-2"></i>
+                    Device is set to inactive`;
+            }
         }
-        
+
         // Store current location state for next change
         container.dataset.previousLocationActive = isLocationActive.toString();
 
@@ -102,7 +111,7 @@ function initializeDeviceForm() {
                 isLocationActive,
                 checkboxState: activeCheckbox.checked,
                 checkboxDisabled: activeCheckbox.disabled,
-                inactiveReason: isLocationActive ? '' : 'Device cannot be active when its location is inactive'
+                inactiveReason: inactiveReason || ''
             }
         });
         container.dispatchEvent(event);

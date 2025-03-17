@@ -1,6 +1,6 @@
 {% extends "sensors/base.html" %}
-{% load static %}
-{% load widget_tweaks %}
+{# {% load static %} #}
+{# {% load widget_tweaks %} #}
 
 {% block title %}Device Details - {{ device.name }}{% endblock %}
 
@@ -19,7 +19,7 @@
             {% else %}
                 {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
             {% endif %}
-            {% include "sensors/includes/live_counts_card.html" %}
+            {% include "sensors/includes/location_detail_card.html" %}
         </div>
 
         <!-- Right Column -->

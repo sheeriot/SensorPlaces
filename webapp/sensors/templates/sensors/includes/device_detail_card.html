@@ -1,9 +1,22 @@
-{% load widget_tweaks %}
+{# {% load widget_tweaks %} #}
 
-<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not device.is_active %}opacity-75{% endif %}" id="deviceCard_{{ device.pk }}">
+<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not device.is_active %}opacity-50{% endif %}" id="device-card-{{ device.pk }}">
     <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
-            <i class="bi bi-hdd-rack me-2"></i>Device Details
+            <i class="bi bi-hdd-rack me-2"></i>
+            Device: {{ device.name }}
+            <small class="text-body-secondary ms-2">
+                <i class="bi bi-chevron-right"></i>
+                <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}">
+                    <i class="bi bi-geo-alt"></i>
+                    {{ location.name }}
+                </a> 
+                <i class="bi bi-chevron-right"></i>
+                <a href="{% url 'sensors:place_detail' place.slug %}">
+                    <i class="bi bi-house-gear"></i>
+                    {{ place.name }}
+                </a> 
+            </small>
         </h5>
         <div class="btn-group">
             {% if model_name == 'device' %}
@@ -29,12 +42,6 @@
                     <div class="text-body-secondary small text-uppercase mb-1">Location</div>
                     <div class="fs-5">
                         <i class="bi bi-geo-alt me-1"></i>{{ device.location.name }}
-                    </div>
-                </div>
-                <div>
-                    <div class="text-body-secondary small text-uppercase mb-1">Place</div>
-                    <div class="fs-5">
-                        <i class="bi bi-house-gear me-1"></i>{{ device.location.place.name }}
                     </div>
                 </div>
             </div>
