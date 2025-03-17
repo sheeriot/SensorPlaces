@@ -1,26 +1,29 @@
-from django.shortcuts import get_object_or_404
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.urls import reverse
-from django.http import JsonResponse, HttpResponseRedirect
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
+
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
+
 from django.db.models import OuterRef, Subquery, Count, Q  # Count, Q, Exists
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.http import JsonResponse, HttpResponseRedirect
+
 from django.utils import timezone
-from datetime import datetime, timedelta
 from django.utils.safestring import mark_safe
 
 from ..models import Place, Device, Sensor, SensorReading
+from .mixins import PlaceAnnotationMixin
 from ..forms import SensorForm
 from ..utils import get_sensor_readings
-from .mixins import PlaceAnnotationMixin
 
+from datetime import datetime, timedelta
+import sys
 # import json
 from icecream import ic
-import sys
 
 class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = Sensor
@@ -151,29 +154,14 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Get and cache place and device
+        # Get and cache place, locations, device, location
         self._place = self.get_place()
-        
-        # Add debugging to see what's happening
-        device_pk = self.kwargs.get('device_pk')
-        print(f"Device PK from kwargs: {device_pk}")
-        
-        try:
-            self._device = get_object_or_404(Device, pk=device_pk, location__place=self._place)
-            print(f"Found device: {self._device.name} (ID: {self._device.id})")
-        except Exception as e:
-            print(f"Error getting device: {str(e)}")
-            # Provide a fallback for testing
-            if 'test' in sys.modules:
-                print("Running in test mode, using first available device")
-                self._device = Device.objects.filter(location__place=self._place).first()
-                if not self._device:
-                    raise Exception("No devices found for this place")
-            else:
-                raise
-        
         self._locations = self.get_annotated_locations(self._place)
-        
+        try:
+            self._device = get_object_or_404(Device, pk=self.kwargs.get('device_pk', None))
+        except Exception as e:
+            ic(f"Error getting device: {str(e)}")
+
         # Initialize inactive_help_text
         self._inactive_help_text = None
         
@@ -194,6 +182,11 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         
         # Set initial data properly
         kwargs['initial'] = kwargs.get('initial', {})
+        
+        # Set is_active based on device status
+        if self._device:
+            kwargs['initial']['is_active'] = self._device.is_active
+        
         kwargs['initial'].update({
             'referrer': self.request.GET.get('next', '')
         })
@@ -204,31 +197,40 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
         context['place'] = self._place
+        context['locations'] = self._locations
         context['device'] = self._device
         context['location'] = self._device.location
-        context['locations'] = self._locations
         
         # Add a fallback cancel URL
         context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
             'place_slug': self._place.slug,
             'pk': self._device.pk
         })
-        
         return context
 
     def form_valid(self, form):
+        
+        # Ensure is_active is set correctly based on device status
+        if self._device.is_active and not form.instance.is_active:
+            # If device is active but form has inactive sensor, respect the form value
+            pass
+        elif not self._device.is_active:
+            # If device is inactive, sensor must be inactive
+            form.instance.is_active = False
+        else:
+            # If device is active and no explicit choice, make sensor active
+            form.instance.is_active = True
+        
         # Save the form to get the object
         self.object = form.save()
         sensor = self.object
-        device = sensor.device
-        location = device.location
-        place = location.place
+
         
         message = (
             f"Created sensor <strong>{sensor.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {location.name} > "
-            f"<i class='bi bi-hdd-rack'></i> {device.name}<br>"
+            f"<i class='bi bi-house-gear'></i> {self._place.name} > "
+            f"<i class='bi bi-geo-alt'></i> {self._device.location.name} > "
+            f"<i class='bi bi-hdd-rack'></i> {self._device.name}<br>"
             f"<small class='text-muted'>"
             f"Type: {sensor.get_sensor_type_display()}<br>"
             f"Unit: {sensor.unit}<br>"
@@ -243,7 +245,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+            'type': 'success' if sensor.is_active else 'warning'
         })
         
         # Get the success URL and return HttpResponseRedirect
@@ -255,12 +257,6 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             'place_slug': self.kwargs['place_slug'],
             'pk': self.object.pk
         })
-
-    def get_annotated_locations(self, place):
-        """Get locations with active device counts"""
-        return place.locations.select_related('place').annotate(
-            devices_active_count=Count('devices', filter=Q(devices__is_active=True))
-        ).order_by('-is_active', Lower('name'))
 
 class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Sensor
@@ -293,8 +289,8 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
                     sensor.save()
                     
                     # Just log the inconsistency with ic
-                    ic(f"Fixed inconsistency: Sensor {sensor.id} ({sensor.name}) was active "
-                       f"but its Device {device.id} ({device.name}) is inactive.")
+                    ic(f"Fixed inconsistency: Sensor {sensor.pk} ({sensor.name}) was active "
+                       f"but its Device {device.pk} ({device.name}) is inactive.")
                 
                 # Standard message for inactive device
                 self._inactive_help_text = mark_safe(
@@ -349,6 +345,8 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+
+        
         # Store original values before save
         sensor = self.get_object()
         self._original_values = {
@@ -360,12 +358,18 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             'unit': sensor.unit
         }
         
+        # Ensure is_active is set correctly based on device status
+        if not self._device.is_active and form.instance.is_active:
+            # If device is inactive, sensor must be inactive
+            form.instance.is_active = False
+        
         # Save the form
         self.object = form.save()
         sensor = self.object
         device = sensor.device
         location = device.location
         place = location.place
+        
         changes = []
         
         if hasattr(self, '_original_values'):
@@ -444,7 +448,6 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             else:
                 self._inactive_help_text = None
         except Exception as e:
-            ic(f"Error in SensorDeleteView.setup: {str(e)}")
             self._inactive_help_text = None
 
     def get_context_data(self, **kwargs):
@@ -456,6 +459,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         context['device'] = device
         context['location'] = device.location
         context['place'] = self._place
+        context['model_name'] = 'sensor'
         
         # Add sensor_url for cancel button
         context['sensor_url'] = reverse('sensors:sensor_detail', kwargs={
@@ -477,6 +481,8 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         device = sensor.device
         location = device.location
         place = location.place
+        
+        # Store success_url before deletion
         success_url = self.get_success_url()
         
         message = (
@@ -509,7 +515,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     def get_success_url(self):
         device = self.object.device
         return reverse('sensors:device_detail', kwargs={
-            'place_slug': device.location.place.slug,
+            'place_slug': self._place.slug,
             'pk': device.pk
         })
 

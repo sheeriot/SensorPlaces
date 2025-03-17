@@ -108,7 +108,7 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
-        ic("Toast: PlaceCreateView:", getattr(self.request, 'toast_message', None))
+        # ic("Toast: PlaceCreateView:", getattr(self.request, 'toast_message', None))
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()

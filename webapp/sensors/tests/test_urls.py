@@ -400,15 +400,25 @@ class FormSubmissionTestCase(TestCase):
     def test_place_create_form(self):
         """Test creating a place via form submission"""
         place_count = Place.objects.count()
+        print("Starting test_place_create_form")
+        form_data = {
+            'name': 'New Test Place',
+            'is_active': True,
+            'latitude': 51.5074,
+            'longitude': -0.1278
+        }
+        print(f"Form data being submitted: {form_data}")
         response = self.client.post(
             reverse('sensors:place_create'),
-            {
-                'name': 'New Test Place',
-                'is_active': True,
-                'latitude': 51.5074,
-                'longitude': -0.1278
-            }
+            form_data
         )
+        print(f"Response status code: {response.status_code}")
+        if response.status_code != 302:
+            if hasattr(response, 'context') and response.context and 'form' in response.context:
+                print(f"Form errors: {response.context['form'].errors}")
+                print(f"Form fields: {response.context['form'].fields.keys()}")
+            else:
+                print("No form in response context")
         # Should redirect after successful creation
         self.assertEqual(response.status_code, 302)
         # Check that a new place was created
@@ -420,15 +430,19 @@ class FormSubmissionTestCase(TestCase):
     
     def test_location_create_form(self):
         """Test creating a location via form submission"""
+        print("\nStarting test_location_create_form")
         location_count = Location.objects.count()
+        form_data = {
+            'name': 'New Test Location',
+            'place': self.place.id,
+            'is_active': True
+        }
+        print(f"Location form data: {form_data}")
         response = self.client.post(
             reverse('sensors:location_create', kwargs={'place_slug': self.place.slug}),
-            {
-                'name': 'New Test Location',
-                'place': self.place.id,
-                'is_active': True
-            }
+            form_data
         )
+        print(f"Location create response status: {response.status_code}")
         # Should redirect after successful creation
         self.assertEqual(response.status_code, 302)
         # Check that a new location was created
@@ -437,25 +451,30 @@ class FormSubmissionTestCase(TestCase):
         new_location = Location.objects.latest('id')
         self.assertEqual(new_location.name, 'New Test Location')
         self.assertTrue(new_location.is_active)
+        print("Completed test_location_create_form")
     
     def test_device_create_form(self):
         """Test creating a device via form submission"""
+        print("\nStarting test_device_create_form")
         device_count = Device.objects.count()
+        form_data = {
+            'name': 'New Test Device',
+            'location': self.location.id,
+            'is_active': True,
+            'device_type': self.device_type.id,
+            'manufacturer': 'Test Manufacturer',
+            'model': 'Test Model',
+            'serial_number': 'TEST123'
+        }
+        print(f"Device form data: {form_data}")
         response = self.client.post(
             reverse('sensors:device_create', kwargs={
                 'place_slug': self.place.slug,
                 'location_pk': self.location.pk
             }),
-            {
-                'name': 'New Test Device',
-                'location': self.location.id,
-                'is_active': True,
-                'device_type': self.device_type.id,
-                'manufacturer': 'Test Manufacturer',
-                'model': 'Test Model',
-                'serial_number': 'TEST123'
-            }
+            form_data
         )
+        print(f"Device create response status: {response.status_code}")
         # Should redirect after successful creation
         self.assertEqual(response.status_code, 302)
         # Check that a new device was created
@@ -464,22 +483,31 @@ class FormSubmissionTestCase(TestCase):
         new_device = Device.objects.latest('id')
         self.assertEqual(new_device.name, 'New Test Device')
         self.assertTrue(new_device.is_active)
+        print("Completed test_device_create_form")
     
     def test_sensor_create_form(self):
         """Test creating a sensor via form submission"""
         sensor_count = Sensor.objects.count()
         
         # Ensure we have a valid device
-        print(f"Using device: {self.device.name} (ID: {self.device.id})")
-        print(f"Device location: {self.device.location.name} (ID: {self.device.location.id})")
-        print(f"Location place: {self.device.location.place.name} (ID: {self.device.location.place.id})")
+        # print(f"Using device: {self.device.name} (ID: {self.device.id})")
+        # print(f"Device location: {self.device.location.name} (ID: {self.device.location.id})")
+        # print(f"Location place: {self.device.location.place.name} (ID: {self.device.location.place.id})")
+        # print(f"Device is_active: {self.device.is_active}")
+        
+        # Make the device active for the test
+        if not self.device.is_active:
+            # print("Activating device for test")
+            self.device.is_active = True
+            self.device.save()
+            # print(f"Device is now active: {self.device.is_active}")
         
         form_data = {
             'name': 'New Test Sensor',
             'device': self.device.id,
-            'is_active': True,
+            'is_active': True,  # Set to True to match our test expectation
             'sensor_type': 'TEMP',
-            'unit': '',
+            'unit': '°C',
             'data_type': 'DB',
             'influx_measurement': 'test_measurement',
             'referrer': '',
@@ -489,17 +517,19 @@ class FormSubmissionTestCase(TestCase):
             'place_slug': self.place.slug,
             'device_pk': self.device.pk
         })
-        print(f"Posting to URL: {url}")
+        # print(f"Posting to URL: {url}")
         
         response = self.client.post(url, form_data)
         
         # If the response is not a redirect, print form errors
         if response.status_code != 302:
-            print(f"Form submission failed with status code: {response.status_code}")
+            # print(f"Form submission failed with status code: {response.status_code}")
             if hasattr(response, 'context') and response.context and 'form' in response.context:
-                print(f"Form errors: {response.context['form'].errors}")
+                # print(f"Form errors: {response.context['form'].errors}")
+                pass
             else:
-                print("No form in response context")
+                # print("No form in response context")
+                pass
         
         # Should redirect after successful creation
         self.assertEqual(response.status_code, 302)
@@ -509,27 +539,54 @@ class FormSubmissionTestCase(TestCase):
         new_sensor = Sensor.objects.latest('id')
         self.assertEqual(new_sensor.name, 'New Test Sensor')
         self.assertTrue(new_sensor.is_active)
+        # print(f"Created sensor: {new_sensor.name}, is_active: {new_sensor.is_active}")
     
     def test_toggle_active_api(self):
         """Test toggling active status via API"""
         # Test toggling a place
         initial_status = self.place.is_active
+        
+        print(f"Initial place active status: {initial_status}")
+        print(f"CSRF token before get: {self.client.cookies.get('csrftoken')}")
+        
+        # First get the CSRF token
+        self.client.get(reverse('sensors:place_detail', kwargs={'place_slug': self.place.slug}))
+        
+        print(f"CSRF token after get: {self.client.cookies.get('csrftoken')}")
+        
+        # Check if csrftoken is a string or has a value attribute
+        csrf_token = self.client.cookies.get('csrftoken')
+        print(f"CSRF token type: {type(csrf_token)}")
+        
+        # Fix the issue with csrf_token value
+        if csrf_token is None:
+            csrf_value = ''
+            print("No CSRF token found")
+        elif isinstance(csrf_token, str):
+            csrf_value = csrf_token
+            print(f"CSRF token is a string: {csrf_value}")
+        else:
+            csrf_value = csrf_token.value
+            print(f"CSRF token has value attribute: {csrf_value}")
+        
         data = {
             'model_type': 'place',
             'object_id': self.place.id,
             'is_active': not initial_status,
-            'csrf_token': self.client.cookies.get('csrftoken', '').value
+            'csrf_token': csrf_value
         }
         
-        # First get the CSRF token
-        self.client.get(reverse('sensors:place_detail', kwargs={'place_slug': self.place.slug}))
+        print(f"Request data: {data}")
         
         response = self.client.post(
             reverse('sensors:toggle_active', kwargs={'place_slug': self.place.slug}),
             json.dumps(data),
             content_type='application/json',
-            HTTP_X_CSRFTOKEN=self.client.cookies.get('csrftoken').value
+            HTTP_X_CSRFTOKEN=csrf_value
         )
+        
+        print(f"Response status code: {response.status_code}")
+        print(f"Response content: {response.content.decode()}")
         
         # If the API returns 400, let's check the response content for debugging
         if response.status_code == 400:
@@ -540,18 +597,22 @@ class FormSubmissionTestCase(TestCase):
                 'id': self.place.id,
                 'active': not initial_status
             }
+            print(f"Retrying with data: {data}")
             response = self.client.post(
                 reverse('sensors:toggle_active', kwargs={'place_slug': self.place.slug}),
                 json.dumps(data),
                 content_type='application/json',
-                HTTP_X_CSRFTOKEN=self.client.cookies.get('csrftoken').value
+                HTTP_X_CSRFTOKEN=csrf_value
             )
+            print(f"Second response status code: {response.status_code}")
+            print(f"Second response content: {response.content.decode()}")
         
         # Accept either 200 or 302 as success
         self.assertIn(response.status_code, [200, 302])
         
         # Refresh from database
         self.place.refresh_from_db()
+        print(f"Place active status after API call: {self.place.is_active}")
         
         # Check that status was toggled - only if the API call was successful
         if response.status_code in [200, 302]:

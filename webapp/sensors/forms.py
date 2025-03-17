@@ -138,7 +138,6 @@ class PlaceForm(forms.ModelForm):
         self.helper.layout = Layout(
             Field('slug', type='hidden'),
             Field('referrer', type='hidden'),
-            Field('place', type='hidden'),
             Div(
                 Div(
                     Div('name', css_class='col-md-6'),

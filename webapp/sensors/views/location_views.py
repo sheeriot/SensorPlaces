@@ -167,42 +167,18 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
 
-    def form_invalid(self, form):
-        """Override form_invalid to debug form errors"""
-        ic("Form is invalid, errors:", form.errors)
-        ic("Form data:", form.data)
-        
-        # Try to manually create the object to see if it works
-        try:
-            location = Location(
-                name=form.instance.name,
-                place_id=form.instance.place_id,
-                is_active=form.instance.is_active,
-                x_pos=form.instance.x_pos,
-                y_pos=form.instance.y_pos
-            )
-            location.save()
-            ic("Manually created location:", location)
-            
-            # Redirect to the success URL
-            return HttpResponseRedirect(self.get_success_url())
-        except Exception as e:
-            ic("Error creating location manually:", str(e))
-        
-        return super().form_invalid(form)
-
     def post(self, request, *args, **kwargs):
         """Override post to debug form validation"""
         form = self.get_form()
-        ic("LocationCreateView.post - checking form validity")
+
         if form.is_valid():
-            ic("Form is valid, calling form_valid")
+            # ic("Form is valid, calling form_valid")
             return self.form_valid(form)
         else:
-            ic("Form is invalid, errors:", form.errors)
-            ic("Form data:", form.data)
-            ic("Form instance:", vars(form.instance))
-            ic("Form fields:", form.fields)
+            # ic("Form is invalid, errors:", form.errors)
+            # ic("Form data:", form.data)
+            # ic("Form instance:", vars(form.instance))
+            # ic("Form fields:", form.fields)
             return self.form_invalid(form)
 
 class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
