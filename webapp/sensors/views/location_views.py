@@ -167,42 +167,18 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
 
-    def form_invalid(self, form):
-        """Override form_invalid to debug form errors"""
-        ic("Form is invalid, errors:", form.errors)
-        ic("Form data:", form.data)
-        
-        # Try to manually create the object to see if it works
-        try:
-            location = Location(
-                name=form.instance.name,
-                place_id=form.instance.place_id,
-                is_active=form.instance.is_active,
-                x_pos=form.instance.x_pos,
-                y_pos=form.instance.y_pos
-            )
-            location.save()
-            ic("Manually created location:", location)
-            
-            # Redirect to the success URL
-            return HttpResponseRedirect(self.get_success_url())
-        except Exception as e:
-            ic("Error creating location manually:", str(e))
-        
-        return super().form_invalid(form)
-
     def post(self, request, *args, **kwargs):
         """Override post to debug form validation"""
         form = self.get_form()
-        ic("LocationCreateView.post - checking form validity")
+
         if form.is_valid():
-            ic("Form is valid, calling form_valid")
+            # ic("Form is valid, calling form_valid")
             return self.form_valid(form)
         else:
-            ic("Form is invalid, errors:", form.errors)
-            ic("Form data:", form.data)
-            ic("Form instance:", vars(form.instance))
-            ic("Form fields:", form.fields)
+            # ic("Form is invalid, errors:", form.errors)
+            # ic("Form data:", form.data)
+            # ic("Form instance:", vars(form.instance))
+            # ic("Form fields:", form.fields)
             return self.form_invalid(form)
 
 class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
@@ -224,59 +200,88 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             # Try to get the location if we're updating
             location = self.get_object()
             
-            # If place is inactive, create help text about that
-            if self._place and not self._place.is_active:
-                # Check if location is active when it shouldn't be
-                if location and location.is_active:
-                    # Get the list of affected devices before fixing
-                    self._devices_active = list(location.devices.filter(is_active=True).annotate(
-                        sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
-                    ).prefetch_related('sensors'))
-                    
-                    # Fix the inconsistency - set location to inactive
-                    location.is_active = False
-                    location.save()
-                    
-                    # Just log the inconsistency with ic
-                    ic(f"Fixed inconsistency: Location {location.id} ({location.name}) was active "
-                       f"but its Place {self._place.id} ({self._place.name}) is inactive.")
-                    ic(f"Affected devices: {len(self._devices_active)}")
-                
-                # Standard message for inactive place
-                self._inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This location will be inactive because Place "{self._place.name}" is inactive. '
-                    f'All devices within it will not collect data.'
-                    '</div>'
-                )
-            # If location is active, check for active devices
-            elif location and location.is_active:
-                # Get active devices with sensor counts
-                self._devices_active = list(location.devices.filter(is_active=True).annotate(
+            # Get help text based on location active state and its place
+            self._inactive_help_text, self._devices_active = self.get_location_inactive_help_text(location, self._place)
+            
+        except Exception as e:
+            # If we can't get the object yet (e.g., in a GET request before the object exists)
+            # ic(f"Error in LocationUpdateView.setup: {str(e)}")
+            pass
+
+    def get_location_inactive_help_text(self, location, place=None):
+        """
+        Generate help text for location inactive status.
+        
+        Args:
+            location: The location object
+            place: The location's place (optional)
+            
+        Returns:
+            tuple: (help_text, active_devices)
+                - help_text: HTML string with warning message or None
+                - active_devices: list of active devices for this location or []
+        """
+        inactive_help_text = None
+        devices_active = []
+        
+        if not location:
+            return None, []
+            
+        if not place:
+            place = location.place
+            
+        # If place is inactive, create help text about that
+        if place and not place.is_active:
+            # Check if location is active when it shouldn't be
+            if location and location.is_active:
+                # Get the list of affected devices before fixing
+                devices_active = list(location.devices.filter(is_active=True).annotate(
                     sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
                 ).prefetch_related('sensors'))
                 
-                active_device_count = len(self._devices_active)
+                # Fix the inconsistency - set location to inactive
+                location.is_active = False
+                location.save()
                 
-                if active_device_count > 0:
-                    # Generate the list of active devices with their sensor counts
-                    active_devices_list = ''.join([
-                        f'<li><i class="bi bi-hdd-rack text-muted me-1"></i>{device.name} '
-                        f'<small class="text-muted">({device.sensor_count} active sensors)</small></li>'
-                        for device in self._devices_active
-                    ])
-                    
-                    self._inactive_help_text = mark_safe(
-                        '<div class="form-text text-warning-emphasis mt-2">'
-                        f'<i class="bi bi-exclamation-triangle me-2"></i>'
-                        f'This location has {active_device_count} active device{"s" if active_device_count > 1 else ""}:'
-                        f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_devices_list}</ul>'
-                        '</div>'
-                    )
-        except Exception as e:
-            # If we can't get the object yet (e.g., in a GET request before the object exists)
-            ic(f"Error in LocationUpdateView.setup: {str(e)}")
+                # Just log the inconsistency with ic
+                # ic(f"Fixed inconsistency: Location {location.id} ({location.name}) was active "
+                #    f"but its Place {place.id} ({place.name}) is inactive.")
+                # ic(f"Affected devices: {len(devices_active)}")
+            
+            # Standard message for inactive place
+            inactive_help_text = mark_safe(
+                '<div class="form-text text-warning-emphasis mt-2">'
+                '<i class="bi bi-exclamation-triangle me-2"></i>'
+                f'This location will be inactive because Place "{place.name}" is inactive. '
+                f'All devices within it will not collect data.'
+                '</div>'
+            )
+        # If location is active, check for active devices
+        elif location and location.is_active:
+            # Get active devices with sensor counts
+            devices_active = list(location.devices.filter(is_active=True).annotate(
+                sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
+            ).prefetch_related('sensors'))
+            
+            active_device_count = len(devices_active)
+            
+            if active_device_count > 0:
+                # Generate the list of active devices with their sensor counts
+                active_devices_list = ''.join([
+                    f'<li><i class="bi bi-hdd-rack text-muted me-1"></i>{device.name} '
+                    f'<small class="text-muted">({device.sensor_count} active sensors)</small></li>'
+                    for device in devices_active
+                ])
+                
+                inactive_help_text = mark_safe(
+                    '<div class="form-text text-warning-emphasis mt-2">'
+                    f'<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'This location has {active_device_count} active device{"s" if active_device_count > 1 else ""}:'
+                    f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_devices_list}</ul>'
+                    '</div>'
+                )
+        
+        return inactive_help_text, devices_active
 
     def get_initial(self):
         initial = super().get_initial()

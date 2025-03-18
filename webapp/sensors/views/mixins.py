@@ -36,7 +36,7 @@ class PlaceAnnotationMixin:
         try:
             self.place = get_object_or_404(Place, slug=place_slug)
         except Exception as e:
-            ic('-get place error:', e)
+            # ic('-get place error:', e)
             raise ValueError(f"Place with slug {place_slug} not found")
         return self.place
     

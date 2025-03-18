@@ -46,7 +46,7 @@ class PlaceListView(LoginRequiredMixin, ListView):
             map_html = place_map_create(places=self.get_queryset())
             context['place_map_html'] = map_html
         except Exception as e:
-            ic("Error creating place map:", str(e))
+            # ic("Error creating place map:", str(e))
             context['place_map_html'] = ""
         
         return context
@@ -108,7 +108,7 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
-        ic("Toast: PlaceCreateView:", getattr(self.request, 'toast_message', None))
+        # ic("Toast: PlaceCreateView:", getattr(self.request, 'toast_message', None))
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
@@ -191,10 +191,10 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
         
-        ic("PlaceUpdateView setting toast_message:", {
-            'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        })
+        # ic("PlaceUpdateView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+        # })
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
@@ -287,11 +287,12 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
             'type': 'danger'
         })
         
-        ic("PlaceDeleteView setting toast_message:", {
-            'message': message,
-            'type': 'danger'
-        })
+        # ic("PlaceDeleteView setting toast_message:", {
+        #     'message': message,
+        #     'type': 'danger'
+        # })
         
+        # Log the place deletion with place name for debugging
         place.delete()
         
         return HttpResponseRedirect(success_url)
