@@ -1,4 +1,5 @@
 {% load static %}
+{% load debug_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -128,12 +129,17 @@
     </div>
 
         {% block content %}{% endblock %}
+        
+        <!-- Add debug output at the bottom of the page -->
+        {% if debug %}
+            {% debug_context %}
+        {% endif %}
     </div>
     <!-- Toast System Components -->
     {% include "sensors/partials/toast_history_modal.html" %}
     
     <!-- Include toast message container -->
-    {% include "sensors/partials/toast_container.html" %}
+    {% include "sensors/partials/toast_container.html" with toast_message=toast_message toast_messages=toast_messages %}
 
     <footer class="footer mt-auto py-3 bg-light border-top">
         <div class="container">
@@ -159,6 +165,18 @@
         </div>
     </footer>
 
+    <!-- After footer and before script includes -->
+    <!-- Direct Toast Implementation -->
+    {% if toast_message %}
+    <div id="direct-toast-message" style="display:none;">
+        <script type="application/json">
+            {
+                "message": "{{ toast_message.message|safe }}",
+                "type": "{{ toast_message.type }}"
+            }
+        </script>
+    </div>
+    {% endif %}
 
     <!-- Core JavaScript Dependencies -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -188,6 +206,132 @@
 
     <!-- Utilities -->
     <script src="{% static 'sensors/js/time-display.js' %}"></script>
+
+    <!-- Add this script just before closing body tag -->
+    <script>
+        // Direct toast message processing
+        document.addEventListener('DOMContentLoaded', function() {
+            const directToastEl = document.getElementById('direct-toast-message');
+            if (directToastEl) {
+                try {
+                    const scriptEl = directToastEl.querySelector('script');
+                    if (scriptEl) {
+                        const toastData = JSON.parse(scriptEl.innerText);
+                        console.log('Found direct toast message:', toastData);
+                        
+                        // If you have a toast manager function, call it
+                        if (typeof showToast === 'function') {
+                            showToast(toastData.message, toastData.type);
+                        } else {
+                            // Fallback to basic toast
+                            alert(toastData.message);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error processing direct toast:', e);
+                }
+            }
+        });
+    </script>
+
+    <!-- Direct Toast Fallback -->
+    <div id="direct-toast-fallback" style="display:none;">
+    {% if toast_message %}
+        <script type="application/json">
+            {
+                "message": "{{ toast_message.message|safe }}",
+                "type": "{{ toast_message.type }}"
+            }
+        </script>
+    {% endif %}
+    </div>
+
+    <script>
+    // Force process toast message if available
+    document.addEventListener('DOMContentLoaded', function() {
+        // Directly check for toast_message in fallback
+        const directToastEl = document.getElementById('direct-toast-fallback');
+        if (directToastEl) {
+            const scriptEl = directToastEl.querySelector('script');
+            if (scriptEl) {
+                try {
+                    console.log('Checking direct toast fallback');
+                    const toastData = JSON.parse(scriptEl.textContent.trim());
+                    console.log('Found direct toast data:', toastData);
+                    
+                    // Wait a bit for the toast system to initialize
+                    setTimeout(function() {
+                        // First try using toastSystem
+                        if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                            console.log('Using toastSystem.show()');
+                            window.toastSystem.show(toastData);
+                        }
+                        // Then try using showToast 
+                        else if (typeof window.showToast === 'function') {
+                            console.log('Using window.showToast()');
+                            window.showToast(toastData.message, toastData.type);
+                        }
+                        // Finally fall back to creating a toast directly
+                        else {
+                            console.log('Using emergency toast creation');
+                            
+                            // Create toast container if needed
+                            let toastContainer = document.querySelector('.toast-container');
+                            if (!toastContainer) {
+                                toastContainer = document.createElement('div');
+                                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                                toastContainer.style.zIndex = '1050';
+                                document.body.appendChild(toastContainer);
+                            }
+                            
+                            // Create toast element
+                            const toastEl = document.createElement('div');
+                            toastEl.className = `toast text-${toastData.type}`;
+                            toastEl.style.pointerEvents = 'auto';
+                            toastEl.innerHTML = `
+                                <div class="d-flex align-items-center">
+                                    <div class="toast-body d-flex align-items-center flex-grow-1">
+                                        <i class="bi bi-${
+                                            toastData.type === 'success' ? 'check-circle' : 
+                                            toastData.type === 'danger' ? 'exclamation-circle' :
+                                            toastData.type === 'warning' ? 'exclamation-triangle' : 
+                                            'info-circle'
+                                        } me-2"></i>
+                                        <span>${toastData.message}</span>
+                                    </div>
+                                    <button type="button" class="btn-close me-2" data-bs-dismiss="toast"></button>
+                                </div>
+                            `;
+                            
+                            toastContainer.appendChild(toastEl);
+                            
+                            // Show the toast
+                            if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                                const toast = new bootstrap.Toast(toastEl, {
+                                    delay: 5000,
+                                    autohide: true
+                                });
+                                toast.show();
+                            } else {
+                                // Basic fallback
+                                toastEl.style.display = 'block';
+                                toastEl.style.opacity = '1';
+                                
+                                // Remove after 5 seconds
+                                setTimeout(() => {
+                                    toastEl.style.opacity = '0';
+                                    setTimeout(() => toastEl.remove(), 500);
+                                }, 5000);
+                            }
+                        }
+                    }, 500); // Wait 500ms for toast system to initialize
+                } catch (e) {
+                    console.error('Error processing direct toast:', e);
+                }
+            }
+        }
+    }, false);
+    </script>
 
     {% block extra_js %}
     {% endblock %}

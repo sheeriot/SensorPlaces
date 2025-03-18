@@ -127,3 +127,40 @@ class PlaceAnnotationMixin:
         })
         
         return context
+
+class ToastMixin:
+    """Mixin to add toast message helpers to views."""
+    
+    def add_toast(self, message, type='info'):
+        """Add a single toast message."""
+        toast_data = {
+            'message': message,
+            'type': type
+        }
+        
+        # Initialize toast_message as list if doesn't exist
+        if not hasattr(self.request, 'toast_message'):
+            self.request.toast_message = []
+        # If it's a single message, convert to list
+        elif not isinstance(self.request.toast_message, list):
+            self.request.toast_message = [self.request.toast_message]
+            
+        # Add the new toast
+        self.request.toast_message.append(toast_data)
+        return toast_data
+    
+    def add_success_toast(self, message):
+        """Add a success toast message."""
+        return self.add_toast(message, 'success')
+    
+    def add_info_toast(self, message):
+        """Add an info toast message."""
+        return self.add_toast(message, 'info')
+    
+    def add_warning_toast(self, message):
+        """Add a warning toast message."""
+        return self.add_toast(message, 'warning')
+    
+    def add_danger_toast(self, message):
+        """Add a danger toast message."""
+        return self.add_toast(message, 'danger')

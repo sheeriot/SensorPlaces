@@ -2,6 +2,7 @@ from django.urls import resolve
 from django.contrib import messages
 from django.template.response import TemplateResponse
 from django.shortcuts import get_object_or_404
+from django.utils.deprecation import MiddlewareMixin
 
 from .models import Place, ToastNotification
 
@@ -58,6 +59,25 @@ class ToastMiddleware:
         if hasattr(request, 'resolver_match') and request.resolver_match:
             place_slug = request.resolver_match.kwargs.get('place_slug', None)
         
+        # DEBUG: Log request and session information
+        ic("ToastMiddleware process_response", {
+            'path': request.path,
+            'method': request.method,
+            'status_code': response.status_code,
+            'place_slug': place_slug,
+            'has_toast_message': hasattr(request, 'toast_message'),
+            'session_keys': list(request.session.keys()) if hasattr(request, 'session') else None,
+            'has_pending_toast': 'pending_toast' in request.session if hasattr(request, 'session') else False
+        })
+        
+        # Add DIRECT data to the response if it's a redirect with toast
+        if hasattr(request, 'toast_message') and response.status_code in [301, 302]:
+            # Store toast directly in the session for guaranteed access
+            if 'pending_toast' not in request.session:
+                request.session['pending_toast'] = request.toast_message
+                request.session.modified = True
+                ic("Stored toast in pending_toast:", request.toast_message)
+        
         # Initialize context data if using TemplateResponse
         context_data = {}
         if isinstance(response, TemplateResponse):
@@ -69,8 +89,14 @@ class ToastMiddleware:
             
             # Add place_slug to context data
             context_data['place_slug'] = place_slug or 'none'
-            # ic('is template response', place_slug)
-
+            
+            # CHECK FOR PENDING TOAST ON EVERY TEMPLATE RESPONSE
+            if hasattr(request, 'session') and 'pending_toast' in request.session:
+                toast_data = request.session.pop('pending_toast')
+                context_data['toast_message'] = toast_data
+                request.session.modified = True
+                ic("Added pending_toast to template context:", toast_data)
+        
         place = None
         try:
             if place_slug:
@@ -90,44 +116,39 @@ class ToastMiddleware:
             # ic(f"Toast Middleware Error: {e}")
             pass
 
-        toast_data = None
         try:
             # Check for request.toast_message
             if hasattr(request, 'toast_message'):
                 toast_data = request.toast_message
-                # ic("Found toast_message in request:", toast_data)
-
-                # For API responses (JSON), the toast is already included in the response
-                # For other responses, create a ToastNotification record
-                is_json_response = False
-                if hasattr(response, 'headers'):
-                    content_type = response.headers.get('Content-Type', '')
-                    is_json_response = 'application/json' in content_type
-
-                if not is_json_response:
-                    # Create notification in database if we have a valid place and authenticated user
-                    if toast_data and place and hasattr(request, 'user') and request.user.is_authenticated:
-                        notification = ToastNotification.objects.create(
-                            user=request.user,
-                            place=place,
-                            message=toast_data['message'],
-                            type=toast_data['type']
-                        )
-                        # ic("notification:", notification)
-
-                    # For redirect responses (302, 301), store toast in session
-                    if response.status_code in [301, 302]:
-                        if 'pending_toast' not in request.session:
-                            request.session['pending_toast'] = toast_data
-                            request.session.modified = True
-                            # ic("Stored pending_toast in session for redirect:", toast_data)
-                    # For TemplateResponse, add to the context
-                    elif isinstance(response, TemplateResponse):
-                        context_data['toast_message'] = toast_data
-                        # ic("Added toast to template context:", toast_data)
+                ic("Found toast_message in request:", toast_data)
+                
+                # Convert single toast to list if needed
+                if not isinstance(toast_data, list):
+                    toast_data = [toast_data]
+                    
+                # For redirect responses (302, 301), store toasts in session
+                if response.status_code in [301, 302]:
+                    # Initialize toast_messages as a list in session if it doesn't exist
+                    if 'toast_messages' not in request.session:
+                        request.session['toast_messages'] = []
+                        
+                    # Add all toast messages to the session list
+                    request.session['toast_messages'].extend(toast_data)
+                    request.session.modified = True
+                    ic("Stored toast_messages in session for redirect:", request.session['toast_messages'])
+                    
+                # For TemplateResponse, add to the context
+                elif isinstance(response, TemplateResponse):
+                    # Initialize toast_messages as a list in context if it doesn't exist
+                    if 'toast_messages' not in context_data:
+                        context_data['toast_messages'] = []
+                        
+                    # Add all toast messages to the context list
+                    context_data['toast_messages'].extend(toast_data)
+                    ic("Added toast_messages to template context:", toast_data)
 
         except Exception as e:
-            # ic("Create toast notification error:", str(e))
+            ic("Create toast notification error:", str(e))
             pass
 
         try:
@@ -138,32 +159,66 @@ class ToastMiddleware:
             # Handle GET with pending toast (after redirect)
             if request.method == 'GET' and isinstance(response, TemplateResponse):
                 # Handle pending toast from session
-                if 'pending_toast' in request.session:
-                    # ic("Processing pending toast from session:", request.session['pending_toast'])
-                    pending_toast = request.session.pop('pending_toast')
-                    context_data['toast_message'] = pending_toast
+                if 'toast_messages' in request.session:
+                    ic("Processing toast_messages from session:", request.session['toast_messages'])
+                    
+                    # Initialize toast_messages in context if not present
+                    if 'toast_messages' not in context_data:
+                        context_data['toast_messages'] = []
+                        
+                    # Add session messages to context
+                    pending_toasts = request.session.pop('toast_messages')
+                    context_data['toast_messages'].extend(pending_toasts)
                     request.session.modified = True
-                    # ic("Added session toast to template context")
+                    ic("Added session toasts to template context:", pending_toasts)
                 
-                # Update unread count if not already set and we have a place
-                if place and 'toast_unread_count' not in context_data:
-                    user = request.user if hasattr(request, 'user') else None
-                    if user and user.is_authenticated:
-                        unread_count = ToastNotification.get_unread_count(
-                            place=place,
-                            user=user,
-                        )
-                        context_data['toast_unread_count'] = unread_count
-                        # ic("unread_count:", unread_count)
-
+                # Debug the final template context structure
+                if hasattr(response, 'context_data') and response.context_data is not None:
+                    ic("Final context_data keys:", list(response.context_data.keys()))
+                    if response.context_data and 'toast_messages' in response.context_data:
+                        ic("toast_messages in context:", response.context_data['toast_messages'])
+                
         except Exception as e:
-            # ic("get unread count error:", str(e))
-            pass
-
+            ic("Error in process_response:", str(e))
+            # Don't pass so we can see the error
+        
+        # DEBUGGING: Final check of context_data
+        if isinstance(response, TemplateResponse):
+            ic("Final context_data keys:", list(context_data.keys()))
+            if 'toast_message' in context_data:
+                ic("toast_message in final context:", context_data['toast_message'])
+        
         return response
 
     def process_template_response(self, request, response):
         # Only handle template-specific operations here
         if isinstance(response, TemplateResponse) and not hasattr(response, 'context_data'):
             response.context_data = {}
+        return response
+
+class ToastDebugMiddleware(MiddlewareMixin):
+    """Debug middleware to check if toast_message is present in the rendered HTML."""
+    
+    def process_response(self, request, response):
+        # Only check HTML responses
+        if hasattr(response, 'content') and b'<html' in response.content[:1000]:
+            content = response.content.decode('utf-8')
+            
+            # Check if toast message is in the context
+            has_toast_message = 'pending_toast' in request.session if hasattr(request, 'session') else False
+            
+            # Check if the toast container is in the HTML
+            has_toast_container = 'id="toast-messages"' in content
+            
+            # Check if any server-toast-message is in the HTML
+            has_server_toast = 'server-toast-message' in content
+            
+            # Log the results
+            ic("ToastDebugMiddleware: Response check", {
+                'path': request.path,
+                'has_toast_message_in_session': has_toast_message,
+                'has_toast_container_in_html': has_toast_container,
+                'has_server_toast_in_html': has_server_toast,
+            })
+            
         return response

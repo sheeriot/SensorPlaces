@@ -1,6 +1,6 @@
 // Configuration
 const activeStatusConfig = {
-    debug: true  // Set to false to disable verbose logging
+    debug: false  // Set to false to disable verbose logging
 };
 
 function initializeActiveStatusCheckbox() {

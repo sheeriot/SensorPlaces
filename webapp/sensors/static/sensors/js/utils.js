@@ -255,3 +255,37 @@ if (utilsConfig.debug) {
         }
     });
 }
+
+// Add toast message utility to utils
+window.utils.addToast = function(message, type = 'info') {
+    // Create a toast message
+    const toastData = {
+        message: message,
+        type: type
+    };
+    
+    // Add to the system if available
+    if (window.toastSystem) {
+        window.toastSystem.show(toastData);
+    } else {
+        console.warn("Toast system not available, storing for later");
+        // Store for later processing
+        window._pendingToasts = window._pendingToasts || [];
+        window._pendingToasts.push(toastData);
+    }
+};
+
+// Add ability to add multiple toasts at once
+window.utils.addToasts = function(toastArray) {
+    if (!Array.isArray(toastArray)) {
+        console.error("addToasts requires an array of toast objects");
+        return;
+    }
+    
+    // Process with a slight delay between each toast
+    toastArray.forEach((toast, index) => {
+        setTimeout(() => {
+            window.utils.addToast(toast.message, toast.type);
+        }, index * 300); // 300ms delay between toasts
+    });
+};

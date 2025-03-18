@@ -11,7 +11,7 @@ from django.utils.safestring import mark_safe
 
 from ..models import Place, Location, Device, Sensor
 from ..forms import LocationForm
-from .mixins import PlaceAnnotationMixin
+from .mixins import PlaceAnnotationMixin, ToastMixin
 
 import json
 from decimal import Decimal
@@ -181,7 +181,32 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             # ic("Form fields:", form.fields)
             return self.form_invalid(form)
 
-class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
+    def add_toast_message(self, message, type='info'):
+        """Add a toast message to the request.
+        
+        Args:
+            message: HTML message to display
+            type: success, info, warning, or danger
+        """
+        toast_data = {
+            'message': message,
+            'type': type
+        }
+        
+        # Initialize toast_message list if it doesn't exist
+        if not hasattr(self.request, 'toast_message'):
+            self.request.toast_message = []
+        
+        # If it's a single message (not a list), convert to list
+        elif not isinstance(self.request.toast_message, list):
+            self.request.toast_message = [self.request.toast_message]
+        
+        # Add the new toast message
+        self.request.toast_message.append(toast_data)
+        
+        return toast_data
+
+class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, UpdateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
@@ -362,13 +387,27 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
         
         # Set toast message directly on request for middleware
-        setattr(self.request, 'toast_message', {
+        toast_message = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
-        })
+        }
+        
+        # Debug statements
+        ic("⚠️ Setting toast_message on request:", toast_message)
+        
+        # Set on request
+        setattr(self.request, 'toast_message', toast_message)
+        
+        # ALSO set directly in session for reliability
+        if hasattr(self.request, 'session'):
+            self.request.session['pending_toast'] = toast_message
+            self.request.session.modified = True
+            ic("⚠️ Also set pending_toast in session")
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
+        ic("⚠️ Redirecting to:", success_url)
+        
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):

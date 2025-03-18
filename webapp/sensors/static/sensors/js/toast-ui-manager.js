@@ -9,7 +9,7 @@
 
 // System Configuration
 const toastConfig = {
-    debug: false,  // Set to true to enable debug mode
+    debug: true,  // Set to true to enable debug mode
     // apiEndpoint: (placeSlug) => `/api/${placeSlug}/toasts/`,
 };
 
@@ -170,12 +170,12 @@ const createToastSystem = () => {
                                 bootstrap.Modal.getInstance(document.getElementById('mark-all-read-modal')).hide();
                             }
                         } catch (error) {
-                            console.error('Error marking all as read:', error);
+                            if (toastConfig.debug) console.error('Error marking all as read:', error);
                         }
                     });
 
                 } catch (error) {
-                    console.error('Error loading toast history:', error);
+                    if (toastConfig.debug) console.error('Error loading toast history:', error);
                     const historyList = historyModal.querySelector('#toastHistoryList');
                     if (historyList) {
                             historyList.innerHTML = `
@@ -353,7 +353,7 @@ const createToastSystem = () => {
                     // Get template once
                     const template = document.getElementById('toast-history-item-template');
                     if (!template) {
-                        console.error('[Toast Manager] Template not found');
+                        if (toastConfig.debug) console.error('[Toast Manager] Template not found');
                         return;
                     }
 
@@ -431,7 +431,7 @@ const createToastSystem = () => {
                                     }
                                 }
                             } catch (error) {
-                                console.error('Error marking toast as read:', error);
+                                if (toastConfig.debug) console.error('Error marking toast as read:', error);
                                 event.target.checked = false;
                             }
                         });
@@ -479,13 +479,13 @@ const createToastSystem = () => {
                                     }
                                 }
                             } catch (error) {
-                                console.error('Error marking all as read:', error);
+                                if (toastConfig.debug) console.error('Error marking all as read:', error);
                             }
                         };
                     }
                 }
             } catch (error) {
-                console.error('Error loading toast history:', error);
+                if (toastConfig.debug) console.error('Error loading toast history:', error);
                 historyList.innerHTML = `
                     <div class="text-center text-danger py-5">
                         <i class="bi bi-exclamation-circle fs-1 d-block mb-3"></i>
@@ -558,33 +558,152 @@ window.ToastEvents = {
     CLEAR: 'sensors:toast:clear'
 };
 
-// Process server-side toast messages
+// Process server-side toast messages with extra debugging
 const processServerToast = () => {
+    if (toastConfig.debug) console.log('[Toast Manager] Processing server toasts');
+    
     const toastContainer = document.getElementById('toast-messages');
-    if (!toastContainer) return;
+    if (!toastContainer) {
+        if (toastConfig.debug) console.warn('[Toast Manager] Toast container not found');
+        return;
+    }
+
+    // Log the raw HTML content of the toast container for debugging
+    if (toastConfig.debug) {
+        console.log('[Toast Manager] Toast container raw HTML:', toastContainer.innerHTML);
+        
+        // Also check content of any script tags
+        const scripts = toastContainer.querySelectorAll('script');
+        if (scripts.length > 0) {
+            Array.from(scripts).forEach((script, i) => {
+                console.log(`[Toast Manager] Script ${i} content:`, script.textContent);
+            });
+        } else {
+            console.warn('[Toast Manager] No script tags found in toast container');
+        }
+    }
 
     const serverToastElements = toastContainer.querySelectorAll('.server-toast-message');
     if (toastConfig.debug) console.log('[Toast Manager] Found server toasts:', serverToastElements.length);
 
-    Array.from(serverToastElements).forEach(toastMessage => {
+    if (serverToastElements.length === 0) {
+        // Check for direct toast data - as an emergency fallback
+        if (toastConfig.debug) console.log('[Toast Manager] Checking for direct toast data');
+        const directToast = document.getElementById('direct-toast-fallback');
+        if (directToast && directToast.querySelector('script')) {
+            try {
+                const directScript = directToast.querySelector('script');
+                const directData = JSON.parse(directScript.textContent);
+                if (toastConfig.debug) console.log('[Toast Manager] Found direct toast data:', directData);
+                if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                    window.toastSystem.show(directData);
+                } else if (window.showToast) {
+                    window.showToast(directData.message, directData.type);
+                }
+            } catch (e) {
+                if (toastConfig.debug) console.error('[Toast Manager] Error processing direct toast:', e);
+            }
+        }
+        return;
+    }
+
+    // Process all server toast messages
+    Array.from(serverToastElements).forEach((toastMessage, index) => {
         if (toastMessage.getAttribute('data-processed') === 'true') return;
 
-        const toastScript = toastMessage.querySelector('script[type="application/json"]');
+        const toastScript = toastMessage.querySelector('script');
         if (toastScript && window.toastSystem) {
             try {
+                if (toastConfig.debug) console.log(`[Toast Manager] Processing toast ${index}, content:`, toastScript.textContent.trim());
+                
                 const toastData = JSON.parse(toastScript.textContent);
+                if (toastConfig.debug) console.log(`[Toast Manager] Parsed toast ${index}:`, toastData);
+                
                 toastData.addToHistory = false;  // Badge count is already in template
-                window.toastSystem.show(toastData);
+                
+                // Add a slight delay between toasts
+                setTimeout(() => {
+                    if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                        window.toastSystem.show(toastData);
+                    } else if (window.showToast) {
+                        window.showToast(toastData.message, toastData.type);
+                    }
+                }, index * 300);
+                
                 toastMessage.setAttribute('data-processed', 'true');
+                
+                if (toastConfig.debug) console.log(`[Toast Manager] Toast ${index} successfully processed`);
             } catch (e) {
-                console.error('[Toast Manager] Error processing toast:', e);
+                if (toastConfig.debug) console.error(`[Toast Manager] Error processing toast ${index}:`, e, toastScript.textContent);
             }
+        } else {
+            if (toastConfig.debug) console.warn(`[Toast Manager] Toast ${index} has no script or toastSystem not available`);
         }
     });
 };
 
-if (toastConfig.debug) console.log('Toast UI Manager script loaded', {
+// Debug toast container on page load - THESE ARE THE LOGS WE NEED TO FIX
+document.addEventListener('DOMContentLoaded', function() {
+    if (!toastConfig.debug) return; // Only run if debug is enabled
+    
+    console.log("[Toast Manager] Toast UI Manager initialized");
+    
+    // Debug toast elements
+    const toastContainer = document.getElementById('toast-messages');
+    if (toastContainer) {
+        console.log("[Toast Manager] Toast container found:", toastContainer);
+        
+        // Check for server toast messages
+        const serverToasts = toastContainer.querySelectorAll('.server-toast-message[data-processed="false"]');
+        console.log("[Toast Manager] Found server toast messages:", serverToasts.length);
+        
+        // Output the contents of each server toast
+        serverToasts.forEach((toast, index) => {
+            try {
+                const script = toast.querySelector('script');
+                if (script) {
+                    console.log(`[Toast Manager] Toast ${index} content:`, script.textContent.trim());
+                    try {
+                        const jsonContent = JSON.parse(script.textContent.trim());
+                        console.log(`[Toast Manager] Toast ${index} parsed:`, jsonContent);
+                    } catch (parseErr) {
+                        console.error(`[Toast Manager] Error parsing toast ${index} JSON:`, parseErr);
+                    }
+                }
+            } catch (e) {
+                console.error(`[Toast Manager] Error processing toast ${index}:`, e);
+            }
+        });
+    } else {
+        console.warn("[Toast Manager] Toast container not found!");
+    }
+    
+    // Check for direct toast message
+    const directToast = document.getElementById('direct-toast-message');
+    if (directToast) {
+        console.log("[Toast Manager] Direct toast found:", directToast);
+    }
+});
+
+if (toastConfig.debug) console.log('[Toast Manager] Toast UI Manager script loaded', {
     readyState: document.readyState,
     toastSystemAvailable: !!window.toastSystem,
     eventsExported: !!window.ToastEvents
+});
+
+// Add emergency toast processing with debug check
+document.addEventListener('DOMContentLoaded', function() {
+    if (!toastConfig.debug) return; // Only log if debug is enabled
+    
+    setTimeout(() => {
+        try {
+            if (!window.toastSystem) {
+                console.log('[Toast Manager] No toast system found after timeout, creating emergency instance');
+                createToastSystem().initialize();
+                processServerToast();
+            }
+        } catch (e) {
+            console.error('[Toast Manager] Error in emergency toast processing:', e);
+        }
+    }, 1000);
 }); 

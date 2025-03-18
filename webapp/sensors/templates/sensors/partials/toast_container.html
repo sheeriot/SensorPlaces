@@ -1,5 +1,29 @@
+<!-- Add this at the top of your toast_container.html for debugging -->
+<!-- Toast data available: {{ toast_message|yesno:"Yes,No" }} -->
+
+<!-- Toast Container Debug Info -->
+<!-- Toast available: direct={{ toast_message|yesno:"Yes,No" }}, pending={{ request.session.pending_toast|yesno:"Yes,No" }} -->
+
+<!-- Display debug info in an HTML comment -->
+<!-- 
+Debug info:
+- toast_messages count: {{ toast_messages|length|default:"0" }}
+- Individual messages: {% for msg in toast_messages %}[{{ msg.type }}: {{ msg.message|truncatechars:20 }}]{% if not forloop.last %}, {% endif %}{% endfor %}
+-->
+
 <!-- Toast Message Container -->
 <div id="toast-messages" class="d-none">
+    {% if toast_message %}
+        <div class="server-toast-message" data-processed="false">
+            <script type="application/json">
+                {
+                    "message": "{{ toast_message.message|safe }}",
+                    "type": "{{ toast_message.type }}"
+                }
+            </script>
+        </div>
+    {% endif %}
+
     {% if messages %}
         {% for message in messages %}
             <div class="server-toast-message" data-processed="false">
@@ -10,14 +34,16 @@
         {% endfor %}
     {% endif %}
 
-    {% if toast_message %}
-        <div class="server-toast-message" data-processed="false">
-            <script type="application/json">
-                {
-                    "message": "{{ toast_message.message|safe }}",
-                    "type": "{{ toast_message.type }}"
-                }
-            </script>
-        </div>
+    {% if toast_messages %}
+        {% for toast_message in toast_messages %}
+            <div class="server-toast-message" data-processed="false">
+                <script type="application/json">
+                    {
+                        "message": "{{ toast_message.message|safe }}",
+                        "type": "{{ toast_message.type }}"
+                    }
+                </script>
+            </div>
+        {% endfor %}
     {% endif %}
 </div>
