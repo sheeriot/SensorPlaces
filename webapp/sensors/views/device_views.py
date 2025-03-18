@@ -250,59 +250,87 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             device = self.get_object()
             location = device.location
             
-            # If location is inactive, create help text about that
-            if location and not location.is_active:
-                # Check if device is active when it shouldn't be
-                if device and device.is_active:
-                    # Get the list of affected sensors before fixing
-                    self._sensors_active = list(device.sensors.filter(is_active=True).annotate(
-                        reading_count=Count('readings')
-                    ).prefetch_related('sensors'))
-                    
-                    # Fix the inconsistency - set device to inactive
-                    device.is_active = False
-                    device.save()
-                    
-                    # Just log the inconsistency with ic
-                    ic(f"Fixed inconsistency: Device {device.id} ({device.name}) was active "
-                       f"but its Location {location.id} ({location.name}) is inactive.")
-                    ic(f"Affected sensors: {len(self._sensors_active)}")
-                
-                # Standard message for inactive location
-                self._inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This device will be inactive because Location "{location.name}" is inactive.'
-                    '</div>'
-                )
-            # Remove place.is_active check - we only care about the parent location
-            # If device is active, check for active sensors
-            elif device and device.is_active:
-                # Get active sensors with reading counts
-                self._sensors_active = list(device.sensors.filter(is_active=True).annotate(
+            # Get help text based on device active state and its location
+            self._inactive_help_text, self._sensors_active = self.get_device_inactive_help_text(device, location)
+            
+        except Exception as e:
+            # If we can't get the object yet (e.g., in a GET request before the object exists)
+            # ic(f"Error in DeviceUpdateView.setup: {str(e)}")
+            pass
+
+    def get_device_inactive_help_text(self, device, location=None):
+        """
+        Generate help text for device inactive status.
+        
+        Args:
+            device: The device object
+            location: The device's location (optional)
+            
+        Returns:
+            tuple: (help_text, active_sensors)
+                - help_text: HTML string with warning message or None
+                - active_sensors: list of active sensors for this device or []
+        """
+        inactive_help_text = None
+        sensors_active = []
+        
+        if not device:
+            return None, []
+            
+        if not location:
+            location = device.location
+            
+        # If location is inactive, create help text about that
+        if location and not location.is_active:
+            # Check if device is active when it shouldn't be
+            if device and device.is_active:
+                # Get the list of affected sensors before fixing
+                sensors_active = list(device.sensors.filter(is_active=True).annotate(
                     reading_count=Count('readings')
                 ).prefetch_related('sensors'))
                 
-                active_sensor_count = len(self._sensors_active)
+                # Fix the inconsistency - set device to inactive
+                device.is_active = False
+                device.save()
                 
-                if active_sensor_count > 0:
-                    # Generate the list of active sensors with their reading counts
-                    active_sensors_list = ''.join([
-                        f'<li><i class="bi bi-thermometer text-muted me-1"></i>{sensor.name} '
-                        f'<small class="text-muted">({sensor.reading_count} readings)</small></li>'
-                        for sensor in self._sensors_active
-                    ])
-                    
-                    self._inactive_help_text = mark_safe(
-                        '<div class="form-text text-warning-emphasis mt-2">'
-                        f'<i class="bi bi-exclamation-triangle me-2"></i>'
-                        f'This device has {active_sensor_count} active sensor{"s" if active_sensor_count > 1 else ""}:'
-                        f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_sensors_list}</ul>'
-                        '</div>'
-                    )
-        except Exception as e:
-            # If we can't get the object yet (e.g., in a GET request before the object exists)
-            ic(f"Error in DeviceUpdateView.setup: {str(e)}")
+                # Just log the inconsistency with ic
+                # ic(f"Fixed inconsistency: Device {device.id} ({device.name}) was active "
+                #    f"but its Location {location.id} ({location.name}) is inactive.")
+                # ic(f"Affected sensors: {len(sensors_active)}")
+            
+            # Standard message for inactive location
+            inactive_help_text = mark_safe(
+                '<div class="form-text text-warning-emphasis mt-2">'
+                '<i class="bi bi-exclamation-triangle me-2"></i>'
+                f'This device will be inactive because Location "{location.name}" is inactive.'
+                '</div>'
+            )
+        # If device is active, check for active sensors
+        elif device and device.is_active:
+            # Get active sensors with reading counts
+            sensors_active = list(device.sensors.filter(is_active=True).annotate(
+                reading_count=Count('readings')
+            ).prefetch_related('sensors'))
+            
+            active_sensor_count = len(sensors_active)
+            
+            if active_sensor_count > 0:
+                # Generate the list of active sensors with their reading counts
+                active_sensors_list = ''.join([
+                    f'<li><i class="bi bi-thermometer text-muted me-1"></i>{sensor.name} '
+                    f'<small class="text-muted">({sensor.reading_count} readings)</small></li>'
+                    for sensor in sensors_active
+                ])
+                
+                inactive_help_text = mark_safe(
+                    '<div class="form-text text-warning-emphasis mt-2">'
+                    f'<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'This device has {active_sensor_count} active sensor{"s" if active_sensor_count > 1 else ""}:'
+                    f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_sensors_list}</ul>'
+                    '</div>'
+                )
+        
+        return inactive_help_text, sensors_active
 
     def get_initial(self):
         initial = super().get_initial()
@@ -407,7 +435,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-            'place': self._place
+            'place_id': self._place.pk  # Use the primary key instead of the object
         })
         
         # Get the success URL and return HttpResponseRedirect
@@ -439,8 +467,20 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             else:
                 self._inactive_help_text = None
         except Exception as e:
-            ic(f"Error in DeviceDeleteView.setup: {str(e)}")
+            # ic(f"Error in DeviceDeleteView.setup: {str(e)}")
             self._inactive_help_text = None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add place to context for template
+        context['place'] = self._place
+        
+        # Get the device's location
+        device = self.get_object()
+        if device and hasattr(device, 'location'):
+            context['location'] = device.location
+            
+        return context
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()

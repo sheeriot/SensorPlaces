@@ -203,12 +203,40 @@ const toggleActiveManager = {
             }
             
             if (response.success || response.status === 'success') {
-                // Find all rows that match this model type and ID
+                // Find all elements that match this model type and ID
+                const wrappers = document.querySelectorAll(`.toggle-button-wrapper[data-${modelType}-id="${id}"]`);
                 const rows = document.querySelectorAll(`[data-${modelType}-id="${id}"]`);
                 
                 // Find the hideInactive state for this model type
                 const hideInactiveState = this.getHideInactiveState(modelType);
                 
+                // Update all toggle buttons
+                const toggleButtons = document.querySelectorAll(`.toggle-${modelType}-active[data-${modelType}-id="${id}"]`);
+                toggleButtons.forEach(button => {
+                    // Update button state
+                    button.setAttribute('data-current-status', response.is_active.toString());
+                    button.setAttribute('aria-pressed', response.is_active.toString());
+                    if (response.is_active) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                    
+                    // Update status label
+                    const statusLabel = button.querySelector('.status-label');
+                    if (statusLabel) {
+                        statusLabel.textContent = response.is_active ? 'Active' : 'Inactive';
+                        statusLabel.classList.toggle('text-success', response.is_active);
+                        statusLabel.classList.toggle('text-danger', !response.is_active);
+                    }
+                });
+                
+                // Update wrapper attributes
+                wrappers.forEach(wrapper => {
+                    wrapper.setAttribute(`data-${modelType}-active`, response.is_active.toString());
+                });
+                
+                // Update other elements with the same data attribute
                 rows.forEach(row => {
                     if (toggleActiveConfig.debug) {
                         console.group('Updating row');
@@ -242,36 +270,15 @@ const toggleActiveManager = {
                         }
                     }
 
-                    // Update toggle text - FIXED SELECTOR
-                    const statusLabel = row.tagName.toLowerCase() === 'input' 
-                        ? row.parentElement.querySelector('.status-label')  // If row is the input, look for sibling label
-                        : row.querySelector('.status-label');              // Otherwise look within the row
-                        
-                    if (statusLabel) {
-                        if (toggleActiveConfig.debug) {
-                            console.group('Status Label Update');
-                            console.debug('Found status label:', statusLabel);
+                    // Update any other status labels inside the row
+                    const statusLabels = row.querySelectorAll('.status-label');
+                    statusLabels.forEach(label => {
+                        if (!label.closest('.toggle-active-button')) { // Skip labels inside toggle buttons
+                            label.textContent = response.is_active ? 'Active' : 'Inactive';
+                            label.classList.toggle('text-success', response.is_active);
+                            label.classList.toggle('text-danger', !response.is_active);
                         }
-
-                        statusLabel.textContent = response.is_active ? 'Active' : 'inactive';
-                        statusLabel.classList.toggle('text-success', response.is_active);
-                        statusLabel.classList.toggle('text-danger', !response.is_active);
-
-                        if (toggleActiveConfig.debug) {
-                            console.debug('Updated to:', {
-                                text: statusLabel.textContent,
-                                classes: Array.from(statusLabel.classList)
-                            });
-                            console.groupEnd();
-                        }
-                    } else if (toggleActiveConfig.debug) {
-                        console.warn('Status label not found for:', {
-                            type: modelType,
-                            id,
-                            row,
-                            parentElement: row.parentElement
-                        });
-                    }
+                    });
 
                     // Handle device detail card if it exists
                     if (modelType === 'device') {
@@ -310,11 +317,6 @@ const toggleActiveManager = {
                                         }
                                     });
                                 }
-                            } else if (toggleActiveConfig.debug) {
-                                console.warn('Badge not found in device card:', {
-                                    deviceCard,
-                                    selector: '.isactive-badge span.badge'
-                                });
                             }
 
                             if (toggleActiveConfig.debug) {
@@ -330,64 +332,6 @@ const toggleActiveManager = {
                         }
                     }
 
-                    // Handle child toggles based on parent type
-                    if (modelType === 'location') {
-                        // Find all device toggles within this location
-                        const deviceToggles = document.querySelectorAll(`.toggle-device-active[data-location-id="${id}"]`);
-                        deviceToggles.forEach(toggle => {
-                            const toggleContainer = toggle.closest('.form-check');
-                            if (toggleContainer) {
-                                if (response.is_active) {
-                                    toggleContainer.classList.remove('d-none');
-                                    toggle.disabled = false;
-                                } else {
-                                    toggleContainer.classList.add('d-none');
-                                    toggle.disabled = true;
-                                }
-                            }
-                        });
-
-                        // Update status badges visibility
-                        const statusBadges = document.querySelectorAll(`[data-location-id="${id}"] .isactive-badge .badge`);
-                        statusBadges.forEach(badge => {
-                            if (response.is_active) {
-                                badge.classList.add('d-none');
-                            } else {
-                                badge.classList.remove('d-none');
-                            }
-                        });
-                    } else if (modelType === 'device') {
-                        // Find all sensor toggles within this device
-                        const sensorToggles = document.querySelectorAll(`.toggle-sensor-active[data-device-id="${id}"]`);
-                        sensorToggles.forEach(toggle => {
-                            const toggleContainer = toggle.closest('.form-check');
-                            if (toggleContainer) {
-                                if (response.is_active) {
-                                    toggleContainer.classList.remove('d-none');
-                                    toggle.disabled = false;
-                                } else {
-                                    toggleContainer.classList.add('d-none');
-                                    toggle.disabled = true;
-                                }
-                            }
-                        });
-
-                        // Update status badges visibility
-                        const sensorStatusBadges = document.querySelectorAll(`[data-device-id="${id}"] .isactive-badge .badge`);
-                        sensorStatusBadges.forEach(badge => {
-                            if (response.is_active) {
-                                badge.classList.add('d-none');
-                            } else {
-                                badge.classList.remove('d-none');
-                            }
-                        });
-                    }
-
-                    // Handle map markers if this is a place toggle
-                    if (modelType === 'place') {
-                        this.updateMapMarkers(id, response.is_active, hideInactiveState);
-                    }
-
                     if (toggleActiveConfig.debug) {
                         console.debug('Row after update:', {
                             classes: Array.from(row.classList),
@@ -398,13 +342,17 @@ const toggleActiveManager = {
                     }
                 });
 
-                // Find and update all toggle switches for this type/id
-                const toggles = document.querySelectorAll(`.toggle-${modelType}-active[data-${modelType}-id="${id}"]`);
-                toggles.forEach(toggle => {
-                    if (toggle.tagName.toLowerCase() === 'input') {
-                        toggle.checked = response.is_active;
-                    }
-                });
+                // Handle child toggles based on parent type
+                if (modelType === 'location') {
+                    this.updateChildTogglesForLocation(id, response.is_active);
+                } else if (modelType === 'device') {
+                    this.updateChildTogglesForDevice(id, response.is_active);
+                }
+
+                // Handle map markers if this is a place toggle
+                if (modelType === 'place') {
+                    this.updateMapMarkers(id, response.is_active, hideInactiveState);
+                }
 
                 return response;
             } else if (response.status === 'warning') {
@@ -614,30 +562,72 @@ const toggleActiveManager = {
         const modalComponents = this.createToggleModal('location');
         
         document.querySelectorAll('.toggle-location-active').forEach(toggle => {
-            if (toggle.tagName.toLowerCase() === 'button') return; // Skip buttons, they're handled separately
+            // Clean up any old handlers
+            toggle.removeEventListener('click', toggle._clickHandler);
             
-            const oldHandler = toggle._changeHandler;
-            if (oldHandler) toggle.removeEventListener('change', oldHandler);
-
-            const changeHandler = async function(e) {
+            // Create new click handler
+            const clickHandler = async function(e) {
                 e.preventDefault();
                 
                 const locationId = this.dataset.locationId;
                 const placeSlug = this.dataset.placeSlug;
-                const newStatus = this.checked;
-                const toggleElement = this;
-
-                // Find the parent row to get the names
-                const row = document.querySelector(`tr[data-location-id="${locationId}"]`);
-                const locationName = row.dataset.locationName;
-                const placeName = row.dataset.placeName;
-
-                this.checked = !newStatus;
+                const currentStatus = this.getAttribute('aria-pressed') === 'true' || 
+                                     this.dataset.currentStatus === 'true';
+                const newStatus = !currentStatus;
                 
-                modalComponents.messageEl.innerHTML = newStatus ? 
-                    `Are you sure you want to Activate <i class='bi bi-geo-alt'></i> ${locationName} at <i class='bi bi-house-gear'></i> ${placeName}?` : 
-                    `Are you sure you want to Deactivate <i class='bi bi-geo-alt'></i> ${locationName} at <i class='bi bi-house-gear'></i> ${placeName}?`;
+                // Find the location name
+                const wrapper = this.closest('.toggle-button-wrapper');
+                let locationName = 'this location';
+                
+                // Try to find location name in parent row or from label
+                const row = this.closest('tr, [data-location-name]');
+                if (row && row.dataset.locationName) {
+                    locationName = row.dataset.locationName;
+                } else {
+                    // Try to find from a nearby element with location-name class
+                    const nameEl = document.querySelector(`.location-name[data-location-id="${locationId}"]`);
+                    if (nameEl) {
+                        locationName = nameEl.textContent.trim();
+                    }
+                }
+                
+                let message = newStatus ? 
+                    `Are you sure you want to Activate <i class='bi bi-geo-alt'></i> ${locationName}?` : 
+                    `Are you sure you want to Deactivate <i class='bi bi-geo-alt'></i> ${locationName}?`;
 
+                // For deactivation, add info about active devices that will be deactivated
+                if (!newStatus) {
+                    // Find all active devices for this location
+                    const activeDevices = Array.from(document.querySelectorAll(`.toggle-device-active[data-location-id="${locationId}"]`))
+                        .filter(deviceToggle => {
+                            return deviceToggle.classList.contains('active') || 
+                                   deviceToggle.getAttribute('aria-pressed') === 'true' ||
+                                   deviceToggle.dataset.currentStatus === 'true';
+                        })
+                        .map(deviceToggle => {
+                            // Try to find device name
+                            const deviceRow = deviceToggle.closest('tr, [data-device-name]');
+                            if (deviceRow && deviceRow.dataset.deviceName) {
+                                return deviceRow.dataset.deviceName;
+                            }
+                            
+                            const deviceNameEl = deviceToggle.querySelector('.device-name') || 
+                                                document.querySelector(`.device-name[data-device-id="${deviceToggle.dataset.deviceId}"]`);
+                            return deviceNameEl ? deviceNameEl.textContent.trim() : null;
+                        })
+                        .filter(name => name); // Remove any null/undefined entries
+
+                    if (activeDevices.length > 0) {
+                        message += '<br><br>The following active devices will be deactivated:<ul class="mb-0">';
+                        activeDevices.forEach(deviceName => {
+                            message += `<li>${deviceName}</li>`;
+                        });
+                        message += '</ul>';
+                        message += '<br><small class="text-muted">All sensors in these devices will also be deactivated.</small>';
+                    }
+                }
+                
+                modalComponents.messageEl.innerHTML = message;
                 modalComponents.confirmBtn.disabled = false;
                 modalComponents.spinner.classList.add('d-none');
                 
@@ -650,8 +640,9 @@ const toggleActiveManager = {
                     try {
                         const result = await toggleActiveManager.toggleStatus('location', locationId, placeSlug);
                         if (result) {
-                            toggleElement.checked = result.is_active;
                             modalComponents.modal.hide();
+                            // Use the handleToggleResponse to process the response
+                            toggleActiveManager.handleToggleResponse(result);
                         }
                     } finally {
                         modalComponents.confirmBtn.disabled = false;
@@ -663,8 +654,8 @@ const toggleActiveManager = {
                 modalComponents.confirmBtn.addEventListener('click', handleConfirm, { once: true });
             };
 
-            toggle._changeHandler = changeHandler;
-            toggle.addEventListener('change', changeHandler);
+            toggle._clickHandler = clickHandler;
+            toggle.addEventListener('click', clickHandler);
         });
     },
 
@@ -672,53 +663,74 @@ const toggleActiveManager = {
         const modalComponents = this.createToggleModal('device');
         
         document.querySelectorAll('.toggle-device-active').forEach(toggle => {
-            if (toggle.tagName.toLowerCase() === 'button') return; // Skip buttons, they're handled separately
+            // Clean up any old handlers
+            toggle.removeEventListener('click', toggle._clickHandler);
             
-            const oldHandler = toggle._changeHandler;
-            if (oldHandler) toggle.removeEventListener('change', oldHandler);
-
-            const changeHandler = async function(e) {
+            // Create new click handler
+            const clickHandler = async function(e) {
                 e.preventDefault();
                 
                 const deviceId = this.dataset.deviceId;
                 const placeSlug = this.dataset.placeSlug;
-                const newStatus = this.checked;
-                const toggleElement = this;
-
-                this.checked = !newStatus;
+                const currentStatus = this.getAttribute('aria-pressed') === 'true' || 
+                                     this.dataset.currentStatus === 'true';
+                const newStatus = !currentStatus;
                 
+                // Find the device name
+                let deviceName = 'this device';
+                
+                // Try to find device name in parent row or from label
+                const row = this.closest('tr, [data-device-name]');
+                if (row && row.dataset.deviceName) {
+                    deviceName = row.dataset.deviceName;
+                } else {
+                    // Try to find from a nearby element with device-name class
+                    const nameEl = this.querySelector('.device-name') || 
+                                  document.querySelector(`.device-name[data-device-id="${deviceId}"]`);
+                    if (nameEl) {
+                        deviceName = nameEl.textContent.trim();
+                    }
+                }
+                
+                let message = '';
                 if (newStatus) {
-                    modalComponents.messageEl.textContent = 'Are you sure you want to activate this device? This will allow its sensors to be activated.';
-                    showModal();
+                    message = `Are you sure you want to activate <i class='bi bi-hdd-rack'></i> ${deviceName}?<br><small class="text-muted">This will allow its sensors to be activated.</small>`;
                 } else {
                     // Find all active sensors for this device
                     const activeSensors = Array.from(document.querySelectorAll(`.toggle-sensor-active[data-device-id="${deviceId}"]`))
-                        .filter(sensor => sensor.checked)
-                        .map(sensor => {
-                            const row = sensor.closest('tr');
-                            return row ? row.querySelector('.sensor-name')?.textContent?.trim() : null;
+                        .filter(sensorToggle => {
+                            return sensorToggle.classList.contains('active') || 
+                                   sensorToggle.getAttribute('aria-pressed') === 'true' ||
+                                   sensorToggle.dataset.currentStatus === 'true';
+                        })
+                        .map(sensorToggle => {
+                            // Try to find sensor name
+                            const sensorRow = sensorToggle.closest('tr, [data-sensor-name]');
+                            if (sensorRow && sensorRow.dataset.sensorName) {
+                                return sensorRow.dataset.sensorName;
+                            }
+                            
+                            const sensorNameEl = sensorToggle.querySelector('.sensor-name') || 
+                                               document.querySelector(`.sensor-name[data-sensor-id="${sensorToggle.dataset.sensorId}"]`);
+                            return sensorNameEl ? sensorNameEl.textContent.trim() : null;
                         })
                         .filter(name => name); // Remove any null/undefined entries
 
-                    let message = 'Are you sure you want to deactivate this device? This will disable all its sensors.';
+                    message = `Are you sure you want to deactivate <i class='bi bi-hdd-rack'></i> ${deviceName}?`;
                     
                     if (activeSensors.length > 0) {
-                        message += '<br><br>The following active sensors will be disabled:<ul class="mb-0">';
+                        message += '<br><br>The following active sensors will be deactivated:<ul class="mb-0">';
                         activeSensors.forEach(sensorName => {
                             message += `<li>${sensorName}</li>`;
                         });
                         message += '</ul>';
                     }
-                    
-                    modalComponents.messageEl.innerHTML = message;
-                    showModal();
                 }
-
-                function showModal() {
-                    modalComponents.confirmBtn.disabled = false;
-                    modalComponents.spinner.classList.add('d-none');
-                    modalComponents.modal.show();
-                }
+                
+                modalComponents.messageEl.innerHTML = message;
+                modalComponents.confirmBtn.disabled = false;
+                modalComponents.spinner.classList.add('d-none');
+                modalComponents.modal.show();
 
                 const handleConfirm = async () => {
                     modalComponents.confirmBtn.disabled = true;
@@ -727,8 +739,9 @@ const toggleActiveManager = {
                     try {
                         const result = await toggleActiveManager.toggleStatus('device', deviceId, placeSlug);
                         if (result) {
-                            toggleElement.checked = result.is_active;
                             modalComponents.modal.hide();
+                            // Use the handleToggleResponse to process the response
+                            toggleActiveManager.handleToggleResponse(result);
                         }
                     } finally {
                         modalComponents.confirmBtn.disabled = false;
@@ -740,8 +753,8 @@ const toggleActiveManager = {
                 modalComponents.confirmBtn.addEventListener('click', handleConfirm, { once: true });
             };
 
-            toggle._changeHandler = changeHandler;
-            toggle.addEventListener('change', changeHandler);
+            toggle._clickHandler = clickHandler;
+            toggle.addEventListener('click', clickHandler);
         });
     },
 
@@ -749,24 +762,38 @@ const toggleActiveManager = {
         const modalComponents = this.createToggleModal('sensor');
         
         document.querySelectorAll('.toggle-sensor-active').forEach(toggle => {
-            if (toggle.tagName.toLowerCase() === 'button') return; // Skip buttons, they're handled separately
+            // Clean up any old handlers
+            toggle.removeEventListener('click', toggle._clickHandler);
             
-            const oldHandler = toggle._changeHandler;
-            if (oldHandler) toggle.removeEventListener('change', oldHandler);
-
-            const changeHandler = async function(e) {
+            // Create new click handler
+            const clickHandler = async function(e) {
                 e.preventDefault();
                 
                 const sensorId = this.dataset.sensorId;
                 const placeSlug = this.dataset.placeSlug;
-                const newStatus = this.checked;
-                const toggleElement = this;
-
-                this.checked = !newStatus;
+                const currentStatus = this.getAttribute('aria-pressed') === 'true' || 
+                                     this.dataset.currentStatus === 'true';
+                const newStatus = !currentStatus;
                 
-                modalComponents.messageEl.textContent = newStatus ? 
-                    'Are you sure you want to activate this sensor?' : 
-                    'Are you sure you want to deactivate this sensor?';
+                // Find the sensor name
+                let sensorName = 'this sensor';
+                
+                // Try to find sensor name in parent row or from label
+                const row = this.closest('tr, [data-sensor-name]');
+                if (row && row.dataset.sensorName) {
+                    sensorName = row.dataset.sensorName;
+                } else {
+                    // Try to find from a nearby element with sensor-name class
+                    const nameEl = this.querySelector('.sensor-name') || 
+                                  document.querySelector(`.sensor-name[data-sensor-id="${sensorId}"]`);
+                    if (nameEl) {
+                        sensorName = nameEl.textContent.trim();
+                    }
+                }
+                
+                modalComponents.messageEl.innerHTML = newStatus ? 
+                    `Are you sure you want to activate <i class='bi bi-thermometer'></i> ${sensorName}?` : 
+                    `Are you sure you want to deactivate <i class='bi bi-thermometer'></i> ${sensorName}?`;
 
                 modalComponents.confirmBtn.disabled = false;
                 modalComponents.spinner.classList.add('d-none');
@@ -780,8 +807,9 @@ const toggleActiveManager = {
                     try {
                         const result = await toggleActiveManager.toggleStatus('sensor', sensorId, placeSlug);
                         if (result) {
-                            toggleElement.checked = result.is_active;
                             modalComponents.modal.hide();
+                            // Use the handleToggleResponse to process the response
+                            toggleActiveManager.handleToggleResponse(result);
                         }
                     } finally {
                         modalComponents.confirmBtn.disabled = false;
@@ -793,8 +821,8 @@ const toggleActiveManager = {
                 modalComponents.confirmBtn.addEventListener('click', handleConfirm, { once: true });
             };
 
-            toggle._changeHandler = changeHandler;
-            toggle.addEventListener('change', changeHandler);
+            toggle._clickHandler = clickHandler;
+            toggle.addEventListener('click', clickHandler);
         });
     },
 
@@ -862,11 +890,126 @@ const toggleActiveManager = {
     },
 
     handleToggleResponse(response) {
-        if (response.toast) {
-            // Trigger the toast display
-            window.toastSystem.showToast(response.toast.message, response.toast.type);
+        if (toggleActiveConfig.debug) {
+            console.group('Handling Toggle Response');
+            console.debug('Response:', response);
         }
-        // ... rest of the handler code ...
+        
+        if (!response) {
+            if (toggleActiveConfig.debug) {
+                console.debug('No response to handle');
+                console.groupEnd();
+            }
+            return;
+        }
+
+        try {
+            // Handle toast message from response
+            if (response.toast) {
+                if (toggleActiveConfig.debug) {
+                    console.debug('Showing toast from response:', response.toast);
+                }
+                // Use the toast system to display the message
+                window.toastSystem.showToast(response.toast.message, response.toast.type);
+            }
+            
+            // Handle any dependencies that were affected
+            if (response.dependencies && response.dependencies.length > 0) {
+                // We might want to update UI for the affected dependencies
+                if (toggleActiveConfig.debug) {
+                    console.debug('Dependencies affected:', response.dependencies);
+                }
+                
+                // Update UI for each dependency
+                response.dependencies.forEach(dep => {
+                    // Find any toggles for this dependency
+                    const depToggles = document.querySelectorAll(
+                        `.toggle-${dep.type}-active[data-${dep.type}-id="${dep.id}"]`
+                    );
+                    
+                    // Update each toggle to match the new state (always false for dependencies)
+                    depToggles.forEach(toggle => {
+                        if (toggle.tagName.toLowerCase() === 'input') {
+                            toggle.checked = false;
+                        }
+                    });
+                    
+                    // Find related rows and update their classes
+                    const depRows = document.querySelectorAll(`[data-${dep.type}-id="${dep.id}"]`);
+                    depRows.forEach(row => {
+                        row.setAttribute(`data-${dep.type}-active`, "false");
+                        row.classList.add('opacity-50', 'text-muted');
+                        
+                        // If we're hiding inactive items, hide this row
+                        const hideInactive = this.getHideInactiveState(dep.type);
+                        if (hideInactive) {
+                            row.classList.add('d-none');
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('Error handling toggle response:', error);
+        } finally {
+            if (toggleActiveConfig.debug) {
+                console.groupEnd();
+            }
+        }
+    },
+
+    // Add helper methods to update child toggles
+    updateChildTogglesForLocation(locationId, isActive) {
+        // Find all device toggles within this location
+        const deviceToggles = document.querySelectorAll(`.toggle-device-active[data-location-id="${locationId}"]`);
+        deviceToggles.forEach(toggle => {
+            const toggleWrapper = toggle.closest('.toggle-button-wrapper');
+            if (toggleWrapper) {
+                if (isActive) {
+                    toggleWrapper.classList.remove('d-none');
+                    toggle.disabled = false;
+                } else {
+                    toggleWrapper.classList.add('d-none');
+                    toggle.disabled = true;
+                }
+            }
+        });
+
+        // Update status badges visibility
+        const statusBadges = document.querySelectorAll(`[data-location-id="${locationId}"] .isactive-badge .badge`);
+        statusBadges.forEach(badge => {
+            if (isActive) {
+                badge.classList.add('d-none');
+            } else {
+                badge.classList.remove('d-none');
+            }
+        });
+    },
+
+    updateChildTogglesForDevice(deviceId, isActive) {
+        // Find all sensor toggles within this device
+        const sensorToggles = document.querySelectorAll(`.toggle-sensor-active[data-device-id="${deviceId}"]`);
+        sensorToggles.forEach(toggle => {
+            const toggleWrapper = toggle.closest('.toggle-button-wrapper');
+            if (toggleWrapper) {
+                if (isActive) {
+                    toggleWrapper.classList.remove('d-none');
+                    toggle.disabled = false;
+                } else {
+                    toggleWrapper.classList.add('d-none');
+                    toggle.disabled = true;
+                }
+            }
+        });
+
+        // Update status badges visibility
+        const sensorStatusBadges = document.querySelectorAll(`[data-device-id="${deviceId}"] .isactive-badge .badge`);
+        sensorStatusBadges.forEach(badge => {
+            if (isActive) {
+                badge.classList.add('d-none');
+            } else {
+                badge.classList.remove('d-none');
+            }
+        });
     }
 };
 

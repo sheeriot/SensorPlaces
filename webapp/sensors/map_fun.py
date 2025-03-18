@@ -128,7 +128,6 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
         
         # ic("Generated map HTML length:", len(map_html))
         return map_html
-    
     except Exception as e:
-        ic("Error creating map:", str(e))
+        # ic("Error creating map:", str(e))
         return "" 

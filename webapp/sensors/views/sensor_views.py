@@ -160,19 +160,58 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         try:
             self._device = get_object_or_404(Device, pk=self.kwargs.get('device_pk', None))
         except Exception as e:
-            ic(f"Error getting device: {str(e)}")
+            # ic(f"Error getting device: {str(e)}")
+            pass
 
-        # Initialize inactive_help_text
+        # Initialize inactive_help_text based on device status
         self._inactive_help_text = None
         
+        # Only generate help text if we have a device, but don't create a dummy sensor
+        if hasattr(self, '_device') and self._device:
+            self._inactive_help_text = self.get_sensor_inactive_help_text(None, self._device)
+
+    def get_sensor_inactive_help_text(self, sensor, device=None):
+        """
+        Generate help text for sensor inactive status.
+        
+        Args:
+            sensor: The sensor object
+            device: The sensor's device (optional)
+            
+        Returns:
+            str: HTML string with warning message or None
+        """
+        inactive_help_text = None
+            
         # If device is inactive, create help text about that
-        if self._device and not self._device.is_active:
-            self._inactive_help_text = mark_safe(
+        if device and not device.is_active:
+            # For existing sensors, check if active when they shouldn't be
+            if sensor and hasattr(sensor, 'is_active') and sensor.is_active and hasattr(sensor, 'pk') and sensor.pk:
+                # Fix the inconsistency - set sensor to inactive
+                sensor.is_active = False
+                sensor.save()
+                
+                # Just log the inconsistency with ic
+                # ic(f"Fixed inconsistency: Sensor {sensor.id} ({sensor.name}) was active "
+                #    f"but its Device {device.id} ({device.name}) is inactive.")
+            
+            # Standard message for inactive device
+            inactive_help_text = mark_safe(
                 '<div class="form-text text-warning-emphasis mt-2">'
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
-                f'This sensor will be inactive because Device "{self._device.name}" is inactive.'
+                f'Sensor cannot be active because Device "{device.name}" is inactive.'
                 '</div>'
             )
+        # If sensor is active, create help text about deactivation
+        elif sensor and sensor.is_active:
+            inactive_help_text = mark_safe(
+                '<div class="form-text text-warning-emphasis mt-2">'
+                '<i class="bi bi-exclamation-triangle me-2"></i>'
+                'If deactivated, this sensor will no longer collect data and readings will not be available.'
+                '</div>'
+            )
+        
+        return inactive_help_text
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -280,36 +319,62 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             device = sensor.device
             self._device = device
             
-            # If device is inactive, create help text about that
-            if device and not device.is_active:
-                # Check if sensor is active when it shouldn't be
-                if sensor and sensor.is_active:
-                    # Fix the inconsistency - set sensor to inactive
-                    sensor.is_active = False
-                    sensor.save()
-                    
-                    # Just log the inconsistency with ic
-                    ic(f"Fixed inconsistency: Sensor {sensor.pk} ({sensor.name}) was active "
-                       f"but its Device {device.pk} ({device.name}) is inactive.")
-                
-                # Standard message for inactive device
-                self._inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This sensor will be inactive because Device "{device.name}" is inactive.'
-                    '</div>'
-                )
-            # If sensor is active, create help text about deactivation
-            elif sensor and sensor.is_active:
-                self._inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    'If deactivated, this sensor will no longer collect data and readings will not be available.'
-                    '</div>'
-                )
+            # Get help text based on sensor active state and its device
+            self._inactive_help_text = self.get_sensor_inactive_help_text(sensor, device)
+            
         except Exception as e:
             # If we can't get the object yet (e.g., in a GET request before the object exists)
-            ic(f"Error in SensorUpdateView.setup: {str(e)}")
+            # ic(f"Error in SensorUpdateView.setup: {str(e)}")
+            pass
+            
+    def get_sensor_inactive_help_text(self, sensor, device=None):
+        """
+        Generate help text for sensor inactive status.
+        
+        Args:
+            sensor: The sensor object
+            device: The sensor's device (optional)
+            
+        Returns:
+            str: HTML string with warning message or None
+        """
+        inactive_help_text = None
+        
+        if not sensor:
+            return None
+            
+        if not device:
+            device = sensor.device
+            
+        # If device is inactive, create help text about that
+        if device and not device.is_active:
+            # Check if sensor is active when it shouldn't be
+            if sensor and sensor.is_active:
+                # Fix the inconsistency - set sensor to inactive
+                sensor.is_active = False
+                sensor.save()
+                
+                # Just log the inconsistency with ic
+                # ic(f"Fixed inconsistency: Sensor {sensor.pk} ({sensor.name}) was active "
+                #    f"but its Device {device.pk} ({device.name}) is inactive.")
+            
+            # Standard message for inactive device
+            inactive_help_text = mark_safe(
+                '<div class="form-text text-warning-emphasis mt-2">'
+                '<i class="bi bi-exclamation-triangle me-2"></i>'
+                f'This sensor will be inactive because Device "{device.name}" is inactive.'
+                '</div>'
+            )
+        # If sensor is active, create help text about deactivation
+        elif sensor and sensor.is_active:
+            inactive_help_text = mark_safe(
+                '<div class="form-text text-warning-emphasis mt-2">'
+                '<i class="bi bi-exclamation-triangle me-2"></i>'
+                'If deactivated, this sensor will no longer collect data and readings will not be available.'
+                '</div>'
+            )
+        
+        return inactive_help_text
 
     def get_initial(self):
         initial = super().get_initial()
@@ -403,7 +468,8 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if sensor.is_active else 'warning'
+            'type': 'success' if sensor.is_active else 'warning',
+            'place_id': place.pk  # Use place_id instead of place object
         })
         
         # Get the success URL and return HttpResponseRedirect

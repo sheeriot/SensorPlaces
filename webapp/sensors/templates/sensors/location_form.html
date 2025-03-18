@@ -1,5 +1,6 @@
 {% extends "sensors/base.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}
     {% if object %}Edit{% else %}New{% endif %} Location
@@ -16,7 +17,7 @@
         {% else %}
             {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
         {% endif %}
-        {% include "sensors/includes/live_counts_card.html %}
+        {% include "sensors/includes/live_counts_card.html" %}
     </div>
     <div class="col-md-8">
         {% include 'sensors/includes/location_form_card.html' %}
