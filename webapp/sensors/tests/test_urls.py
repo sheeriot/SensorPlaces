@@ -140,6 +140,12 @@ class URLAccessTestCase(TestCase):
         else:
             self.sensor = Sensor.objects.first()
     
+    # Place URL Access Tests
+    def test_place_create_access(self):
+        """Test access to place create view"""
+        self.assertEqual(self.client.get(reverse('sensors:place_create')).status_code, 200)
+        print("===> test_urls.py --> test_place_create_access PASS")
+    
     def test_place_list_access(self):
         """Test access to place list view"""
         self.assertEqual(self.client.get(reverse('sensors:place_list')).status_code, 200)
@@ -152,17 +158,20 @@ class URLAccessTestCase(TestCase):
         ).status_code, 200)
         print("===> test_urls.py --> test_place_detail_access PASS")
     
-    def test_place_create_access(self):
-        """Test access to place create view"""
-        self.assertEqual(self.client.get(reverse('sensors:place_create')).status_code, 200)
-        print("===> test_urls.py --> test_place_create_access PASS")
-    
     def test_place_update_access(self):
         """Test access to place update view"""
         self.assertEqual(self.client.get(
             reverse('sensors:place_update', kwargs={'place_slug': self.place.slug})
         ).status_code, 200)
         print("===> test_urls.py --> test_place_update_access PASS")
+    
+    # Location URL Access Tests
+    def test_location_create_access(self):
+        """Test access to location create view"""
+        self.assertEqual(self.client.get(
+            reverse('sensors:location_create', kwargs={'place_slug': self.place.slug})
+        ).status_code, 200)
+        print("===> test_urls.py --> test_location_create_access PASS")
     
     def test_location_list_access(self):
         """Test access to location list view"""
@@ -181,6 +190,17 @@ class URLAccessTestCase(TestCase):
         ).status_code, 200)
         print("===> test_urls.py --> test_location_detail_access PASS")
     
+    # Device URL Access Tests
+    def test_device_create_access(self):
+        """Test access to device create view"""
+        self.assertEqual(self.client.get(
+            reverse('sensors:device_create', kwargs={
+                'place_slug': self.place.slug,
+                'location_pk': self.location.pk
+            })
+        ).status_code, 200)
+        print("===> test_urls.py --> test_device_create_access PASS")
+    
     def test_device_list_access(self):
         """Test access to device list view"""
         self.assertEqual(self.client.get(
@@ -197,6 +217,17 @@ class URLAccessTestCase(TestCase):
             })
         ).status_code, 200)
         print("===> test_urls.py --> test_device_detail_access PASS")
+    
+    # Sensor URL Access Tests
+    def test_sensor_create_access(self):
+        """Test access to sensor create view"""
+        self.assertEqual(self.client.get(
+            reverse('sensors:sensor_create', kwargs={
+                'place_slug': self.place.slug,
+                'device_pk': self.device.pk
+            })
+        ).status_code, 200)
+        print("===> test_urls.py --> test_sensor_create_access PASS")
     
     def test_sensor_list_access(self):
         """Test access to sensor list view"""
@@ -215,6 +246,7 @@ class URLAccessTestCase(TestCase):
         ).status_code, 200)
         print("===> test_urls.py --> test_sensor_detail_access PASS")
     
+    # API URL Access Tests
     def test_api_access(self):
         """Test access to API endpoints"""
         # Test toast API
@@ -293,6 +325,7 @@ class FormSubmissionTestCase(TestCase):
         else:
             self.device = Device.objects.first()
     
+    # Place Form Submission Tests
     def test_place_create_form(self):
         """Test creating a place via form submission"""
         place_count = Place.objects.count()
@@ -324,6 +357,7 @@ class FormSubmissionTestCase(TestCase):
             print(f"===> test_urls.py --> test_place_create_form FAIL: {str(e)}")
             raise
     
+    # Location Form Submission Tests
     def test_location_create_form(self):
         """Test creating a location via form submission"""
         location_count = Location.objects.count()
@@ -341,6 +375,7 @@ class FormSubmissionTestCase(TestCase):
         self.assertTrue(Location.objects.latest('id').is_active)
         print("===> test_urls.py --> test_location_create_form PASS")
     
+    # Device Form Submission Tests
     def test_device_create_form(self):
         """Test creating a device via form submission"""
         device_count = Device.objects.count()
@@ -365,6 +400,7 @@ class FormSubmissionTestCase(TestCase):
         self.assertTrue(Device.objects.latest('id').is_active)
         print("===> test_urls.py --> test_device_create_form PASS")
     
+    # Sensor Form Submission Tests
     def test_sensor_create_form(self):
         """Test creating a sensor via form submission"""
         sensor_count = Sensor.objects.count()
@@ -396,6 +432,7 @@ class FormSubmissionTestCase(TestCase):
         self.assertTrue(Sensor.objects.latest('id').is_active)
         print("===> test_urls.py --> test_sensor_create_form PASS")
     
+    # API Form Submission Tests
     def test_toggle_active_api(self):
         """Test toggling active status via API for a device with dependent sensors"""
         # Create a test hierarchy explicitly for this test

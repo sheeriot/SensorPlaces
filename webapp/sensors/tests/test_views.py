@@ -137,6 +137,32 @@ class SensorsViewTestCase(TestCase):
             )
 
     # Place View Tests
+    def test_place_create_view(self):
+        """Test PlaceCreateView displays correctly"""
+        response = self.client.get(reverse('sensors:place_create'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/place_form.html')
+        self.assertContains(response, 'New Place')
+        print("===> test_views.py --> test_place_create_view PASS")
+    
+    def test_place_create_post(self):
+        """Test creating a place via POST request"""
+        place_count = Place.objects.count()
+        response = self.client.post(
+            reverse('sensors:place_create'),
+            {
+                'name': 'New Test Place',
+                'is_active': True,
+                'latitude': 51.5074,
+                'longitude': -0.1278
+            }
+        )
+        self.assertEqual(response.status_code, 302)  # Redirect after successful creation
+        self.assertEqual(Place.objects.count(), place_count + 1)
+        new_place = Place.objects.latest('id')
+        self.assertEqual(new_place.name, 'New Test Place')
+        print("===> test_views.py --> test_place_create_post PASS")
+
     def test_place_list_view(self):
         """Test PlaceListView displays correctly"""
         # Ensure self.place is not None
@@ -161,14 +187,6 @@ class SensorsViewTestCase(TestCase):
         self.assertContains(response, self.place.name)
         print("===> test_views.py --> test_place_detail_view PASS")
     
-    def test_place_create_view(self):
-        """Test PlaceCreateView displays correctly"""
-        response = self.client.get(reverse('sensors:place_create'))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/place_form.html')
-        self.assertContains(response, 'New Place')
-        print("===> test_views.py --> test_place_create_view PASS")
-    
     def test_place_update_view(self):
         """Test PlaceUpdateView displays correctly"""
         # Ensure self.place is not None
@@ -181,34 +199,6 @@ class SensorsViewTestCase(TestCase):
         self.assertTemplateUsed(response, 'sensors/place_form.html')
         self.assertContains(response, 'Edit')
         print("===> test_views.py --> test_place_update_view PASS")
-    
-    def test_place_delete_view(self):
-        """Test PlaceDeleteView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:place_delete', kwargs={'place_slug': self.place.slug})
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/place_confirm_delete.html')
-        self.assertContains(response, 'Delete Place')
-        print("===> test_views.py --> test_place_delete_view PASS")
-    
-    def test_place_create_post(self):
-        """Test creating a place via POST request"""
-        place_count = Place.objects.count()
-        response = self.client.post(
-            reverse('sensors:place_create'),
-            {
-                'name': 'New Test Place',
-                'is_active': True,
-                'latitude': 51.5074,
-                'longitude': -0.1278
-            }
-        )
-        self.assertEqual(response.status_code, 302)  # Redirect after successful creation
-        self.assertEqual(Place.objects.count(), place_count + 1)
-        new_place = Place.objects.latest('id')
-        self.assertEqual(new_place.name, 'New Test Place')
-        print("===> test_views.py --> test_place_create_post PASS")
     
     def test_place_update_post(self):
         """Test updating a place via POST request"""
@@ -228,6 +218,16 @@ class SensorsViewTestCase(TestCase):
         self.place.refresh_from_db()
         self.assertEqual(self.place.name, 'Updated Place Name')
         print("===> test_views.py --> test_place_update_post PASS")
+    
+    def test_place_delete_view(self):
+        """Test PlaceDeleteView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:place_delete', kwargs={'place_slug': self.place.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/place_confirm_delete.html')
+        self.assertContains(response, 'Delete Place')
+        print("===> test_views.py --> test_place_delete_view PASS")
     
     def test_place_delete_post(self):
         """Test deleting a place via POST request"""
@@ -251,6 +251,34 @@ class SensorsViewTestCase(TestCase):
         print("===> test_views.py --> test_place_delete_post PASS")
     
     # Location View Tests
+    def test_location_create_view(self):
+        """Test LocationCreateView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:location_create', kwargs={'place_slug': self.place.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/location_form.html')
+        self.assertContains(response, 'New Location')
+        print("===> test_views.py --> test_location_create_view PASS")
+    
+    def test_location_create_post(self):
+        """Test creating a location via POST request"""
+        location_count = Location.objects.count()
+        response = self.client.post(
+            reverse('sensors:location_create', kwargs={'place_slug': self.place.slug}),
+            {
+                'name': 'New Test Location',
+                'place': self.place.id,
+                'is_active': True
+            }
+        )
+        self.assertEqual(response.status_code, 302)  # Redirect after successful creation
+        self.assertEqual(Location.objects.count(), location_count + 1)
+        new_location = Location.objects.latest('id')
+        self.assertEqual(new_location.name, 'New Test Location')
+        self.assertEqual(new_location.place, self.place)  # Verify location belongs to correct place
+        print("===> test_views.py --> test_location_create_post PASS")
+    
     def test_location_list_view(self):
         """Test LocationListView displays correctly"""
         response = self.client.get(
@@ -274,16 +302,6 @@ class SensorsViewTestCase(TestCase):
         self.assertContains(response, self.location.name)
         print("===> test_views.py --> test_location_detail_view PASS")
     
-    def test_location_create_view(self):
-        """Test LocationCreateView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:location_create', kwargs={'place_slug': self.place.slug})
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/location_form.html')
-        self.assertContains(response, 'New Location')
-        print("===> test_views.py --> test_location_create_view PASS")
-    
     def test_location_update_view(self):
         """Test LocationUpdateView displays correctly"""
         response = self.client.get(
@@ -296,37 +314,6 @@ class SensorsViewTestCase(TestCase):
         self.assertTemplateUsed(response, 'sensors/location_form.html')
         self.assertContains(response, 'Edit')
         print("===> test_views.py --> test_location_update_view PASS")
-    
-    def test_location_delete_view(self):
-        """Test LocationDeleteView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:location_delete', kwargs={
-                'place_slug': self.place.slug,
-                'pk': self.location.pk
-            })
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/location_confirm_delete.html')
-        self.assertContains(response, 'Delete Location')
-        print("===> test_views.py --> test_location_delete_view PASS")
-    
-    def test_location_create_post(self):
-        """Test creating a location via POST request"""
-        location_count = Location.objects.count()
-        response = self.client.post(
-            reverse('sensors:location_create', kwargs={'place_slug': self.place.slug}),
-            {
-                'name': 'New Test Location',
-                'place': self.place.id,
-                'is_active': True
-            }
-        )
-        self.assertEqual(response.status_code, 302)  # Redirect after successful creation
-        self.assertEqual(Location.objects.count(), location_count + 1)
-        new_location = Location.objects.latest('id')
-        self.assertEqual(new_location.name, 'New Test Location')
-        self.assertEqual(new_location.place, self.place)  # Verify location belongs to correct place
-        print("===> test_views.py --> test_location_create_post PASS")
     
     def test_location_update_post(self):
         """Test updating a location via POST request"""
@@ -346,7 +333,58 @@ class SensorsViewTestCase(TestCase):
         self.assertEqual(self.location.name, 'Updated Location Name')
         print("===> test_views.py --> test_location_update_post PASS")
     
+    def test_location_delete_view(self):
+        """Test LocationDeleteView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:location_delete', kwargs={
+                'place_slug': self.place.slug,
+                'pk': self.location.pk
+            })
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/location_confirm_delete.html')
+        self.assertContains(response, 'Delete Location')
+        print("===> test_views.py --> test_location_delete_view PASS")
+    
     # Device View Tests
+    def test_device_create_view(self):
+        """Test DeviceCreateView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:device_create', kwargs={
+                'place_slug': self.place.slug,
+                'location_pk': self.location.pk
+            })
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/device_form.html')
+        self.assertContains(response, 'New Device')
+        print("===> test_views.py --> test_device_create_view PASS")
+    
+    def test_device_create_post(self):
+        """Test creating a device via POST request"""
+        device_count = Device.objects.count()
+        response = self.client.post(
+            reverse('sensors:device_create', kwargs={
+                'place_slug': self.place.slug,
+                'location_pk': self.location.pk
+            }),
+            {
+                'name': 'New Test Device',
+                'location': self.location.id,
+                'is_active': True,
+                'device_type': self.device_type.id,
+                'manufacturer': 'Test Manufacturer',
+                'model': 'Test Model',
+                'serial_number': 'TEST123'
+            }
+        )
+        self.assertEqual(response.status_code, 302)  # Redirect after successful creation
+        self.assertEqual(Device.objects.count(), device_count + 1)
+        new_device = Device.objects.latest('id')
+        self.assertEqual(new_device.name, 'New Test Device')
+        self.assertEqual(new_device.location, self.location)  # Verify device belongs to correct location
+        print("===> test_views.py --> test_device_create_post PASS")
+    
     def test_device_list_view(self):
         """Test DeviceListView displays correctly"""
         response = self.client.get(
@@ -369,19 +407,6 @@ class SensorsViewTestCase(TestCase):
         self.assertTemplateUsed(response, 'sensors/device_detail.html')
         self.assertContains(response, self.device.name)
         print("===> test_views.py --> test_device_detail_view PASS")
-    
-    def test_device_create_view(self):
-        """Test DeviceCreateView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:device_create', kwargs={
-                'place_slug': self.place.slug,
-                'location_pk': self.location.pk
-            })
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/device_form.html')
-        self.assertContains(response, 'New Device')
-        print("===> test_views.py --> test_device_create_view PASS")
     
     def test_device_update_view(self):
         """Test DeviceUpdateView displays correctly"""
@@ -409,55 +434,7 @@ class SensorsViewTestCase(TestCase):
         self.assertContains(response, 'Delete Device')
         print("===> test_views.py --> test_device_delete_view PASS")
     
-    def test_device_create_post(self):
-        """Test creating a device via POST request"""
-        device_count = Device.objects.count()
-        response = self.client.post(
-            reverse('sensors:device_create', kwargs={
-                'place_slug': self.place.slug,
-                'location_pk': self.location.pk
-            }),
-            {
-                'name': 'New Test Device',
-                'location': self.location.id,
-                'is_active': True,
-                'device_type': self.device_type.id,
-                'manufacturer': 'Test Manufacturer',
-                'model': 'Test Model',
-                'serial_number': 'TEST123'
-            }
-        )
-        self.assertEqual(response.status_code, 302)  # Redirect after successful creation
-        self.assertEqual(Device.objects.count(), device_count + 1)
-        new_device = Device.objects.latest('id')
-        self.assertEqual(new_device.name, 'New Test Device')
-        self.assertEqual(new_device.location, self.location)  # Verify device belongs to correct location
-        print("===> test_views.py --> test_device_create_post PASS")
-    
     # Sensor View Tests
-    def test_sensor_list_view(self):
-        """Test SensorListView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:sensor_list', kwargs={'place_slug': self.place.slug})
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/sensor_list.html')
-        self.assertContains(response, self.sensor.name)
-        print("===> test_views.py --> test_sensor_list_view PASS")
-    
-    def test_sensor_detail_view(self):
-        """Test SensorDetailView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:sensor_detail', kwargs={
-                'place_slug': self.place.slug,
-                'pk': self.sensor.pk
-            })
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/sensor_detail.html')
-        self.assertContains(response, self.sensor.name)
-        print("===> test_views.py --> test_sensor_detail_view PASS")
-    
     def test_sensor_create_view(self):
         """Test SensorCreateView displays correctly"""
         response = self.client.get(
@@ -470,32 +447,6 @@ class SensorsViewTestCase(TestCase):
         self.assertTemplateUsed(response, 'sensors/sensor_form.html')
         self.assertContains(response, 'Create New Sensor')
         print("===> test_views.py --> test_sensor_create_view PASS")
-    
-    def test_sensor_update_view(self):
-        """Test SensorUpdateView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:sensor_update', kwargs={
-                'place_slug': self.place.slug,
-                'pk': self.sensor.pk
-            })
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/sensor_form.html')
-        self.assertContains(response, 'Edit Sensor')
-        print("===> test_views.py --> test_sensor_update_view PASS")
-    
-    def test_sensor_delete_view(self):
-        """Test SensorDeleteView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:sensor_delete', kwargs={
-                'place_slug': self.place.slug,
-                'pk': self.sensor.pk
-            })
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/sensor_confirm_delete.html')
-        self.assertContains(response, 'Delete Sensor')
-        print("===> test_views.py --> test_sensor_delete_view PASS")
     
     def test_sensor_create_post(self):
         """Test creating a sensor via POST request"""
@@ -524,6 +475,55 @@ class SensorsViewTestCase(TestCase):
         self.assertEqual(new_sensor.name, 'New Test Sensor')
         self.assertEqual(new_sensor.device, self.device)  # Verify sensor belongs to correct device
         print("===> test_views.py --> test_sensor_create_post PASS")
+    
+    def test_sensor_list_view(self):
+        """Test SensorListView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:sensor_list', kwargs={'place_slug': self.place.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/sensor_list.html')
+        self.assertContains(response, self.sensor.name)
+        print("===> test_views.py --> test_sensor_list_view PASS")
+    
+    def test_sensor_detail_view(self):
+        """Test SensorDetailView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:sensor_detail', kwargs={
+                'place_slug': self.place.slug,
+                'pk': self.sensor.pk
+            })
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/sensor_detail.html')
+        self.assertContains(response, self.sensor.name)
+        print("===> test_views.py --> test_sensor_detail_view PASS")
+    
+    def test_sensor_update_view(self):
+        """Test SensorUpdateView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:sensor_update', kwargs={
+                'place_slug': self.place.slug,
+                'pk': self.sensor.pk
+            })
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/sensor_form.html')
+        self.assertContains(response, 'Edit Sensor')
+        print("===> test_views.py --> test_sensor_update_view PASS")
+    
+    def test_sensor_delete_view(self):
+        """Test SensorDeleteView displays correctly"""
+        response = self.client.get(
+            reverse('sensors:sensor_delete', kwargs={
+                'place_slug': self.place.slug,
+                'pk': self.sensor.pk
+            })
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'sensors/sensor_confirm_delete.html')
+        self.assertContains(response, 'Delete Sensor')
+        print("===> test_views.py --> test_sensor_delete_view PASS")
     
     # Test API endpoints
     def test_place_stats_api(self):
