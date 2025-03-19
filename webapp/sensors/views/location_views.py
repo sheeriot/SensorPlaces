@@ -10,11 +10,9 @@ from django.db.models.query import QuerySet
 from django.utils.safestring import mark_safe
 
 from ..models import Place, Location, Device, Sensor
-from ..forms import LocationForm
-from .mixins import PlaceAnnotationMixin, ToastMixin
+from .location_forms import LocationForm
+from .mixins import PlaceAnnotationMixin, ToastMixin, FormDataMixin
 
-import json
-from decimal import Decimal
 from icecream import ic
 
 # Location Views
@@ -74,48 +72,46 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         
         return context
 
-class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
+class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin, CreateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
     object: Location
-
+    
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Get and cache place and locations
-        self._place = self.get_place()
-        self._locations = self.get_annotated_locations(self._place)
+        # Create inactive help text to be used in toast messages
+        self._inactive_help_text = mark_safe(
+            '<i class="bi bi-exclamation-triangle me-2"></i>'
+            'This location is inactive. All devices within it will not collect data.'
+        )
         
-        # Create inactive help text to be used in form and toast messages
-        if self._place and not self._place.is_active:
-            self._inactive_help_text = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
-                '<i class="bi bi-exclamation-triangle me-2"></i>'
-                f'This location will be inactive because Place "{self._place.name}" is inactive. '
-                f'All devices within it will not collect data.'
-                '</div>'
-            )
-        else:
-            self._inactive_help_text = None
+        # Get the referrer URL
+        self._referrer = request.META.get('HTTP_REFERER', '')
 
     def get_success_url(self):
-        return reverse('sensors:location_detail', kwargs={
-            'place_slug': self.kwargs.get('place_slug'), 
-            'pk': self.object.pk
+        """Return the URL to redirect to after processing a valid form."""
+        if self.object:
+            return reverse('sensors:location_detail', kwargs={
+                'place_slug': self.kwargs['place_slug'],
+                'pk': self.object.pk
+            })
+        return reverse('sensors:location_list', kwargs={
+            'place_slug': self.kwargs['place_slug']
         })
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self._place
-        kwargs['locations'] = self._locations
+        kwargs['place'] = self.get_place()
+        kwargs['locations'] = self.get_annotated_locations(self.get_place())
         kwargs['inactive_help_text'] = self._inactive_help_text
         
         # Set initial data properly
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial'].update({
-            'is_active': self._place.is_active,
-            'place': self._place.pk,  # Use the primary key, not the object
-            'referrer': self.request.GET.get('next', '')
+            'is_active': self.get_place().is_active,
+            'place': self.get_place().pk,  # Use the primary key, not the object
+            'referrer': self._referrer
         })
         
         return kwargs
@@ -123,31 +119,31 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        context['place'] = self._place
-        context['locations'] = self._locations
+        context['place'] = self.get_place()
+        context['locations'] = self.get_annotated_locations(self.get_place())
         
         # Add a fallback cancel URL
         if self.object and self.object.pk:
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
-                'place_slug': self._place.slug,
+                'place_slug': self.get_place().slug,
                 'pk': self.object.pk
             })
         else:
             context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
-                'place_slug': self._place.slug
+                'place_slug': self.get_place().slug
             })
         
         return context
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
-        form.instance.place = self._place
+        form.instance.place = self.get_place()
         # Save the form to get the object
         self.object = form.save()
         
         message = (
             f"Created location <strong>{self.object.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {self._place.name}<br>"
+            f"<i class='bi bi-house-gear'></i> {self.get_place().name}<br>"
             f"<small class='text-muted'>"
             f"Status: {'Active' if self.object.is_active else 'inactive'}"
             f"</small>"
@@ -182,12 +178,11 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             return self.form_invalid(form)
 
     def add_toast_message(self, message, type='info'):
-        """Add a toast message to the request.
+        """Add a toast message to the request."""
+        # Get the place from self.get_place() (set in PlaceAnnotationMixin.setup)
+        place = self.get_place()
         
-        Args:
-            message: HTML message to display
-            type: success, info, warning, or danger
-        """
+        # Create toast data dict
         toast_data = {
             'message': message,
             'type': type
@@ -206,32 +201,33 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         
         return toast_data
 
-class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, UpdateView):
+class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin, UpdateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
-
+    context_object_name = 'location'
+    
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Get and cache place and locations
-        self._place = self.get_place()
-        self._locations = self.get_annotated_locations(self._place)
+        # Create inactive help text to be used in toast messages
+        self._inactive_help_text = mark_safe(
+            '<i class="bi bi-exclamation-triangle me-2"></i>'
+            'This location is inactive. All devices within it will not collect data.'
+        )
         
-        # Default inactive_help_text to None
-        self._inactive_help_text = None
-        self._devices_active = []
-        
-        try:
-            # Try to get the location if we're updating
-            location = self.get_object()
-            
-            # Get help text based on location active state and its place
-            self._inactive_help_text, self._devices_active = self.get_location_inactive_help_text(location, self._place)
-            
-        except Exception as e:
-            # If we can't get the object yet (e.g., in a GET request before the object exists)
-            # ic(f"Error in LocationUpdateView.setup: {str(e)}")
-            pass
+        # Get the referrer URL
+        self._referrer = request.META.get('HTTP_REFERER', '')
+
+    def get_success_url(self):
+        """Return the URL to redirect to after processing a valid form."""
+        if self.object:
+            return reverse('sensors:location_detail', kwargs={
+                'place_slug': self.kwargs['place_slug'],
+                'pk': self.object.pk
+            })
+        return reverse('sensors:location_list', kwargs={
+            'place_slug': self.kwargs['place_slug']
+        })
 
     def get_location_inactive_help_text(self, location, place=None):
         """
@@ -316,8 +312,8 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, U
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self._place
-        kwargs['locations'] = self._locations
+        kwargs['place'] = self.get_place()
+        kwargs['locations'] = self.get_annotated_locations(self.get_place())
         kwargs['inactive_help_text'] = self._inactive_help_text
         
         # Get active devices for this location if it's active
@@ -332,7 +328,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, U
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        context['place'] = self._place
+        context['place'] = self.get_place()
         location = self.get_object()
         
         # Add all devices to context with annotations
@@ -354,7 +350,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, U
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
-        form.instance.place = self._place
+        form.instance.place = self.get_place()
         
         # Get the object before saving to compare values
         location = self.get_object()
@@ -376,7 +372,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, U
         # Build toast message
         message = (
             f"Updated location <strong>{self.object.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {self._place.name}<br>"
+            f"<i class='bi bi-house-gear'></i> {self.get_place().name}<br>"
             f"<small class='text-muted'>"
             f"Changes: {', '.join(changes) if changes else 'No changes'}"
             f"</small>"
@@ -393,7 +389,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, U
         }
         
         # Debug statements
-        ic("⚠️ Setting toast_message on request:", toast_message)
+        # ic("⚠️ Setting toast_message on request:", toast_message)
         
         # Set on request
         setattr(self.request, 'toast_message', toast_message)
@@ -402,26 +398,13 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ToastMixin, U
         if hasattr(self.request, 'session'):
             self.request.session['pending_toast'] = toast_message
             self.request.session.modified = True
-            ic("⚠️ Also set pending_toast in session")
+            # ic("⚠️ Also set pending_toast in session")
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
-        ic("⚠️ Redirecting to:", success_url)
+        # ic("⚠️ Redirecting to:", success_url)
         
         return HttpResponseRedirect(success_url)
-
-    def get_success_url(self):
-        # Use cleaned_data from the form instead of request.POST
-        if self.object and hasattr(self.object, 'referrer') and self.object.referrer:
-            return self.object.referrer
-        # Or check form's cleaned_data
-        elif hasattr(self, 'form') and 'referrer' in self.form.cleaned_data and self.form.cleaned_data['referrer']:
-            return self.form.cleaned_data['referrer']
-        # Fallback to default URL
-        return reverse('sensors:location_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
-            'pk': self.object.pk
-        })
 
 class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Location
@@ -435,10 +418,8 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Create inactive help text to be used in form and toast messages
         if self._place and not self._place.is_active:
             self._inactive_help_text = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 f'This location is inactive because Place "{self._place.name}" is inactive.'
-                '</div>'
             )
         else:
             self._inactive_help_text = None

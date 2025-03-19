@@ -10,7 +10,7 @@ from django.db.models.query import QuerySet, Prefetch
 from django.utils.safestring import mark_safe
 
 from ..models import Place, Location, Device, Sensor
-from ..forms import DeviceForm
+from .device_forms import DeviceForm
 from .mixins import PlaceAnnotationMixin
 
 from icecream import ic
@@ -300,10 +300,8 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             
             # Standard message for inactive location
             inactive_help_text = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 f'This device will be inactive because Location "{location.name}" is inactive.'
-                '</div>'
             )
         # If device is active, check for active sensors
         elif device and device.is_active:
@@ -323,11 +321,9 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
                 ])
                 
                 inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
-                    f'<i class="bi bi-exclamation-triangle me-2"></i>'
+                    '<i class="bi bi-exclamation-triangle me-2"></i>'
                     f'This device has {active_sensor_count} active sensor{"s" if active_sensor_count > 1 else ""}:'
                     f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_sensors_list}</ul>'
-                    '</div>'
                 )
         
         return inactive_help_text, sensors_active
@@ -459,10 +455,8 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             
             if location and not location.is_active:
                 self._inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
                     '<i class="bi bi-exclamation-triangle me-2"></i>'
                     f'This device is inactive because Location "{location.name}" is inactive.'
-                    '</div>'
                 )
             else:
                 self._inactive_help_text = None
@@ -487,44 +481,49 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         device = self.object
         location = device.location
         place = location.place
-        success_url = self.get_success_url()
+        
+        # Before we delete the device, store its data
+        device_data = {
+            'name': device.name,
+            'is_active': device.is_active,
+            'device_type': device.device_type.name if device.device_type else 'Unknown',
+            'model': device.model or '',
+            'serial_number': device.serial_number or ''
+        }
         
         # Get active sensors before deletion
         active_sensors = device.sensors.filter(is_active=True)
         sensors_info = [sensor.name for sensor in active_sensors]
         
         message = (
-            f"Deleted device <strong>{device.name}</strong> from "
-            f"<i class='bi bi-house-gear'></i> {place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {location.name}<br>"
+            f"Deleted device <strong>{device_data['name']}</strong> from "
+            f"<i class='bi bi-diagram-3'></i> {location.name}<br>"
             f"<small class='text-muted'>"
-            f"Type: {device.device_type or '-'}<br>"
-            f"Model: {device.model or '-'}<br>"
-            f"Status: {'Active' if device.is_active else 'inactive'}"
+            f"Type: {device_data['device_type']}<br>"
+            f"Model: {device_data['model']}<br>"
+            f"Serial: {device_data['serial_number']}<br>"
+            f"Status: {'Active' if device_data['is_active'] else 'inactive'}"
         )
         
-        # Add affected sensors section if there were any active sensors
         if sensors_info:
-            message += "<br>Affected sensors:<ul class='mb-0'>"
-            for sensor in sensors_info:
-                message += f"<li><i class='bi bi-thermometer'></i> {sensor}</li>"
+            message += "<br>Affected active sensors:<ul class='mb-0'>"
+            for sensor_name in sensors_info:
+                message += f"<li>{sensor_name}</li>"
             message += "</ul>"
         
         message += "</small>"
-        
-        # Add inactive warning to message if device is inactive
-        if not device.is_active and self._inactive_help_text:
-            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
+
+        # Create toast message with device data
+        request.toast_message = {
+            'message': message,
+            'type': 'warning'
+        }
         
         # Delete the device
         device.delete()
         
-        # Set toast message directly on request for middleware
-        setattr(request, 'toast_message', {
-            'message': message,
-            'type': 'danger'
-        })
-        
+        # Get the success URL and return HttpResponseRedirect
+        success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):

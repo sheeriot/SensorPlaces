@@ -1,5 +1,5 @@
 <div id="device-list-card"
-     class="card {% if not location.is_active %}opacity-50 text-muted{% endif %}">
+     class="card {% if location and not location.is_active %}opacity-50 text-muted{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center">
         {% if location %}
             {# Single location view #}
@@ -12,7 +12,7 @@
                     {% include "sensors/partials/hide_inactive_switch.html" with model="device" %}
                 {% endif %}
             </div>
-            {% include "sensors/partials/device_new_button.html" with place=place location=location %}
+            {% include "sensors/partials/device_new_button.html" %}
         {% else %}
             {# All locations view #}
             <div class="d-flex align-items-center gap-3">

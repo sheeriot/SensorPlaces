@@ -1,11 +1,9 @@
 from django.test import TestCase
-from django.core.files.uploadedfile import SimpleUploadedFile
-from sensors.forms import PlaceForm, LocationForm, DeviceForm, SensorForm
+from sensors.views.place_forms import PlaceForm, PlaceDeleteForm
+from sensors.views.location_forms import LocationForm
+from sensors.views.device_forms import DeviceForm
+from sensors.views.sensor_forms import SensorForm
 from sensors.models import Place, Location, Device, Sensor, DeviceType, InfluxSource
-from decimal import Decimal
-import tempfile
-from PIL import Image
-import io
 from django.test import Client
 from django.urls import reverse
 import json
@@ -487,15 +485,6 @@ class SensorFormTest(TestCase):
 class ToastMessageTestCase(TestCase):
     """Test that toast messages are correctly generated for form submissions"""
     
-    fixtures = [
-        'sensors/tests/fixtures/test_users.json',
-        'sensors/tests/fixtures/test_places.json',
-        'sensors/tests/fixtures/test_locations.json',
-        'sensors/tests/fixtures/test_influxsources.json',
-        'sensors/tests/fixtures/test_devices.json',
-        'sensors/tests/fixtures/test_sensors.json',
-    ]
-    
     def setUp(self):
         self.client = Client()
         self.user = get_user_model().objects.create_user(
@@ -505,47 +494,35 @@ class ToastMessageTestCase(TestCase):
         )
         self.client.login(username='toastuser', password='toastpass123')
         
-        # Create test data if fixtures are empty
-        if not Place.objects.exists():
-            self.place = Place.objects.create(
-                name='Toast Place',
-                slug='toast-place',
-                is_active=True,
-                latitude=52.3676,
-                longitude=4.9041
-            )
-        else:
-            self.place = Place.objects.first()
+        # Create test data
+        self.place = Place.objects.create(
+            name='Toast Place',
+            slug='toast-place',
+            is_active=True,
+            latitude=52.3676,
+            longitude=4.9041
+        )
             
-        if not Location.objects.exists():
-            self.location = Location.objects.create(
-                name='Toast Location',
-                place=self.place,
-                is_active=True
-            )
-        else:
-            self.location = Location.objects.first()
+        self.location = Location.objects.create(
+            name='Toast Location',
+            place=self.place,
+            is_active=True
+        )
             
-        # Create a device type if none exists
-        if not DeviceType.objects.exists():
-            self.device_type = DeviceType.objects.create(
-                name='Toast Device Type',
-                description='Device type for toast testing',
-                icon='bi-router',
-                is_active=True
-            )
-        else:
-            self.device_type = DeviceType.objects.first()
+        # Create a device type
+        self.device_type = DeviceType.objects.create(
+            name='Toast Device Type',
+            description='Device type for toast testing',
+            icon='bi-router',
+            is_active=True
+        )
             
-        if not Device.objects.exists():
-            self.device = Device.objects.create(
-                name='Toast Device',
-                location=self.location,
-                is_active=True,
-                device_type=self.device_type
-            )
-        else:
-            self.device = Device.objects.first()
+        self.device = Device.objects.create(
+            name='Toast Device',
+            location=self.location,
+            is_active=True,
+            device_type=self.device_type
+        )
     
     def test_create_toast_messages(self):
         """Test that creating a place, location, device, and sensor generates toast messages"""
@@ -620,7 +597,11 @@ class ToastMessageTestCase(TestCase):
         
         # Set up CSRF token
         response = self.client.get(reverse('sensors:place_detail', kwargs={'place_slug': self.place.slug}))
-        csrf_token = self.client.cookies.get('csrftoken').value
+        csrf_token = response.cookies.get('csrftoken', None)
+        if csrf_token:
+            csrf_token = csrf_token.value
+        else:
+            csrf_token = 'test-csrf-token'  # Fallback for testing
         
         # Toggle the device inactive - should deactivate dependent sensors too
         response = self.client.post(
@@ -645,4 +626,31 @@ class ToastMessageTestCase(TestCase):
         toast_key = 'toast_data' if 'toast_data' in response_data else 'toast'
         self.assertTrue(toast_key in response_data)
         self.assertIn('message', response_data[toast_key])
-        print("===> test_forms.py --> test_toggle_active_toast_messages PASS") 
+        print("===> test_forms.py --> test_toggle_active_toast_messages PASS")
+
+    def test_place_delete_form_validation(self):
+        """Test that PlaceDeleteForm requires the correct name confirmation"""
+        # Create a test place
+        test_place = Place.objects.create(
+            name='Delete Test Place',
+            slug='delete-test-place',
+            is_active=True,
+            latitude=53.4808,
+            longitude=-2.2426
+        )
+        
+        # Test with incorrect name
+        form_data = {
+            'confirmation_name': 'Wrong Name'
+        }
+        form = PlaceDeleteForm(data=form_data, instance=test_place)
+        self.assertFalse(form.is_valid())
+        self.assertIn('confirmation_name', form.errors)
+        
+        # Test with correct name
+        form_data = {
+            'confirmation_name': 'Delete Test Place'
+        }
+        form = PlaceDeleteForm(data=form_data, instance=test_place)
+        self.assertTrue(form.is_valid())
+        print("===> test_forms.py --> test_place_delete_form_validation PASS") 

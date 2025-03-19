@@ -1,0 +1,153 @@
+{% extends "sensors/base.html" %}
+{% load static %}
+
+{% block title %}Notifications - {{ place.name }} - SensorPlaces{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-bell me-2"></i>Notifications for {{ place.name }}
+                </h5>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="markAllReadBtn">
+                        <i class="bi bi-check-all me-1"></i>Mark all as read
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if toasts %}
+                    <div class="list-group list-group-flush">
+                        {% for toast in toasts %}
+                            <div class="list-group-item list-group-item-action border-0 toast-item" data-toast-id="{{ toast.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">{{ toast.created_at|date:"M d, Y H:i" }}</small>
+                                    <span class="badge rounded-pill bg-{{ toast.type }}">{{ toast.type }}</span>
+                                </div>
+                                <div class="mt-2">
+                                    {{ toast.message|safe }}
+                                </div>
+                                <div class="d-flex justify-content-end mt-2">
+                                    <button class="btn btn-sm btn-outline-secondary mark-read-btn" data-toast-id="{{ toast.id }}">
+                                        <i class="bi bi-check2"></i> Mark as read
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-bell-slash fs-1 d-block mb-3 text-muted"></i>
+                        <p class="text-muted">No notifications found for this place.</p>
+                    </div>
+                {% endif %}
+            </div>
+            {% if toasts.has_other_pages %}
+                <div class="card-footer">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if toasts.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ toasts.previous_page_number }}">Previous</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Previous</span>
+                            </li>
+                        {% endif %}
+                        
+                        {% for i in toasts.paginator.page_range %}
+                            {% if toasts.number == i %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ i }}</span>
+                                </li>
+                            {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if toasts.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ toasts.next_page_number }}">Next</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Next</span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle mark as read buttons
+        document.querySelectorAll('.mark-read-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const toastId = this.dataset.toastId;
+                markAsRead([toastId]);
+            });
+        });
+
+        // Handle mark all as read button
+        document.getElementById('markAllReadBtn').addEventListener('click', function() {
+            const toastIds = Array.from(document.querySelectorAll('.toast-item')).map(item => {
+                return item.dataset.toastId;
+            });
+            
+            if (toastIds.length > 0) {
+                if (confirm('Are you sure you want to mark all notifications as read?')) {
+                    markAsRead(toastIds);
+                }
+            }
+        });
+
+        // Function to mark toasts as read
+        function markAsRead(toastIds) {
+            if (!toastIds.length) return;
+            
+            fetch(`/api/{{ place.slug }}/toasts/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    action: 'mark_read',
+                    toast_ids: toastIds
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // For single toast, hide the item
+                    if (toastIds.length === 1) {
+                        const toastItem = document.querySelector(`.toast-item[data-toast-id="${toastIds[0]}"]`);
+                        if (toastItem) {
+                            toastItem.querySelector('.mark-read-btn').disabled = true;
+                            toastItem.querySelector('.mark-read-btn').innerHTML = '<i class="bi bi-check2-all"></i> Read';
+                            toastItem.classList.add('bg-light');
+                        }
+                    } else {
+                        // For all toasts, reload the page
+                        window.location.reload();
+                    }
+                } else {
+                    console.error('Failed to mark toasts as read:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    });
+</script>
+{% endblock %} 

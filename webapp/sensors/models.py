@@ -118,10 +118,26 @@ class Location(models.Model):
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
+    def clean(self):
+        super().clean()
+        # Ensure location can't be active if place is inactive
+        if self.is_active and not self.place.is_active:
+            raise ValidationError({
+                'is_active': 'Location cannot be active when its place is inactive.'
+            })
+
     def save(self, *args, **kwargs):
+        # Run full validation first
+        self.full_clean()
+        
+        # If parent place is inactive, location must be inactive
+        if hasattr(self, 'place') and self.place and not self.place.is_active:
+            self.is_active = False
+        
         # If location is being deactivated, deactivate all its devices
         if not self.is_active and self.pk:  # Only for existing locations
             Device.objects.filter(location=self).update(is_active=False)
+            
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -177,10 +193,18 @@ class Device(models.Model):
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
-    def __str__(self) -> str:
-        return f"{self.name} ({self.model})"
+    def clean(self):
+        super().clean()
+        # Ensure device can't be active if location is inactive
+        if self.is_active and not self.location.is_active:
+            raise ValidationError({
+                'is_active': 'Device cannot be active when its location is inactive.'
+            })
 
     def save(self, *args, **kwargs):
+        # Run full validation first
+        self.full_clean()
+        
         # If location is inactive, device must be inactive
         if not self.location.is_active:
             self.is_active = False
@@ -191,6 +215,9 @@ class Device(models.Model):
             Sensor.objects.filter(device=self).update(is_active=False)
             
         super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.model})"
 
     class Meta:
         verbose_name_plural = '4. Devices'
@@ -258,9 +285,16 @@ class Sensor(models.Model):
 
     def clean(self):
         super().clean()
+        # Ensure sensor can't be active if device is inactive
         if self.is_active and not self.device.is_active:
             raise ValidationError({
-                'is_active': 'Cannot activate a sensor that belongs to an inactive device.'
+                'is_active': 'Sensor cannot be active when its device is inactive.'
+            })
+            
+        # Also check if the device's location is inactive
+        if self.is_active and self.device.location and not self.device.location.is_active:
+            raise ValidationError({
+                'is_active': 'Sensor cannot be active when its device\'s location is inactive.'
             })
 
     def save(self, *args, **kwargs):
@@ -269,6 +303,10 @@ class Sensor(models.Model):
         
         # If device is inactive, sensor must be inactive
         if not self.device.is_active:
+            self.is_active = False
+        
+        # Also check if the device's location is inactive
+        if self.device.location and not self.device.location.is_active:
             self.is_active = False
             
         super().save(*args, **kwargs)

@@ -24,23 +24,13 @@ Debug info:
         </div>
     {% endif %}
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="server-toast-message" data-processed="false">
-                <script type="application/json">
-                    {{ message }}
-                </script>
-            </div>
-        {% endfor %}
-    {% endif %}
-
     {% if toast_messages %}
-        {% for toast_message in toast_messages %}
+        {% for message in toast_messages %}
             <div class="server-toast-message" data-processed="false">
                 <script type="application/json">
                     {
-                        "message": "{{ toast_message.message|safe }}",
-                        "type": "{{ toast_message.type }}"
+                        "message": "{{ message.message|safe }}",
+                        "type": "{{ message.type }}"
                     }
                 </script>
             </div>

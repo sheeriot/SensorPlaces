@@ -1,9 +1,9 @@
 // System Configuration
 const utilsConfig = {
-    debug: false,  // Set to true to enable debug mode
-    logCSRF: true,
-    logFetch: true,
-    logToasts: true
+    debug: false,  // Set to false in production
+    logCSRF: false,
+    logFetch: false,
+    logToasts: false
 };
 
 // Utility Functions
@@ -170,11 +170,10 @@ const utils = {
                     console.log('Showing toast message:', toastData);
                 }
 
-                if (window.toastSystem) {
-                    window.toastSystem.show(toastData);
-                } else if (utilsConfig.debug && utilsConfig.logToasts) {
-                    console.warn('Toast system not available');
-                }
+                // Dispatch toast event instead of direct toastSystem call
+                document.dispatchEvent(new CustomEvent('sensors:toast:show', {
+                    detail: toastData
+                }));
             }
 
             // Handle CSRF errors
@@ -192,15 +191,19 @@ const utils = {
             // Handle other error responses
             if (!response.ok) {
                 // Show error toast if there isn't already a toast message
-                if (!data.toast && window.toastSystem) {
+                if (!data.toast) {
                     if (utilsConfig.debug && utilsConfig.logToasts) {
                         console.log('Showing error toast for non-OK response');
                     }
-                    window.toastSystem.show({
-                        message: data.detail || 'An error occurred while processing your request.',
-                        type: 'danger',
-                        addToHistory: true
-                    });
+                    
+                    // Dispatch toast event for errors
+                    document.dispatchEvent(new CustomEvent('sensors:toast:show', {
+                        detail: {
+                            message: data.detail || 'An error occurred while processing your request.',
+                            type: 'danger',
+                            addToHistory: true
+                        }
+                    }));
                 }
                 const error = new Error(data.detail || 'Request failed');
                 if (utilsConfig.debug && utilsConfig.logFetch) {
@@ -226,16 +229,14 @@ const utils = {
             }
             
             // Show error toast for network/parsing errors
-            if (window.toastSystem) {
-                if (utilsConfig.debug && utilsConfig.logToasts) {
-                    console.log('Showing error toast for fetch error');
-                }
-                window.toastSystem.show({
+            document.dispatchEvent(new CustomEvent('sensors:toast:show', {
+                detail: {
                     message: error.message || 'A network error occurred. Please try again.',
                     type: 'danger',
                     addToHistory: true
-                });
-            }
+                }
+            }));
+            
             throw error;
         }
     }
@@ -264,15 +265,10 @@ window.utils.addToast = function(message, type = 'info') {
         type: type
     };
     
-    // Add to the system if available
-    if (window.toastSystem) {
-        window.toastSystem.show(toastData);
-    } else {
-        console.warn("Toast system not available, storing for later");
-        // Store for later processing
-        window._pendingToasts = window._pendingToasts || [];
-        window._pendingToasts.push(toastData);
-    }
+    // Dispatch toast event
+    document.dispatchEvent(new CustomEvent('sensors:toast:show', {
+        detail: toastData
+    }));
 };
 
 // Add ability to add multiple toasts at once

@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
 
-from django.db.models import OuterRef, Subquery, Count, Q  # Count, Q, Exists
+from django.db.models import OuterRef, Subquery
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
@@ -17,12 +17,13 @@ from django.utils.safestring import mark_safe
 
 from ..models import Place, Device, Sensor, SensorReading
 from .mixins import PlaceAnnotationMixin
-from ..forms import SensorForm
+from .sensor_forms import SensorForm
 from ..utils import get_sensor_readings
 
 from datetime import datetime, timedelta
-import sys
+# import sys
 # import json
+
 from icecream import ic
 
 class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
@@ -197,18 +198,14 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             
             # Standard message for inactive device
             inactive_help_text = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 f'Sensor cannot be active because Device "{device.name}" is inactive.'
-                '</div>'
             )
         # If sensor is active, create help text about deactivation
         elif sensor and sensor.is_active:
             inactive_help_text = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 'If deactivated, this sensor will no longer collect data and readings will not be available.'
-                '</div>'
             )
         
         return inactive_help_text
@@ -360,18 +357,14 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             
             # Standard message for inactive device
             inactive_help_text = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 f'This sensor will be inactive because Device "{device.name}" is inactive.'
-                '</div>'
             )
         # If sensor is active, create help text about deactivation
         elif sensor and sensor.is_active:
             inactive_help_text = mark_safe(
-                '<div class="form-text text-warning-emphasis mt-2">'
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 'If deactivated, this sensor will no longer collect data and readings will not be available.'
-                '</div>'
             )
         
         return inactive_help_text
@@ -506,10 +499,8 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             
             if device and not device.is_active:
                 self._inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
                     '<i class="bi bi-exclamation-triangle me-2"></i>'
                     f'This sensor is inactive because Device "{device.name}" is inactive.'
-                    '</div>'
                 )
             else:
                 self._inactive_help_text = None
@@ -548,34 +539,38 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         location = device.location
         place = location.place
         
-        # Store success_url before deletion
-        success_url = self.get_success_url()
+        # Before deleting the sensor, store its data
+        sensor_data = {
+            'name': sensor.name,
+            'is_active': sensor.is_active,
+            'sensor_type': sensor.sensor_type or '',
+            'data_type': sensor.data_type or '',
+            'unit': sensor.unit or ''
+        }
         
         message = (
-            f"Deleted sensor <strong>{sensor.name}</strong> from "
-            f"<i class='bi bi-house-gear'></i> {place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {location.name} > "
+            f"Deleted sensor <strong>{sensor_data['name']}</strong> from "
             f"<i class='bi bi-hdd-rack'></i> {device.name}<br>"
             f"<small class='text-muted'>"
-            f"Type: {sensor.get_sensor_type_display()}<br>"
-            f"Unit: {sensor.unit}<br>"
-            f"Status: {'Active' if sensor.is_active else 'inactive'}"
-            f"</small>"
+            f"Type: {sensor_data['sensor_type']}<br>"
+            f"Data type: {sensor_data['data_type']}<br>"
+            f"Unit: {sensor_data['unit']}<br>"
+            f"Status: {'Active' if sensor_data['is_active'] else 'inactive'}"
         )
         
-        # Add inactive warning to message if sensor is inactive
-        if not sensor.is_active and hasattr(self, '_inactive_help_text') and self._inactive_help_text:
-            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
+        message += "</small>"
+        
+        # Create toast message
+        request.toast_message = {
+            'message': message,
+            'type': 'warning'
+        }
         
         # Delete the sensor
         sensor.delete()
         
-        # Set toast message directly on request for middleware
-        setattr(request, 'toast_message', {
-            'message': message,
-            'type': 'danger'
-        })
-        
+        # Get the success URL and return HttpResponseRedirect
+        success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):
