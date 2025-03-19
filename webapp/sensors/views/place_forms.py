@@ -79,6 +79,9 @@ class PlaceForm(forms.ModelForm):
         self.helper.error_text_inline = True
         self.helper.help_text_inline = True
         
+        # Make address field optional
+        self.fields['address'].required = False
+        
         # If this is an existing Place, preserve its slug
         if self.instance and self.instance.pk:
             self.fields['slug'].initial = self.instance.slug
@@ -215,6 +218,10 @@ class PlaceForm(forms.ModelForm):
         name = cleaned_data.get('name')
         current_slug = cleaned_data.get('slug')
         
+        # Set a default empty value for address if it's missing
+        if 'address' not in cleaned_data or cleaned_data.get('address') is None:
+            cleaned_data['address'] = ''
+        
         if name:
             # Only generate new slug if this is a new place or slug is missing
             if not current_slug:
@@ -311,12 +318,8 @@ class PlaceDeleteForm(forms.ModelForm):
     
     def clean_confirmation_name(self):
         confirmation_name = self.cleaned_data.get('confirmation_name')
-        # Debug output
-        # ic("Cleaning confirmation_name")
         # Ensure instance has a name attribute
         place_name = self.instance.name if self.instance and hasattr(self.instance, 'name') else ""
-        # ic(f"Instance name: {place_name}")
-        # ic(f"Confirmation name: {confirmation_name}")
         
         if confirmation_name != place_name:
             raise forms.ValidationError(

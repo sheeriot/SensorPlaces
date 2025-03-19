@@ -89,7 +89,8 @@ class SensorForm(forms.ModelForm):
 
         # Add form helpers
         self.helper = FormHelper()
-        self.helper.form_tag = False
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
         self.helper.layout = Layout(
             # Hidden field
             'referrer',
