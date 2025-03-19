@@ -18,15 +18,15 @@
     </div>
     <div class="card-body px-2 pb-1 pt-2">
         <dl class="row g-0">
-            <dt class="text-secondary small mb-1">Address</dt>
-            <dd class="mb-2 fw-medium">{{ place.address }}</dd>
-            
             <dt class="text-secondary small mb-1">Status</dt>
             <dd class="mb-2">
                 <div class="d-flex align-items-center gap-2">
-                    {% include "sensors/partials/status_active_badge.html" with object=place show_active=true %}
+                    {% include "sensors/partials/status_active_badge.html" with object=place show_active=True %}
                 </div>
             </dd>
+            
+            <dt class="text-secondary small mb-1">Address</dt>
+            <dd class="mb-2 fw-medium">{{ place.address }}</dd>
             
             <dt class="text-secondary small mb-1">Coordinates</dt>
             <dd class="mb-2">

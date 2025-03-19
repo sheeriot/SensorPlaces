@@ -1,1 +1,1 @@
-# This file makes the templatetags directory a Python package 
+# This file is intentionally empty to make Python treat the directory as a package 

@@ -21,12 +21,7 @@
 
         <!-- right column -->
         <div class="col-md-8">
-            {% if location %}
-                <div class="mb-3">Location: {{ location.name }}</div>
-                {% include "sensors/includes/device_list_card.html" with place=place locations=locations.all location=location %}
-            {% else %}
-                {% include "sensors/includes/device_list_card.html" with place=place locations=locations.all %}
-            {% endif %}
+            {% include "sensors/includes/device_list_card.html" %}
         </div>
     </div>
 </div>

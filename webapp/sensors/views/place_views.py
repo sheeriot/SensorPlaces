@@ -10,11 +10,11 @@ from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.utils.safestring import mark_safe
-from typing import Dict, Any, Optional, cast
+# from typing import Dict, Any, Optional, cast
 
 # App stuff
 from ..models import Place, Location, Device, Sensor, ToastNotification
-from ..forms import PlaceForm, PlaceDeleteForm
+from .place_forms import PlaceForm, PlaceDeleteForm
 from ..map_fun import place_map_create
 from .mixins import PlaceAnnotationMixin
 
@@ -64,6 +64,14 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
+        
+        # Add place_map_html to the context
+        try:
+            map_html = place_map_create(places=[self.object])
+            context['place_map_html'] = map_html
+        except Exception as e:
+            context['place_map_html'] = ""
+            
         return context
 
 class PlaceCreateView(LoginRequiredMixin, CreateView):
@@ -75,10 +83,8 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
         super().setup(request, *args, **kwargs)
         # Create inactive help text to be used in form and toast messages
         self._inactive_help_text = mark_safe(
-            '<div class="form-text text-warning-emphasis mt-2">'
             '<i class="bi bi-exclamation-triangle me-2"></i>'
             'This place is inactive. All locations and devices within it will not collect data.'
-            '</div>'
         )
     
     def get_form_kwargs(self):
@@ -127,11 +133,10 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
         super().setup(request, *args, **kwargs)
         # Create inactive help text to be used in form and toast messages
         self._inactive_help_text = mark_safe(
-            '<div class="form-text text-warning-emphasis mt-2">'
             '<i class="bi bi-exclamation-triangle me-2"></i>'
             'This place is inactive. All locations and devices within it will not collect data.'
-            '</div>'
         )
+        
 
     def get_initial(self):
         initial = super().get_initial()
@@ -220,82 +225,78 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
     
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Create inactive help text to be used in form and toast messages
-        self._inactive_help_text = mark_safe(
-            '<div class="form-text text-warning-emphasis mt-2">'
-            '<i class="bi bi-exclamation-triangle me-2"></i>'
-            'This place is inactive. All locations and devices within it will not collect data.'
-            '</div>'
-        )
     
     def get_form_kwargs(self):
         """Return the keyword arguments for instantiating the form."""
-        kwargs = {}
-        if hasattr(self, 'object'):
-            kwargs.update({'place': self.object})
-        kwargs.update({'inactive_help_text': self._inactive_help_text})
+        kwargs = super().get_form_kwargs()
         return kwargs
     
-    def get_form(self):
-        """Return the form instance."""
-        form_class = self.get_form_class()
-        return form_class(**self.get_form_kwargs())
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model_name'] = 'place'
+        return context
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         place = self.object
-        success_url = self.get_success_url()
         
-        # Get active locations and devices before deletion
-        active_locations = Location.objects.filter(
-            place=place,
-            is_active=True
-        ).annotate(
-            active_devices=Count('devices', filter=Q(devices__is_active=True))
-        )
+        # Debug the object
+        # ic("Place in post method:", place)
+        # ic("Place name:", place.name if place else "No name")
         
-        # Store place data before deletion
-        place_data = {
-            'name': place.name,
-            'latitude': place.latitude,
-            'longitude': place.longitude,
-            'is_active': place.is_active
-        }
+        # Get the form with the object instance properly set
+        form_class = self.get_form_class()
+        form = form_class(request.POST, instance=place)
         
-        message = (
-            f"Deleted place <strong>{place_data['name']}</strong><br>"
-            f"<small class='text-muted'>"
-            f"Location: ({place_data['latitude']}, {place_data['longitude']})<br>"
-            f"Status: {'Active' if place_data['is_active'] else 'inactive'}"
-        )
+        # Debug the form
+        # ic("Form instance:", form.instance)
+        # ic("Form instance name:", form.instance.name if hasattr(form.instance, 'name') else "No name")
         
-        if active_locations.exists():
-            message += "<br>Affected active locations:<ul class='mb-0'>"
-            for loc in active_locations:
-                message += f"<li>{loc.name} ({loc.active_devices} active devices)</li>"
-            message += "</ul>"
-        
-        message += "</small>"
-        
-        # Add inactive warning to message if place is inactive
-        if not place_data['is_active']:
-            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
-        
-        # Set toast message directly on request for middleware
-        setattr(request, 'toast_message', {
-            'message': message,
-            'type': 'danger'
-        })
-        
-        # ic("PlaceDeleteView setting toast_message:", {
-        #     'message': message,
-        #     'type': 'danger'
-        # })
-        
-        # Log the place deletion with place name for debugging
-        place.delete()
-        
-        return HttpResponseRedirect(success_url)
+        if form.is_valid():
+            # Store place data before deletion
+            place_data = {
+                'name': place.name,
+                'latitude': place.latitude,
+                'longitude': place.longitude,
+                'is_active': place.is_active
+            }
+            
+            message = (
+                f"Deleted place <strong>{place_data['name']}</strong> "
+                f"<small class='text-muted'>{place_data['latitude']:.6f}, {place_data['longitude']:.6f}</small>"
+            )
+            
+            # Get count of active locations before deletion
+            active_locations = Location.objects.filter(
+                place=place,
+                is_active=True
+            ).annotate(
+                active_devices=Count('devices', filter=Q(devices__is_active=True))
+            )
+            
+            if active_locations.exists():
+                message += "<br>Affected active locations:<ul class='mb-0'>"
+                for loc in active_locations:
+                    message += f"<li>{loc.name} ({loc.active_devices} active devices)</li>"
+                message += "</ul>"
+            
+            message += "</small>"
+            
+            # Before we delete the place, add a toast notification without place association
+            # Setting the place association for a Place deletion would create a foreign key issue
+            # because the Place would be deleted before the notification could be saved
+            setattr(request, 'toast_message', {
+                'message': message,
+                'type': 'warning'
+            })
+            
+            # Delete the place
+            success_url = self.get_success_url()
+            self.object.delete()
+            
+            return HttpResponseRedirect(success_url)
+        else:
+            return self.form_invalid(form)
 
 @login_required
 @csrf_protect
@@ -368,6 +369,21 @@ def place_stats(request, place_slug):
             'error': str(e)
         }, status=500)
 
+from django import forms
+
+class LocationPositionForm(forms.Form):
+    id = forms.IntegerField()
+    x_pos = forms.DecimalField(max_digits=5, decimal_places=2)
+    y_pos = forms.DecimalField(max_digits=5, decimal_places=2)
+
+    def clean_x_pos(self):
+        x_pos = self.cleaned_data['x_pos']
+        return Decimal(str(round(float(x_pos), 2)))
+
+    def clean_y_pos(self):
+        y_pos = self.cleaned_data['y_pos']
+        return Decimal(str(round(float(y_pos), 2)))
+
 @login_required
 @csrf_protect
 def siteplan_update(request, place_slug):
@@ -388,19 +404,27 @@ def siteplan_update(request, place_slug):
         # Track changes for message
         location_changes = []
         
-        # Update each location's position
+        # Validate and update each location's position
         for loc_data in changed_locations:
-            location = get_object_or_404(Location, id=loc_data['id'], place=place)
+            # Validate the data using the form
+            form = LocationPositionForm(loc_data)
+            if not form.is_valid():
+                return JsonResponse({
+                    'message': f"Invalid position data: {form.errors}",
+                    'type': 'danger'
+                }, status=400)
+            
+            location = get_object_or_404(Location, id=form.cleaned_data['id'], place=place)
             old_x = float(location.x_pos)
             old_y = float(location.y_pos)
-            new_x = float(loc_data['x_pos'])
-            new_y = float(loc_data['y_pos'])
+            new_x = float(form.cleaned_data['x_pos'])
+            new_y = float(form.cleaned_data['y_pos'])
             
             # Only process if position actually changed
-            if abs(old_x - new_x) > 0.01 or abs(old_y - new_y) > 0.01:  # Small threshold for float comparison
-                # Update position
-                location.x_pos = new_x
-                location.y_pos = new_y
+            if abs(old_x - new_x) > 0.01 or abs(old_y - new_y) > 0.01:
+                # Update position with cleaned (rounded) values
+                location.x_pos = form.cleaned_data['x_pos']
+                location.y_pos = form.cleaned_data['y_pos']
                 location.save()
                 
                 # Add to changes list with ID

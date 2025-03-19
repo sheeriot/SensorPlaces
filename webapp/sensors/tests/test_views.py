@@ -242,8 +242,14 @@ class SensorsViewTestCase(TestCase):
         place_count = Place.objects.count()
         response = self.client.post(
             reverse('sensors:place_delete', kwargs={'place_slug': temp_place.slug}),
-            {'confirm_name': temp_place.name}
+            {'confirmation_name': temp_place.name}  # Use the correct field name from the form
         )
+        
+        # Print response content for debugging
+        # print(f"Response status: {response.status_code}")
+        # if response.status_code != 302:
+        #     print(f"Response content: {response.content.decode('utf-8')}")
+            
         self.assertEqual(response.status_code, 302)  # Redirect after successful deletion
         self.assertEqual(Place.objects.count(), place_count - 1)
         with self.assertRaises(Place.DoesNotExist):

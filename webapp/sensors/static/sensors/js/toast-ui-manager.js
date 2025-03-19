@@ -9,17 +9,12 @@
 
 // System Configuration
 const toastConfig = {
-    debug: false,  // Set to true to enable debug mode
-    // apiEndpoint: (placeSlug) => `/api/${placeSlug}/toasts/`,
+    debug: false,  // Set to false in production
+    apiEndpoint: (placeSlug) => `/api/${placeSlug}/toasts/`,
 };
-
-// if (toastConfig.debug) 
-// console.log('toastConfig.apiEndpoint:', toastConfig.apiEndpoint);
 
 // Create and initialize the system
 const createToastSystem = () => {
-    if (toastConfig.debug) console.log('[Toast Manager] Creating toast system');
-    
     const system = {
         initialized: false,
         historyButton: null,
@@ -29,49 +24,33 @@ const createToastSystem = () => {
 
         initialize() {
             if (this.initialized) {
-                if (toastConfig.debug) console.log('[Toast Manager] System already initialized');
                 return true;
             }
-            
-            if (toastConfig.debug) console.group('[Toast Manager] System Initialization');
             
             // Get DOM elements
             this.historyButton = document.getElementById('toast-history-button');
             this.historyBadge = document.getElementById('toast-history-badge');
             
             if (!this.historyButton || !this.historyBadge) {
-                if (toastConfig.debug) console.log('[Toast Manager] Required elements not found');
-                if (toastConfig.debug) console.groupEnd();
                 return false;
             }
 
             // Get initial count from global state
-            this.toastUnreadCount = window.sensorPlaces.toastUnreadCount;
+            this.toastUnreadCount = window.sensorPlaces?.toastUnreadCount || 0;
             
-            if (toastConfig.debug) {
-                console.log('[Toast Manager] Initial state:', {
-                    unreadCount: this.toastUnreadCount,
-                    placeSlug: window.sensorPlaces.currentPlaceSlug,
-                    badgeVisible: !this.historyBadge.classList.contains('d-none')
-                });
-            }
-
             // Set up click handler for history button
             this.historyButton.addEventListener('click', async (event) => {
-                if (toastConfig.debug) console.log('[Toast Manager] History button clicked');
                 event.preventDefault();
 
                 // Find history modal
                 let historyModal = document.getElementById('toast-history-modal');
                 if (!historyModal) {
-                    if (toastConfig.debug) console.log('[Toast Manager] Error: History modal not found');
                     return;
                 }
 
                 // Get place slug from global state
                 const placeSlug = window.sensorPlaces?.currentPlaceSlug;
                 if (!placeSlug) {
-                    if (toastConfig.debug) console.log('[Toast Manager] Error: No current place slug found in global state');
                     return;
                 }
 
@@ -178,7 +157,7 @@ const createToastSystem = () => {
                     console.error('Error loading toast history:', error);
                     const historyList = historyModal.querySelector('#toastHistoryList');
                     if (historyList) {
-                            historyList.innerHTML = `
+                        historyList.innerHTML = `
                             <div class="text-center text-danger py-5">
                                 <i class="bi bi-exclamation-circle fs-1 d-block mb-3"></i>
                                 Error loading notifications
@@ -188,25 +167,16 @@ const createToastSystem = () => {
             });
 
             this.initialized = true;
-            if (toastConfig.debug) console.groupEnd();
             return true;
         },
 
         updateBadge(count) {
             if (!this.historyBadge) {
-                if (toastConfig.debug) console.log('[Toast Manager] Cannot update badge: element not found');
                 return;
             }
             
             // Ensure count is a number
             this.toastUnreadCount = parseInt(count, 10) || 0;
-            
-            if (toastConfig.debug) {
-                console.log('[Toast Manager] Updating badge:', {
-                    count: this.toastUnreadCount,
-                    willBeVisible: this.toastUnreadCount > 0
-                });
-            }
             
             // Update badge text
             this.historyBadge.textContent = this.toastUnreadCount || '';
@@ -225,9 +195,7 @@ const createToastSystem = () => {
             }
         },
 
-        showToast(message, type = 'success', addToHistory = true) {
-            if (toastConfig.debug) console.log('[Toast Manager] Showing toast:', { message, type, addToHistory });
-
+        show(message, type = 'success', addToHistory = true) {
             if (!this.initialized) {
                 const initResult = this.initialize();
                 if (!initResult) {
@@ -262,7 +230,7 @@ const createToastSystem = () => {
 
             // Create toast element with pointer-events enabled
             const toastEl = document.createElement('div');
-            toastEl.className = `toast text-${toastData.type}`;  // Remove 'show' class
+            toastEl.className = `toast text-${toastData.type}`;
             toastEl.style.pointerEvents = 'auto';
             toastEl.setAttribute('role', 'alert');
             toastEl.setAttribute('aria-live', 'assertive');
@@ -287,7 +255,7 @@ const createToastSystem = () => {
             // Initialize Bootstrap toast with a slight delay
             requestAnimationFrame(() => {
                 if (typeof bootstrap === 'undefined') {
-                    if (toastConfig.debug) console.log('[Toast Manager] Error: Bootstrap not loaded!');
+                    console.error('Bootstrap not loaded!');
                     return;
                 }
 
@@ -313,27 +281,6 @@ const createToastSystem = () => {
             });
         },
 
-        // Main show method that handles both object and parameter-based calls
-        show(message, type = 'success', addToHistory = true) {
-            if (toastConfig.debug) {
-                console.group('[Toast Manager] show() called');
-                console.log('Received args:', { message, type, addToHistory });
-                
-                if (typeof message === 'object') {
-                    console.log('Message is an object, extracting:', message);
-                } else {
-                    console.log('Message is direct string:', message);
-                }
-                console.groupEnd();
-            }
-
-            if (typeof message === 'object') {
-                this.showToast(message.message, message.type, message.addToHistory);
-            } else {
-                this.showToast(message, type, addToHistory);
-            }
-        },
-
         // Add new method for loading toast history
         async loadToastHistory(placeSlug, showAll = false) {
             const historyList = document.querySelector('#toastHistoryList');
@@ -353,7 +300,7 @@ const createToastSystem = () => {
                     // Get template once
                     const template = document.getElementById('toast-history-item-template');
                     if (!template) {
-                        console.error('[Toast Manager] Template not found');
+                        console.error('Toast history item template not found');
                         return;
                     }
 
@@ -497,25 +444,17 @@ const createToastSystem = () => {
 
     // Export for use in other modules
     window.toastSystem = system;
-    if (toastConfig.debug) console.log('[Toast Manager] System exported to window');
     return system;
 };
 
 // Initialize the toast system
 const initializeToastSystem = () => {
-    if (toastConfig.debug) console.log('[Toast Manager] Initializing system:', {
-        readyState: document.readyState,
-        time: new Date().toISOString()
-    });
-
     if (!window.toastSystem) {
-        if (toastConfig.debug) console.log('[Toast Manager] Creating new system instance');
         createToastSystem();
     }
 
     const initResult = window.toastSystem.initialize();
-    if (toastConfig.debug) console.log('[Toast Manager] System initialized:', initResult);
-
+    
     if (document.readyState === 'complete') {
         processServerToast();
     } else {
@@ -524,32 +463,9 @@ const initializeToastSystem = () => {
 };
 
 // Ensure proper initialization sequence
-const initWhenReady = () => {
-    if (toastConfig.debug) console.log('Checking document ready state', {
-        readyState: document.readyState,
-        bodyAvailable: !!document.body
-    });
-
-    if (document.readyState === 'loading') {
-        if (toastConfig.debug) console.log('Document still loading, adding DOMContentLoaded listener');
-        document.addEventListener('DOMContentLoaded', () => {
-            if (toastConfig.debug) console.log('DOMContentLoaded fired');
-            if (document.readyState !== 'complete') {
-                if (toastConfig.debug) console.log('Waiting for full load');
-                window.addEventListener('load', initializeToastSystem);
-            } else {
-                initializeToastSystem();
-            }
-        });
-    } else {
-        if (toastConfig.debug) console.log('Document already interactive/complete, initializing now');
-        initializeToastSystem();
-    }
-};
-
-// Start initialization process immediately
-if (toastConfig.debug) console.log('Starting toast system initialization process');
-initWhenReady();
+document.addEventListener('DOMContentLoaded', () => {
+    initializeToastSystem();
+});
 
 // Export toast events for other modules
 window.ToastEvents = {
@@ -561,30 +477,55 @@ window.ToastEvents = {
 // Process server-side toast messages
 const processServerToast = () => {
     const toastContainer = document.getElementById('toast-messages');
-    if (!toastContainer) return;
+    if (!toastContainer) {
+        return;
+    }
 
+    // Process all server toast messages
     const serverToastElements = toastContainer.querySelectorAll('.server-toast-message');
-    if (toastConfig.debug) console.log('[Toast Manager] Found server toasts:', serverToastElements.length);
+    
+    if (serverToastElements.length === 0) {
+        // Check for direct toast data - as an emergency fallback
+        const directToast = document.getElementById('direct-toast-fallback');
+        if (directToast && directToast.querySelector('script')) {
+            try {
+                const directScript = directToast.querySelector('script');
+                const directData = JSON.parse(directScript.textContent);
+                if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                    window.toastSystem.show(directData);
+                } else if (window.showToast) {
+                    window.showToast(directData.message, directData.type);
+                }
+            } catch (e) {
+                console.error('Error processing direct toast:', e);
+            }
+        }
+        return;
+    }
 
-    Array.from(serverToastElements).forEach(toastMessage => {
+    // Process all server toast messages
+    Array.from(serverToastElements).forEach((toastMessage, index) => {
         if (toastMessage.getAttribute('data-processed') === 'true') return;
 
-        const toastScript = toastMessage.querySelector('script[type="application/json"]');
+        const toastScript = toastMessage.querySelector('script');
         if (toastScript && window.toastSystem) {
             try {
                 const toastData = JSON.parse(toastScript.textContent);
                 toastData.addToHistory = false;  // Badge count is already in template
-                window.toastSystem.show(toastData);
+                
+                // Add a slight delay between toasts
+                setTimeout(() => {
+                    if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                        window.toastSystem.show(toastData);
+                    } else if (window.showToast) {
+                        window.showToast(toastData.message, toastData.type);
+                    }
+                }, index * 300);
+                
                 toastMessage.setAttribute('data-processed', 'true');
             } catch (e) {
-                console.error('[Toast Manager] Error processing toast:', e);
+                console.error('Error processing toast:', e, toastScript.textContent);
             }
         }
     });
-};
-
-if (toastConfig.debug) console.log('Toast UI Manager script loaded', {
-    readyState: document.readyState,
-    toastSystemAvailable: !!window.toastSystem,
-    eventsExported: !!window.ToastEvents
-}); 
+}; 

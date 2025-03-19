@@ -1,4 +1,3 @@
-
 from django.views import View
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
@@ -8,10 +7,36 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.db.models import Exists, OuterRef
 from django.http import JsonResponse
+from django.views.generic import ListView
 
 from ..models import Place, ToastNotification, ToastReadStatus
 
 import json
+
+
+# Add the ToastListView class
+class ToastListView(LoginRequiredMixin, ListView):
+    """View for displaying a list of toast notifications for a place."""
+    model = ToastNotification
+    template_name = 'sensors/toast_list.html'
+    context_object_name = 'toasts'
+    paginate_by = 20
+    
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.place = get_object_or_404(Place, slug=kwargs.get('place_slug'))
+    
+    def get_queryset(self):
+        return ToastNotification.objects.filter(
+            user=self.request.user,
+            place=self.place
+        ).order_by('-created_at')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['place'] = self.place
+        context['model_name'] = 'toast'
+        return context
 
 
 @method_decorator(csrf_protect, name='dispatch')

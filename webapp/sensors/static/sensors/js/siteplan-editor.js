@@ -338,8 +338,8 @@ const sitePlanSystem = {
     imageCoordsToPercent(coords) {
         const bounds = this.state.imageBounds;
         return {
-            x_pos: (coords.lng / bounds[1][1]) * 100,
-            y_pos: (coords.lat / bounds[1][0]) * 100
+            x_pos: Number((coords.lng / bounds[1][1] * 100).toFixed(2)),
+            y_pos: Number((coords.lat / bounds[1][0] * 100).toFixed(2))
         };
     },
 
@@ -365,9 +365,9 @@ const sitePlanSystem = {
         const changedLocations = Array.from(this.state.markers.entries())
             .map(([id, {marker, originalPosition}]) => {
                 const currentPos = this.imageCoordsToPercent(marker.getLatLng());
-                // Round to 2 decimal places to avoid floating point issues
-                const x_pos = parseFloat(currentPos.x_pos.toFixed(2));
-                const y_pos = parseFloat(currentPos.y_pos.toFixed(2));
+                // Values are already rounded to 2 decimal places in imageCoordsToPercent
+                const x_pos = currentPos.x_pos;
+                const y_pos = currentPos.y_pos;
                 
                 // Compare with original position
                 if (x_pos !== originalPosition.x_pos || y_pos !== originalPosition.y_pos) {
