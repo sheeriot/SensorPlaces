@@ -240,17 +240,9 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
         self.object = self.get_object()
         place = self.object
         
-        # Debug the object
-        # ic("Place in post method:", place)
-        # ic("Place name:", place.name if place else "No name")
-        
         # Get the form with the object instance properly set
         form_class = self.get_form_class()
         form = form_class(request.POST, instance=place)
-        
-        # Debug the form
-        # ic("Form instance:", form.instance)
-        # ic("Form instance name:", form.instance.name if hasattr(form.instance, 'name') else "No name")
         
         if form.is_valid():
             # Store place data before deletion

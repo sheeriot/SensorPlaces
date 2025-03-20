@@ -362,9 +362,10 @@ class DeviceFormTest(TestCase):
 
 
 class SensorFormTest(TestCase):
-    """Test the sensor form"""
+    """Test the SensorForm validation"""
     
     def setUp(self):
+        # Create a place
         self.place = Place.objects.create(
             name='Test Place',
             slug='test-place',
@@ -372,38 +373,34 @@ class SensorFormTest(TestCase):
             latitude=52.3676,
             longitude=4.9041
         )
+        
+        # Create a location
         self.location = Location.objects.create(
             name='Test Location',
             place=self.place,
             is_active=True
         )
         
-        # Create a device type with a unique name using timestamp
-        unique_suffix = f"{datetime.datetime.now().timestamp()}-{random.randint(1000, 9999)}"
+        # Create a device type
         self.device_type = DeviceType.objects.create(
-            name=f'Gateway-{unique_suffix}',
-            description='Gateway device type for testing',
-            icon='bi-router',
+            name='Test Device Type',
+            description='Test device type for testing',
+            icon='bi-hdd',
             is_active=True
         )
         
+        # Create a device
         self.device = Device.objects.create(
             name='Test Device',
             location=self.location,
             is_active=True,
             device_type=self.device_type
         )
-        self.inactive_device = Device.objects.create(
-            name='Inactive Device',
-            location=self.location,
-            is_active=False,
-            device_type=self.device_type
-        )
         
-        # Create an InfluxSource for testing
+        # Create an influx source
         self.influx_source = InfluxSource.objects.create(
-            name='Test InfluxDB',
-            server_dns='test.influxdb.com',
+            name='Test Influx',
+            server_dns='localhost',
             server_port=8086,
             bucket_name='test_bucket',
             org='test_org',
@@ -420,42 +417,65 @@ class SensorFormTest(TestCase):
             'unit': '°C',
             'data_type': 'DB'
         }
-        
         form = SensorForm(data=form_data, device=self.device)
-        if not form.is_valid():
-            print(f"Form errors: {form.errors}")
         self.assertTrue(form.is_valid())
         print("===> test_forms.py --> test_valid_form (SensorFormTest) PASS")
     
     def test_inactive_device_constraint(self):
-        """Test that sensor can't be active if device is inactive"""
+        """Test that a sensor's is_active is automatically set to False if its device is inactive"""
         # Make the device inactive
         self.device.is_active = False
         self.device.save()
         
+        # Form data with is_active=False is valid with inactive device
         form_data = {
             'name': 'New Test Sensor',
             'device': self.device.pk,
-            'is_active': False,  # Set this to False to make the form valid
+            'is_active': False,
             'sensor_type': 'TEMP',
             'unit': '°C',
             'data_type': 'DB'
         }
         
         form = SensorForm(data=form_data, device=self.device)
-        # Store errors for debugging but only print if test fails
-        form_errors = form.errors if not form.is_valid() else None
         self.assertTrue(form.is_valid())
+        self.assertFalse(form.cleaned_data['is_active'])
         
-        # Form is invalid if is_active=True with inactive device
-        form_data['is_active'] = True
+        # Form data with is_active=True is invalid with inactive device
+        form_data = {
+            'name': 'New Test Sensor',
+            'device': self.device.pk,
+            'is_active': True,
+            'sensor_type': 'TEMP',
+            'unit': '°C',
+            'data_type': 'DB'
+        }
+        
         form = SensorForm(data=form_data, device=self.device)
         self.assertFalse(form.is_valid())
         self.assertIn('is_active', form.errors)
+        # Check that the right error message is raised
+        self.assertIn('Sensor cannot be active', str(form.errors['is_active']))
         print("===> test_forms.py --> test_inactive_device_constraint PASS")
     
     def test_influx_fields_required(self):
-        """Test that InfluxDB fields are required for INFLUX data_type"""
+        """Test that InfluxDB fields are required when data_type is INFLUX"""
+        # Form with data_type=INFLUX but missing influx_source and influx_measurement should be invalid
+        form_data = {
+            'name': 'New Test Sensor',
+            'device': self.device.pk,
+            'is_active': True,
+            'sensor_type': 'TEMP',
+            'unit': '°C',
+            'data_type': 'INFLUX'
+        }
+        
+        form = SensorForm(data=form_data, device=self.device)
+        self.assertFalse(form.is_valid())
+        self.assertIn('influx_source', form.errors)
+        self.assertIn('influx_measurement', form.errors)
+        
+        # Form with data_type=INFLUX and all required fields should be valid
         form_data = {
             'name': 'New Test Sensor',
             'device': self.device.pk,
@@ -463,23 +483,66 @@ class SensorFormTest(TestCase):
             'sensor_type': 'TEMP',
             'unit': '°C',
             'data_type': 'INFLUX',
-            # Missing required fields for INFLUX data type
+            'influx_source': self.influx_source.pk,
+            'influx_measurement': 'test_measurement'
         }
         
         form = SensorForm(data=form_data, device=self.device)
-        # Store errors for debugging but only print if test fails
-        form_errors = form.errors if not form.is_valid() else None
-        self.assertFalse(form.is_valid())
-        self.assertIn('influx_source', form.errors)
-        self.assertIn('influx_measurement', form.errors)
-        
-        # Add the required fields to make it valid
-        form_data['influx_source'] = self.influx_source.pk
-        form_data['influx_measurement'] = 'test_measurement'
-        form = SensorForm(data=form_data, device=self.device)
-        form_errors = form.errors if not form.is_valid() else None
         self.assertTrue(form.is_valid())
         print("===> test_forms.py --> test_influx_fields_required PASS")
+        
+    def test_form_html_rendering(self):
+        """Test that the SensorForm correctly generates HTML with form tags"""
+        form = SensorForm(device=self.device)
+        
+        # Check form helper configuration
+        self.assertTrue(form.helper.form_tag)
+        self.assertEqual(form.helper.form_method, 'post')
+        
+        # Verify that key fields are in the form layout
+        layout_fields = self._get_layout_field_names(form.helper.layout)
+        self.assertIn('name', layout_fields)
+        self.assertIn('device', layout_fields)
+        self.assertIn('is_active', layout_fields)
+        self.assertIn('sensor_type', layout_fields)
+        self.assertIn('unit', layout_fields)
+        self.assertIn('data_type', layout_fields)
+        
+        # Check if the submit button is included
+        has_submit = self._layout_has_submit(form.helper.layout)
+        self.assertTrue(has_submit, "Form should include a submit button")
+        
+        print("===> test_forms.py --> test_form_html_rendering PASS")
+    
+    def _get_layout_field_names(self, layout):
+        """Extract field names from a layout object recursively"""
+        field_names = []
+        
+        if hasattr(layout, 'fields'):
+            for field in layout.fields:
+                if hasattr(field, 'fields'):
+                    field_names.extend(self._get_layout_field_names(field))
+                elif hasattr(field, 'field'):
+                    field_names.append(field.field)
+                elif isinstance(field, str):
+                    field_names.append(field)
+        
+        return field_names
+    
+    def _layout_has_submit(self, layout):
+        """Check if layout contains a submit button"""
+        if hasattr(layout, 'fields'):
+            for field in layout.fields:
+                if hasattr(field, 'fields'):
+                    if self._layout_has_submit(field):
+                        return True
+                elif str(field).lower().find('submit') >= 0:
+                    return True
+                elif hasattr(field, 'content'):
+                    content = str(field.content).lower()
+                    if 'submit' in content or 'type="submit"' in content:
+                        return True
+        return False
 
 
 class ToastMessageTestCase(TestCase):
