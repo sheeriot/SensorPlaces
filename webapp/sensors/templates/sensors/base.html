@@ -20,7 +20,8 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'sensors/css/common.css' %}">
-    {% block extra_css %}{% endblock %}
+    {% block extra_css %}
+    {% endblock %}
 
 </head>
 <body data-toast-unread-count="{{ toast_unread_count|default:0 }}"
@@ -128,7 +129,8 @@
         {% include "sensors/partials/place_nav_breadcrumbs.html" with place=place location=location device=device sensor=sensor model_name=model_name %}
     </div>
 
-        {% block content %}{% endblock %}
+        {% block content %}
+        {% endblock %}
         
         <!-- Add debug output at the bottom of the page -->
         {% if debug %}
@@ -202,11 +204,11 @@
     <script src="{% static 'sensors/js/place-map-popout.js' %}"></script>
     <script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
 
-
     <!-- Utilities -->
     <script src="{% static 'sensors/js/time-display.js' %}"></script>
 
     {% block extra_js %}
     {% endblock %}
+
 </body>
 </html> 

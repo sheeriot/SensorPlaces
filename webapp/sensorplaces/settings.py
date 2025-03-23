@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,14 +20,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6(r&6ixhh6-ct2h0_)#*pz(pswbx!x6z318oc9(suw5w&wtzp!'
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
+# SECURITY WARNING: don't run with debug turned on in production!
+if os.environ.get('DJANGO_DEBUG') == 'False':
+    DEBUG = False
+else:
+    DEBUG = True
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+SERVERNAME1 = os.environ.get('SERVERNAME1')
+SERVERNAME2 = os.environ.get('SERVERNAME2')
 
+ALLOWED_HOSTS = ["127.0.0.1", SERVERNAME1, SERVERNAME2]
+CSRF_TRUSTED_ORIGINS = [
+    'https://' + SERVERNAME1,
+    'https://' + SERVERNAME2,
+    'http://' + SERVERNAME1,
+    'http://' + SERVERNAME2,
+]
 
 # Application definition
 
@@ -141,9 +158,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / "sensors" / "static",
-]
+STATIC_ROOT = '/opt/app/static_files'
+# STATICFILES_DIRS = [
+#     BASE_DIR / "sensors" / "static",
+# ]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

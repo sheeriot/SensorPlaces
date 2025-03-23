@@ -23,7 +23,8 @@ const placesMapFoliumSystem = {
         map: null,
         hideInactiveState: false,
         userHasAdjustedView: false,
-        debug: false  // Default to false, will be updated in initialize()
+        debug: false,  // Default to false, will be updated in initialize()
+        leafletLoaded: false
     },
 
     async initialize() {
@@ -46,6 +47,9 @@ const placesMapFoliumSystem = {
         if (!mapContainer) return;
 
         try {
+            // First, make sure Leaflet is loaded
+            await this.ensureLeafletLoaded();
+            
             const foliumMap = await this.waitForFoliumMap(mapContainer);
             if (!foliumMap) return;
 
@@ -62,6 +66,28 @@ const placesMapFoliumSystem = {
         } catch (error) {
             console.error('Map initialization error:', error);
         }
+    },
+    
+    ensureLeafletLoaded() {
+        return new Promise(resolve => {
+            const checkLeaflet = () => {
+                if (typeof L !== 'undefined') {
+                    this.state.leafletLoaded = true;
+                    if (this.state.debug) {
+                        console.log('Leaflet is loaded and ready');
+                    }
+                    resolve();
+                    return;
+                }
+                
+                if (this.state.debug) {
+                    console.log('Waiting for Leaflet to load...');
+                }
+                setTimeout(checkLeaflet, 100);
+            };
+            
+            checkLeaflet();
+        });
     },
 
     waitForFoliumMap(container) {
@@ -230,7 +256,9 @@ const placesMapFoliumSystem = {
             this.state.map.fitBounds(bounds);
         } catch (error) {
             console.error('Error fitting map to bounds:', error);
-            this.state.map.fitBounds(L.latLngBounds(markers).pad(0.1));
+            if (this.state.leafletLoaded) {
+                this.state.map.fitBounds(L.latLngBounds(markers).pad(0.1));
+            }
         }
     },
 
@@ -329,6 +357,10 @@ const placesMapFoliumSystem = {
     }
 };
 
+// Make sure Leaflet is loaded before initializing the system
 document.addEventListener('DOMContentLoaded', () => {
-    placesMapFoliumSystem.initialize();
+    // Delay initialization to ensure scripts are loaded
+    setTimeout(() => {
+        placesMapFoliumSystem.initialize();
+    }, 100);
 }); 

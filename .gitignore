@@ -19,7 +19,6 @@ staticfiles/
 
 # Python virtual environment
 venv/
-env/
 ENV/
 .Python
 .python-version
@@ -28,6 +27,7 @@ ENV/
 .docker/
 docker-compose.override.yml
 *.env
+!env/django-sample.env
 .env.*
 
 # macOS

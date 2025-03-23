@@ -52,13 +52,9 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
         else:
             center = [sum(all_lats) / len(all_lats), sum(all_lons) / len(all_lons)]
         
-        # Initialize map
+        # Initialize map with a specific ID that matches what places-map-folium.js expects
         m = folium.Map(location=center, **map_kwargs)
         m._name = "places_overview_map"
-        
-        # Tell Folium not to include resources we already have
-        m.default_css = []
-        m.default_js = []
         
         # Add markers
         for place in places:
@@ -69,9 +65,9 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
             </div>
             """
             
-            # Create marker with all options
+            # Create marker with all data attributes needed by places-map-folium.js
             icon_html = f'''
-                <div class="awesome-marker-icon-{'blue' if place.is_active else 'red'} awesome-marker place-marker{' d-none opacity-50 text-muted' if not place.is_active else ''}"
+                <div class="awesome-marker-icon-{'blue' if place.is_active else 'red'} awesome-marker place-marker"
                     data-place-slug="{place.slug}"
                     data-place-active="{str(place.is_active).lower()}"
                     data-place-lat="{str(place.latitude)}"
@@ -120,7 +116,7 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
         # Get the map HTML
         map_html = m.get_root().render()
         
-        # Add the bounds data as a proper JSON attribute
+        # Add the bounds data as a proper JSON attribute for placesMapFoliumSystem to use
         map_html = map_html.replace(
             'class="folium-map"',
             f'class="folium-map" data-map-bounds=\'{json.dumps(bounds_data)}\''
