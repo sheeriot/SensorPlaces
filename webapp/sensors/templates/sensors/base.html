@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    {% csrf_token %}
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}Sensor Management - SensorPlaces{% endblock %}</title>
     
     <!-- Core CSS -->
@@ -29,6 +29,7 @@
       {% for key, value in body_data_attributes.items %} 
       data-{{ key }}="{{ value }}"
       {% endfor %}>
+    {% csrf_token %}
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
         <div class="container">
             <div class="d-flex align-items-center flex-grow-1">

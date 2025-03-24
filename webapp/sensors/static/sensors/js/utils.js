@@ -1,8 +1,8 @@
 // System Configuration
 const utilsConfig = {
-    debug: false,  // Set to false in production
-    logCSRF: false,
-    logFetch: false,
+    debug: true,  // Set to true temporarily
+    logCSRF: true,
+    logFetch: true,
     logToasts: false
 };
 
@@ -46,14 +46,19 @@ const utils = {
             if (utilsConfig.debug && utilsConfig.logCSRF) {
                 console.log('Token not found in cookie, checking meta tag');
             }
+            // Try both meta tag and input element
+            const metaTag = document.querySelector('meta[name="csrf-token"]');
             const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
-            if (csrfInput) {
+            
+            if (metaTag) {
+                token = metaTag.getAttribute('content');
+            } else if (csrfInput) {
                 token = csrfInput.value;
             }
         }
         
         if (utilsConfig.debug && utilsConfig.logCSRF) {
-            console.log('Final CSRF token:', token ? 'Found' : 'Not found');
+            console.log('Final CSRF token:', token ? token.substring(0, 8) + '...' : 'Not found');
             console.groupEnd();
         }
         return token;
@@ -69,9 +74,10 @@ const utils = {
         }
 
         const defaultOptions = {
-            credentials: 'same-origin',
+            credentials: 'include',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
             cache: 'no-store'
         };
@@ -90,7 +96,9 @@ const utils = {
                 }
                 throw error;
             }
+            // Add both header formats to ensure compatibility
             defaultOptions.headers['X-CSRFToken'] = csrfToken;
+            defaultOptions.headers['X-CSRF-Token'] = csrfToken;
         }
 
         // Properly merge headers
@@ -105,6 +113,7 @@ const utils = {
 
         if (utilsConfig.debug && utilsConfig.logFetch) {
             console.log('Merged request options:', mergedOptions);
+            console.log('Request headers:', mergedOptions.headers);
         }
         
         // Ensure URL doesn't start with double slashes
