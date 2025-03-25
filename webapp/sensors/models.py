@@ -234,45 +234,53 @@ class InfluxSource(models.Model):
         verbose_name_plural = 'InfluxDB Sources'
 
 class Sensor(models.Model):
-    DATA_TYPES = [
-        ('DB', 'Database'),
-        ('INFLUX', 'InfluxDB'),
-    ]
-    
+    """A sensor that can be attached to a device."""
     SENSOR_TYPES = [
-        ('TEMP', 'Temperature'),
-        ('HUM', 'Humidity'),
-        ('PRESS', 'Pressure'),
-        ('CO2', 'CO2'),
+        ('TEMPERATURE', 'Temperature'),
+        ('HUMIDITY', 'Humidity'),
+        ('PRESSURE', 'Pressure'),
+        ('LIGHT', 'Light'),
+        ('SOUND', 'Sound'),
+        ('MOTION', 'Motion'),
+        ('CO2', 'Carbon Dioxide'),
+        ('VOC', 'Volatile Organic Compounds'),
+        ('PM25', 'Particulate Matter 2.5'),
+        ('PM10', 'Particulate Matter 10'),
         ('OTHER', 'Other'),
     ]
-
-    UNITS = [
-        ('°C', 'Celsius'),
-        ('°F', 'Fahrenheit'),
-        ('%', 'Percent'),
-        ('hPa', 'Hectopascal'),
-        ('ppm', 'Parts per Million'),
-        ('other', 'Other'),
+    DATA_TYPES = [
+        ('DIRECT', 'Direct'),
+        ('INFLUX', 'InfluxDB'),
     ]
-
+    UNITS = [
+        ('C', '°C'),
+        ('F', '°F'),
+        ('K', 'K'),
+        ('RH', '%RH'),
+        ('PA', 'Pa'),
+        ('HPA', 'hPa'),
+        ('LUX', 'lux'),
+        ('DB', 'dB'),
+        ('PPM', 'ppm'),
+        ('PPB', 'ppb'),
+        ('UGM3', 'μg/m³'),
+        ('NONE', '(None)'),
+    ]
+    INFLUX_SOURCES = [
+        ('MAIN', 'Main InfluxDB'),
+        ('SECONDARY', 'Secondary InfluxDB'),
+    ]
+    
     name: CharField = models.CharField(max_length=100)
-    sensor_type: CharField = models.CharField(max_length=50, choices=SENSOR_TYPES)
     device: ForeignKey = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='sensors')
-    unit = models.CharField(max_length=10, choices=UNITS, default='other')
-    data_type = models.CharField(max_length=10, choices=DATA_TYPES, default='DB')
-    influx_source = models.ForeignKey(
-        InfluxSource, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='sensors'
-    )
-    influx_measurement = models.CharField(max_length=100, default='sensor_readings', blank=True)
-    is_active: BooleanField = models.BooleanField(
-        default=True,
-        # help_text="inactive sensors will be hidden by default"
-    )
+    is_active: BooleanField = models.BooleanField(default=True, verbose_name='Active Status')
+    sensor_type: CharField = models.CharField(max_length=20, choices=SENSOR_TYPES)
+    unit: CharField = models.CharField(max_length=10, choices=UNITS)
+    
+    # For data source
+    data_type: CharField = models.CharField(max_length=10, choices=DATA_TYPES, default='DIRECT')
+    influx_source: CharField = models.CharField(max_length=20, choices=INFLUX_SOURCES, null=True, blank=True)
+    influx_measurement: CharField = models.CharField(max_length=100, null=True, blank=True)
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 

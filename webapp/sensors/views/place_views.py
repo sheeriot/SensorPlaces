@@ -23,8 +23,6 @@ from .views_fun import get_place_data, get_place_counts, get_annotated_locations
 import json
 from decimal import Decimal
 
-from icecream import ic
-
 # Place Views
 class PlaceListView(LoginRequiredMixin, ListView):
     model = Place
@@ -43,7 +41,6 @@ class PlaceListView(LoginRequiredMixin, ListView):
             map_html = place_map_create(places=self.get_queryset(), zoom_start=10)
             context['place_map_html'] = map_html
         except Exception as e:
-            # ic("Error creating place map:", str(e))
             context['place_map_html'] = ""
         
         return context
@@ -123,7 +120,6 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
-        # ic("Toast: PlaceCreateView:", getattr(self.request, 'toast_message', None))
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
@@ -144,7 +140,7 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
         self._place = self.get_object()
         
         # Generate detailed inactive help text 
-        self._inactive_help_text, self._active_locations = self.get_place_inactive_help_text(self._place)
+        self._inactive_help_text = self.get_place_inactive_help_text(self._place)
         
         # Cache the referrer for later use
         self._referrer = request.META.get('HTTP_REFERER', '')
@@ -157,15 +153,13 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
             place: The place object
             
         Returns:
-            tuple: (help_text, active_locations)
-                - help_text: HTML string with warning message or None
-                - active_locations: list of active locations for this place
+            help_text: HTML string with warning message or None
         """
         if not place:
-            return None, []
+            return None
             
-        # Basic message
-        basic_message = 'This place is inactive. All locations and devices within it will not collect data.'
+        # Basic message - short version
+        basic_message = 'When inactive, all devices within this place will stop collecting data.'
         
         # Get active locations with device counts
         active_locations = Location.objects.filter(
@@ -182,32 +176,28 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
             # Just return the basic message if no active locations
             return mark_safe(
                 '<i class="bi bi-exclamation-triangle me-2"></i>' + basic_message
-            ), []
+            )
             
         # Count total active devices and sensors
         total_active_devices = sum(loc.active_devices for loc in active_locations)
         total_active_sensors = sum(loc.active_sensors for loc in active_locations)
         
-        # Generate the list of active locations with their device and sensor counts
+        # Generate a more concise list of active locations with their device and sensor counts
         active_locations_list = ''.join([
-            f'<li><i class="bi bi-geo-alt text-muted me-1"></i>{loc.name} '
-            f'<small class="text-muted">({loc.active_devices} active devices, {loc.active_sensors} active sensors)</small></li>'
+            f'<li>{loc.name} <span class="text-muted">({loc.active_devices} device{"s" if loc.active_devices != 1 else ""}, {loc.active_sensors} sensor{"s" if loc.active_sensors != 1 else ""})</span></li>'
             for loc in active_locations
         ])
         
-        # Create detailed help text
+        # Create concise help text
         help_text = mark_safe(
-            '<div class="form-text text-warning-emphasis mt-2">'
             f'<i class="bi bi-exclamation-triangle me-2"></i>{basic_message}<br>'
-            f'Setting this place to inactive will affect:<br>'
-            f'<strong>{active_location_count} active location{"s" if active_location_count > 1 else ""}</strong> with '
-            f'<strong>{total_active_devices} active device{"s" if total_active_devices != 1 else ""}</strong> and '
-            f'<strong>{total_active_sensors} active sensor{"s" if total_active_sensors != 1 else ""}</strong>'
-            f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_locations_list}</ul>'
-            '</div>'
+            f'<small><strong>Affected:</strong> {active_location_count} location{"s" if active_location_count > 1 else ""} '
+            f'with {total_active_devices} device{"s" if total_active_devices != 1 else ""} '
+            f'and {total_active_sensors} sensor{"s" if total_active_sensors != 1 else ""}</small>'
+            f'<ul class="list-unstyled small mb-0 mt-1 ms-2">{active_locations_list}</ul>'
         )
-        
-        return help_text, list(active_locations)
+            
+        return help_text
 
     def get_initial(self):
         initial = super().get_initial()
@@ -257,49 +247,45 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
             f"</small>"
         )
         
-        # Check if place was set to inactive from active
-        if original_values['is_active'] and not form.cleaned_data['is_active']:
-            # Get fresh inactive help text for toast message (in case things changed)
-            toast_inactive_help_text, active_locations = self.get_place_inactive_help_text(self.object)
-            
-            # Add affected locations and devices list to toast
-            if active_locations:
-                # Count total affected devices and sensors
-                total_active_devices = sum(loc.active_devices for loc in active_locations)
-                total_active_sensors = sum(loc.active_sensors for loc in active_locations)
-                
-                # Simplified formatted list of affected locations
-                locations_list = ''.join([
-                    f"<li>{loc.name} ({loc.active_devices} devices, {loc.active_sensors} sensors)</li>"
-                    for loc in active_locations
-                ])
-                
-                message += (
-                    f"<br><small class='text-warning'>"
-                    f"<i class='bi bi-exclamation-triangle me-2'></i>"
-                    f"This place has been set to inactive, affecting:<br>"
-                    f"<strong>{len(active_locations)} active location{'s' if len(active_locations) > 1 else ''}</strong> with "
-                    f"<strong>{total_active_devices} active device{'s' if total_active_devices != 1 else ''}</strong> and "
-                    f"<strong>{total_active_sensors} active sensor{'s' if total_active_sensors != 1 else ''}</strong>"
-                    f"<ul class='mb-0 mt-1'>{locations_list}</ul>"
-                    f"</small>"
+        # Add inactive warning to toast message if place is now inactive
+        if not form.cleaned_data['is_active']:
+            # Check if this is a change from active to inactive
+            if original_values['is_active'] and not form.cleaned_data['is_active']:
+                # Generate fresh inactive help text for the toast - but more concise version for the toast
+                active_locations = Location.objects.filter(
+                    place=self.object,
+                    is_active=True
+                ).annotate(
+                    active_devices=Count('devices', filter=Q(devices__is_active=True)),
+                    active_sensors=Count('devices__sensors', filter=Q(devices__sensors__is_active=True))
                 )
+                
+                active_location_count = active_locations.count()
+                if active_location_count > 0:
+                    total_active_devices = sum(loc.active_devices for loc in active_locations)
+                    total_active_sensors = sum(loc.active_sensors for loc in active_locations)
+                    
+                    message += (
+                        f"<br><small class='text-warning'>"
+                        f"<i class='bi bi-exclamation-triangle me-2'></i>Place set to inactive - "
+                        f"{active_location_count} location{'s' if active_location_count != 1 else ''}, "
+                        f"{total_active_devices} device{'s' if total_active_devices != 1 else ''}, and "
+                        f"{total_active_sensors} sensor{'s' if total_active_sensors != 1 else ''} affected"
+                        f"</small>"
+                    )
+                else:
+                    message += (
+                        f"<br><small class='text-warning'>"
+                        f"<i class='bi bi-exclamation-triangle me-2'></i>Place set to inactive"
+                        f"</small>"
+                    )
             else:
-                # Basic message if no active locations
+                # This place was already inactive, just show a simple message
                 message += (
                     f"<br><small class='text-warning'>"
-                    f"<i class='bi bi-exclamation-triangle me-2'></i>"
-                    f"This place has been set to inactive. All locations and devices within it will not collect data."
+                    f"<i class='bi bi-exclamation-triangle me-2'></i>Place is inactive"
                     f"</small>"
                 )
-        # Add basic inactive help text if already inactive
-        elif not form.cleaned_data['is_active']:
-            message += (
-                f"<br><small class='text-warning'>"
-                f"<i class='bi bi-exclamation-triangle me-2'></i>"
-                f"This place is inactive. All locations and devices within it will not collect data."
-                f"</small>"
-            )
         
         # Set toast message directly on request instead of session
         setattr(self.request, 'toast_message', {

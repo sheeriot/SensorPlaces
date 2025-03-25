@@ -119,6 +119,13 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['place'] = self._place
         context['location'] = self._location
         
+        # Add sensors to context
+        # Convert to list to ensure it's iterable
+        context['sensors'] = list(self.object.sensors.all())
+        
+        # For convenience, also add active sensors separately
+        context['active_sensors'] = [s for s in context['sensors'] if s.is_active]
+        
         # Rest of your context data setup
         # ...
         
@@ -252,11 +259,10 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             location = device.location
             
             # Get help text based on device active state and its location
-            self._inactive_help_text, self._sensors_active = self.get_device_inactive_help_text(device, location)
+            self._inactive_help_text = self.get_device_inactive_help_text(device, location)
             
         except Exception as e:
             # If we can't get the object yet (e.g., in a GET request before the object exists)
-            # ic(f"Error in DeviceUpdateView.setup: {str(e)}")
             pass
 
     def get_device_inactive_help_text(self, device, location=None):
@@ -268,15 +274,13 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             location: The device's location (optional)
             
         Returns:
-            tuple: (help_text, active_sensors)
-                - help_text: HTML string with warning message or None
-                - active_sensors: list of active sensors for this device or []
+            str: help_text HTML string with warning message or None
         """
         inactive_help_text = None
         sensors_active = []
         
         if not device:
-            return None, []
+            return None
             
         if not location:
             location = device.location
@@ -286,30 +290,26 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             # Check if device is active when it shouldn't be
             if device and device.is_active:
                 # Get the list of affected sensors before fixing
+                # Convert queryset to list to ensure it's iterable
                 sensors_active = list(device.sensors.filter(is_active=True).annotate(
                     reading_count=Count('readings')
-                ).prefetch_related('sensors'))
+                ))
                 
                 # Fix the inconsistency - set device to inactive
                 device.is_active = False
                 device.save()
-                
-                # Just log the inconsistency with ic
-                # ic(f"Fixed inconsistency: Device {device.id} ({device.name}) was active "
-                #    f"but its Location {location.id} ({location.name}) is inactive.")
-                # ic(f"Affected sensors: {len(sensors_active)}")
             
             # Standard message for inactive location
             inactive_help_text = mark_safe(
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 f'This device will be inactive because Location "{location.name}" is inactive.'
             )
-        # If device is active, check for active sensors
-        elif device and device.is_active:
-            # Get active sensors with reading counts
+        # If device is being set to inactive or viewing an inactive device, check for active sensors
+        elif device:
+            # Get active sensors with reading counts - convert queryset to list
             sensors_active = list(device.sensors.filter(is_active=True).annotate(
                 reading_count=Count('readings')
-            ).prefetch_related('sensors'))
+            ))
             
             active_sensor_count = len(sensors_active)
             
@@ -327,7 +327,10 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
                     f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_sensors_list}</ul>'
                 )
         
-        return inactive_help_text, sensors_active
+        # Store the active sensors list for later use - make sure it's a list
+        self._sensors_active = sensors_active if isinstance(sensors_active, list) else list(sensors_active)
+        
+        return inactive_help_text
 
     def get_initial(self):
         initial = super().get_initial()
@@ -385,9 +388,10 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     def form_valid(self, form):
         # Store original values before save
         device = self.get_object()
+        original_is_active = device.is_active
         self._original_values = {
             'name': device.name,
-            'is_active': device.is_active,
+            'is_active': original_is_active,
             'location': device.location,
             'device_type': device.device_type,
             'model': device.model,
@@ -413,6 +417,10 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
                 changes.append(f"model: {self._original_values['model']} → {form.cleaned_data['model']}")
             if self._original_values['serial_number'] != form.cleaned_data['serial_number']:
                 changes.append(f"serial number: {self._original_values['serial_number']} → {form.cleaned_data['serial_number']}")
+
+        # If active status changed, update the inactive_help_text
+        if original_is_active != device.is_active:
+            self._inactive_help_text = self.get_device_inactive_help_text(device, device.location)
 
         # Build toast message
         message = (

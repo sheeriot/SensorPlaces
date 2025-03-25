@@ -3,83 +3,29 @@ This template expects:
 - field: The form field (is_active)
 - model_name: The name of the model (e.g., 'location', 'device', 'sensor')
 - instance_pk: The primary key of the instance
-- affected_items: List of items that will be affected by deactivation (optional)
 - place_slug: The place's slug (optional)
 {% endcomment %}
 
 {% load crispy_forms_field %}
 
 <div id="div_{{ field.html_name }}" 
-     class="form-check d-flex align-items-center gap-3 {% if not field.value %}opacity-50 text-muted{% endif %}"
+     class="form-check d-flex align-items-start gap-2 {% if not field.value %}opacity-50 text-muted{% endif %}"
      data-field-name="{{ field.html_name }}"
      data-model-name="{{ model_name|default:'unknown' }}"
      {% if instance_pk %}data-{{ model_name }}-id="{{ instance_pk }}"{% endif %}
      {% if instance_pk %}data-{{ model_name }}-active="{{ field.value|lower }}"{% endif %}
      {% if place_slug %}data-place-slug="{{ place_slug }}"{% endif %}>
-    <div class="d-flex align-items-center flex-shrink-0" style="min-width: 80px;">
-        <div class="form-check-input-container" style="width: 20px; height: 20px; flex-shrink: 0;">
+    <div class="d-flex align-items-center" style="flex-shrink: 0;">
+        <div class="form-check-input-container">
             {% crispy_field field %}
         </div>
-        <label for="{{ field.id_for_label }}" class="form-check-label ms-2 mb-0" style="flex-shrink: 0;">
+        <label for="{{ field.id_for_label }}" class="form-check-label ms-1 mb-0">
             {{ field.label }}
         </label>
     </div>
     {% if field.help_text %}
-    <div class="flex-grow-1 {% if field.value %}d-none{% endif %} form-text text-warning-emphasis mt-2" data-help-text-container>
+    <div class="flex-grow-1 {% if field.value %}d-none{% endif %} form-text text-warning-emphasis mt-0" data-help-text-container>
         {{ field.help_text|safe }}
     </div>
     {% endif %}
-    
-    {% if affected_items and affected_items|length > 0 %}
-    <div class="affected-items-container {% if field.value %}d-none{% endif %} ms-3">
-        <div class="text-warning-emphasis">
-            <small>
-                <i class="bi bi-exclamation-triangle me-1"></i>
-                When inactive, these items will also be inactive:
-            </small>
-            <ul class="mb-0 mt-1 small text-muted">
-                {% for item in affected_items|slice:":5" %}
-                <li>{{ item.name }}</li>
-                {% endfor %}
-                {% if affected_items|length > 5 %}
-                <li>... and {{ affected_items|length|add:"-5" }} more</li>
-                {% endif %}
-            </ul>
-        </div>
-    </div>
-    {% endif %}
 </div>
-
-<script>
-// Optional JavaScript to show/hide affected items when checkbox changes
-document.addEventListener('DOMContentLoaded', function() {
-    const checkbox = document.getElementById('{{ field.id_for_label }}');
-    if (checkbox) {
-        checkbox.addEventListener('change', function() {
-            const container = this.closest('[data-field-name="{{ field.html_name }}"]');
-            if (container) {
-                // Update data attribute
-                container.setAttribute('data-{{ model_name }}-active', this.checked.toString());
-                
-                // Update opacity classes
-                if (this.checked) {
-                    container.classList.remove('opacity-50', 'text-muted');
-                } else {
-                    container.classList.add('opacity-50', 'text-muted');
-                }
-                
-                // Toggle help text and affected items
-                const helpText = container.querySelector('[data-help-text-container]');
-                if (helpText) {
-                    helpText.classList.toggle('d-none', this.checked);
-                }
-                
-                const affectedItems = container.querySelector('.affected-items-container');
-                if (affectedItems) {
-                    affectedItems.classList.toggle('d-none', this.checked);
-                }
-            }
-        });
-    }
-});
-</script>

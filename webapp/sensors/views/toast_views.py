@@ -103,8 +103,9 @@ class ToastAPIView(LoginRequiredMixin, View):
         """Handle POST requests for marking messages as read.
         
         POST Data:
-            action: str - 'mark_read'
-            toast_ids: int or list[int] - Single ID or list of IDs to mark as read
+            action: str - 'mark_read' or 'mark_all_read'
+            toast_id: int - Single ID to mark as read (for 'mark_read' action)
+            toast_ids: list[int] - List of IDs to mark as read (for 'mark_read' action)
         """
         try:
             place = get_object_or_404(Place, slug=place_slug)
@@ -112,11 +113,18 @@ class ToastAPIView(LoginRequiredMixin, View):
             action = data.get('action')
             
             if action == 'mark_read':
-                toast_ids = data.get('toast_ids')
+                # Handle single toast_id
+                toast_id = data.get('toast_id')
+                if toast_id is not None:
+                    toast_ids = [toast_id]
+                else:
+                    # Fall back to toast_ids list
+                    toast_ids = data.get('toast_ids')
+                
                 if not toast_ids:
                     return JsonResponse({
                         'success': False,
-                        'error': 'toast_ids is required'
+                        'error': 'toast_id or toast_ids is required'
                     }, status=400)
                 
                 # Convert single ID to list
@@ -147,6 +155,30 @@ class ToastAPIView(LoginRequiredMixin, View):
                         user=request.user,
                         place=place
                     )
+                })
+            
+            elif action == 'mark_all_read':
+                # Get all unread notifications for this user in this place
+                unread_notifications = ToastNotification.objects.filter(
+                    user=request.user,
+                    place=place
+                ).exclude(
+                    toastreadstatus__user=request.user
+                )
+                
+                # Mark all as read
+                count = 0
+                for toast in unread_notifications:
+                    ToastReadStatus.objects.get_or_create(
+                        user=request.user,
+                        toast=toast
+                    )
+                    count += 1
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Marked all {count} messages as read',
+                    'unread_count': 0  # After marking all as read, count is 0
                 })
             
             else:

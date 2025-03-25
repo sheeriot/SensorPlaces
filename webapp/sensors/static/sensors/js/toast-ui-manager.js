@@ -129,7 +129,12 @@ const createToastSystem = () => {
             try {
                 const response = await window.utils.fetchWithCSRF(
                     toastConfig.apiEndpoint(placeSlug),
-                    { method: 'POST' }
+                    { 
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'mark_all_read'
+                        })
+                    }
                 );
 
                 if (response.success) {
@@ -281,9 +286,14 @@ const createToastSystem = () => {
             if (!historyList) return;
 
             try {
-                const data = await window.utils.fetchWithCSRF(
-                    `${toastConfig.apiEndpoint(placeSlug)}?show_all=${showAll}`
-                );
+                if (toastConfig.debug) {
+                    console.log(`Loading toast history for place ${placeSlug}, showAll=${showAll}`);
+                }
+                
+                // Use a URL with proper query parameter formatting
+                const url = `${toastConfig.apiEndpoint(placeSlug)}?show_all=${showAll ? 'true' : 'false'}`;
+                
+                const data = await window.utils.fetchWithCSRF(url);
 
                 if (data.success) {
                     // Update badge
@@ -291,13 +301,16 @@ const createToastSystem = () => {
                         this.updateBadge(data.unread_count);
                     }
 
-                    if (data.history.length === 0) {
+                    if (!data.history || data.history.length === 0) {
                         this._showEmptyHistoryMessage(historyList);
                         return;
                     }
 
                     // Render history
                     this._renderHistoryItems(historyList, data.history, showAll, placeSlug);
+                } else {
+                    console.error('Server returned error loading toast history:', data.error || 'Unknown error');
+                    this._showHistoryErrorMessage(historyList);
                 }
             } catch (error) {
                 console.error('Error loading toast history:', error);
@@ -404,7 +417,7 @@ const createToastSystem = () => {
                         method: 'POST',
                         body: JSON.stringify({
                             action: 'mark_read',
-                            toast_ids: [toastId]
+                            toast_id: toastId
                         })
                     }
                 );
@@ -432,10 +445,7 @@ const createToastSystem = () => {
                     {
                         method: 'POST',
                         body: JSON.stringify({
-                            action: 'mark_read',
-                            toast_ids: historyData
-                                .filter(t => !t.read)
-                                .map(t => t.id)
+                            action: 'mark_all_read'
                         })
                     }
                 );
@@ -454,6 +464,8 @@ const createToastSystem = () => {
                     // Update badge
                     if (response.unread_count !== undefined) {
                         this.updateBadge(response.unread_count);
+                    } else {
+                        this.updateBadge(0);
                     }
 
                     // Close confirmation modal
@@ -498,55 +510,66 @@ const processServerToast = () => {
     const toastContainer = document.getElementById('toast-messages');
     if (!toastContainer) return;
 
-    // Process toast messages
-    const serverToastElements = toastContainer.querySelectorAll('.server-toast-message');
-    
-    if (serverToastElements.length === 0) {
-        _processDirectToastFallback();
-        return;
-    }
-
-    // Process all server toast messages
-    Array.from(serverToastElements).forEach((toastMessage, index) => {
-        if (toastMessage.getAttribute('data-processed') === 'true') return;
-
-        const toastScript = toastMessage.querySelector('script');
-        if (toastScript && window.toastSystem) {
-            try {
-                const toastData = JSON.parse(toastScript.textContent);
-                toastData.addToHistory = false;  // Badge count is already in template
-                
-                // Add a slight delay between toasts
-                setTimeout(() => {
-                    if (window.toastSystem && typeof window.toastSystem.show === 'function') {
-                        window.toastSystem.show(toastData);
-                    } else if (window.showToast) {
-                        window.showToast(toastData.message, toastData.type);
-                    }
-                }, index * 300);
-                
-                toastMessage.setAttribute('data-processed', 'true');
-            } catch (e) {
-                console.error('Error processing toast:', e);
-            }
+    try {
+        // Process toast messages
+        const serverToastElements = toastContainer.querySelectorAll('.server-toast-message');
+        
+        if (serverToastElements.length === 0) {
+            _processDirectToastFallback();
+            return;
         }
-    });
+
+        // Process all server toast messages
+        Array.from(serverToastElements).forEach((toastMessage, index) => {
+            if (toastMessage.getAttribute('data-processed') === 'true') return;
+
+            const toastScript = toastMessage.querySelector('script');
+            if (toastScript && window.toastSystem) {
+                try {
+                    const toastData = JSON.parse(toastScript.textContent);
+                    toastData.addToHistory = false;  // Badge count is already in template
+                    
+                    // Add a slight delay between toasts
+                    setTimeout(() => {
+                        if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                            window.toastSystem.show(toastData);
+                        } else if (window.showToast) {
+                            console.warn('Using legacy showToast function - consider updating to toastSystem');
+                            window.showToast(toastData.message, toastData.type);
+                        }
+                    }, index * 300);
+                    
+                    toastMessage.setAttribute('data-processed', 'true');
+                } catch (e) {
+                    console.error('Error processing toast:', e, toastScript.textContent);
+                }
+            }
+        });
+    } catch (e) {
+        console.error('Error in processServerToast:', e);
+    }
 };
 
 // Process direct toast fallback
 const _processDirectToastFallback = () => {
-    const directToast = document.getElementById('direct-toast-fallback');
-    if (directToast && directToast.querySelector('script')) {
-        try {
-            const directScript = directToast.querySelector('script');
-            const directData = JSON.parse(directScript.textContent);
-            if (window.toastSystem && typeof window.toastSystem.show === 'function') {
-                window.toastSystem.show(directData);
-            } else if (window.showToast) {
-                window.showToast(directData.message, directData.type);
+    try {
+        const directToast = document.getElementById('direct-toast-fallback');
+        if (directToast && directToast.querySelector('script')) {
+            try {
+                const directScript = directToast.querySelector('script');
+                const directData = JSON.parse(directScript.textContent);
+                if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                    window.toastSystem.show(directData);
+                } else if (window.showToast) {
+                    console.warn('Using legacy showToast function - consider updating to toastSystem');
+                    window.showToast(directData.message, directData.type);
+                }
+            } catch (e) {
+                console.error('Error processing direct toast:', e, 
+                              directToast.querySelector('script')?.textContent || 'No script content');
             }
-        } catch (e) {
-            console.error('Error processing direct toast:', e);
         }
+    } catch (e) {
+        console.error('Error in _processDirectToastFallback:', e);
     }
 }; 
