@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,14 +20,56 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6(r&6ixhh6-ct2h0_)#*pz(pswbx!x6z318oc9(suw5w&wtzp!'
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
+# SECURITY WARNING: don't run with debug turned on in production!
+if os.environ.get('DJANGO_DEBUG') == 'False':
+    DEBUG = False
+else:
+    DEBUG = True
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+SERVERNAME1 = os.environ.get('SERVERNAME1')
+SERVERNAME2 = os.environ.get('SERVERNAME2')
 
+ALLOWED_HOSTS = ["127.0.0.1", SERVERNAME1, SERVERNAME2]
+CSRF_TRUSTED_ORIGINS = [
+    'https://' + SERVERNAME1,
+    'https://' + SERVERNAME2,
+    'http://' + SERVERNAME1,
+    'http://' + SERVERNAME2,
+    'http://127.0.0.1',
+    'http://localhost',
+]
+
+# CSRF Settings
+CSRF_COOKIE_SECURE = False  # Set to False for HTTP
+CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests in Lax mode
+CSRF_USE_SESSIONS = False  # Store in cookie for easier JavaScript access
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to the cookie
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'  # Django's default, matches our JavaScript
+CSRF_COOKIE_NAME = 'csrftoken'  # Django's default, matches our JavaScript
+
+# CORS Settings
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CSRF_TRUSTED_ORIGINS.extend(['http://localhost:*', 'http://127.0.0.1:*'])
 
 # Application definition
 
@@ -50,12 +93,14 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'crispy_forms',
     'crispy_bootstrap5',
+    'corsheaders',
     # ... other apps
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -141,9 +186,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / "sensors" / "static",
-]
+STATIC_ROOT = '/opt/app/static_files'
+# STATICFILES_DIRS = [
+#     BASE_DIR / "sensors" / "static",
+# ]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -206,7 +253,7 @@ ACCOUNT_RATE_LIMITS = {
 
 # Email verification settings
 ACCOUNT_EMAIL_VERIFICATION = "optional"  # Change from "mandatory" to "optional"
-ACCOUNT_EMAIL_REQUIRED = True  # Keep email required but verification optional
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']  # New recommended way to specify required fields
 
 # If you want to completely disable email verification for local users:
 SOCIALACCOUNT_EMAIL_VERIFICATION = "mandatory"  # Keep strict verification for social accounts
@@ -227,3 +274,20 @@ SOCIALACCOUNT_PROVIDERS = {
 
 ACCOUNT_LOGOUT_ON_GET = True  # Add this to allow logout without confirmation
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True  # Add this to auto-login after email confirmation
+
+# Security settings for HTTP
+SESSION_COOKIE_SECURE = False  # Set to False for HTTP
+CSRF_COOKIE_SECURE = False    # Set to False for HTTP
+SECURE_SSL_REDIRECT = False   # Don't redirect to HTTPS
+SECURE_PROXY_SSL_HEADER = None
+
+# If you're using frames (like for map embedding)
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# Security headers for HTTP
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Security Policy headers
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+SECURE_REFERRER_POLICY = 'same-origin'

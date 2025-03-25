@@ -5,9 +5,8 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
 
-from django.db.models import OuterRef, Subquery
-from django.db.models.functions import Lower
-from django.db.models.query import QuerySet
+from django.db.models import OuterRef, Subquery, Count
+
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect
@@ -15,14 +14,13 @@ from django.http import JsonResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
-from ..models import Place, Device, Sensor, SensorReading
+from ..models import Device, Sensor, SensorReading
 from .mixins import PlaceAnnotationMixin
 from .sensor_forms import SensorForm
 from ..utils import get_sensor_readings
+from .views_fun import get_annotated_locations
 
 from datetime import datetime, timedelta
-# import sys
-# import json
 
 from icecream import ic
 
@@ -31,42 +29,51 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     context_object_name = 'sensors'
     template_name = 'sensors/sensor_list.html'
 
-    def get_queryset(self) -> QuerySet[Sensor]:
-        if not hasattr(self, '_queryset'):
-            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # Check if we're filtering by device
+        device_pk = self.kwargs.get('device_pk')
+        if device_pk:
+            self._device = get_object_or_404(Device, pk=device_pk, location__place=self._place)
+        else:
+            self._device = None
+
+    def get_queryset(self):
+        """Get sensors filtered by place and optional device."""
+        # Use the cached place
+        place = self._place
+        base_queryset = super().get_queryset()
+        
+        # If we have a device_pk, filter by that device
+        if hasattr(self, '_device') and self._device:
+            queryset = base_queryset.filter(device=self._device)
+        else:
+            # Otherwise, get all sensors for the place
+            queryset = base_queryset.filter(device__location__place=place)
             
-            # If we have a device_pk, filter by that device
-            device_pk = self.kwargs.get('device_pk')
-            if device_pk:
-                device = get_object_or_404(Device, pk=device_pk, location__place=place)
-                self._queryset = device.sensors.all()
-            else:
-                # Otherwise, get all sensors for the place
-                self._queryset = Sensor.objects.filter(device__location__place=place)
-            
-            # Apply ordering and select related fields
-            self._queryset = self._queryset.select_related(
-                'device',
-                'device__location',
-                'device__location__place'
-            ).order_by('-is_active', Lower('name'))
-            
-        return self._queryset
+        return queryset.select_related(
+            'device',
+            'device__location',
+            'device__location__place',
+        ).annotate(
+            reading_count=Count('readings')
+        ).order_by(
+            '-device__location__is_active',  # Active locations first
+            'device__location__name',
+            '-device__is_active',            # Active devices first
+            'device__name',
+            '-is_active',                    # Active sensors first
+            'name'
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
         
         # If we're looking at a specific device's sensors, add it to context
-        device_pk = self.kwargs.get('device_pk')
-        if device_pk:
-            context['device'] = get_object_or_404(
-                Device, 
-                pk=device_pk,
-                location__place=context['place']
-            )
-            context['location'] = context['device'].location
+        if hasattr(self, '_device') and self._device:
+            context['device'] = self._device
+            context['location'] = self._device.location
         
         # Add sensor statistics
         context.update({
@@ -80,41 +87,38 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Sensor
     context_object_name = 'sensor'
     template_name = 'sensors/sensor_detail.html'
-    object: Sensor
-
-    def get_queryset(self) -> QuerySet[Sensor]:
-        if not hasattr(self, '_queryset'):
-            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-            base_queryset = super().get_queryset()
-            
-            # Filter sensors for this place and prefetch related fields
-            self._queryset = base_queryset.filter(
-                device__location__place=place
-            ).select_related(
-                'device',
-                'device__location',
-                'device__location__place'
-            )
-            
-            # Get the last reading if it exists
-            last_reading = SensorReading.objects.filter(
-                sensor=OuterRef('pk')
-            ).order_by('-timestamp')
-            
-            # Annotate with the last reading value and timestamp
-            self._queryset = self._queryset.annotate(
-                last_value=Subquery(
-                    last_reading.values('value')[:1]
-                ),
-                last_reading_time=Subquery(
-                    last_reading.values('timestamp')[:1]
-                ))
-        return self._queryset
+    
+    def get_queryset(self):
+        """Get sensors for this place with annotations."""
+        # Use the cached place
+        base_queryset = super().get_queryset()
+        
+        # Filter sensors for this place and prefetch related fields
+        queryset = base_queryset.filter(
+            device__location__place=self._place
+        ).select_related(
+            'device',
+            'device__location',
+            'device__location__place',
+        )
+        
+        # Get the last reading if it exists
+        last_reading = SensorReading.objects.filter(
+            sensor=OuterRef('pk')
+        ).order_by('-timestamp')
+        
+        # Annotate with the last reading value and timestamp
+        return queryset.annotate(
+            last_value=Subquery(
+                last_reading.values('value')[:1]
+            ),
+            last_reading_time=Subquery(
+                last_reading.values('timestamp')[:1]
+            ))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = get_object_or_404(Place, slug=self.kwargs['place_slug'])
         
         # Add device and location to context
         sensor = self.get_object()
@@ -157,7 +161,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         super().setup(request, *args, **kwargs)
         # Get and cache place, locations, device, location
         self._place = self.get_place()
-        self._locations = self.get_annotated_locations(self._place)
+        self._locations = get_annotated_locations(self._place)
         try:
             self._device = get_object_or_404(Device, pk=self.kwargs.get('device_pk', None))
         except Exception as e:
@@ -232,16 +236,25 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = self._place
-        context['locations'] = self._locations
-        context['device'] = self._device
-        context['location'] = self._device.location
+        # Place is already in context from PlaceAnnotationMixin
+        
+        # Add device and location data
+        if hasattr(self, '_device') and self._device:
+            context['device'] = self._device
+            context['location'] = self._device.location
         
         # Add a fallback cancel URL
-        context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
-            'place_slug': self._place.slug,
-            'pk': self._device.pk
-        })
+        if hasattr(self, '_device') and self._device:
+            context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
+                'place_slug': self._place.slug,
+                'pk': self._device.pk
+            })
+        else:
+            # Fallback to place detail if no device specified
+            context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
+                'place_slug': self._place.slug
+            })
+        
         return context
 
     def form_valid(self, form):
@@ -290,7 +303,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
 
     def get_success_url(self):
         return reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
+            'place_slug': self._place.slug,
             'pk': self.object.pk
         })
 
@@ -304,7 +317,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         super().setup(request, *args, **kwargs)
         # Get and cache place
         self._place = self.get_place()
-        self._locations = self.get_annotated_locations(self._place)
+        self._locations = get_annotated_locations(self._place)
         
         # Default inactive_help_text to None
         self._inactive_help_text = None
@@ -386,13 +399,12 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = self._place
+        # Place is already in context from PlaceAnnotationMixin
         
         sensor = self.get_object()
         device = sensor.device
         context['device'] = device
         context['location'] = device.location
-        context['locations'] = self._locations
         
         # Add a fallback cancel URL
         context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
@@ -478,7 +490,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             return self.form.cleaned_data['referrer']
         # Fallback to default URL
         return reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
+            'place_slug': self._place.slug,
             'pk': self.object.pk
         })
 
@@ -515,12 +527,12 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Add device and location to context
         context['device'] = device
         context['location'] = device.location
-        context['place'] = self._place
+        # Place is already in context from PlaceAnnotationMixin
         context['model_name'] = 'sensor'
         
         # Add sensor_url for cancel button
         context['sensor_url'] = reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
+            'place_slug': self._place.slug,
             'pk': sensor.pk
         })
         
@@ -678,54 +690,42 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
     def setup(self, request, *args, **kwargs):
         """Cache common values during view setup"""
         super().setup(request, *args, **kwargs)
-        self._place = None
-        self._sensor = None
-
-    @property
-    def place(self):
-        """Cached place getter"""
-        if self._place is None:
-            place_slug = self.kwargs.get('place_slug')
-            self._place = get_object_or_404(Place, slug=place_slug)
-        return self._place
-
-    @property
-    def sensor(self):
-        """Cached sensor getter"""
-        if self._sensor is None:
-            sensor_pk = self.kwargs.get('sensor_pk')
-            if sensor_pk:
-                self._sensor = get_object_or_404(
-                    Sensor.objects.select_related(
-                        'device',
-                        'device__location'
-                    ),
-                    pk=sensor_pk,
-                    device__location__place=self.place
-                )
-        return self._sensor
+        # Place is already set by PlaceAnnotationMixin
+        
+        # Get and cache the sensor
+        sensor_pk = self.kwargs.get('sensor_pk')
+        if sensor_pk:
+            self._sensor = get_object_or_404(
+                Sensor.objects.select_related(
+                    'device',
+                    'device__location'
+                ),
+                pk=sensor_pk,
+                device__location__place=self._place
+            )
+        else:
+            self._sensor = None
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         # Set initial timestamp to now
-        kwargs['initial'] = {
-            'timestamp': timezone.now()
-        }
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial']['timestamp'] = timezone.now()
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
             'model_name': 'sensor_reading',
-            'place': self.place,
-            'sensor': self.sensor,
-            'device': self.sensor.device,
-            'location': self.sensor.device.location,
+            # Place is already in context from PlaceAnnotationMixin
+            'sensor': self._sensor,
+            'device': self._sensor.device if self._sensor else None,
+            'location': self._sensor.device.location if self._sensor else None,
         })
         return context
 
     def form_valid(self, form):
-        form.instance.sensor = self.sensor
+        form.instance.sensor = self._sensor
         response = super().form_valid(form)
         reading = self.object
         sensor = reading.sensor
@@ -751,17 +751,12 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
             'type': 'success'
         })
         
-        # ic("SensorReadingCreateView setting toast_message:", {
-        #     'message': message,
-        #     'type': 'success'
-        # })
-        
         return response
 
     def get_success_url(self):
         return reverse('sensors:sensor_reading_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
-            'sensor_pk': self.sensor.pk,
+            'place_slug': self._place.slug,
+            'sensor_pk': self._sensor.pk,
             'pk': self.object.pk
         })
 

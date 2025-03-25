@@ -904,14 +904,7 @@ const toggleActiveManager = {
         }
 
         try {
-            // Handle toast message from response
-            if (response.toast) {
-                if (toggleActiveConfig.debug) {
-                    console.debug('Showing toast from response:', response.toast);
-                }
-                // Use the toast system to display the message
-                window.toastSystem.showToast(response.toast.message, response.toast.type);
-            }
+            // Note: Toast handling is now done in utils.fetchWithCSRF
             
             // Handle any dependencies that were affected
             if (response.dependencies && response.dependencies.length > 0) {
@@ -950,6 +943,14 @@ const toggleActiveManager = {
             }
         } catch (error) {
             console.error('Error handling toggle response:', error);
+            // Show error toast using event system
+            document.dispatchEvent(new CustomEvent('sensors:toast:show', {
+                detail: {
+                    message: 'Error handling toggle response: ' + error.message,
+                    type: 'danger',
+                    addToHistory: true
+                }
+            }));
         } finally {
             if (toggleActiveConfig.debug) {
                 console.groupEnd();

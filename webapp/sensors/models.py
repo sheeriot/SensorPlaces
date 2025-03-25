@@ -1,20 +1,13 @@
 from django.db import models
-# from django.conf import settings
-# from django.core.validators import FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
-# from django.core.validators import MinValueValidator, MaxValueValidator
-# from django.db.models.signals import post_save
-# from django.dispatch import receiver
-# import uuid
 from django.db.models.functions import Lower
-from typing import Any, Optional, Union, cast
-# from django.urls import reverse
+from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
+
+from django.conf import settings
+from typing import Any, Optional
 from datetime import datetime
 from decimal import Decimal
-from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
-from django.contrib.auth import get_user_model
-from django.conf import settings
 
 def validate_image_size(image):
     filesize = image.size
