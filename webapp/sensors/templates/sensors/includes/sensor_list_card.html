@@ -7,7 +7,7 @@
                 <i class="bi bi-thermometer me-2"></i>
                 Sensors
             </h5>
-            {% if place.is_active %}
+            {% if device.is_active %}
                 {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
             {% endif %}
         </div>
@@ -29,17 +29,7 @@
                 <tbody>
                     {% if device %}
                         {% for sensor in sensors %}
-                            {% if place.is_active %}
-                                {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
-                            {% else %}
-                                {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor show_inactive=True %}
-                            {% endif %}
-                        {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center small py-3">
-                                    No sensors found. Click "Add Sensor" to create one.
-                                </td>
-                            </tr>
+                            {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
                         {% endfor %}
                     {% else %}
                         {% regroup sensors by device.location as location_list %}

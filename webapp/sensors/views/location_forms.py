@@ -19,7 +19,8 @@ class LocationForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input active-checkbox',
                 'data-active-label': 'Active',
-                'data-inactive-label': 'inactive'
+                'data-inactive-label': 'inactive',
+                'style': 'margin-top: 0.1rem;'
             })
         }
 
@@ -53,7 +54,7 @@ class LocationForm(forms.ModelForm):
             if not self.place.is_active:
                 self.fields['is_active'].initial = False
                 self.fields['is_active'].widget.attrs['disabled'] = True
-                self.fields['is_active'].label = 'inactive'
+                self.fields['is_active'].label = 'inactive'  # Set initial label
                 
                 # Set help text for inactive state
                 self.fields['is_active'].help_text = mark_safe(

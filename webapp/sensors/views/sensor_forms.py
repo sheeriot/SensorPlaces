@@ -1,7 +1,7 @@
 from django import forms
 from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, HTML, Div, Submit  # TemplateNameMixin
+from crispy_forms.layout import Layout, Row, Column, HTML, Div, Submit, Field
 from crispy_forms.bootstrap import FormActions
 
 from ..models import Sensor
@@ -18,7 +18,14 @@ class SensorForm(forms.ModelForm):
         widgets = {
             'device': forms.Select(attrs={'class': 'form-select'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
+            'is_active': forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input active-checkbox',
+                    'data-active-label': 'Active',
+                    'data-inactive-label': 'inactive',
+                    'style': 'margin-top: 0.1rem;'
+                }
+            ),
             'sensor_type': forms.Select(attrs={'class': 'form-select'}),
             'unit': forms.Select(attrs={'class': 'form-select'}),
             'data_type': forms.Select(attrs={'class': 'form-select'}),
@@ -36,7 +43,7 @@ class SensorForm(forms.ModelForm):
         kwargs.pop('devices_active', None)
         
         super().__init__(*args, **kwargs)
-
+                
         # Set default device if provided
         if self.device:
             self.fields['device'].initial = self.device
@@ -45,7 +52,7 @@ class SensorForm(forms.ModelForm):
             if not self.device.is_active:
                 self.fields['is_active'].initial = False
                 self.fields['is_active'].widget.attrs['disabled'] = True
-                self.fields['is_active'].label = 'inactive'
+                self.fields['is_active'].label = 'inactive'  # Set initial label
                 
                 # Set help text for inactive state
                 self.fields['is_active'].help_text = mark_safe(
@@ -56,7 +63,7 @@ class SensorForm(forms.ModelForm):
         elif self.instance and self.instance.pk and self.instance.device and not self.instance.device.is_active:
             self.fields['is_active'].initial = False
             self.fields['is_active'].widget.attrs['disabled'] = True
-            self.fields['is_active'].label = 'inactive'
+            self.fields['is_active'].label = 'inactive'  # Set initial label
             
             # Set help text for inactive state
             self.fields['is_active'].help_text = mark_safe(
@@ -65,13 +72,20 @@ class SensorForm(forms.ModelForm):
             )
         # For existing instances that are inactive for other reasons
         elif self.instance and self.instance.pk and not self.instance.is_active:
-            self.fields['is_active'].label = 'inactive'
+            self.fields['is_active'].label = 'inactive'  # Set initial label
         else:
-            self.fields['is_active'].label = 'Active'
+            self.fields['is_active'].label = 'Active'  # Set initial label
             
         # Apply inactive_help_text if provided
         if inactive_help_text:
             self.fields['is_active'].help_text = inactive_help_text
+
+        # Setup Active field with proper ID
+        checkbox_id = f"sensor-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
+        self.fields['is_active'].widget.attrs.update({
+            'id': checkbox_id,
+            'data-sensor-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
+        })
 
         # If we have data_type, update fields based on it
         if 'data_type' in self.data:
@@ -101,7 +115,15 @@ class SensorForm(forms.ModelForm):
                 css_class='form-row'
             ),
             Row(
-                Column('is_active', css_class='form-group col-md-6'),
+                Column(
+                    Field(
+                        'is_active',
+                        template='sensors/partials/active_status_checkbox.html',
+                        model_name='sensor',
+                        instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
+                    ),
+                    css_class='form-group col-md-12'
+                ),
                 css_class='form-row'
             ),
             Row(
@@ -132,9 +154,9 @@ class SensorForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         data_type = cleaned_data.get('data_type')
+        device = cleaned_data.get('device') or self.device
         influx_source = cleaned_data.get('influx_source')
         influx_measurement = cleaned_data.get('influx_measurement')
-        device = cleaned_data.get('device') or self.device
 
         # Ensure device is set
         if not device and self.device:

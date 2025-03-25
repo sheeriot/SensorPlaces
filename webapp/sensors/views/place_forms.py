@@ -9,9 +9,6 @@ from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div  #, Submit
 from ..models import Place
 
 
-from icecream import ic
-
-
 class PlaceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
     slug = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -39,7 +36,8 @@ class PlaceForm(forms.ModelForm):
                 attrs={
                     'class': 'form-check-input active-checkbox',
                     'data-active-label': 'Active',
-                    'data-inactive-label': 'inactive'
+                    'data-inactive-label': 'inactive',
+                    'style': 'margin-top: 0.1rem;'
                 }
             ),
             'latitude': forms.NumberInput(attrs={
@@ -64,6 +62,7 @@ class PlaceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         inactive_help_text = kwargs.pop('inactive_help_text', None)
+        
         # Remove the referrer pop - we'll handle it through initial data instead
         # Pop parameters from FormDataMixin that we don't use
         kwargs.pop('place', None)
@@ -103,7 +102,9 @@ class PlaceForm(forms.ModelForm):
         # Set help text for inactive state if provided
         if inactive_help_text:
             self.fields['is_active'].help_text = inactive_help_text
-        
+        else:
+            pass
+            
         self.fields['latitude'].label = None
         self.fields['longitude'].label = None
 
@@ -148,15 +149,18 @@ class PlaceForm(forms.ModelForm):
             Field('referrer', type='hidden'),
             Div(
                 Div(
-                    Div('name', css_class='col-md-6'),
+                    Div('name', css_class='col-12'),
+                    css_class='row mb-3'
+                ),
+                Div(
                     Div(
                         Field(
                             'is_active',
                             template='sensors/partials/active_status_checkbox.html',
-                            model_name='place',  # or 'location' for LocationForm
+                            model_name='place',
                             instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
                         ),
-                        css_class='col-md-6 d-flex align-items-center'
+                        css_class='col-12'
                     ),
                     css_class='row mb-3'
                 ),

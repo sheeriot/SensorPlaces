@@ -179,11 +179,6 @@
     min-width: 80px;
 }
 
-.toast-history-item {
-    padding: 0.5rem;
-    border-bottom: 1px solid var(--bs-border-color);
-}
-
 .toast-history-time {
     font-family: var(--bs-font-monospace);
     font-size: 0.75rem;

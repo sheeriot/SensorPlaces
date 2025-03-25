@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.http import HttpResponseRedirect
 from django.contrib.auth.mixins import LoginRequiredMixin
 # from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.utils.safestring import mark_safe
@@ -22,11 +22,21 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     context_object_name = 'locations'
     template_name = 'sensors/location_list.html'
 
-    # def get_queryset(self) -> QuerySet[Location]:
-    #     if not hasattr(self, '_queryset'):
-    #         place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-    #         self._queryset = self.get_annotated_locations(place)
-    #     return self._queryset
+    def get_queryset(self) -> QuerySet[Location]:
+        """Get locations with device and sensor counts."""
+        place = self._place
+        
+        return Location.objects.filter(
+            place=place
+        ).annotate(
+            devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
+            devices_inactive_count=Count('devices', filter=Q(devices__is_active=False)),
+            sensors_active_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
+            sensors_inactive_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
+        ).order_by(
+            '-is_active',
+            Lower('name')
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

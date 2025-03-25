@@ -22,9 +22,10 @@ class DeviceForm(forms.ModelForm):
             'model': forms.TextInput(attrs={'placeholder': 'Enter model'}),
             'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
             'is_active': forms.CheckboxInput(attrs={
-                'class': 'me-2 checkboxinput active-checkbox',
+                'class': 'form-check-input active-checkbox',
                 'data-active-label': 'Active',
-                'data-inactive-label': 'inactive'
+                'data-inactive-label': 'inactive',
+                'style': 'margin-top: 0.1rem;'
             })
         }
 
@@ -49,6 +50,16 @@ class DeviceForm(forms.ModelForm):
             'data-device-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new',
         })
         
+        # Set the initial label based on current state
+        if self.instance and self.instance.pk and not self.instance.is_active:
+            self.fields['is_active'].label = 'inactive'
+            self.fields['is_active'].widget.attrs['data-inactive-label'] = 'inactive'
+            self.fields['is_active'].widget.attrs['data-active-label'] = 'Active'
+        else:
+            self.fields['is_active'].label = 'Active'
+            self.fields['is_active'].widget.attrs['data-inactive-label'] = 'inactive'
+            self.fields['is_active'].widget.attrs['data-active-label'] = 'Active'
+        
         # Store original state for JavaScript
         if self.instance and self.instance.pk:
             self.fields['is_active'].widget.attrs['data-isactive-original'] = str(self.instance.is_active).lower()
@@ -66,14 +77,8 @@ class DeviceForm(forms.ModelForm):
                         f'<i class="bi bi-exclamation-triangle me-2"></i>'
                         f'Device cannot be active because Location "{self.instance.location.name}" is inactive.'
                     )
-        
-        # Set the label based on the current state
-        elif self.instance and self.instance.pk and not self.instance.is_active:
-            self.fields['is_active'].label = 'inactive'
-        else:
-            self.fields['is_active'].label = 'Active'
-        
-        # Set help text for inactive state if provided from view
+                    
+        # Apply inactive_help_text if provided from view
         if inactive_help_text:
             # Ensure help text doesn't have nested form-text divs
             if '<div class="form-text' in inactive_help_text:
@@ -133,8 +138,7 @@ class DeviceForm(forms.ModelForm):
 
         self.helper.layout = Layout(
             Row(
-                Column('name', css_class='col-6'),
-                Column('device_type', css_class='col-4'),
+                Column('name', css_class='col-12'),
                 css_class='mb-2'
             ),
             Row(
@@ -142,10 +146,16 @@ class DeviceForm(forms.ModelForm):
                     Field(
                         'is_active',
                         template='sensors/partials/active_status_checkbox.html',
+                        model_name='device',
+                        instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
                         css_id='div_id_is_active'
                     ),
                     css_class='col-12'
                 ),
+                css_class='mb-2'
+            ),
+            Row(
+                Column('device_type', css_class='col-4'),
                 css_class='mb-2'
             ),
             Row(

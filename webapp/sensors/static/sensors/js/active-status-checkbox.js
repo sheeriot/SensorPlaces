@@ -77,23 +77,27 @@ function watchCheckbox(checkbox) {
     checkboxContainer.addEventListener('locationStatusChanged', function(e) {
         const { isLocationActive, checkboxState, checkboxDisabled, inactiveReason } = e.detail;
         
-        console.log("[Active Status] Location status changed:", {
-            isLocationActive: isLocationActive,
-            checkboxState: checkboxState,
-            disabled: checkboxDisabled,
-            hasInactiveReason: !!inactiveReason
-        });
+        if (activeStatusConfig.debug) {
+            console.log("[Active Status] Location status changed:", {
+                isLocationActive: isLocationActive,
+                checkboxState: checkboxState,
+                disabled: checkboxDisabled,
+                hasInactiveReason: !!inactiveReason
+            });
+        }
 
         // Find the help text container within the same form-check div
         const helpTextContainer = checkboxContainer.querySelector('[data-help-text-container]');
         
         if (helpTextContainer) {
+            // Only update help text content if inactiveReason is provided
+            // Otherwise, preserve the existing help text from the server
             if (inactiveReason) {
-                // Show both the location reason and the impact on sensors if device was originally active
-                const wasOriginallyActive = checkbox.getAttribute('data-isactive-original') === 'true';
-                const sensorImpactText = wasOriginallyActive ? 
-                    `<div class="mt-2">Existing sensors will stop collecting data.</div>` : '';
-                helpTextContainer.innerHTML = `${inactiveReason}${sensorImpactText}`;
+                helpTextContainer.innerHTML = inactiveReason;
+            }
+            
+            // Toggle visibility based on checkbox state
+            if (!checkbox.checked) {
                 helpTextContainer.classList.remove('d-none');
             } else {
                 helpTextContainer.classList.add('d-none');
@@ -106,15 +110,27 @@ function watchCheckbox(checkbox) {
 
     // Handle checkbox change by another script or by user
     checkbox.addEventListener('change', function() {
-        const helpTextContainer = checkboxContainer.querySelector('[data-help-text-container]');
-        if (helpTextContainer) {
-            const wasOriginallyActive = checkbox.getAttribute('data-isactive-original') === 'true';
-            if (!checkbox.checked && wasOriginallyActive) {
-                helpTextContainer.innerHTML = `<i class="bi bi-exclamation-triangle me-2"></i>
-                    Existing sensors will stop collecting data.`;
-                helpTextContainer.classList.remove('d-none');
+        const checkboxContainer = this.closest('.form-check');
+        if (checkboxContainer) {
+            // Update data attributes
+            const modelName = checkboxContainer.dataset.modelName || 'unknown';
+            checkboxContainer.setAttribute(`data-${modelName}-active`, this.checked.toString());
+            
+            // Update opacity classes
+            if (this.checked) {
+                checkboxContainer.classList.remove('opacity-50', 'text-muted');
             } else {
-                helpTextContainer.classList.add('d-none');
+                checkboxContainer.classList.add('opacity-50', 'text-muted');
+            }
+            
+            // Toggle help text
+            const helpTextContainer = checkboxContainer.querySelector('[data-help-text-container]');
+            if (helpTextContainer) {
+                if (!this.checked) {
+                    helpTextContainer.classList.remove('d-none');
+                } else {
+                    helpTextContainer.classList.add('d-none');
+                }
             }
         }
         
