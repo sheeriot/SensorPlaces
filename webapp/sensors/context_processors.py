@@ -1,10 +1,10 @@
 from django.shortcuts import get_object_or_404
 
-from .models import Place, Location, Device, Sensor, ToastNotification
+from .models import Place, ToastNotification
 from .views.views_fun import get_place_data
 # from .views.mixins import PlaceAnnotationMixin
 
-import json
+# import json
 
 from icecream import ic
 
@@ -34,7 +34,7 @@ def place_context(request):
                     user=request.user,
                 )
             
-            # Add all place data
+            # Add all place data using the get_place_data function
             context.update(get_place_data(place))
             
         except Exception:

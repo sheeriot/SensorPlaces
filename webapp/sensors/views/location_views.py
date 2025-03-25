@@ -3,7 +3,7 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.urls import reverse
 from django.http import HttpResponseRedirect
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import ImproperlyConfigured
+# from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
@@ -11,7 +11,8 @@ from django.utils.safestring import mark_safe
 
 from ..models import Place, Location, Device, Sensor
 from .location_forms import LocationForm
-from .mixins import PlaceAnnotationMixin, ToastMixin, FormDataMixin
+from .mixins import PlaceAnnotationMixin, FormDataMixin
+from .views_fun import get_place_counts, get_annotated_locations
 
 from icecream import ic
 
@@ -21,24 +22,19 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     context_object_name = 'locations'
     template_name = 'sensors/location_list.html'
 
-    def get_queryset(self) -> QuerySet[Location]:
-        if not hasattr(self, '_queryset'):
-            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-            self._queryset = self.get_annotated_locations(place)
-        return self._queryset
+    # def get_queryset(self) -> QuerySet[Location]:
+    #     if not hasattr(self, '_queryset'):
+    #         place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+    #         self._queryset = self.get_annotated_locations(place)
+    #     return self._queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         place = context['place']
 
-        # Add place statistics
-        context.update({
-            'place_devices_active': Device.objects.filter(location__place=place, is_active=True).count(),
-            'place_devices_inactive': Device.objects.filter(location__place=place, is_active=False).count(),
-            'place_sensors_active': Sensor.objects.filter(device__location__place=place, is_active=True).count(),
-            'place_sensors_inactive': Sensor.objects.filter(device__location__place=place, is_active=False).count(),
-        })
+        # Add place statistics from views_fun.py
+        context.update(get_place_counts(place))
         
         return context
 
@@ -51,8 +47,8 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         
-        # Use the annotated location data from the mixin
-        location = self.get_annotated_locations(self.object.place).get(pk=self.object.pk)
+        # Use the annotated location data from views_fun.py
+        location = get_annotated_locations(self._place).get(pk=self.object.pk)
         context['location'] = location
 
         # Add annotated devices to context
@@ -80,11 +76,13 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
     
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Create inactive help text to be used in toast messages
-        self._inactive_help_text = mark_safe(
-            '<i class="bi bi-exclamation-triangle me-2"></i>'
-            'This location is inactive. All devices within it will not collect data.'
-        )
+        # Get and cache place 
+        self._place = self.get_place()
+        self._inactive_help_text = None
+        
+        # Generate help text if place is inactive
+        if self._place and not self._place.is_active:
+            self._inactive_help_text = self.get_location_inactive_help_text(None, self._place)[0]
         
         # Get the referrer URL
         self._referrer = request.META.get('HTTP_REFERER', '')
@@ -100,17 +98,41 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
             'place_slug': self.kwargs['place_slug']
         })
 
+    def get_location_inactive_help_text(self, location, place=None):
+        """
+        Generate help text for location inactive status when creating.
+        
+        Args:
+            location: The location object (None for create view)
+            place: The location's place
+            
+        Returns:
+            tuple: (help_text, active_devices)
+                - help_text: HTML string with warning message or None
+                - active_devices: empty list for create view
+        """
+        inactive_help_text = None
+        
+        # For create view, we only care about place being inactive
+        if place and not place.is_active:
+            inactive_help_text = mark_safe(
+                '<div class="form-text text-warning-emphasis mt-2">'
+                '<i class="bi bi-exclamation-triangle me-2"></i>'
+                f'This location will be inactive because Place "{place.name}" is inactive. '
+                f'All devices within it will not collect data.'
+                '</div>'
+            )
+        
+        return inactive_help_text, []
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self.get_place()
-        kwargs['locations'] = self.get_annotated_locations(self.get_place())
-        kwargs['inactive_help_text'] = self._inactive_help_text
         
-        # Set initial data properly
+        # Set initial data properly - everything else comes from FormDataMixin
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial'].update({
-            'is_active': self.get_place().is_active,
-            'place': self.get_place().pk,  # Use the primary key, not the object
+            'is_active': self._place.is_active,
+            'place': self._place.pk,  # Use the primary key, not the object
             'referrer': self._referrer
         })
         
@@ -119,31 +141,29 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        context['place'] = self.get_place()
-        context['locations'] = self.get_annotated_locations(self.get_place())
         
         # Add a fallback cancel URL
         if self.object and self.object.pk:
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
-                'place_slug': self.get_place().slug,
+                'place_slug': self._place.slug,  # Use cached place
                 'pk': self.object.pk
             })
         else:
             context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
-                'place_slug': self.get_place().slug
+                'place_slug': self._place.slug  # Use cached place
             })
         
         return context
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
-        form.instance.place = self.get_place()
+        form.instance.place = self._place
         # Save the form to get the object
         self.object = form.save()
         
         message = (
             f"Created location <strong>{self.object.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {self.get_place().name}<br>"
+            f"<i class='bi bi-house-gear'></i> {self._place.name}<br>"
             f"<small class='text-muted'>"
             f"Status: {'Active' if self.object.is_active else 'inactive'}"
             f"</small>"
@@ -209,14 +229,27 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
     
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Create inactive help text to be used in toast messages
-        self._inactive_help_text = mark_safe(
-            '<i class="bi bi-exclamation-triangle me-2"></i>'
-            'This location is inactive. All devices within it will not collect data.'
-        )
+        # Get and cache place
+        self._place = self.get_place()
+        self._inactive_help_text = None
+        self._devices_active = []
         
         # Get the referrer URL
         self._referrer = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            # Try to get the location if we're updating
+            location = self.get_object()
+            
+            # Use the helper method to get the appropriate help text
+            self._inactive_help_text, self._devices_active = self.get_location_inactive_help_text(location, self._place)
+        except Exception as e:
+            # If we can't get the object yet (e.g., in a GET request before the object exists)
+            # Just use default help text
+            self._inactive_help_text = mark_safe(
+                '<i class="bi bi-exclamation-triangle me-2"></i>'
+                'This location is inactive. All devices within it will not collect data.'
+            )
 
     def get_success_url(self):
         """Return the URL to redirect to after processing a valid form."""
@@ -312,25 +345,20 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self.get_place()
-        kwargs['locations'] = self.get_annotated_locations(self.get_place())
-        kwargs['inactive_help_text'] = self._inactive_help_text
         
-        # Get active devices for this location if it's active
-        location = self.get_object()
-        if location and location.is_active:
-            kwargs['devices_active'] = location.devices.filter(is_active=True).annotate(
-                sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
-            )
-            
+        # Set initial data properly - everything else comes from FormDataMixin
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial'].update({
+            'referrer': self._referrer
+        })
+        
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        context['place'] = self.get_place()
         location = self.get_object()
-        
+         
         # Add all devices to context with annotations
         context['devices'] = Device.objects.filter(
             location=location
@@ -346,11 +374,22 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
             Lower('name')
         )
         
+        # Add a fallback cancel URL
+        if self.object and self.object.pk:
+            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
+                'place_slug': self._place.slug,  # Use cached place
+                'pk': self.object.pk
+            })
+        else:
+            context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
+                'place_slug': self._place.slug  # Use cached place
+            })
+        
         return context
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
-        form.instance.place = self.get_place()
+        form.instance.place = self._place
         
         # Get the object before saving to compare values
         location = self.get_object()
@@ -372,7 +411,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         # Build toast message
         message = (
             f"Updated location <strong>{self.object.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {self.get_place().name}<br>"
+            f"<i class='bi bi-house-gear'></i> {self._place.name}<br>"
             f"<small class='text-muted'>"
             f"Changes: {', '.join(changes) if changes else 'No changes'}"
             f"</small>"

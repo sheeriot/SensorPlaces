@@ -60,16 +60,28 @@ class LocationForm(forms.ModelForm):
                     f'<i class="bi bi-exclamation-triangle me-2"></i>'
                     f'Location cannot be active because Place "{self.place.name}" is inactive.'
                 )
-        
+            else:
+                # Set the label based on the instance state
+                self.fields['is_active'].label = 'inactive' if (self.instance and self.instance.pk and not self.instance.is_active) else 'Active'
         # Set the label based on the current state for existing instances
-        elif self.instance and self.instance.pk and not self.instance.is_active:
-            self.fields['is_active'].label = 'inactive'
+        elif self.instance and self.instance.pk:
+            self.fields['is_active'].label = 'inactive' if not self.instance.is_active else 'Active'
         else:
             self.fields['is_active'].label = 'Active'
         
         # Set help text for inactive state if provided from view
         if inactive_help_text:
-            self.fields['is_active'].help_text = inactive_help_text
+            # Ensure help text doesn't have nested form-text divs
+            if '<div class="form-text' in inactive_help_text:
+                # Extract the inner content if it's wrapped in a form-text div
+                import re
+                inner_content = re.search(r'<div class="form-text.*?>(.*?)</div>', inactive_help_text, re.DOTALL)
+                if inner_content:
+                    self.fields['is_active'].help_text = mark_safe(inner_content.group(1))
+                else:
+                    self.fields['is_active'].help_text = inactive_help_text
+            else:
+                self.fields['is_active'].help_text = inactive_help_text
         
         # Form layout with crispy forms
         self.helper.layout = Layout(

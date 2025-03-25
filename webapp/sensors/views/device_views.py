@@ -12,6 +12,7 @@ from django.utils.safestring import mark_safe
 from ..models import Place, Location, Device, Sensor
 from .device_forms import DeviceForm
 from .mixins import PlaceAnnotationMixin
+from .views_fun import get_place_counts, get_annotated_locations
 
 from icecream import ic
 
@@ -27,7 +28,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         location_pk = self.kwargs.get('location_pk', None)
         if location_pk:
             self.location = get_object_or_404(Location, pk=location_pk, place=self.place)
-        self.locations = self.get_annotated_locations(self.place)
+        self.locations = get_annotated_locations(self.place)
 
     def get_queryset(self) -> QuerySet[Device]:
         if not hasattr(self, '_queryset'):
@@ -75,7 +76,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         if location_pk:
             context['location'] = get_object_or_404(Location, pk=location_pk, place=place)
             
-        context['locations'] = self.get_annotated_locations(place)
+        context['locations'] = get_annotated_locations(place)
         return context
 
 class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
@@ -133,7 +134,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         super().setup(request, *args, **kwargs)
         # Get and cache place and locations
         self._place = self.get_place()
-        self._locations = self.get_annotated_locations(self._place)
+        self._locations = get_annotated_locations(self._place)
         
         # Initialize location and inactive_help_text
         self._location = None
@@ -239,7 +240,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         super().setup(request, *args, **kwargs)
         # Get and cache place and locations
         self._place = self.get_place()
-        self._locations = self.get_annotated_locations(self._place)
+        self._locations = get_annotated_locations(self._place)
         
         # Default inactive_help_text to None
         self._inactive_help_text = None

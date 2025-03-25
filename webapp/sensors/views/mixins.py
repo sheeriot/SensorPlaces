@@ -8,7 +8,7 @@ from django.http import HttpRequest
 from decimal import Decimal
 
 from ..models import Place, Location
-from .views_fun import get_annotated_locations
+from .views_fun import get_annotated_locations, get_place_data
 
 from typing import Any, Dict, Optional
 
@@ -41,7 +41,7 @@ class PlaceAnnotationMixin:
         return get_object_or_404(Place, slug=place_slug)
     
     def get_annotated_locations(self, place: Place) -> QuerySet[Location]:
-        """Get annotated locations for a place."""
+        """Get annotated locations for a place using the function from views_fun.py."""
         return get_annotated_locations(place)
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
@@ -56,8 +56,13 @@ class PlaceAnnotationMixin:
         place = getattr(self, '_place', self.get_place())
         
         # Always ensure place is in context
-        if 'place' not in context:
-            context['place'] = place
+        context['place'] = place
+        
+        # If we have a place, add place data to context
+        if place:
+            # Add annotated locations if needed
+            if 'locations' not in context:
+                context['locations'] = self.get_annotated_locations(place)
         
         return context
 
@@ -76,8 +81,16 @@ class FormDataMixin:
             
             # Add annotated locations if they're needed by the form
             if hasattr(self, 'get_annotated_locations'):
-                kwargs['locations'] = self.get_annotated_locations(place)
+                kwargs['locations'] = get_annotated_locations(place)
         
+        # Pass inactive_help_text if available
+        if hasattr(self, '_inactive_help_text'):
+            kwargs['inactive_help_text'] = self._inactive_help_text
+            
+        # Pass active devices if available
+        if hasattr(self, '_devices_active'):
+            kwargs['devices_active'] = self._devices_active
+            
         return kwargs
 
 

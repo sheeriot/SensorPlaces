@@ -3,9 +3,25 @@ from django.db.models.functions import Lower
 from decimal import Decimal
 from typing import Dict, Any
 
-from ..models import Location, Device, Sensor
+from ..models import Place, Location, Device, Sensor
 
 from icecream import ic
+
+def get_annotated_places():
+    """Get annotated places with minimal counts for the landing page/index view.
+    
+    Optimized for performance with only essential annotations:
+    - active_locations_count: Count of active locations
+    - devices_active_count: Count of active devices
+    
+    Returns:
+        QuerySet: Places with minimal annotations, ordered by active status and name.
+    """
+    return Place.objects.annotate(
+        active_locations_count=Count('locations', filter=Q(locations__is_active=True)),
+        devices_active_count=Count('locations__devices', filter=Q(locations__devices__is_active=True))
+        # Removed active_sensors_count to optimize query performance
+    ).order_by('-is_active', Lower('name'))
 
 def get_annotated_locations(place):
     """Get annotated locations for a place."""

@@ -17,6 +17,7 @@ from ..models import Place, Location, Device, Sensor, ToastNotification
 from .place_forms import PlaceForm, PlaceDeleteForm
 from ..map_fun import place_map_create
 from .mixins import PlaceAnnotationMixin
+from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places
 
 # utility
 import json
@@ -32,18 +33,14 @@ class PlaceListView(LoginRequiredMixin, ListView):
     
     def get_queryset(self) -> QuerySet[Place]:
         if not hasattr(self, '_queryset'):
-            self._queryset = Place.objects.annotate(
-                active_locations_count=Count('locations', filter=Q(locations__is_active=True)),
-                devices_active_count=Count('locations__devices', filter=Q(locations__devices__is_active=True)),
-                active_sensors_count=Count('locations__devices__sensors', filter=Q(locations__devices__sensors__is_active=True))
-            ).order_by('-is_active', Lower('name'))
+            self._queryset = get_annotated_places()
         return self._queryset
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
         try:
-            map_html = place_map_create(places=self.get_queryset())
+            map_html = place_map_create(places=self.get_queryset(), zoom_start=10)
             context['place_map_html'] = map_html
         except Exception as e:
             # ic("Error creating place map:", str(e))
@@ -64,6 +61,10 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
+        
+        # Add place data from get_place_data function
+        place_data = get_place_data(self.object)
+        context.update(place_data)
         
         # Add place_map_html to the context
         try:
@@ -298,13 +299,11 @@ def place_stats(request, place_slug):
         # Get the place
         place = get_object_or_404(Place, slug=place_slug)
         
-        # Get location statistics
-        locations = Location.objects.filter(place=place).annotate(
-            devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
-            devices_inactive_count=Count('devices', filter=Q(devices__is_active=False)),
-            sensors_active_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
-            sensors_inactive_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
-        ).values(
+        # Get place data using the common function from views_fun.py
+        place_data = get_place_data(place, include_json=False)
+        
+        # Get location statistics using the annotated locations
+        locations = place_data['locations'].values(
             'id', 'name', 'is_active',
             'devices_active_count', 'devices_inactive_count',
             'sensors_active_count', 'sensors_inactive_count'
@@ -331,6 +330,22 @@ def place_stats(request, place_slug):
             place=place
         )
         
+        # Calculate totals from the place_data
+        total_stats = {
+            'locations': {
+                'active': sum(1 for loc in locations if loc['is_active']),
+                'inactive': sum(1 for loc in locations if not loc['is_active'])
+            },
+            'devices': {
+                'active': place_data.get('devices_active_count', 0),
+                'inactive': place_data.get('devices_inactive_count', 0)
+            },
+            'sensors': {
+                'active': place_data.get('sensors_active_count', 0),
+                'inactive': place_data.get('sensors_inactive_count', 0)
+            }
+        }
+        
         return JsonResponse({
             'success': True,
             'stats': {
@@ -338,20 +353,7 @@ def place_stats(request, place_slug):
                 'devices': list(devices),
                 'sensors': list(sensors),
                 'unread_toast_count': unread_count,
-                'total': {
-                    'locations': {
-                        'active': sum(1 for loc in locations if loc['is_active']),
-                                     'inactive': sum(1 for loc in locations if not loc['is_active'])
-                    },
-                    'devices': {
-                        'active': sum(1 for dev in devices if dev['is_active']),
-                        'inactive': sum(1 for dev in devices if not dev['is_active'])
-                    },
-                    'sensors': {
-                        'active': sum(1 for sen in sensors if sen['is_active']),
-                        'inactive': sum(1 for sen in sensors if not sen['is_active'])
-                    }
-                }
+                'total': total_stats
             }
         })
         
@@ -449,17 +451,14 @@ def siteplan_update(request, place_slug):
         
         message += "</ul></small>"
         
-        # Get updated statistics
-        devices_active = Device.objects.filter(location__place=place, is_active=True).count()
-        devices_inactive = Device.objects.filter(location__place=place, is_active=False).count()
-        sensors_active = Sensor.objects.filter(device__location__place=place, is_active=True).count()
-        sensors_inactive = Sensor.objects.filter(device__location__place=place, is_active=False).count()
+        # Get updated place statistics
+        place_stats = get_place_counts(place)
         
         # Get updated location statistics
-        locations = place.locations.annotate(
-            devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
-            devices_inactive_count=Count('devices', filter=Q(devices__is_active=False))
-        ).values('id', 'name', 'is_active', 'devices_active_count', 'devices_inactive_count')
+        locations = get_annotated_locations(place).values(
+            'id', 'name', 'is_active', 
+            'devices_active_count', 'devices_inactive_count'
+        )
         
         return JsonResponse({
             'message': message,
@@ -476,10 +475,10 @@ def siteplan_update(request, place_slug):
                     } for change in location_changes
                 ]
             },
-            'devices_active': devices_active,
-            'devices_inactive': devices_inactive,
-            'sensors_active': sensors_active,
-            'sensors_inactive': sensors_inactive,
+            'devices_active': place_stats['devices_active_count'],
+            'devices_inactive': place_stats['devices_inactive_count'],
+            'sensors_active': place_stats['sensors_active_count'],
+            'sensors_inactive': place_stats['sensors_inactive_count'],
             'locations': list(locations)
         })
 
