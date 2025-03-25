@@ -1,6 +1,6 @@
 // System Configuration
 const utilsConfig = {
-    debug: true,  // Set to true temporarily
+    debug: false,  // Set to true temporarily
     logCSRF: true,
     logFetch: true,
     logToasts: false

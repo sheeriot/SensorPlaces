@@ -87,10 +87,18 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             '<i class="bi bi-exclamation-triangle me-2"></i>'
             'This place is inactive. All locations and devices within it will not collect data.'
         )
+        
+        # Cache the referrer for later use
+        self._referrer = request.META.get('HTTP_REFERER', '')
     
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['inactive_help_text'] = self._inactive_help_text
+        
+        # Set initial data with referrer
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial']['referrer'] = self._referrer
+        
         return kwargs
 
     def form_valid(self, form: PlaceForm):
@@ -132,17 +140,22 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
     
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
+        # Cache the place object early
+        self._place = self.get_object()
+        
         # Create inactive help text to be used in form and toast messages
         self._inactive_help_text = mark_safe(
             '<i class="bi bi-exclamation-triangle me-2"></i>'
             'This place is inactive. All locations and devices within it will not collect data.'
         )
         
+        # Cache the referrer for later use
+        self._referrer = request.META.get('HTTP_REFERER', '')
 
     def get_initial(self):
         initial = super().get_initial()
         # Set the referrer in initial data
-        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
+        initial['referrer'] = self._referrer
         return initial
     
     def get_form_kwargs(self):
@@ -152,7 +165,7 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
 
     def form_valid(self, form: PlaceForm):
         # Get the object before saving to compare values
-        place = self.get_object()
+        place = self._place
         original_values = {
             'name': place.name,
             'is_active': place.is_active,

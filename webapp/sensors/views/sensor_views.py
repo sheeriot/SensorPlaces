@@ -6,8 +6,7 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.utils.decorators import method_decorator
 
 from django.db.models import OuterRef, Subquery, Count
-from django.db.models.functions import Lower
-from django.db.models.query import QuerySet
+
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect
@@ -15,15 +14,13 @@ from django.http import JsonResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
-from ..models import Place, Device, Sensor, SensorReading
+from ..models import Device, Sensor, SensorReading
 from .mixins import PlaceAnnotationMixin
 from .sensor_forms import SensorForm
 from ..utils import get_sensor_readings
-from .views_fun import get_place_data, get_place_counts, get_annotated_locations
+from .views_fun import get_annotated_locations
 
 from datetime import datetime, timedelta
-# import sys
-# import json
 
 from icecream import ic
 
@@ -58,7 +55,6 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             'device',
             'device__location',
             'device__location__place',
-            'sensor_type'
         ).annotate(
             reading_count=Count('readings')
         ).order_by(
@@ -104,7 +100,6 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
             'device',
             'device__location',
             'device__location__place',
-            'sensor_type'
         )
         
         # Get the last reading if it exists
@@ -241,16 +236,25 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = self._place
-        context['locations'] = self._locations
-        context['device'] = self._device
-        context['location'] = self._device.location
+        # Place is already in context from PlaceAnnotationMixin
+        
+        # Add device and location data
+        if hasattr(self, '_device') and self._device:
+            context['device'] = self._device
+            context['location'] = self._device.location
         
         # Add a fallback cancel URL
-        context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
-            'place_slug': self._place.slug,
-            'pk': self._device.pk
-        })
+        if hasattr(self, '_device') and self._device:
+            context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
+                'place_slug': self._place.slug,
+                'pk': self._device.pk
+            })
+        else:
+            # Fallback to place detail if no device specified
+            context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
+                'place_slug': self._place.slug
+            })
+        
         return context
 
     def form_valid(self, form):
@@ -299,7 +303,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
 
     def get_success_url(self):
         return reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
+            'place_slug': self._place.slug,
             'pk': self.object.pk
         })
 
@@ -395,13 +399,12 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        context['place'] = self._place
+        # Place is already in context from PlaceAnnotationMixin
         
         sensor = self.get_object()
         device = sensor.device
         context['device'] = device
         context['location'] = device.location
-        context['locations'] = self._locations
         
         # Add a fallback cancel URL
         context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
@@ -487,7 +490,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             return self.form.cleaned_data['referrer']
         # Fallback to default URL
         return reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
+            'place_slug': self._place.slug,
             'pk': self.object.pk
         })
 
@@ -524,12 +527,12 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Add device and location to context
         context['device'] = device
         context['location'] = device.location
-        context['place'] = self._place
+        # Place is already in context from PlaceAnnotationMixin
         context['model_name'] = 'sensor'
         
         # Add sensor_url for cancel button
         context['sensor_url'] = reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
+            'place_slug': self._place.slug,
             'pk': sensor.pk
         })
         
@@ -687,54 +690,42 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
     def setup(self, request, *args, **kwargs):
         """Cache common values during view setup"""
         super().setup(request, *args, **kwargs)
-        self._place = None
-        self._sensor = None
-
-    @property
-    def place(self):
-        """Cached place getter"""
-        if self._place is None:
-            place_slug = self.kwargs.get('place_slug')
-            self._place = get_object_or_404(Place, slug=place_slug)
-        return self._place
-
-    @property
-    def sensor(self):
-        """Cached sensor getter"""
-        if self._sensor is None:
-            sensor_pk = self.kwargs.get('sensor_pk')
-            if sensor_pk:
-                self._sensor = get_object_or_404(
-                    Sensor.objects.select_related(
-                        'device',
-                        'device__location'
-                    ),
-                    pk=sensor_pk,
-                    device__location__place=self.place
-                )
-        return self._sensor
+        # Place is already set by PlaceAnnotationMixin
+        
+        # Get and cache the sensor
+        sensor_pk = self.kwargs.get('sensor_pk')
+        if sensor_pk:
+            self._sensor = get_object_or_404(
+                Sensor.objects.select_related(
+                    'device',
+                    'device__location'
+                ),
+                pk=sensor_pk,
+                device__location__place=self._place
+            )
+        else:
+            self._sensor = None
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         # Set initial timestamp to now
-        kwargs['initial'] = {
-            'timestamp': timezone.now()
-        }
+        kwargs['initial'] = kwargs.get('initial', {})
+        kwargs['initial']['timestamp'] = timezone.now()
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
             'model_name': 'sensor_reading',
-            'place': self.place,
-            'sensor': self.sensor,
-            'device': self.sensor.device,
-            'location': self.sensor.device.location,
+            # Place is already in context from PlaceAnnotationMixin
+            'sensor': self._sensor,
+            'device': self._sensor.device if self._sensor else None,
+            'location': self._sensor.device.location if self._sensor else None,
         })
         return context
 
     def form_valid(self, form):
-        form.instance.sensor = self.sensor
+        form.instance.sensor = self._sensor
         response = super().form_valid(form)
         reading = self.object
         sensor = reading.sensor
@@ -760,17 +751,12 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
             'type': 'success'
         })
         
-        # ic("SensorReadingCreateView setting toast_message:", {
-        #     'message': message,
-        #     'type': 'success'
-        # })
-        
         return response
 
     def get_success_url(self):
         return reverse('sensors:sensor_reading_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
-            'sensor_pk': self.sensor.pk,
+            'place_slug': self._place.slug,
+            'sensor_pk': self._sensor.pk,
             'pk': self.object.pk
         })
 

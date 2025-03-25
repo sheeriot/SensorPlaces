@@ -7,10 +7,11 @@ services:
     env_file:
       - env/django.env
     entrypoint: /opt/app/docker-entrypoint.sh
-    command: gunicorn -c /opt/app/webapp/gunicorn.conf.py sensorplaces.wsgi
+    # command: gunicorn -c /opt/app/webapp/gunicorn.conf.py sensorplaces.wsgi
+    command: python manage.py runserver 0.0.0.0:8002
     restart: unless-stopped
     ports:
-      - 8002:8000
+      - 8002:8002
     volumes:
       - sensorplaces-db:/opt/app/db
       - sensorplaces-static:/opt/app/static_files

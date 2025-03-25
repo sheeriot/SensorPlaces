@@ -33,6 +33,9 @@ RUN groupadd -g "${GID}" -r web \
 # Install requirements
 RUN pip install -r /opt/app/requirements.txt
 
+# Run collectstatic during build
+# RUN python manage.py collectstatic --noinput
+
 # switch to non-root user
 USER web
 
