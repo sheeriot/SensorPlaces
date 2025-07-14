@@ -8,9 +8,15 @@
     <div class="card-body">
         <div class="readings-chart-container" 
              data-sensor-id="{{ sensor.pk }}"
+             data-place-slug="{{ place.slug }}"
              data-unit="{{ sensor.get_unit_display }}"
              data-name="{{ sensor.name }}">
-            <canvas id="readingsChart"></canvas>
+            <canvas></canvas>
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>

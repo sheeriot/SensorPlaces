@@ -36,7 +36,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             location_pk = self.kwargs.get('location_pk')
             
             base_queryset = super().get_queryset()
-            queryset = base_queryset.filter(location__place=place)
+            queryset = base_queryset.filter(place=place)
             
             # Filter by location if specified
             if location_pk:
@@ -70,6 +70,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         # Add place to context
         place = self.get_place()
         context['place'] = place
+        context['unassigned_devices'] = self.get_queryset().filter(location__isnull=True)
         
         # Get location if specified
         location_pk = self.request.GET.get('location', None)
@@ -100,7 +101,7 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
             base_queryset = super().get_queryset()
-            self._queryset = base_queryset.filter(location__place=place)\
+            self._queryset = base_queryset.filter(place=place)\
                 .annotate(active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)))\
                 .prefetch_related(
                     Prefetch(
@@ -199,23 +200,28 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         
         return context
 
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
-            'pk': self.object.pk
-        })
-
     def form_valid(self, form):
+        # Set the place on the instance before saving
+        form.instance.place = self._place
+        
         # Save the form to get the object
         self.object = form.save()
         device = self.object
-        location = device.location
-        place = location.place
         
-        message = (
-            f"Created device <strong>{device.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {location.name}<br>"
+        # Build the message based on whether location is set
+        if device.location:
+            message = (
+                f"Created device <strong>{device.name}</strong> in "
+                f"<i class='bi bi-house-gear'></i> {device.place.name} > "
+                f"<i class='bi bi-geo-alt'></i> {device.location.name}<br>"
+            )
+        else:
+            message = (
+                f"Created unassigned device <strong>{device.name}</strong> in "
+                f"<i class='bi bi-house-gear'></i> {device.place.name}<br>"
+            )
+
+        message += (
             f"<small class='text-muted'>"
             f"Type: {device.device_type or '-'}<br>"
             f"Model: {device.model or '-'}<br>"
@@ -230,7 +236,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning'
+            'type': 'success' if form.cleaned_data.get('is_active', True) else 'warning'
         })
         
         # Get the success URL and return HttpResponseRedirect
@@ -373,79 +379,77 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         return context
 
     def get_success_url(self):
-        # Use cleaned_data from the form instead of request.POST
-        if hasattr(self, 'object') and hasattr(self.object, 'referrer') and self.object.referrer:
-            return self.object.referrer
-        # Or check form's cleaned_data
-        elif hasattr(self, 'form') and 'referrer' in self.form.cleaned_data and self.form.cleaned_data['referrer']:
-            return self.form.cleaned_data['referrer']
-        # Fallback to default URL
         return reverse('sensors:device_detail', kwargs={
-            'place_slug': self._place.slug,
+            'place_slug': self.kwargs['place_slug'],
             'pk': self.object.pk
         })
 
     def form_valid(self, form):
         # Store original values before save
-        device = self.get_object()
-        original_is_active = device.is_active
-        self._original_values = {
-            'name': device.name,
-            'is_active': original_is_active,
-            'location': device.location,
-            'device_type': device.device_type,
-            'model': device.model,
-            'serial_number': device.serial_number
-        }
-        
-        # Save the form
-        self.object = form.save()
-        device = self.object
-        changes = []
-        
-        # Build list of changes
-        if hasattr(self, '_original_values'):
-            if self._original_values['name'] != form.cleaned_data['name']:
-                changes.append(f"name: {self._original_values['name']} → {form.cleaned_data['name']}")
-            if self._original_values['is_active'] != form.cleaned_data['is_active']:
-                changes.append(f"active: {self._original_values['is_active']} → {form.cleaned_data['is_active']}")
-            if self._original_values['location'] != form.cleaned_data['location']:
-                changes.append(f"location: {self._original_values['location'].name} → {form.cleaned_data['location'].name}")
-            if self._original_values['device_type'] != form.cleaned_data['device_type']:
-                changes.append(f"type: {self._original_values['device_type']} → {form.cleaned_data['device_type']}")
-            if self._original_values['model'] != form.cleaned_data['model']:
-                changes.append(f"model: {self._original_values['model']} → {form.cleaned_data['model']}")
-            if self._original_values['serial_number'] != form.cleaned_data['serial_number']:
-                changes.append(f"serial number: {self._original_values['serial_number']} → {form.cleaned_data['serial_number']}")
+        original_is_active = self.object.is_active
+        original_location = self.object.location
 
-        # If active status changed, update the inactive_help_text
-        if original_is_active != device.is_active:
-            self._inactive_help_text = self.get_device_inactive_help_text(device, device.location)
+        # Save the form but don't commit yet to check changes
+        device = form.save(commit=False)
 
-        # Build toast message
-        message = (
-            f"Updated device <strong>{device.name}</strong> in "
-            f"<i class='bi bi-house-gear'></i> {device.location.place.name} > "
-            f"<i class='bi bi-geo-alt'></i> {device.location.name}<br>"
-            f"<small class='text-muted'>"
-            f"Changes: {', '.join(changes) if changes else 'No changes'}"
-            f"</small>"
+        # Retrieve the place from the setup method
+        place = self._place
+
+        # Handle the case where location is cleared (set to None)
+        if 'location' in form.changed_data and form.cleaned_data['location'] is None:
+            device.location = None
+        
+        # If location is not cleared, or it's a new location, set it
+        elif 'location' in form.cleaned_data and form.cleaned_data['location']:
+            device.location = form.cleaned_data['location']
+
+        # Ensure the device always has a place
+        device.place = place
+
+        # Now, save the device with all changes
+        device.save()
+        self.object = device  # Update the view's object
+
+        # Check if the location has changed and update toast message
+        new_location = self.object.location
+        location_changed = original_location != new_location
+        status_changed = original_is_active != self.object.is_active
+
+        toast_message = self.construct_toast_message(
+            form, 
+            status_changed, 
+            location_changed, 
+            original_location
         )
+
+        setattr(self.request, 'toast_message', toast_message)
         
-        # Add inactive warning to message if device is inactive
-        if not device.is_active and self._inactive_help_text:
-            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
+        return HttpResponseRedirect(self.get_success_url())
+
+    def construct_toast_message(self, form, status_changed, location_changed, original_location):
+        device = self.object
+        message_parts = [f"Updated device <strong>{device.name}</strong>"]
+        details = []
+
+        if location_changed:
+            if device.location:
+                details.append(f"Moved to <i class='bi bi-geo-alt'></i> {device.location.name}")
+            else:
+                details.append("Moved to <i class='bi bi-question-circle'></i> Unassigned")
         
-        # Set toast message directly on request for middleware
-        setattr(self.request, 'toast_message', {
-            'message': message,
-            'type': 'success' if form.cleaned_data['is_active'] else 'warning',
-            'place_id': self._place.pk  # Use the primary key instead of the object
-        })
+        if status_changed:
+            status_text = "set to <strong class='text-success'>Active</strong>" if device.is_active else "set to <strong class='text-danger'>inactive</strong>"
+            details.append(f"Status {status_text}")
         
-        # Get the success URL and return HttpResponseRedirect
-        success_url = self.get_success_url()
-        return HttpResponseRedirect(success_url)
+        if not details:
+            details.append("No changes detected.")
+
+        message_parts.append("<br><small class='text-muted'>" + ", ".join(details) + "</small>")
+        
+        return {
+            'message': "".join(message_parts),
+            'type': 'success'
+        }
 
 class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Device
@@ -495,9 +499,11 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         device_data = {
             'name': device.name,
             'is_active': device.is_active,
-            'device_type': device.device_type.name if device.device_type else 'Unknown',
+            'device_type': device.device_type.name if device.device_type else '',
+            'icon': device.device_type.icon if device.device_type else 'bi-hdd',
             'model': device.model or '',
-            'serial_number': device.serial_number or ''
+            'manufacturer': device.manufacturer or '',
+            'device_id': device.device_id or ''
         }
         
         # Get active sensors before deletion
@@ -510,8 +516,9 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             f"<small class='text-muted'>"
             f"Type: {device_data['device_type']}<br>"
             f"Model: {device_data['model']}<br>"
-            f"Serial: {device_data['serial_number']}<br>"
-            f"Status: {'Active' if device_data['is_active'] else 'inactive'}"
+            f"Manufacturer: {device_data['manufacturer']}<br>"
+            f"ID: {device_data['device_id']}<br>"
+            f"Active: {'Yes' if device.is_active else 'No'}"
         )
         
         if sensors_info:

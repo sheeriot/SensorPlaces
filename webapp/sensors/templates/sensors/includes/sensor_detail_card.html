@@ -1,6 +1,6 @@
 {% load widget_tweaks %}
 
-<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not sensor.is_active %}opacity-50{% endif %}" id="sensor-card-{{ device.pk }}">
+<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not sensor.is_active %}opacity-50{% endif %}" id="sensor-card-{{ sensor.pk }}">
 
     <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
@@ -20,50 +20,47 @@
             {% endif %}
         </div>
     </div>
-    <div class="card-body py-2">
-        <!-- First Row: Name and Device -->
-        <div class="row g-3 mb-3">
-            <div class="col-6">
-                <label class="text-body-secondary small text-uppercase d-block">Name</label>
-                <div>{{ sensor.name }}</div>
-            </div>
-            <div class="col-6">
-                <label class="text-body-secondary small text-uppercase d-block">Device</label>
-                <div>{{ device.name }}</div>
-            </div>
+    <div class="card-body py-3">
+        <!-- Sensor Name -->
+        <div class="mb-1">
+            <label class="text-body-secondary small text-uppercase d-block">Sensor Name</label>
+            <div class="fs-5 fw-bold">{{ sensor.name }}</div>
         </div>
 
-        <!-- Second Row: Status -->
-        <div class="row mb-3">
-            <div class="col-12">
+        <!-- Device Name -->
+        <div class="mb-3">
+            <label class="text-body-secondary small text-uppercase d-block">Device</label>
+            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
+                <i class="bi bi-hdd me-1"></i>{{ device.name }}
+            </a>
+        </div>
+
+        <!-- Status and Source -->
+        <div class="row g-3 mb-3">
+            <div class="col-6">
                 <label class="text-body-secondary small text-uppercase d-block">Status</label>
                 <div class="d-flex align-items-center">
-                    <div class="me-3">
+                    <div class="me-2">
                         {% include "sensors/partials/toggle_active_button.html" with place_slug=place.slug type="sensor" id=sensor.pk is_active=sensor.is_active %}
                     </div>
                     {% include "sensors/partials/status_active_badge.html" with object=sensor %}
-
                 </div>
+            </div>
+            <div class="col-6">
+                <label class="text-body-secondary small text-uppercase d-block">Source</label>
+                <div>{{ sensor.get_data_type_display }}</div>
             </div>
         </div>
 
-        <!-- Third Row: Type and Unit -->
+        <!-- Type and Unit -->
         <div class="row g-3 mb-3">
             <div class="col-6">
                 <label class="text-body-secondary small text-uppercase d-block">Type</label>
-                <div>{{ sensor.sensor_type }}</div>
+                <div>{{ sensor.get_sensor_type_display }}</div>
             </div>
             <div class="col-6">
                 <label class="text-body-secondary small text-uppercase d-block">Unit</label>
                 <div>{{ sensor.unit }}</div>
-            </div>
-        </div>
-
-        <!-- Fourth Row: Data Source -->
-        <div class="row mb-3">
-            <div class="col-12">
-                <label class="text-body-secondary small text-uppercase d-block">Data Source</label>
-                <div>{{ sensor.get_data_type_display }}</div>
             </div>
         </div>
 
@@ -80,5 +77,36 @@
             </div>
         </div>
         {% endif %}
+
+        <hr>
+
+        <!-- Statistics -->
+        <div class="mt-3">
+            <div class="d-flex justify-content-between align-items-baseline mb-2">
+               <label class="text-body-secondary small text-uppercase d-block">Statistics</label>
+               <span class="text-muted small">Count: {{ reading_stats.reading_count|default:"N/A" }}</span>
+            </div>
+            <div class="row">
+               <div class="col-auto text-body-secondary small">Last:</div>
+               <div class="col ps-0">{{ reading_stats.last_reading|date:"M d, Y P"|default:"N/A" }}</div>
+            </div>
+            <div class="row">
+               <div class="col-auto text-body-secondary small">First:</div>
+               <div class="col ps-0">{{ reading_stats.first_reading|date:"M d, Y P"|default:"N/A" }}</div>
+            </div>
+       </div>
+
+        <!-- Sparkline Placeholder -->
+        <div class="mt-4">
+            <span class="text-body-secondary small text-uppercase d-block mb-1">Reading Distribution</span>
+            {% if sparkline_image %}
+                <img src="{{ sparkline_image }}" alt="Sensor reading distribution sparkline" class="img-fluid">
+            {% else %}
+                <div class="p-3 bg-light border rounded text-muted text-center small">
+                    No reading data available to generate chart.
+                </div>
+            {% endif %}
+        </div>
+
     </div>
 </div> 

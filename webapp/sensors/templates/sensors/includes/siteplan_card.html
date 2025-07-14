@@ -21,6 +21,7 @@
             <!-- Leaflet map container with absolute positioning -->
             <div id="siteplan-container" 
                  class="position-absolute top-0 start-0 w-100 h-100 leaflet-container"
+                 data-place-slug="{{ place.slug }}"
                  data-image-url="{{ place.get_siteplan_url }}"
                  data-locations="{{ locations_json|escapejs }}">
             </div>

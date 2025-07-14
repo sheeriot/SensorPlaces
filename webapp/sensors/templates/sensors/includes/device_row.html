@@ -1,17 +1,16 @@
-{% load static %}
-
-<tr class="device-row {% if not device.is_active %}opacity-50 text-muted{% if hide_inactive %}d-none{% endif %}{% endif %}" 
+  <tr class="device-row {% if not device.is_active %}opacity-50 text-muted{% if hide_inactive %}d-none{% endif %}{% endif %}" 
     data-device-active="{{ device.is_active|lower }}" 
     data-device-id="{{ device.pk }}"
-    data-location-active="{{ device.location.is_active|lower }}"
-    data-location-id="{{ device.location.pk }}">
+    data-location-active="{% if device.location %}{{ device.location.is_active|lower }}{% else %}true{% endif %}"
+    data-location-id="{% if device.location %}{{ device.location.pk }}{% else %}unassigned{% endif %}">
     <td>
         <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
-            <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}
+            <i class="bi bi-hdd me-2"></i>
+            {{ device.name }}
         </a>
     </td>
     <td>
-        {% if device.location.is_active %}
+        {% if not device.location or device.location.is_active %}
             {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug disabled=is_disabled %}
         {% else %}
             <span class="d-none">
@@ -19,50 +18,20 @@
             </span>
         {% endif %}
     </td>
+    <td>{{ device.device_type.name|default:"-" }}</td>
     <td>{{ device.model|default:"-" }}</td>
     <td>{{ device.manufacturer|default:"-" }}</td>
-    <td>{{ device.serial_number|default:"-" }}</td>
+    <td>{{ device.device_id|default:"-" }}</td>
     <td class="text-end">
-        <div class="btn-group" role="group">
+        <div class="btn-group">
             <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" 
-               class="btn btn-warning btn-sm"
-               {% if not device.is_active %}disabled{% endif %}>
+               class="btn btn-sm btn-outline-warning">
                 <i class="bi bi-pencil"></i>
             </a>
             <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" 
-               class="btn btn-danger btn-sm"
-               {% if not device.is_active %}disabled{% endif %}>
+               class="btn btn-sm btn-outline-danger">
                 <i class="bi bi-trash"></i>
             </a>
         </div>
     </td>
 </tr>
-
-<!-- Device Status Change Modal -->
-<div class="modal fade" id="deviceStatusModal-{{ device.id }}" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirm Device Status Change</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to <span class="action-text"></span> device "{{ device.name }}"?</p>
-                {% if device.sensors.exists %}
-                <div class="alert alert-warning static-alert">
-                    <h6>This will affect the following sensors:</h6>
-                    <ul class="mb-0">
-                    {% for sensor in device.sensors.all %}
-                        <li>{{ sensor.name }}</li>
-                    {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary confirm-status-change">Confirm</button>
-            </div>
-        </div>
-    </div>
-</div>

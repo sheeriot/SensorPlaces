@@ -171,8 +171,15 @@ class Device(models.Model):
     name: CharField = models.CharField(max_length=100)
     model: CharField = models.CharField(max_length=100, null=True, blank=True)
     manufacturer: CharField = models.CharField(max_length=100, null=True, blank=True)
-    serial_number: CharField = models.CharField(max_length=100, null=True, blank=True)
-    location: ForeignKey = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='devices')
+    device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    place: ForeignKey = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='devices', null=True, blank=True)
+    location: ForeignKey = models.ForeignKey(
+        Location, 
+        on_delete=models.SET_NULL, 
+        related_name='devices',
+        null=True,
+        blank=True
+    )
     device_type = models.ForeignKey(
         DeviceType,
         on_delete=models.SET_NULL,
@@ -189,17 +196,29 @@ class Device(models.Model):
     def clean(self):
         super().clean()
         # Ensure device can't be active if location is inactive
-        if self.is_active and not self.location.is_active:
+        if self.is_active and self.location and not self.location.is_active:
             raise ValidationError({
                 'is_active': 'Device cannot be active when its location is inactive.'
             })
+        
+        if self.location and self.location.place != self.place:
+            raise ValidationError({
+                'location': "The selected location does not belong to the device's place."
+            })
 
     def save(self, *args, **kwargs):
+        # If location is set, ensure place is consistent
+        if self.location and self.place != self.location.place:
+            self.place = self.location.place
+
+        if self.device_id:
+            self.device_id = self.device_id.lower()
+
         # Run full validation first
         self.full_clean()
         
         # If location is inactive, device must be inactive
-        if not self.location.is_active:
+        if self.location and not self.location.is_active:
             self.is_active = False
         
         # Check if this is an existing device being deactivated
@@ -214,7 +233,7 @@ class Device(models.Model):
 
     class Meta:
         verbose_name_plural = '4. Devices'
-        ordering = ['location', '-is_active', Lower('name')]
+        ordering = ['place', 'location', '-is_active', Lower('name')]
 
 class InfluxSource(models.Model):
     name = models.CharField(max_length=100)

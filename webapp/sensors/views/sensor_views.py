@@ -5,11 +5,11 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
 
-from django.db.models import OuterRef, Subquery, Count
+from django.db.models import OuterRef, Subquery, Count, Min, Max
 
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect, HttpRequest
 
 from django.utils import timezone
 from django.utils.safestring import mark_safe
@@ -17,7 +17,7 @@ from django.utils.safestring import mark_safe
 from ..models import Device, Sensor, SensorReading
 from .mixins import PlaceAnnotationMixin
 from .sensor_forms import SensorForm
-from ..utils import get_sensor_readings
+from ..utils import get_sensor_readings, generate_sparkline
 from .views_fun import get_annotated_locations
 
 from datetime import datetime, timedelta
@@ -125,29 +125,22 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['device'] = sensor.device
         context['location'] = sensor.device.location
         
-        # Try to get recent readings if this is an InfluxDB sensor
-        if sensor.data_type == 'INFLUX':
-            try:
-                # Get readings for the last hour
-                stop = timezone.now()
-                start = stop - timedelta(minutes=60)
-                
-                readings = get_sensor_readings(sensor=sensor, start=start, stop=stop, limit=100)
-                if readings:
-                    values = [reading['value'] for reading in readings]
-                    context['readings_summary'] = {
-                        'count': len(values),
-                        'min': min(values),
-                        'max': max(values),
-                        'avg': sum(values) / len(values),
-                        'first_timestamp': readings[0]['timestamp'],
-                        'last_timestamp': readings[-1]['timestamp'],
-                        'unit': sensor.unit
-                    }
-                    context['recent_readings'] = readings[:10]  # Last 10 readings
-            except Exception as e:
-                # ic(f"Error getting sensor readings: {str(e)}")
-                context['readings_error'] = str(e)
+        # Get all readings for statistics and sparkline
+        readings = SensorReading.objects.filter(sensor=sensor).order_by('timestamp')
+        
+        context['readings'] = readings
+
+        # Get sensor reading statistics
+        stats = SensorReading.objects.filter(sensor=sensor).aggregate(
+            first_reading=Min('timestamp'),
+            last_reading=Max('timestamp'),
+            reading_count=Count('id')
+        )
+        context['reading_stats'] = stats
+
+        # Generate sparkline
+        timestamps = [reading.timestamp for reading in readings]
+        context['sparkline_image'] = generate_sparkline(timestamps)
         
         return context
 
@@ -817,3 +810,87 @@ def test_sensor_readings(request, place_slug, sensor_pk):
             'status': 'error',
             'message': f'Failed to connect to InfluxDB: {str(e)}'
         }, status=500)
+
+@login_required
+def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonResponse:
+    """
+    API endpoint to get sensor readings for a given sensor.
+    """
+    try:
+        sensor = get_object_or_404(
+            Sensor,
+            pk=pk,
+            device__location__place__slug=place_slug
+        )
+        
+        # Get start and end dates from query parameters
+        start_str = request.GET.get('start')
+        end_str = request.GET.get('end')
+        
+        queryset = SensorReading.objects.filter(sensor=sensor)
+
+        if start_str and end_str:
+            try:
+                # Assuming ISO 8601 format from JavaScript (e.g., "2024-07-16T10:00:00.000Z")
+                # The 'Z' is for UTC, fromisoformat handles it correctly in Python 3.11+
+                # For older versions, it might need replacement with +00:00
+                start_date = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+                end_date = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+                
+                queryset = queryset.filter(timestamp__gte=start_date, timestamp__lte=end_date)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid date format. Use ISO 8601 format.'}, status=400)
+        else:
+            # Default to the last 24 hours if no range is provided
+            time_threshold = timezone.now() - timedelta(hours=24)
+            queryset = queryset.filter(timestamp__gte=time_threshold)
+
+        readings = queryset.order_by('timestamp').values('timestamp', 'value')
+        
+        return JsonResponse(list(readings), safe=False)
+
+    except Exception as e:
+        ic(f"Error fetching sensor readings: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: int) -> JsonResponse:
+    """
+    API endpoint to get a rendered table of sensor readings for a given sensor.
+    """
+    try:
+        sensor = get_object_or_404(
+            Sensor,
+            pk=sensor_pk,
+            device__location__place__slug=place_slug
+        )
+        
+        # Get start and end dates from query parameters
+        start_str = request.GET.get('start')
+        end_str = request.GET.get('end')
+        
+        queryset = SensorReading.objects.filter(sensor=sensor)
+
+        if start_str and end_str:
+            try:
+                start_date = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+                end_date = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+                queryset = queryset.filter(timestamp__gte=start_date, timestamp__lte=end_date)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid date format.'}, status=400)
+        else:
+            # Default to the last 24 hours if no range is provided
+            time_threshold = timezone.now() - timedelta(hours=24)
+            queryset = queryset.filter(timestamp__gte=time_threshold)
+
+        readings = queryset.order_by('-timestamp')
+        
+        # Render the template partial
+        from django.template.loader import render_to_string
+        html = render_to_string('sensors/includes/sensor_readings_table.html', {'readings': readings, 'sensor': sensor})
+        
+        return JsonResponse({'html': html})
+
+    except Exception as e:
+        ic(f"Error fetching sensor readings table: {e}")
+        return JsonResponse({'error': str(e)}, status=500)

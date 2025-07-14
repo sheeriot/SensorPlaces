@@ -1,10 +1,14 @@
-from influxdb_client_3 import InfluxDBClient3 as InfluxDBClient
-# from django.conf import settings
-# from datetime import datetime
-# from django.utils.safestring import mark_safe
-from icecream import ic
-from django.http import JsonResponse
-from .models import ToastNotification
+import base64
+from io import BytesIO
+import matplotlib.pyplot as plt
+import matplotlib
+from datetime import datetime, timezone as dt_timezone
+from typing import List, Optional
+import numpy as np
+
+# Use a non-interactive backend for matplotlib
+matplotlib.use('Agg')
+
 
 def get_influxdb_client(influx_source):
     return InfluxDBClient(
@@ -159,3 +163,66 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
 #         return JsonResponse({'success': True})
 #     except Exception as e:
 #         return JsonResponse({'error': str(e)}, status=500)
+
+
+def generate_sparkline(timestamps: List[datetime]) -> Optional[str]:
+    """
+    Generates a sparkline chart from a list of timestamps, showing their
+    distribution over time from the first reading to now.
+    """
+    if not timestamps or len(timestamps) < 2:
+        return None
+
+    # Ensure timestamps are timezone-aware (assuming UTC if naive)
+    aware_timestamps = []
+    for ts in timestamps:
+        if ts.tzinfo is None:
+            aware_timestamps.append(ts.replace(tzinfo=dt_timezone.utc))
+        else:
+            aware_timestamps.append(ts)
+    
+    aware_timestamps.sort()
+
+    x_values = aware_timestamps
+    # Y-axis has no meaning, use random jitter for density visualization
+    y_values = np.random.uniform(0, 1, len(x_values))
+
+    fig, ax = plt.subplots(figsize=(4, 0.4), dpi=120)
+    
+    # Plot the readings as dots
+    ax.scatter(x_values, y_values, s=8, alpha=0.5, color='dodgerblue', edgecolor='none')
+
+    # --- Configure Axes ---
+    start_time = aware_timestamps[0]
+    end_time = datetime.now(dt_timezone.utc)
+    ax.set_xlim(start_time, end_time)
+    ax.set_ylim(0, 1) # Set Y-lim to the data range
+    
+    # --- Configure Spines & Ticks for a minimal look ---
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['bottom'].set_color('lightgray')
+    ax.spines['bottom'].set_linewidth(0.8)
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.tick_params(axis='both', which='both', length=0)
+
+    # --- Add 'first' and 'now' labels ---
+    # Use axes coordinates to place text just below the bottom spine.
+    ax.text(0, -0.1, 'first', ha='left', va='top', fontsize=12, color='gray', transform=ax.transAxes, clip_on=False)
+    ax.text(1, -0.1, 'now', ha='right', va='top', fontsize=12, color='gray', transform=ax.transAxes, clip_on=False)
+    
+    # --- Save to buffer ---
+    buf = BytesIO()
+    plt.tight_layout(pad=0)
+    plt.savefig(buf, format='png', transparent=True, bbox_inches='tight', pad_inches=0.1)
+    plt.close(fig)
+    buf.seek(0)
+    
+    image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    buf.close()
+
+    return f"data:image/png;base64,{image_base64}"
