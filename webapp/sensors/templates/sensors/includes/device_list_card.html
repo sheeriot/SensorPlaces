@@ -31,11 +31,12 @@
             <table class="table table-light table-hover mb-0">
                 <thead>
                     <tr>
-                        <th style="width: 30%">Name</th>
+                        <th style="width: 25%">Name</th>
                         <th style="width: 15%">Status</th>
+                        <th style="width: 15%">Type</th>
                         <th style="width: 15%">Model</th>
                         <th style="width: 15%">Manufacturer</th>
-                        <th style="width: 15%">Serial</th>
+                        <th style="width: 15%">Device ID</th>
                         <th style="width: 10%" class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -58,7 +59,7 @@
                                 data-location-id="{{ location.pk }}"
                                 data-location-name="{{ location.name }}"
                                 data-place-name="{{ place.name }}">
-                                <th colspan="6" class="px-3 py-2">
+                                <th colspan="7" class="px-3 py-2">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div class="d-flex align-items-center gap-2">
                                             <i class="bi bi-geo-alt me-2"></i>

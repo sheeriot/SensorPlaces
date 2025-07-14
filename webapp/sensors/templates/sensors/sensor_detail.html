@@ -1,33 +1,37 @@
 {% extends "sensors/base.html" %}
+{% load static %}
+{% load i18n %}
 
-{% block title %}Sensor Details - {{ sensor.name }}{% endblock %}
+{% block head_title %}{{ sensor.name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-
-    <!-- Place Title Card - Spans both columns -->
-    {% include 'sensors/partials/place_title_card.html' %}
-
+<div class="container-fluid px-2 mt-2">
     <div class="row">
-        <!-- Left Column -->
         <div class="col-md-4">
-            <!-- Place Navigation Card -->
-            {% if place.is_active %}
-                {% include "sensors/includes/place_nav_card.html" %}
-            {% else %}
-                {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
-            {% endif %}
-            {% if device %}
-                {% include "sensors/includes/device_detail_card.html" %}
-            {% endif %}
+            {% include "sensors/includes/sensor_detail_card.html" %}
         </div>
-
-        <!-- Right Column -->
         <div class="col-md-8">
-            {% include "sensors/includes/sensor_detail_card.html" with sensor=sensor %}
-            {% if sensor.is_active %}
-                {% include "sensors/includes/sensor_readings_card.html" with sensor=sensor %}
-            {% endif %}
+            <div class="d-flex justify-content-end align-items-center mb-2">
+                <div class="btn-toolbar" role="toolbar">
+                    <div class="btn-group btn-group-sm me-2" role="group" aria-label="Time range">
+                        <button type="button" class="btn btn-outline-secondary" data-range="1">24h</button>
+                        <button type="button" class="btn btn-outline-secondary" data-range="7">7d</button>
+                        <button type="button" class="btn btn-outline-secondary" data-range="30">30d</button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary d-none" id="reset-zoom-btn">Reset Zoom</button>
+                    </div>
+                </div>
+            </div>
+            {% include "sensors/includes/sensor_readings_card.html" %}
+            <div id="readings-table-container">
+                {% include "sensors/includes/sensor_readings_table.html" %}
+            </div>
+        </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock content %}
+
+{% block extra_js %}
+    <script src="{% static 'sensors/js/charts.js' %}" defer></script>
+{% endblock extra_js %} 

@@ -386,7 +386,7 @@ class FormSubmissionTestCase(TestCase):
             'device_type': self.device_type.id,
             'manufacturer': 'Test Manufacturer',
             'model': 'Test Model',
-            'serial_number': 'TEST123'
+            'device_id': 'TEST123'
         }
         self.assertEqual(self.client.post(
             reverse('sensors:device_create', kwargs={

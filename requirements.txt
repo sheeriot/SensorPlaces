@@ -11,4 +11,4 @@ django-allauth >= 65.4
 jwt
 pylint-django
 django-cors-headers
-
+matplotlib

@@ -21,7 +21,16 @@
 
         <!-- right column -->
         <div class="col-md-8">
-            {% include "sensors/includes/device_list_card.html" %}
+
+            {% include "sensors/includes/unassigned_devices_card.html" %}
+
+            {% if location %}
+                {# Single location view #}
+                {% include "sensors/includes/device_list_card.html" with location=location devices=devices %}
+            {% else %}
+                {# List of all devices #}
+                {% include "sensors/includes/device_list_card.html" %}
+            {% endif %}
         </div>
     </div>
 </div>

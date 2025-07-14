@@ -1,4 +1,5 @@
 from django.contrib import admin
+from icecream import ic
 
 from .models import (
     Place,
@@ -35,15 +36,12 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
-    list_display = (
-        'name',
-        'location',
-        'device_type',
-        'serial_number',
-        'is_active'
-    )
-    list_filter = ('device_type', 'is_active', 'location__place')
-    search_fields = ('name', 'serial_number', 'location__name')
+    list_display = ('name', 'place', 'location', 'device_type', 'is_active', 'model', 'manufacturer', 'device_id')
+    list_filter = ('is_active', 'place', 'location', 'device_type', 'manufacturer')
+    search_fields = ('name', 'device_id', 'place__name', 'location__name')
+    list_editable = ('is_active',)
+    autocomplete_fields = ('place', 'location', 'device_type')
+    ordering = ('name',)
 
     class Meta:
         verbose_name_plural = '3. Devices'

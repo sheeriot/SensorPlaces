@@ -15,12 +15,12 @@ class DeviceForm(forms.ModelForm):
 
     class Meta:
         model = Device
-        fields = ['name', 'is_active', 'location', 'device_type', 'manufacturer', 'model', 'serial_number']
+        fields = ['name', 'is_active', 'location', 'device_type', 'manufacturer', 'model', 'device_id']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter device name'}),
             'manufacturer': forms.TextInput(attrs={'placeholder': 'Enter manufacturer'}),
             'model': forms.TextInput(attrs={'placeholder': 'Enter model'}),
-            'serial_number': forms.TextInput(attrs={'placeholder': 'Enter serial number'}),
+            'device_id': forms.TextInput(attrs={'placeholder': 'Enter device ID'}),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input active-checkbox',
                 'data-active-label': 'Active',
@@ -37,6 +37,9 @@ class DeviceForm(forms.ModelForm):
         self.devices_active = kwargs.pop('devices_active', None)
         inactive_help_text = kwargs.pop('inactive_help_text', None)
         super().__init__(*args, **kwargs)
+        
+        if 'location' in self.fields:
+            self.fields['location'].required = False
         
         # Configure crispy form helper
         self.helper = FormHelper()
@@ -168,7 +171,7 @@ class DeviceForm(forms.ModelForm):
                 css_class='mb-1'
             ),
             Row(
-                Column('serial_number', css_class='col-auto'),
+                Column('device_id', css_class='col-auto'),
                 css_class='mb-2'
             ),
             Div(
@@ -233,34 +236,22 @@ class DeviceForm(forms.ModelForm):
         
         return cleaned_data
 
-    def clean_serial_number(self):
-        serial_number = self.cleaned_data.get('serial_number')
-        manufacturer = self.cleaned_data.get('manufacturer')
-        model = self.cleaned_data.get('model')
+    def clean_device_id(self):
+        device_id = self.cleaned_data.get('device_id')
+        if not device_id:
+            return device_id
 
-        if serial_number:
-            # Get existing devices with the same serial number, excluding current device if editing
-            existing_devices = Device.objects.filter(serial_number=serial_number)
-            if self.instance and self.instance.pk:
-                existing_devices = existing_devices.exclude(pk=self.instance.pk)
+        # Check for uniqueness
+        if self.instance and self.instance.pk:
+            # If updating, exclude self from the check
+            if Device.objects.filter(device_id__iexact=device_id).exclude(pk=self.instance.pk).exists():
+                self.add_warning('device_id', f'Device with ID "{device_id}" already exists.')
+        else:
+            # If creating, check all devices
+            if Device.objects.filter(device_id__iexact=device_id).exists():
+                self.add_warning('device_id', f'Device with ID "{device_id}" already exists.')
 
-            if existing_devices.exists():
-                # Check if any device with same serial number has matching manufacturer or model
-                matching_devices = existing_devices.filter(
-                    models.Q(manufacturer=manufacturer) | models.Q(model=model)
-                )
-
-                if matching_devices.exists():
-                    raise forms.ValidationError(
-                        "A device with this serial number already exists with the same manufacturer or model."
-                    )
-                else:
-                    self.add_warning(
-                        'serial_number',
-                        'This serial number is already in use by another device.'
-                    )
-
-        return serial_number
+        return device_id
 
     def add_warning(self, field, message):
         if not hasattr(self, '_warnings'):

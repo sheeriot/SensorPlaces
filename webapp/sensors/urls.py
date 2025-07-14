@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from .views.place_views import (
     PlaceListView, PlaceDetailView, PlaceCreateView, PlaceUpdateView, PlaceDeleteView,
     place_stats, siteplan_update
@@ -12,16 +12,20 @@ from .views.device_views import (
 )
 from .views.sensor_views import (
     SensorListView, SensorDetailView, SensorCreateView, SensorUpdateView, SensorDeleteView,
-    SensorReadingListView, SensorReadingDetailView, SensorReadingCreateView, test_sensor_readings
+    SensorReadingListView, SensorReadingDetailView, SensorReadingCreateView, test_sensor_readings,
+    sensor_readings_api, sensor_readings_table_api
 )
 from .views.toast_views import ToastAPIView, ToastListView
 from .views.toggle_active import ToggleActiveView
+from .views.webhook_views import WebhookReceiverView
 
 app_name = 'sensors'
 
 urlpatterns = [
 
     # Shared API endpoints
+    re_path(r'^api/(?P<place_slug>[^/]+)/webhook/(?P<device_id>[^/]+)/?$', WebhookReceiverView.as_view(), name='webhook_receiver'),
+    re_path(r'^api/(?P<place_slug>[^/]+)/webhook/?$', WebhookReceiverView.as_view(), name='webhook_receiver_no_id'),
     path('api/<slug:place_slug>/toasts/', ToastAPIView.as_view(), name='toast_api'),
     path('api/<slug:place_slug>/toggle-active/', ToggleActiveView.as_view(), name='toggle_active'),
 
@@ -64,6 +68,8 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:pk>/', SensorDetailView.as_view(), name='sensor_detail'),
     path('<slug:place_slug>/sensor/<int:pk>/update/', SensorUpdateView.as_view(), name='sensor_update'),
     path('<slug:place_slug>/sensor/<int:pk>/delete/', SensorDeleteView.as_view(), name='sensor_delete'),
+    path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_readings_api, name='sensor_readings_api'),
+    path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_readings_table_api, name='sensor_readings_table_api'),
     path('api/<slug:place_slug>/sensor_test/<int:pk>', test_sensor_readings, name='sensor_test'),
 
     # Sensor `Reading URLs - nested under places

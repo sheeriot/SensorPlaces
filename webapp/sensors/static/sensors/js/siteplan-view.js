@@ -12,7 +12,8 @@ const sitePlanView = {
         locations: new Map(), // id -> location data
         imageBounds: null,
         initialized: false,
-        debug: false  // Add debug flag
+        debug: true,  // Add debug flag
+        placeSlug: null
     },
 
     // Debug logging helper
@@ -126,6 +127,7 @@ const sitePlanView = {
 
             // Get the image URL and locations data
             const imageUrl = container.dataset.imageUrl;
+            this.state.placeSlug = container.dataset.placeSlug;
             if (!imageUrl) {
                 this.log('No siteplan image configured for this place');
                 this.state.initialized = true;
@@ -136,6 +138,7 @@ const sitePlanView = {
             // Debug logging
             this.log('Found container:', container);
             this.log('Image URL:', imageUrl);
+            this.log('Place Slug:', this.state.placeSlug);
             this.log('Locations data:', container.dataset.locations);
 
             // Create a temporary image to get dimensions
@@ -314,20 +317,32 @@ const sitePlanView = {
                 this.closePopup();
             });
 
+            // Add click event to scroll to the location
+            marker.on('click', () => {
+                this.log(`Marker clicked for location ${location.id}`);
+                if (this.state.placeSlug) {
+                    window.location.href = `/${this.state.placeSlug}/location/${location.id}/`;
+                } else {
+                    this.error('Cannot navigate to location detail, place slug not found.');
+                }
+            });
+
             // Add to map and store reference
             marker.addTo(this.state.map);
-            this.state.markers.set(location.id, {
-                marker,
-                is_active: location.is_active,
-                iconType
-            });
+
+            // Storing for later reference
+            marker.iconType = iconType;
+            this.state.markers.set(location.id, marker);
         });
     },
 
     // Update markers visibility based on hide-inactive state
     updateMarkersVisibility(hideInactive) {
-        this.state.markers.forEach(({marker, is_active}) => {
-            if (!is_active) {
+        this.state.markers.forEach((marker, id) => {
+            const location = this.state.locations.get(id);
+
+            // A location might not (yet) exist for a marker during updates, so we check.
+            if (location && !location.is_active) {
                 const element = marker.getElement();
                 if (element) {
                     element.classList.toggle('d-none', hideInactive);
@@ -343,66 +358,41 @@ const sitePlanView = {
         
         let changed = false;
         
-        updates.forEach(update => {
-            const location = this.state.locations.get(update.id);
-            this.log(`Processing update for location ${update.id}:`, update);
-            this.log('Found existing location:', location);
-            
-            if (location) {
-                // Only update the position properties
-                location.x_pos = parseFloat(update.x_pos.toFixed(2));
-                location.y_pos = parseFloat(update.y_pos.toFixed(2));
-                
-                // Remove old marker
-                const markerData = this.state.markers.get(update.id);
-                this.log('Found existing marker data:', markerData);
-                
-                if (markerData && markerData.marker) {
-                    markerData.marker.remove();
+        // Update locations that already exist
+        Object.entries(updates).forEach(([id, location]) => {
+            if (this.state.locations.has(id)) {
+                // Update local data store
+                this.state.locations.set(id, { ...this.state.locations.get(id), ...location });
+                const updatedLocation = this.state.locations.get(id);
+
+                // Update marker on map
+                const existingMarker = this.state.markers.get(id);
+                if (existingMarker) {
+                    const coords = this.percentToImageCoords(updatedLocation.x_pos, updatedLocation.y_pos);
+                    const icon = this.createIcon(updatedLocation.is_active, existingMarker.iconType, updatedLocation.name);
+                    existingMarker.setLatLng(coords);
+                    existingMarker.setIcon(icon);
+                    this.log(`Updated marker for ${updatedLocation.name}`);
                 }
-                
-                // Add new marker for this location
-                const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
-                this.log('New coordinates:', coords);
-                
-                const iconType = markerData ? markerData.iconType : this.getRandomIcon(location.name);
-                this.log('Using icon type:', iconType);
-                
-                // Create new marker with existing properties
-                const marker = L.marker(coords, {
-                    icon: this.createIcon(location.is_active, iconType, location.name),
-                    title: location.name
-                });
+            } else {
+                // If location is new, add it
+                this.addMarkers([location]);
+                this.log(`Added new marker for ${location.name}`);
+            }
+        });
 
-                // Add popup with location info
-                marker.bindPopup(this.createMarkerPopup(location), {
-                    offset: [0, -10],
-                    closeButton: false,
-                    className: 'location-popup',
-                    autoPan: false,
-                    autoPanPadding: [50, 50],
-                    keepInView: true
-                });
+        // Remove markers for deleted locations
+        const updatedIds = new Set(Object.keys(updates).map(id => parseInt(id, 10)));
+        const currentIds = Array.from(this.state.locations.keys());
+        const deletedIds = currentIds.filter(id => !updatedIds.has(id));
 
-                // Show popup on hover
-                marker.on('mouseover', function() {
-                    this.openPopup();
-                });
-                
-                marker.on('mouseout', function() {
-                    this.closePopup();
-                });
-
-                // Add to map and store reference
-                marker.addTo(this.state.map);
-                this.state.markers.set(location.id, {
-                    marker,
-                    is_active: location.is_active,
-                    iconType
-                });
-                
-                changed = true;
-                this.log('Updated marker for location:', location.id);
+        deletedIds.forEach(id => {
+            const marker = this.state.markers.get(id);
+            if (marker) {
+                marker.remove();
+                this.state.markers.delete(id);
+                this.state.locations.delete(id);
+                this.log(`Removed marker for deleted location ID: ${id}`);
             }
         });
         

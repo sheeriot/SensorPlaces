@@ -265,7 +265,7 @@ class DeviceFormTest(TestCase):
             'device_type': self.device_type.pk,
             'model': 'Test Model',
             'manufacturer': 'Test Manufacturer',
-            'serial_number': 'TEST123'
+            'device_id': 'TEST123'
         }
         
         form = DeviceForm(data=form_data)
@@ -285,7 +285,7 @@ class DeviceFormTest(TestCase):
             'device_type': self.device_type.pk,
             'model': 'Test Model',
             'manufacturer': 'Test Manufacturer',
-            'serial_number': 'TEST456'
+            'device_id': 'TEST456'
         }
         
         form = DeviceForm(data=form_data)
@@ -299,66 +299,73 @@ class DeviceFormTest(TestCase):
         self.assertIn('is_active', form.errors)
         print("===> test_forms.py --> test_inactive_location_constraint PASS")
         
-    def test_serial_number_uniqueness(self):
-        """Test that serial number uniqueness validation works correctly"""
-        # Create a device for uniqueness checking
-        device = Device.objects.create(
+    def test_device_form_uniqueness(self):
+        """Test device form uniqueness validation"""
+        # Create an initial device
+        Device.objects.create(
             name='Existing Device',
             location=self.location,
-            is_active=True,
             device_type=self.device_type,
-            manufacturer='Test Manufacturer',
-            model='Test Model',
-            serial_number='EXISTING123'
+            device_id='EXISTING123'
         )
-        
-        # Form with different serial number is valid
-        form_data = {
-            'name': 'New Test Device',
+
+        # Form with a new, unique device_id should be valid
+        form_new = DeviceForm(data={
+            'name': 'New Device',
             'location': self.location.pk,
-            'is_active': True,
             'device_type': self.device_type.pk,
-            'manufacturer': 'Test Manufacturer',
-            'model': 'Test Model',
-            'serial_number': 'DIFFERENT123'
-        }
-        
-        form = DeviceForm(data=form_data)
-        self.assertTrue(form.is_valid())
-        
-        # Form with same serial number but different manufacturer and model should show warnings
-        form_data = {
-            'name': 'New Test Device',
+            'device_id': 'DIFFERENT123'
+        })
+        self.assertTrue(form_new.is_valid())
+
+        # Form with a duplicate device_id should have warnings
+        form_duplicate = DeviceForm(data={
+            'name': 'Another Device',
             'location': self.location.pk,
-            'is_active': True,
             'device_type': self.device_type.pk,
-            'manufacturer': 'Different Manufacturer',
-            'model': 'Different Model',
-            'serial_number': 'EXISTING123'
-        }
+            'device_id': 'EXISTING123'
+        })
+        self.assertTrue(form_duplicate.is_valid())  # is_valid should be true
+        warnings = form_duplicate.get_warnings()
+        self.assertIn('device_id', warnings)
+        self.assertIn('already exists', warnings['device_id'][0])
+        print("===> test_forms.py --> test_device_form_uniqueness PASS")
+
+    def test_device_form_update_toast(self):
+        """Test that updating a device and changing its name creates a toast notification"""
+        # First create a device
+        device = Device.objects.create(
+            name='Original Name',
+            location=self.location,
+            device_type=self.device_type,
+            device_id='TOASTUPDATE123'
+        )
+
+        # Form data to update the device
+        response = self.client.post(
+            reverse('sensors:device_update', kwargs={
+                'place_slug': self.place.slug,
+                'pk': device.pk
+            }),
+            {
+                'name': 'Updated Toast Device',
+                'location': self.location.pk,
+                'is_active': True,
+                'device_type': self.device_type.pk,
+                'manufacturer': 'Updated Manufacturer',
+                'model': 'Updated Toast Model',
+                'device_id': 'TOASTUPDATE123'
+            }
+        )
+        # Check response is a redirect (indicating success)
+        self.assertEqual(response.status_code, 302)
         
-        form = DeviceForm(data=form_data)
-        self.assertTrue(form.is_valid())
-        
-        # Use get_warnings() method to check for warnings
-        warnings = form.get_warnings() if hasattr(form, 'get_warnings') else {}
-        self.assertIn('serial_number', warnings)
-        
-        # Form with same manufacturer, model, and serial number is invalid
-        form_data = {
-            'name': 'New Test Device',
-            'location': self.location.pk,
-            'is_active': True,
-            'device_type': self.device_type.pk,
-            'manufacturer': 'Test Manufacturer',
-            'model': 'Test Model',
-            'serial_number': 'EXISTING123'
-        }
-        
-        form = DeviceForm(data=form_data)
-        self.assertFalse(form.is_valid())
-        self.assertIn('serial_number', form.errors)
-        print("===> test_forms.py --> test_serial_number_uniqueness PASS")
+        # Check the session for pending_toast
+        self.assertIn('pending_toast', self.client.session)
+        self.assertIn('message', self.client.session['pending_toast'])
+        self.assertIn('Updated Toast Device', self.client.session['pending_toast']['message'])
+        self.assertIn('name: Original Name', self.client.session['pending_toast']['message'])
+        print("===> test_forms.py --> test_device_form_update_toast PASS")
 
 
 class SensorFormTest(TestCase):
@@ -623,7 +630,7 @@ class ToastMessageTestCase(TestCase):
             device_type=self.device_type,
             manufacturer='Mouse',
             model='woolen',
-            serial_number='yy'
+            device_id='yy'
         )
         
         # Now update it with changes to all fields
@@ -639,7 +646,7 @@ class ToastMessageTestCase(TestCase):
                 'device_type': self.device_type.pk,
                 'manufacturer': 'Updated Manufacturer',
                 'model': 'Updated Toast Model',
-                'serial_number': 'TOASTUPDATE123'
+                'device_id': 'TOASTUPDATE123'
             }
         )
         # Check response is a redirect (indicating success)
