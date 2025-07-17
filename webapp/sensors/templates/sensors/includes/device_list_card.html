@@ -26,71 +26,46 @@
             </div>
         {% endif %}
     </div>
-    <div class="card-body toggle-table p-0" id="device-card-table">
-        <div class="table-responsive">
-            <table class="table table-light table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th style="width: 25%">Name</th>
-                        <th style="width: 15%">Status</th>
-                        <th style="width: 15%">Type</th>
-                        <th style="width: 15%">Model</th>
-                        <th style="width: 15%">Manufacturer</th>
-                        <th style="width: 15%">Device ID</th>
-                        <th style="width: 10%" class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if location %}
-                        {# Single location view - direct device list #}
-                        {% for device in devices %}
-                            {% if place.is_active %}
-                                {% include "sensors/includes/device_row.html" with place=place location=location device=device %}
+    <div class="card-body p-0">
+        {% if devices %}
+            <!-- Header Row -->
+            <div class="list-group-item d-none d-md-block bg-light small text-muted px-0">
+                <div class="row align-items-center ps-1 g-0">
+                    <div class="col-4">NAME</div>
+                    <div class="col-3">MODEL</div>
+                    <div class="col-3">ACTIVE</div>
+                    <div class="col-2">ACTIONS</div>
+                </div>
+            </div>
+            <div class="list-group list-group-flush">
+                {% if location %}
+                    {# Single location view - no grouping needed #}
+                    {% for device in devices %}
+                        {% include "sensors/partials/device_row.html" %}
+                    {% endfor %}
+                {% else %}
+                    {# All locations view - group by location #}
+                    {% regroup devices by location as location_groups %}
+                    {% for location_group in location_groups %}
+                        <div class="list-group-item bg-light fw-bold">
+                            <i class="bi bi-geo-alt me-1"></i>
+                            {% if location_group.grouper %}
+                                <a href="{% url 'sensors:location_detail' place.slug location_group.grouper.slug %}" class="link-dark text-decoration-none">{{ location_group.grouper.name }}</a>
                             {% else %}
-                                {% include "sensors/includes/device_row.html" with place=place location=location device=device show_inactive=True %}
+                                Unassigned
                             {% endif %}
+                        </div>
+                        {% for device in location_group.list %}
+                            {% include "sensors/partials/device_row.html" %}
                         {% endfor %}
-                    {% else %}
-                        {# All locations view - grouped by location #}
-                        {% regroup devices by location as device_list %}
-                        {% for location in locations %}
-                            <tr class="grouped-list-header device-location-list location-row {% if not location.is_active and place.is_active %}opacity-50 text-muted d-none{% elif not location.is_active %}opacity-50 text-muted{% endif %}"
-                                data-location-active="{{ location.is_active|lower }}"
-                                data-location-id="{{ location.pk }}"
-                                data-location-name="{{ location.name }}"
-                                data-place-name="{{ place.name }}">
-                                <th colspan="7" class="px-3 py-2">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <i class="bi bi-geo-alt me-2"></i>
-                                            <a href="{% url 'sensors:location_detail' place.slug location.id %}" class="link-dark text-decoration-none">{{ location.name }}</a>
-                                            {% include "sensors/partials/status_active_badge.html" with object=location %}
-                                        </div>
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="d-flex gap-2">
-                                                <span class="badge bg-success" id="location-{{ location.id }}-active">{{ location.devices_active_count }}</span>
-                                                <span class="badge bg-danger" id="location-{{ location.id }}-inactive">{{ location.devices_inactive_count }}</span>
-                                            </div>
-                                            {% include "sensors/partials/device_new_button.html" with place=place location=location %}
-                                        </div>
-                                    </div>
-                                </th>
-                            </tr>
-                            {% for device_group in device_list %}
-                                {% if device_group.grouper == location %}
-                                    {% for device in device_group.list %}
-                                        {% if place.is_active %}
-                                            {% include "sensors/includes/device_row.html" with place=place location=location device=device %}
-                                        {% else %}
-                                            {% include "sensors/includes/device_row.html" with place=place location=location device=device show_inactive=True %}
-                                        {% endif %}
-                                    {% endfor %}
-                                {% endif %}
-                            {% endfor %}
-                        {% endfor %}
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="text-center text-muted p-4">
+                <i class="bi bi-hdd-stack fs-1"></i>
+                <p class="mt-2">No devices found in this place.</p>
+            </div>
+        {% endif %}
     </div>
 </div>

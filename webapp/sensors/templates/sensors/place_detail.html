@@ -4,6 +4,10 @@
 
 {% block title %}Sensor Places - {{ place.name }}{% endblock %}
 
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <!-- Header with Title and Navigation -->
@@ -50,4 +54,5 @@
 
 {% block extra_js %}
 <script src="{% static 'sensors/js/siteplan-editor.js' %}"></script>
+<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
 {% endblock %}

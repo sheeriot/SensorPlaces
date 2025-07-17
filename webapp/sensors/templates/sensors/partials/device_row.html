@@ -1,0 +1,39 @@
+<div class="list-group-item device-row px-0 py-1 {% if not device.is_active %}opacity-50 text-muted{% if hide_inactive %} d-none{% endif %}{% endif %}"
+    data-device-active="{{ device.is_active|lower }}"
+    data-device-id="{{ device.pk }}"
+    data-location-active="{% if device.location %}{{ device.location.is_active|lower }}{% else %}true{% endif %}"
+    data-location-id="{% if device.location %}{{ device.location.pk }}{% else %}unassigned{% endif %}">
+    <div class="row align-items-center ps-1 g-0">
+        
+        <!-- Left side: Device Name and Model -->
+        <div class="col-4 text-nowrap">
+            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none fw-bold">
+                <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}
+            </a>
+        </div>
+        <div class="col-3 text-nowrap">
+            <div class="small text-muted">
+                {{ device.model|default:"" }}
+            </div>
+        </div>
+
+        <!-- Right side: Toggle and Buttons -->
+        <div class="col-3">
+            {% if not device.location or device.location.is_active %}
+                {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug disabled=is_disabled %}
+            {% endif %}
+        </div>
+        <div class="col-2">
+            <div class="btn-group">
+                <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" 
+                   class="btn btn-sm btn-outline-warning">
+                    <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" 
+                   class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

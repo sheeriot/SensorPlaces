@@ -1,85 +1,125 @@
 {% load widget_tweaks %}
-<div id="sensors-card"
-     class="card {% if not device.is_active %}opacity-50 text-muted{% endif %}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center gap-3">
+
+{% if device.is_lorawan %}
+    <div id="lorawan-sensors-card" class="card">
+        <div class="card-header">
             <h5 class="card-title mb-0">
-                <i class="bi bi-thermometer me-2"></i>
-                Sensors
+                <i class="bi bi-broadcast me-2"></i> LoRaWAN Device Sensors
             </h5>
-            {% if device.is_active %}
-                {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
+        </div>
+        <div class="card-body">
+            <p>This is a LoRaWAN device. The sensor data is sourced from an external InfluxDB instance.</p>
+            {% if sensors %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>InfluxDB Source</th>
+                                <th>Measurement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sensor in sensors %}
+                                <tr>
+                                    <td><a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}">{{ sensor.name }}</a></td>
+                                    <td>{{ sensor.get_sensor_type_display }}</td>
+                                    <td>{{ sensor.influx_source.name }}</td>
+                                    <td>{{ sensor.influx_measurement }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-center">No sensors configured for this device.</p>
             {% endif %}
         </div>
-        {% if device %}
-            {% include "sensors/partials/sensor_new_button.html" with device=device %}
-        {% endif %}
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th style="width: 25%">Name</th>
-                        <th style="width: 20%">Status</th>
-                        <th style="width: 20%">Type</th>
-                        <th style="width: 15%" class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if device %}
-                        {% for sensor in sensors %}
-                            {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
-                        {% endfor %}
-                    {% else %}
-                        {% regroup sensors by device.location as location_list %}
-                        {% for location in location_list %}
-                            <tr class="table-primary w-100">
-                                <th colspan="5" class="w-100">
-                                    <strong><i class="bi bi-geo-alt"></i> {{ location.grouper.name }}</strong>
-                                </th>
-                            </tr>
-                            {% regroup location.list by device as device_list %}
-                            {% for device in device_list %}
-                                {% if device.grouper.is_active or not hideInactiveSwitch.checked or not place.is_active %}
-                                    <tr class="table-light {% if not device.grouper.is_active and place.is_active %}text-muted opacity-50 d-none{% elif not device.grouper.is_active %}text-muted opacity-50{% endif %}">
-                                        <td>
-                                            <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge {% if device.grouper.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                                {% if device.grouper.is_active %}Active{% else %}inactive{% endif %}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <strong>{{ device.grouper.device_type }}</strong> ({{ device.grouper.model }})
-                                        </td>
-                                        <td class="text-end">
-                                            <div class="btn-group btn-group-sm">
-                                                <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.grouper.id %}" class="btn btn-outline-dark"><i class="bi bi-hdd-rack"></i></a>
-                                                <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.grouper.id %}" class="btn btn-outline-primary"><i class="bi bi-thermometer"></i><i class="bi bi-plus-circle"></i></a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                {% endif %}
-                                {% for sensor in device.list %}
-                                    {% if place.is_active %}
-                                        {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
-                                    {% else %}
-                                        {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" show_inactive=True %}
-                                    {% endif %}
-                                {% endfor %}
+{% else %}
+    <div id="sensors-card"
+         class="card {% if device and not device.is_active %}opacity-50 text-muted{% endif %}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-thermometer me-2"></i>
+                    Sensors
+                </h5>
+                {% if device.is_active %}
+                    {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" %}
+                {% endif %}
+            </div>
+            {% if device %}
+                {% include "sensors/partials/sensor_new_button.html" with device=device %}
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 25%">Name</th>
+                            <th style="width: 20%">Status</th>
+                            <th style="width: 20%">Type</th>
+                            <th style="width: 15%" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if device %}
+                            {% for sensor in sensors %}
+                                {% include 'sensors/includes/sensor_row.html' with device=device sensor=sensor %}
                             {% endfor %}
-                        {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center small py-3">
-                                    No sensors found.
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    {% endif %}
-                </tbody>
-            </table>
+                        {% else %}
+                            {% regroup sensors by device.location as location_list %}
+                            {% for location in location_list %}
+                                <tr class="table-primary w-100">
+                                    <th colspan="5" class="w-100">
+                                        <strong><i class="bi bi-geo-alt"></i> {{ location.grouper.name }}</strong>
+                                    </th>
+                                </tr>
+                                {% regroup location.list by device as device_list %}
+                                {% for device in device_list %}
+                                    {% if device.grouper.is_active or not hideInactiveSwitch.checked or not place.is_active %}
+                                        <tr class="table-light {% if not device.grouper.is_active and place.is_active %}text-muted opacity-50 d-none{% elif not device.grouper.is_active %}text-muted opacity-50{% endif %}">
+                                            <td>
+                                                <strong><i class="bi bi-hdd-rack"></i> {{ device.grouper.name }}</strong>
+                                            </td>
+                                            <td>
+                                                <span class="badge {% if device.grouper.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                                    {% if device.grouper.is_active %}Active{% else %}inactive{% endif %}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <strong>{{ device.grouper.device_type }}</strong> ({{ device.grouper.model }})
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.grouper.id %}" class="btn btn-outline-dark"><i class="bi bi-hdd-rack"></i></a>
+                                                    <a href="{% url 'sensors:sensor_create' place_slug=place.slug device_pk=device.grouper.id %}" class="btn btn-outline-primary"><i class="bi bi-thermometer"></i><i class="bi bi-plus-circle"></i></a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                    {% for sensor in device.list %}
+                                        {% if place.is_active %}
+                                            {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" %}
+                                        {% else %}
+                                            {% include 'sensors/includes/sensor_row.html' with device=sensor.device sensor=sensor class="ps-5" show_inactive=True %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center small py-3">
+                                        No sensors found.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
+{% endif %}

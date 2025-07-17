@@ -65,6 +65,11 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
+        
+        # Check for hide_inactive cookie
+        hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
+        context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+        
         # ic('device_list_context', context)
 
         # Add place to context
@@ -200,6 +205,21 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         
         return context
 
+    def get_success_url(self):
+        """
+        Determine the URL to redirect to on successful form submission.
+        - First, try the 'referrer' from the form's POST data.
+        - Fallback to the detail view of the created device.
+        """
+        referrer_url = self.request.POST.get('referrer')
+        if referrer_url:
+            return referrer_url
+        
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self.object.place.slug, 
+            'pk': self.object.pk
+        })
+
     def form_valid(self, form):
         # Set the place on the instance before saving
         form.instance.place = self._place
@@ -242,6 +262,12 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
+
+    def form_invalid(self, form):
+        ic("DeviceCreateView: form_invalid")
+        ic(form.errors)
+        return super().form_invalid(form)
+
 
 class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Device
@@ -425,6 +451,11 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         setattr(self.request, 'toast_message', toast_message)
         
         return HttpResponseRedirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        ic("DeviceUpdateView: form_invalid")
+        ic(form.errors)
+        return super().form_invalid(form)
 
     def construct_toast_message(self, form, status_changed, location_changed, original_location):
         device = self.object

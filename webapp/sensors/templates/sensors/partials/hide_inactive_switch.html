@@ -8,7 +8,7 @@ Supported models: place, location, device, sensor
            class="form-check-input hide-inactive-switch hide-inactive-{{ model }}-switch"
            data-model="{{ model }}"
            aria-label="Hide inactive {{ model }}s"
-           checked>
+           {% if hide_inactive %}checked{% endif %}>
     <label class="form-check-label">
         Hide inactive
     </label>

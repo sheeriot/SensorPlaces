@@ -23,13 +23,14 @@
         <div class="list-group list-group-flush rounded-bottom">
             {% for location in locations %}
             {% if location.is_active or show_hidden %}
-            <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
+            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" 
                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-1 px-2
-                      {% if location.pk == current_location.pk %}current-location{% endif %}
+                      {% if location.slug == active_location_slug %}current-location{% endif %}
                       {% if not location.is_active %}opacity-50 text-muted{% endif %}"
                data-location-active="{{ location.is_active|lower }}"
                data-location-id="{{ location.pk }}">
                 <div>
+                    <i class="bi bi-geo-alt me-2"></i>
                     {{ location.name }}
                     {% if not location.is_active %}
                     <span class="badge text-bg-secondary ms-2">inactive</span>

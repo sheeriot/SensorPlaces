@@ -14,10 +14,11 @@ from django.http import JsonResponse, HttpResponseRedirect, HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
-from ..models import Device, Sensor, SensorReading
+from ..models import Device, Sensor, SensorReading, Place
 from .mixins import PlaceAnnotationMixin
 from .sensor_forms import SensorForm
 from ..utils import get_sensor_readings, generate_sparkline
+from ..influx_graphs import get_lorawan_sensor_data
 from .views_fun import get_annotated_locations
 
 from datetime import datetime, timedelta
@@ -852,6 +853,26 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
     except Exception as e:
         ic(f"Error fetching sensor readings: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def lorawan_sensor_graph_view(request, place_slug, pk):
+    place = get_object_or_404(Place, slug=place_slug)
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place=place)
+    time_range = request.GET.get('time_range', '1h')
+
+    chart_data = None
+    if sensor.device.is_lorawan:
+        chart_data = get_lorawan_sensor_data(sensor, time_range)
+
+    context = {
+        'place': place,
+        'sensor': sensor,
+        'device': sensor.device,
+        'location': sensor.device.location,
+        'chart_data': chart_data,
+        'time_range': time_range,
+    }
+    return render(request, 'sensors/lorawan_sensor_graph.html', context)
 
 @login_required
 def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: int) -> JsonResponse:

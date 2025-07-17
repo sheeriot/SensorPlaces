@@ -1,27 +1,28 @@
 # Base docker-compose file. Use docker-compose.override.yml files as needed.
 
 services:
-  sensorplaces:
+  sensors:
     build:
       context: .
     env_file:
       - env/django.env
     entrypoint: /opt/app/docker-entrypoint.sh
     # command: gunicorn -c /opt/app/webapp/gunicorn.conf.py sensorplaces.wsgi
-    command: python manage.py runserver 0.0.0.0:8002
+    command: python manage.py runserver 0.0.0.0:8010
     restart: unless-stopped
     ports:
-      - 8002:8002
+      - 8010:8010
     volumes:
-      - sensorplaces-db:/opt/app/db
-      - sensorplaces-static:/opt/app/static_files
-      - sensorplaces-media:/opt/app/media
+      - ./webapp:/opt/app/webapp
+      - sensors-db:/opt/app/db
+      - sensors-static:/opt/app/static_files
+      - sensors-media:/opt/app/media
 volumes:
-  sensorplaces-db:
-  sensorplaces-static:
-  sensorplaces-media:
+  sensors-db:
+  sensors-static:
+  sensors-media:
 
 networks:
   default:
-    name: webhost
+    name: webdev
     external: true 

@@ -15,7 +15,7 @@ class DeviceForm(forms.ModelForm):
 
     class Meta:
         model = Device
-        fields = ['name', 'is_active', 'location', 'device_type', 'manufacturer', 'model', 'device_id']
+        fields = ['name', 'is_active', 'is_lorawan', 'location', 'device_type', 'manufacturer', 'model', 'device_id']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter device name'}),
             'manufacturer': forms.TextInput(attrs={'placeholder': 'Enter manufacturer'}),
@@ -153,8 +153,9 @@ class DeviceForm(forms.ModelForm):
                         instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
                         css_id='div_id_is_active'
                     ),
-                    css_class='col-12'
+                    css_class='col-6'
                 ),
+                Column('is_lorawan', css_class='col-6'),
                 css_class='mb-2'
             ),
             Row(
@@ -197,6 +198,9 @@ class DeviceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        ic(cleaned_data)
+        if self.errors:
+            ic(self.errors.as_json())
         name = cleaned_data.get('name')
         location = cleaned_data.get('location') or self.location
         

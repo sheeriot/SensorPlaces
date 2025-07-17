@@ -1,27 +1,35 @@
 from django.urls import path, re_path
 from .views.place_views import (
     PlaceListView, PlaceDetailView, PlaceCreateView, PlaceUpdateView, PlaceDeleteView,
-    place_stats, siteplan_update
+    place_stats, siteplan_update, siteplan_view
 )
 from .views.location_views import (
     LocationListView, LocationDetailView, LocationCreateView, LocationUpdateView, LocationDeleteView
 )
 from .views.device_views import (
     DeviceListView, DeviceDetailView, DeviceCreateView, DeviceUpdateView, DeviceDeleteView,
-    # DeviceMoveLocationView
 )
 from .views.sensor_views import (
     SensorListView, SensorDetailView, SensorCreateView, SensorUpdateView, SensorDeleteView,
     SensorReadingListView, SensorReadingDetailView, SensorReadingCreateView, test_sensor_readings,
-    sensor_readings_api, sensor_readings_table_api
+    sensor_readings_api, sensor_readings_table_api, lorawan_sensor_graph_view
 )
 from .views.toast_views import ToastAPIView, ToastListView
 from .views.toggle_active import ToggleActiveView
 from .views.webhook_views import WebhookReceiverView
+from .views.influx_views import (
+    InfluxSourceListView, InfluxSourceDetailView, InfluxSourceCreateView, InfluxSourceUpdateView, InfluxSourceDeleteView
+)
 
 app_name = 'sensors'
 
 urlpatterns = [
+    # InfluxSource URLs
+    path('influxsources/', InfluxSourceListView.as_view(), name='influxsource_list'),
+    path('influxsources/create/', InfluxSourceCreateView.as_view(), name='influxsource_create'),
+    path('influxsources/<int:pk>/', InfluxSourceDetailView.as_view(), name='influxsource_detail'),
+    path('influxsources/<int:pk>/update/', InfluxSourceUpdateView.as_view(), name='influxsource_update'),
+    path('influxsources/<int:pk>/delete/', InfluxSourceDeleteView.as_view(), name='influxsource_delete'),
 
     # Shared API endpoints
     re_path(r'^api/(?P<place_slug>[^/]+)/webhook/(?P<device_id>[^/]+)/?$', WebhookReceiverView.as_view(), name='webhook_receiver'),
@@ -38,6 +46,7 @@ urlpatterns = [
     path('<slug:place_slug>/', PlaceDetailView.as_view(), name='place_detail'),
     path('<slug:place_slug>/update/', PlaceUpdateView.as_view(), name='place_update'),
     path('<slug:place_slug>/delete/', PlaceDeleteView.as_view(), name='place_delete'),
+    path('<slug:place_slug>/siteplan/', siteplan_view, name='siteplan'),
     # Place API URLs
     path('api/<slug:place_slug>/stats/', place_stats, name='place_stats'),
     path('api/<slug:place_slug>/siteplan_update/', siteplan_update, name='siteplan_update'),
@@ -45,9 +54,9 @@ urlpatterns = [
     # Location URLs - nested under places
     path('<slug:place_slug>/location/create/', LocationCreateView.as_view(), name='location_create'),
     path('<slug:place_slug>/locations/', LocationListView.as_view(), name='location_list'),
-    path('<slug:place_slug>/location/<int:pk>/', LocationDetailView.as_view(), name='location_detail'),
-    path('<slug:place_slug>/location/<int:pk>/update/', LocationUpdateView.as_view(), name='location_update'),
-    path('<slug:place_slug>/location/<int:pk>/delete/', LocationDeleteView.as_view(), name='location_delete'),
+    path('<slug:place_slug>/location/<slug:slug>/', LocationDetailView.as_view(), name='location_detail'),
+    path('<slug:place_slug>/location/<slug:slug>/update/', LocationUpdateView.as_view(), name='location_update'),
+    path('<slug:place_slug>/location/<slug:slug>/delete/', LocationDeleteView.as_view(), name='location_delete'),
     
     # Device URLs - nested under places and locations
     path('<slug:place_slug>/location/<int:location_pk>/device/create/', DeviceCreateView.as_view(), name='device_create'),
@@ -57,8 +66,6 @@ urlpatterns = [
     path('<slug:place_slug>/device/<int:pk>/', DeviceDetailView.as_view(), name='device_detail'),
     path('<slug:place_slug>/device/<int:pk>/update/', DeviceUpdateView.as_view(), name='device_update'),
     path('<slug:place_slug>/device/<int:pk>/delete/', DeviceDeleteView.as_view(), name='device_delete'),
-    # Device APIs
-    # path('api/<slug:place_slug>/device/<int:pk>/move_location/', DeviceMoveLocationView.as_view(), name='device_move_location'),
     
     # Sensor URLs - nested under places, locations, and devices
     path('<slug:place_slug>/device/<int:device_pk>/sensor/create/', SensorCreateView.as_view(), name='sensor_create'),
@@ -71,10 +78,10 @@ urlpatterns = [
     path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_readings_api, name='sensor_readings_api'),
     path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_readings_table_api, name='sensor_readings_table_api'),
     path('api/<slug:place_slug>/sensor_test/<int:pk>', test_sensor_readings, name='sensor_test'),
+    path('<slug:place_slug>/sensor/<int:pk>/lorawan_graph/', lorawan_sensor_graph_view, name='lorawan_sensor_graph'),
 
-    # Sensor `Reading URLs - nested under places
+    # Sensor Reading URLs - nested under places
     path('<slug:place_slug>/readings/', SensorReadingListView.as_view(), name='place_readings'),
     path('<slug:place_slug>/readings/<int:pk>/', SensorReadingDetailView.as_view(), name='reading_detail'),
     path('<slug:place_slug>/readings/create/', SensorReadingCreateView.as_view(), name='reading_create'),
-
 ]

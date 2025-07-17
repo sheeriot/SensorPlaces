@@ -43,6 +43,10 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         context['model_name'] = 'location'
         place = context['place']
 
+        # Add hide_inactive state from cookie
+        hide_inactive_cookie = self.request.COOKIES.get('hideInactive_location', 'false')
+        context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+
         # Add place statistics from views_fun.py
         context.update(get_place_counts(place))
         
@@ -52,13 +56,18 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Location
     context_object_name = 'location'
     template_name = 'sensors/location_detail.html'
+    slug_url_kwarg = 'slug'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         
+        # Check for hide_inactive cookie
+        hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
+        context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+        
         # Use the annotated location data from views_fun.py
-        location = get_annotated_locations(self._place).get(pk=self.object.pk)
+        location = get_annotated_locations(self._place).get(slug=self.object.slug)
         context['location'] = location
 
         # Add annotated devices to context
@@ -102,7 +111,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         if self.object:
             return reverse('sensors:location_detail', kwargs={
                 'place_slug': self.kwargs['place_slug'],
-                'pk': self.object.pk
+                'slug': self.object.slug
             })
         return reverse('sensors:location_list', kwargs={
             'place_slug': self.kwargs['place_slug']
@@ -156,7 +165,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         if self.object and self.object.pk:
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,  # Use cached place
-                'pk': self.object.pk
+                'slug': self.object.slug
             })
         else:
             context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
@@ -236,6 +245,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
     context_object_name = 'location'
+    slug_url_kwarg = 'slug'
     
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
@@ -266,7 +276,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         if self.object:
             return reverse('sensors:location_detail', kwargs={
                 'place_slug': self.kwargs['place_slug'],
-                'pk': self.object.pk
+                'slug': self.object.slug
             })
         return reverse('sensors:location_list', kwargs={
             'place_slug': self.kwargs['place_slug']
@@ -388,7 +398,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         if self.object and self.object.pk:
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,  # Use cached place
-                'pk': self.object.pk
+                'slug': self.object.slug
             })
         else:
             context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
@@ -415,6 +425,8 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         changes = []
         if original_values['name'] != form.cleaned_data['name']:
             changes.append(f"Name: {original_values['name']} → {form.cleaned_data['name']}")
+        if original_values['slug'] != form.cleaned_data['slug']:
+            changes.append(f"Slug: {original_values['slug']} → {form.cleaned_data['slug']}")
         if original_values['is_active'] != form.cleaned_data['is_active']:
             changes.append(f"Status: {'active' if original_values['is_active'] else 'inactive'} → {'active' if form.cleaned_data['is_active'] else 'inactive'}")
 
@@ -458,6 +470,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
 class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Location
     template_name = 'sensors/location_confirm_delete.html'
+    slug_url_kwarg = 'slug'
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)

@@ -29,7 +29,7 @@ const sitePlanSystem = {
     state: {
         editorMap: null,        // Editor Leaflet map instance
         imageOverlay: null,     // Current image overlay in editor
-        markers: new Map(),     // id -> L.Marker in editor
+        markers: new Map(),     // slug -> L.Marker in editor
         imageBounds: null,      // Bounds of the site plan image
         isDirty: false         // Whether there are unsaved changes
     },
@@ -73,6 +73,12 @@ const sitePlanSystem = {
             if (this.state.editorMap) {
                 this.state.editorMap.invalidateSize();
                 this.fitMapPerfectly();
+            }
+        });
+        // Use hide.bs.modal to move focus BEFORE it's hidden, preventing ARIA error
+        modal.addEventListener('hide.bs.modal', () => {
+            if (this.editButton) {
+                this.editButton.focus();
             }
         });
         modal.addEventListener('hidden.bs.modal', () => this.cleanupEditor());
@@ -161,6 +167,20 @@ const sitePlanSystem = {
     },
 
     initializeEditorMap(container, imageUrl) {
+        // --- New Sizing Logic ---
+        const siteplanWrapper = container.closest('.siteplan-wrapper');
+        if (siteplanWrapper) {
+            const imageWidth = this.state.imageBounds[1][1];
+            const imageHeight = this.state.imageBounds[1][0];
+            const aspectRatio = imageHeight / imageWidth;
+            const availableWidth = siteplanWrapper.offsetWidth;
+            let calculatedHeight = availableWidth * aspectRatio;
+            const maxHeight = window.innerHeight * 0.8; // Use more of the modal height
+            const finalHeight = Math.min(calculatedHeight, maxHeight);
+            siteplanWrapper.style.height = `${finalHeight}px`;
+        }
+        // --- End New Sizing Logic ---
+
         // Initialize map with same settings as view, but enable dragging
         this.state.editorMap = L.map(container, {
             crs: L.CRS.Simple,
@@ -178,32 +198,20 @@ const sitePlanSystem = {
             maxZoom: 2
         });
 
-        // Get wrapper for loading state
-        const wrapper = container.closest('.siteplan-wrapper');
-
         // Add image overlay with loading handler
         const bounds = this.state.imageBounds;
         this.state.imageOverlay = L.imageOverlay(imageUrl, bounds)
             .addTo(this.state.editorMap)
             .on('load', () => {
                 // Mark as loaded once image is ready
-                if (wrapper) {
-                    wrapper.classList.add('loaded');
+                if (siteplanWrapper) {
+                    siteplanWrapper.classList.add('loaded');
                 }
                 container.dataset.editorReady = 'true';
             });
 
-        if (wrapper) {
-            const aspectRatio = (this.state.imageBounds[1][0] / this.state.imageBounds[1][1]) * 100;
-            wrapper.style.paddingBottom = `${aspectRatio}%`;
-            
-            // Clear any existing styles that might interfere
-            wrapper.style.height = '';
-            wrapper.style.minHeight = '';
-            wrapper.style.maxHeight = '';
-            container.style.position = 'absolute';
-        }
-
+        // The aspect ratio is now handled by the explicit height calculation above
+        
         // Initial fit
         this.fitMapPerfectly();
 
@@ -213,7 +221,7 @@ const sitePlanSystem = {
         });
 
         // Observe both wrapper and container
-        if (wrapper) resizeObserver.observe(wrapper);
+        if (siteplanWrapper) resizeObserver.observe(siteplanWrapper);
         resizeObserver.observe(container);
 
         // Also handle window resize
@@ -228,15 +236,22 @@ const sitePlanSystem = {
 
     addEditorMarkers() {
         try {
-            const rawData = this.viewContainer.dataset.locations || '[]';
-            const unescapedData = rawData.replace(/\\u(\w{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-            const locations = JSON.parse(unescapedData);
+            // Instead of reading from the stale dataset, get the most up-to-date
+            // locations directly from the sitePlanView's state.
+            const locations = Array.from(window.sitePlanView.state.locations.values());
+
+            if (!locations || locations.length === 0) {
+                this.logDebug('warning', 'No locations found in sitePlanView state.');
+                return;
+            }
+
+            this.logDebug('markers', `Loading ${locations.length} markers from sitePlanView state.`);
 
             locations.forEach(location => {
                 const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
                 
                 // Get the existing icon type from the view
-                const viewMarker = window.sitePlanView.state.markers.get(location.id);
+                const viewMarker = window.sitePlanView.state.markers.get(location.slug);
                 const iconType = viewMarker ? viewMarker.iconType : window.sitePlanView.getRandomIcon(location.name);
                 
                 const icon = window.sitePlanView.createIcon(location.is_active, iconType, location.name);
@@ -310,11 +325,11 @@ const sitePlanSystem = {
 
                 marker.addTo(this.state.editorMap);
                 
-                // Store marker reference
-                this.state.markers.set(location.id, {
+                // Store marker reference with original position in percentages
+                this.state.markers.set(location.slug, {
                     marker,
                     iconType,
-                    originalPosition: coords
+                    originalPosition: { x_pos: location.x_pos, y_pos: location.y_pos }
                 });
             });
 
@@ -363,15 +378,15 @@ const sitePlanSystem = {
 
         // Get only changed markers
         const changedLocations = Array.from(this.state.markers.entries())
-            .map(([id, {marker, originalPosition}]) => {
+            .map(([slug, {marker, originalPosition}]) => {
                 const currentPos = this.imageCoordsToPercent(marker.getLatLng());
-                // Values are already rounded to 2 decimal places in imageCoordsToPercent
                 const x_pos = currentPos.x_pos;
                 const y_pos = currentPos.y_pos;
                 
-                // Compare with original position
-                if (x_pos !== originalPosition.x_pos || y_pos !== originalPosition.y_pos) {
-                    return { id, x_pos, y_pos };
+                // Compare with original position (both are percentages)
+                // Use a small tolerance to avoid floating point issues
+                if (Math.abs(x_pos - originalPosition.x_pos) > 0.01 || Math.abs(y_pos - originalPosition.y_pos) > 0.01) {
+                    return { slug, x_pos, y_pos };
                 }
                 return null;
             })
@@ -413,16 +428,26 @@ const sitePlanSystem = {
             
             // Update the view's location data
             if (data.changes && data.changes.locations) {
-                const updatedLocations = data.changes.locations.map(change => ({
-                    id: change.id,
-                    name: change.name,
-                    x_pos: parseFloat(change.new_position.x_pos.toFixed(2)),
-                    y_pos: parseFloat(change.new_position.y_pos.toFixed(2))
-                }));
+                // Get the full location data from the view's state and merge
+                // with the new position from the server response.
+                const updatedLocations = data.changes.locations.reduce((acc, change) => {
+                    const slug = change.slug;
+                    const existingLocation = window.sitePlanView.state.locations.get(slug);
+                    if (existingLocation) {
+                        acc[slug] = {
+                            ...existingLocation,
+                            x_pos: parseFloat(change.new_position.x_pos),
+                            y_pos: parseFloat(change.new_position.y_pos)
+                        };
+                    } else {
+                        this.logDebug('error', `Could not find existing location for slug: ${slug}`);
+                    }
+                    return acc;
+                }, {});
                 
                 this.logDebug('saves', 'Dispatching siteplan-update event with locations:', updatedLocations);
                 
-                // Dispatch update event
+                // Dispatch update event with an object, not an array
                 window.dispatchEvent(new CustomEvent('siteplan-update', {
                     detail: { locations: updatedLocations }
                 }));

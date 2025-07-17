@@ -54,6 +54,7 @@ def get_location_data(location) -> Dict[str, Any]:
     """Convert a Location instance to a JSON-serializable dictionary."""
     return {
         'id': str(location.pk),
+        'slug': str(location.slug),
         'name': str(location.name),
         'x_pos': float(location.x_pos) if isinstance(location.x_pos, Decimal) else location.x_pos,
         'y_pos': float(location.y_pos) if isinstance(location.y_pos, Decimal) else location.y_pos,

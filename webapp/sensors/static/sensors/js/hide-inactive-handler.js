@@ -39,10 +39,10 @@ const hideInactiveHandler = {
         switchSelector: '.hide-inactive-switch',
         modelSwitchSelector: (model) => `.hide-inactive-${model}-switch`,
         rowSelectors: {
-            place: 'tr.place-row',
-            location: 'tr.location-row',
-            device: 'tr.device-row',
-            sensor: 'tr.sensor-row'
+            place: '.place-row',
+            location: '.location-row',
+            device: '.device-row',
+            sensor: '.sensor-row'
         },
         groupHeaderClasses: {
             device: 'device-location-list',
@@ -70,19 +70,29 @@ const hideInactiveHandler = {
                 return;
             }
 
+            // Restore state from localStorage
+            const storedStateJSON = localStorage.getItem(`hideInactive_${model}`);
+            const storedState = storedStateJSON ? JSON.parse(storedStateJSON) : null;
+            
             if (hideInactiveConfig.debug) {
-                console.log(`Initializing switch for model: ${model}`);
+                console.log(`[${model}] Initializing switch. Stored state: ${storedState}, Server-rendered state: ${switchEl.checked}`);
+                if (storedState !== null && storedState !== switchEl.checked) {
+                    console.warn(`[${model}] Mismatch between stored state (${storedState}) and server-rendered state (${switchEl.checked}).`);
+                }
             }
-
-            // Initial row update based on switch state
-            this.updateRowVisibility(model, switchEl.checked);
-
+            
             // Set up change listener
             switchEl.addEventListener('change', (e) => {
                 const newState = e.target.checked;
+
+                // Save state to localStorage
+                localStorage.setItem(`hideInactive_${model}`, JSON.stringify(newState));
+
+                // Set a cookie for the server to read
+                document.cookie = `hideInactive_${model}=${newState};path=/;max-age=31536000;samesite=lax`;
                 
                 if (hideInactiveConfig.debug) {
-                    console.log(`Switch state changed for ${model}: ${newState}`);
+                    console.log(`[${model}] Switch state changed to: ${newState}. Stored in localStorage and cookie.`);
                 }
 
                 // Update row visibility
@@ -113,7 +123,10 @@ const hideInactiveHandler = {
         }
 
         const selector = this.config.rowSelectors[model];
-        if (!selector) return;
+        if (!selector) {
+            if (hideInactiveConfig.debug) console.error(`No selector found for model: ${model}`);
+            return;
+        }
 
         // Get rows and group headers if applicable
         let rows;
@@ -125,29 +138,28 @@ const hideInactiveHandler = {
         }
 
         if (hideInactiveConfig.debug) {
-            console.log(`Found ${rows.length} rows to process`);
+            console.log(`Using selector: "${selector}". Found ${rows.length} rows to process.`);
         }
 
         // Update visibility of rows
         rows.forEach(row => {
-            if (row.classList.contains('grouped-list-header')) {
-                const parentModel = row.classList.contains('device-location-list') ? 'location' :
-                                  row.classList.contains('sensor-device-list') ? 'device' : null;
-                if (parentModel) {
-                    const isActive = row.dataset[`${parentModel}Active`] === 'true';
-                    if (!isActive) {
-                        row.classList.toggle('d-none', hideInactive);
-                        if (hideInactiveConfig.debug) {
-                            console.log(`Toggling visibility of group header for ${parentModel}: ${hideInactive}`);
-                        }
-                    }
-                }
-            } else {
-                const isActive = row.dataset[`${model}Active`] === 'true';
-                if (!isActive) {
-                    row.classList.toggle('d-none', hideInactive);
-                    if (hideInactiveConfig.debug) {
-                        console.log(`Toggling visibility of ${model} row: ${hideInactive}`);
+            const isHeader = row.classList.contains('grouped-list-header');
+            const dataAttrModel = isHeader 
+                ? (row.classList.contains('device-location-list') ? 'location' : 'device')
+                : model;
+            
+            const isActive = row.dataset[`${dataAttrModel}Active`] === 'true';
+
+            if (!isActive) {
+                const wasHidden = row.classList.contains('d-none');
+                row.classList.toggle('d-none', hideInactive);
+                const isHidden = row.classList.contains('d-none');
+
+                if (hideInactiveConfig.debug) {
+                    const logPrefix = isHeader ? `Group Header for inactive ${dataAttrModel}` : `Inactive ${model} row`;
+                    console.log(`  - ${logPrefix}. Toggling visibility. Hidden: ${isHidden}`, row);
+                    if (wasHidden !== isHidden) {
+                        console.log(`    > Visibility changed from ${wasHidden} to ${isHidden}`);
                     }
                 }
             }
