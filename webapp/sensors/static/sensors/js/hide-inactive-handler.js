@@ -70,14 +70,32 @@ const hideInactiveHandler = {
                 return;
             }
 
-            // Restore state from localStorage
-            const storedStateJSON = localStorage.getItem(`hideInactive_${model}`);
-            const storedState = storedStateJSON ? JSON.parse(storedStateJSON) : null;
-            
-            if (hideInactiveConfig.debug) {
-                console.log(`[${model}] Initializing switch. Stored state: ${storedState}, Server-rendered state: ${switchEl.checked}`);
-                if (storedState !== null && storedState !== switchEl.checked) {
-                    console.warn(`[${model}] Mismatch between stored state (${storedState}) and server-rendered state (${switchEl.checked}).`);
+            // Check URL for override parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlHideInactive = urlParams.get('hide_inactive');
+
+            if (urlHideInactive !== null) {
+                // URL parameter takes precedence
+                const hide = urlHideInactive.toLowerCase() !== 'false';
+                switchEl.checked = hide;
+                localStorage.setItem(`hideInactive_${model}`, JSON.stringify(hide));
+                document.cookie = `hideInactive_${model}=${hide};path=/;max-age=31536000;samesite=lax`;
+                if (hideInactiveConfig.debug) {
+                    console.log(`[${model}] State overridden by URL parameter. New state: ${hide}`);
+                }
+                // Immediately update visibility based on URL override
+                this.updateAllRowVisibility(hide);
+            } else {
+                // Restore state from localStorage if no URL override
+                const storedStateJSON = localStorage.getItem(`hideInactive_${model}`);
+                const storedState = storedStateJSON ? JSON.parse(storedStateJSON) : null;
+                
+                if (hideInactiveConfig.debug) {
+                    const serverState = switchEl.checked;
+                    console.log(`[${model}] Initializing switch. Stored state: ${storedState}, Server-rendered state: ${serverState}`);
+                    if (storedState !== null && storedState !== serverState) {
+                        console.warn(`[${model}] Mismatch between stored state (${storedState}) and server-rendered state (${serverState}). Server state is used.`);
+                    }
                 }
             }
             
@@ -95,8 +113,7 @@ const hideInactiveHandler = {
                     console.log(`[${model}] Switch state changed to: ${newState}. Stored in localStorage and cookie.`);
                 }
 
-                // Update row visibility
-                this.updateRowVisibility(model, newState);
+                this.updateAllRowVisibility(newState);
 
                 // Dispatch state change event
                 const eventDetail = {
@@ -117,53 +134,81 @@ const hideInactiveHandler = {
         });
     },
 
-    updateRowVisibility(model, hideInactive) {
-        if (hideInactiveConfig.debug) {
-            console.log(`Updating visibility for ${model} rows. Hide inactive: ${hideInactive}`);
-        }
-
-        const selector = this.config.rowSelectors[model];
-        if (!selector) {
-            if (hideInactiveConfig.debug) console.error(`No selector found for model: ${model}`);
+    updateAllRowVisibility(hideInactive) {
+        const table = document.getElementById('sensor-list-table');
+        if (!table) {
+            if (hideInactiveConfig.debug) console.log('sensor-list-table not found');
             return;
         }
 
-        // Get rows and group headers if applicable
-        let rows;
-        const groupHeaderClass = this.config.groupHeaderClasses[model];
-        if (groupHeaderClass) {
-            rows = document.querySelectorAll(`${selector}, tr.grouped-list-header.${groupHeaderClass}`);
-        } else {
-            rows = document.querySelectorAll(selector);
-        }
-
         if (hideInactiveConfig.debug) {
-            console.log(`Using selector: "${selector}". Found ${rows.length} rows to process.`);
+            console.log(`Updating all row visibility. Hide inactive: ${hideInactive}`);
         }
 
-        // Update visibility of rows
-        rows.forEach(row => {
-            const isHeader = row.classList.contains('grouped-list-header');
-            const dataAttrModel = isHeader 
-                ? (row.classList.contains('device-location-list') ? 'location' : 'device')
-                : model;
-            
-            const isActive = row.dataset[`${dataAttrModel}Active`] === 'true';
+        const inactiveLocations = table.querySelectorAll('.location-row[data-location-active="false"]');
+        const inactiveDevices = table.querySelectorAll('.device-row[data-device-active="false"]');
+        const inactiveSensors = table.querySelectorAll('.sensor-row[data-sensor-active="false"]');
 
-            if (!isActive) {
-                const wasHidden = row.classList.contains('d-none');
-                row.classList.toggle('d-none', hideInactive);
-                const isHidden = row.classList.contains('d-none');
+        // First, handle hiding
+        if (hideInactive) {
+            inactiveLocations.forEach(row => row.classList.add('d-none'));
+            inactiveDevices.forEach(row => row.classList.add('d-none'));
+            inactiveSensors.forEach(row => row.classList.add('d-none'));
+            return; // Exit after hiding
+        }
 
-                if (hideInactiveConfig.debug) {
-                    const logPrefix = isHeader ? `Group Header for inactive ${dataAttrModel}` : `Inactive ${model} row`;
-                    console.log(`  - ${logPrefix}. Toggling visibility. Hidden: ${isHidden}`, row);
-                    if (wasHidden !== isHidden) {
-                        console.log(`    > Visibility changed from ${wasHidden} to ${isHidden}`);
+        // Now, handle showing
+        // Show all inactive items first
+        inactiveLocations.forEach(row => row.classList.remove('d-none'));
+        inactiveDevices.forEach(row => row.classList.remove('d-none'));
+        inactiveSensors.forEach(row => row.classList.remove('d-none'));
+
+        // For any shown sensor, ensure its parent device and location are visible
+        inactiveSensors.forEach(sensorRow => {
+            const deviceId = sensorRow.dataset.deviceId;
+            if (deviceId) {
+                const deviceRow = table.querySelector(`.device-row[data-device-id="${deviceId}"]`);
+                if (deviceRow) {
+                    deviceRow.classList.remove('d-none');
+                    const locationId = deviceRow.dataset.locationId;
+                    if (locationId) {
+                        const locationRow = table.querySelector(`.location-row[data-location-id="${locationId}"]`);
+                        if (locationRow) {
+                            locationRow.classList.remove('d-none');
+                        }
                     }
                 }
             }
         });
+
+        // For any shown device, ensure its parent location is visible
+        inactiveDevices.forEach(deviceRow => {
+            const locationId = deviceRow.dataset.locationId;
+            if (locationId) {
+                const locationRow = table.querySelector(`.location-row[data-location-id="${locationId}"]`);
+                if (locationRow) {
+                    locationRow.classList.remove('d-none');
+                }
+            }
+        });
+    },
+
+    updateRowVisibility(model, hideInactive) {
+        // This function is now deprecated in favor of updateAllRowVisibility,
+        // but kept for now to avoid breaking other parts of the application
+        // that might still be calling it. It's recommended to migrate all
+        // calls to updateAllRowVisibility.
+        if (hideInactiveConfig.debug) {
+            console.warn('updateRowVisibility is deprecated. Use updateAllRowVisibility instead.');
+        }
+        this.updateAllRowVisibility(hideInactive);
+    },
+
+    showParentRows(row) {
+        // This function is now deprecated as its logic is included in updateAllRowVisibility.
+        if (hideInactiveConfig.debug) {
+            console.warn('showParentRows is deprecated.');
+        }
     }
 };
 

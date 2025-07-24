@@ -130,12 +130,10 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'django.template.context_processors.static',
-                'sensors.context_processors.place_context',
-                'sensors.context_processors.toast_messages',
             ],
             'builtins': [
                 'django.templatetags.static',
+                'sensors.templatetags.live_counts_tags',
             ],
         },
     },

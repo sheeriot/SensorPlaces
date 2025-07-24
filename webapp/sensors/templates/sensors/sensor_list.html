@@ -11,17 +11,17 @@
     <!-- Two Column Layout for Locations and Devices -->
     <div class="row">
         <div class="col-md-4">
+        {% if device %}
+            {% include "sensors/includes/device_detail_card.html" with readonly=True %}
+        {% endif %}
         <!-- Place Navigation Card -->
         {% if place.is_active %}
             {% include "sensors/includes/place_nav_card.html" %}
         {% else %}
             {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
         {% endif %}
-        {% if device %}
-            {% include "sensors/includes/device_detail_card.html" %}
-        {% else %}
-            {% include "sensors/includes/device_list_card.html" %}
-        {% endif %}
+        {% load live_counts_tags %}
+        {% live_counts_card place %}
         </div>
 
         <!-- right column -->
@@ -32,4 +32,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/live-counts-updater.js' %}"></script>
 {% endblock %}

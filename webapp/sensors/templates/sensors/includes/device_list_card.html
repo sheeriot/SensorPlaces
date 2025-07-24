@@ -1,71 +1,53 @@
-<div id="device-list-card"
-     class="card {% if location and not location.is_active %}opacity-50 text-muted{% endif %}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        {% if location %}
-            {# Single location view #}
-            <div class="d-flex align-items-center gap-3">
-                <h5 class="card-title mb-0 d-flex align-items-center gap-2">
-                    <i class="bi bi-hdd-rack me-1"></i> 
-                    Devices @ <i class="bi bi-geo-alt me-1"></i>{{ location.name }}
-                </h5>
-                {% if place.is_active %}
-                    {% include "sensors/partials/hide_inactive_switch.html" with model="device" %}
-                {% endif %}
-            </div>
-            {% include "sensors/partials/device_new_button.html" %}
-        {% else %}
-            {# All locations view #}
-            <div class="d-flex align-items-center gap-3">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-hdd-rack me-1"></i> 
-                    Devices - All
-                </h5>
-                {% if place.is_active %}
-                    {% include "sensors/partials/hide_inactive_switch.html" with model="device" %}
-                {% endif %}
-            </div>
-        {% endif %}
+<div class="card {% if not place.is_active %}opacity-50 text-muted{% endif %}" id="device-list-card">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <h5 class="card-title mb-0 fs-6 d-flex align-items-center text-nowrap">
+            <i class="bi bi-hdd-rack me-2"></i>
+            <span class="text-nowrap">All Devices</span>
+        </h5>
+        <div class="d-flex align-items-center">
+            {% include "sensors/partials/hide_inactive_switch.html" with model="device" hide_inactive=hide_inactive %}
+        </div>
     </div>
-    <div class="card-body p-0">
-        {% if devices %}
-            <!-- Header Row -->
-            <div class="list-group-item d-none d-md-block bg-light small text-muted px-0">
-                <div class="row align-items-center ps-1 g-0">
-                    <div class="col-4">NAME</div>
-                    <div class="col-3">MODEL</div>
-                    <div class="col-3">ACTIVE</div>
-                    <div class="col-2">ACTIONS</div>
+    <div class="list-group list-group-flush overflow-auto">
+        {% for location in locations %}
+            <div class="list-group-item list-group-item-primary py-1 {% if not location.is_active and hide_inactive %}d-none{% elif not location.is_active %}text-muted opacity-50{% endif %}" data-location-id="{{ location.id }}" data-location-active="{{ location.is_active|lower }}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong><i class="bi bi-geo-alt me-2"></i>{{ location.name }}</strong>
+                        {% if not location.is_active %}
+                            <span class="badge bg-secondary ms-2">inactive</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center">
+                        {% if not location.devices_sorted %}
+                            <span class="text-muted fst-italic me-2">no devices</span>
+                        {% endif %}
+                        {% include "sensors/partials/device_new_button.html" with place=place location=location %}
+                    </div>
                 </div>
             </div>
-            <div class="list-group list-group-flush">
-                {% if location %}
-                    {# Single location view - no grouping needed #}
-                    {% for device in devices %}
-                        {% include "sensors/partials/device_row.html" %}
-                    {% endfor %}
-                {% else %}
-                    {# All locations view - group by location #}
-                    {% regroup devices by location as location_groups %}
-                    {% for location_group in location_groups %}
-                        <div class="list-group-item bg-light fw-bold">
-                            <i class="bi bi-geo-alt me-1"></i>
-                            {% if location_group.grouper %}
-                                <a href="{% url 'sensors:location_detail' place.slug location_group.grouper.slug %}" class="link-dark text-decoration-none">{{ location_group.grouper.name }}</a>
-                            {% else %}
-                                Unassigned
-                            {% endif %}
-                        </div>
-                        {% for device in location_group.list %}
-                            {% include "sensors/partials/device_row.html" %}
-                        {% endfor %}
-                    {% endfor %}
-                {% endif %}
+            {% for device in location.devices_sorted %}
+                {% include "sensors/partials/device_row.html" with device=device hide_inactive=hide_inactive %}
+            {% endfor %}
+        {% endfor %}
+
+        {# Unassigned Devices #}
+        {% if unassigned_devices %}
+            <div class="list-group-item list-group-item-secondary d-flex justify-content-between align-items-center py-1">
+                <strong><i class="bi bi-question-circle me-2"></i>Unassigned Devices</strong>
+                {% include "sensors/partials/device_new_button.html" with place=place %}
             </div>
-        {% else %}
-            <div class="text-center text-muted p-4">
-                <i class="bi bi-hdd-stack fs-1"></i>
-                <p class="mt-2">No devices found in this place.</p>
+            <div class="list-group-item d-none d-md-block bg-light small text-muted py-1">
+                <div class="row g-0">
+                    <div class="col-6">NAME</div>
+                    <div class="col-2">ACTIVE</div>
+                    <div class="col-2 text-center">SENSORS</div>
+                    <div class="col-2 text-end">ACTIONS</div>
+                </div>
             </div>
+            {% for device in unassigned_devices %}
+                {% include "sensors/partials/unassigned_device_row.html" with device=device hide_inactive=hide_inactive %}
+            {% endfor %}
         {% endif %}
     </div>
 </div>

@@ -1,0 +1,13 @@
+{% load crispy_forms_tags %}
+<form method="post" action="{% url 'sensors:influxsource_create' %}">
+    {% csrf_token %}
+    {{ form|crispy }}
+    <div class="d-flex justify-content-end">
+        <a href="#" class="btn btn-secondary me-2" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-1"></i>Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>Save
+        </button>
+    </div>
+</form> 

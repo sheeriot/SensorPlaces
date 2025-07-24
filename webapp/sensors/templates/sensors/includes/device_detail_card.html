@@ -1,85 +1,59 @@
 {# {% load widget_tweaks %} #}
 
-<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not device.is_active %}opacity-50{% endif %}" id="device-card-{{ device.pk }}">
-    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+<div id="device-detail-card" class="card {% if not device.is_active %}opacity-50{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
-            <i class="bi bi-hdd me-2"></i>
-            <span>{{ device.name }}</span>
+            <i class="bi bi-hdd-rack me-2"></i>
+            {{ device.name }}
         </h5>
         <div class="d-flex align-items-center">
-            {% if device.location %}
-                <span class="badge bg-light text-dark me-2">
-                    <i class="bi bi-geo-alt me-1"></i>
-                    <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="link-dark text-decoration-none">
-                        {{ device.location.name }}
-                    </a>
-                </span>
-            {% endif %}
-            <span class="badge bg-{{ device.is_active|yesno:'success,secondary' }} me-2">
-                {{ device.is_active|yesno:'Active,inactive' }}
+            <span class="text-muted me-2" title="Location">
+                <i class="bi bi-geo-alt me-1"></i>
+                {{ device.location.name }}
             </span>
-        </div>
-        <div class="btn-group">
-            {% if model_name == 'device' %}
-                <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" 
-                   class="btn btn-warning btn-sm">
-                    <i class="bi bi-pencil"></i>
-                </a>
-                <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" 
-                   class="btn btn-danger btn-sm">
-                    <i class="bi bi-trash"></i>
-                </a>
-            {% endif %}
+            <span id="device-inactive-badge" class="badge bg-secondary me-2 {% if device.is_active %}d-none{% endif %}">
+                inactive
+            </span>
+            <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-primary me-2" title="Edit Device">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-danger" title="Delete Device">
+                <i class="bi bi-trash"></i>
+            </a>
         </div>
     </div>
-    <div class="card-body py-2">
-        <div class="d-flex flex-column gap-3">
-            <div class="d-flex gap-3">
-                <div>
-                    <div class="text-body-secondary small text-uppercase mb-1">Name</div>
-                    <div class="fs-5">{{ device.name }}</div>
-                </div>
-                <div>
-                    <div class="text-body-secondary small text-uppercase mb-1">Location</div>
-                    <div class="fs-5">
-                        <i class="bi bi-geo-alt me-1"></i>{{ device.location.name }}
-                    </div>
-                </div>
-            </div>
-
-            <div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-6">
                 <div class="text-body-secondary small text-uppercase mb-1">Device Type</div>
-                <div class="fs-5">{{ device.device_type.name }}</div>
-            </div>
-
-            <div class="d-flex gap-3">
-                <div>
-                    <div class="text-body-secondary small text-uppercase mb-1">Manufacturer</div>
-                    <div class="fs-5">{{ device.manufacturer|default:"-" }}</div>
-                </div>
-                <div>
-                    <div class="text-body-secondary small text-uppercase mb-1">Model</div>
-                    <div class="fs-5">{{ device.model|default:"-" }}</div>
+                <div class="fs-6">
+                    {{ device.device_type.name }}
+                    {% if device.is_lorawan %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill">
+                            <i class="bi bi-broadcast me-1"></i>LoRaWAN
+                        </span>
+                    {% endif %}
                 </div>
             </div>
-
-            <div>
-                <div class="text-body-secondary small text-uppercase mb-1">Device ID</div>
-                <div class="fs-5">{{ device.device_id|default:"-" }}</div>
+            <div class="col-6">
+                <div class="text-body-secondary small text-uppercase mb-1">Model</div>
+                <div class="fs-6">{{ device.model|default:"-" }}</div>
             </div>
-
-            <div class="d-flex gap-3">
-                <div>
-                    <div class="text-body-secondary small text-uppercase mb-1">Sensor Count</div>
-                    <div class="fs-5">{{ device.sensors.count }}</div>
-                </div>
-                <div>
-                    <div class="text-body-secondary small text-uppercase mb-1">Status</div>
-                    <div class="d-flex align-items-center gap-3">
-                        {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug %}
-                        {% include "sensors/partials/status_active_badge.html" with object=device %}
-                    </div>
-                </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-6">
+                <div class="text-body-secondary small text-uppercase mb-1">Sensor Count</div>
+                <div class="fs-6">{{ device.sensors.count }}</div>
+            </div>
+            <div class="col-6">
+                <div class="text-body-secondary small text-uppercase mb-1">Active</div>
+                {% if readonly %}
+                    <span class="badge {% if device.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                        {% if device.is_active %}Active{% else %}inactive{% endif %}
+                    </span>
+                {% else %}
+                    {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug %}
+                {% endif %}
             </div>
         </div>
     </div>

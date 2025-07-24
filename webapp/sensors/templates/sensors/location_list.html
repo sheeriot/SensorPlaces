@@ -17,7 +17,8 @@
         {% else %}
             {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
         {% endif %}
-        {% include "sensors/includes/live_counts_card.html" %}
+        {% load live_counts_tags %}
+        {% live_counts_card place %}
     </div>
     <!-- Right Column: Locations and Site Plan -->
     <div class="col-md-8">
@@ -37,4 +38,5 @@
 
 {% block extra_js %}
 <script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+<script src="{% static 'sensors/js/live-counts-updater.js' %}"></script>
 {% endblock %}

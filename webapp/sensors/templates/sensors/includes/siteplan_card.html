@@ -12,6 +12,10 @@
         <button id="siteplan-edit" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-grid"></i> Edit Layout
         </button>
+        {% else %}
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#siteplan-view-modal">
+            <i class="bi bi-arrows-fullscreen"></i> Expand
+        </button>
         {% endif %}
     </div>
     {% if place.siteplan_image %}
@@ -31,6 +35,20 @@
     {% endif %}
 </div>
 
+<!-- Siteplan View Modal -->
+<div class="modal fade" id="siteplan-view-modal" tabindex="-1" aria-labelledby="siteplan-view-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="siteplan-view-modal-label">{{ place.name }} Site Plan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <!-- The map container will be moved here by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Siteplan Editor Modal -->
 <div class="modal fade" id="siteplan-editor" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">

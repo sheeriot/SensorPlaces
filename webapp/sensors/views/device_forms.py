@@ -38,6 +38,11 @@ class DeviceForm(forms.ModelForm):
         inactive_help_text = kwargs.pop('inactive_help_text', None)
         super().__init__(*args, **kwargs)
         
+        # Get cancel URL from initial data or fallback
+        initial = kwargs.get('initial', {})
+        referrer = initial.get('referrer')
+        cancel_url = referrer or initial.get('cancel_fallback_url')
+
         if 'location' in self.fields:
             self.fields['location'].required = False
         
@@ -180,7 +185,7 @@ class DeviceForm(forms.ModelForm):
                 Div(
                     Field('referrer', type='hidden'),
                     HTML(f"""
-                        <a href="{{ form.referrer.value|default:cancel_fallback_url }}" 
+                        <a href="{cancel_url}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>

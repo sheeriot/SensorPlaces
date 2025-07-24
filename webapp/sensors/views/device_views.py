@@ -12,77 +12,56 @@ from django.utils.safestring import mark_safe
 from ..models import Place, Location, Device, Sensor
 from .device_forms import DeviceForm
 from .mixins import PlaceAnnotationMixin
-from .views_fun import get_place_counts, get_annotated_locations
+from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
 
 from icecream import ic
 
 # Device Views
 class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
-    model = Device
-    context_object_name = 'devices'
+    model = Location
+    context_object_name = 'locations'
     template_name = 'sensors/device_list.html'
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-        self.place = self.get_place()
-        location_pk = self.kwargs.get('location_pk', None)
-        if location_pk:
-            self.location = get_object_or_404(Location, pk=location_pk, place=self.place)
-        self.locations = get_annotated_locations(self.place)
+    def get_queryset(self) -> QuerySet[Location]:
+        # Prefetch devices for each location
+        devices_prefetch = Prefetch(
+            'devices',
+            queryset=Device.objects.annotate(
+                sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False))
+            ).order_by('-is_active', 'name'),
+            to_attr='devices_sorted'
+        )
 
-    def get_queryset(self) -> QuerySet[Device]:
-        if not hasattr(self, '_queryset'):
-            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-            location_pk = self.kwargs.get('location_pk')
-            
-            base_queryset = super().get_queryset()
-            queryset = base_queryset.filter(place=place)
-            
-            # Filter by location if specified
-            if location_pk:
-                queryset = queryset.filter(location_id=location_pk)
-            
-            # Add annotations and ordering
-            self._queryset = queryset.select_related(
-                'location', 
-                'location__place'
-            ).prefetch_related(
-                Prefetch(
-                    'sensors',
-                    queryset=Sensor.objects.order_by('-is_active', Lower('name'))
-                )
-            ).annotate(
-                active_sensors=Count('sensors', filter=Q(sensors__is_active=True)),
-                total_sensors=Count('sensors')
-            ).order_by(
-                '-location__is_active',  # Active locations first
-                'location__name',
-                '-is_active',           # Active devices first
-                'name'
-            )
-        return self._queryset
+        return get_annotated_locations(self._place).prefetch_related(devices_prefetch)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
         
-        # Check for hide_inactive cookie
-        hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
-        context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+        # Add hide_inactive state from GET param or cookie
+        hide_inactive_param = self.request.GET.get('hide_inactive')
+        if hide_inactive_param is not None:
+            context['hide_inactive'] = hide_inactive_param.lower() == 'true'
+        else:
+            hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
+            context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
         
         # ic('device_list_context', context)
 
         # Add place to context
         place = self.get_place()
         context['place'] = place
-        context['unassigned_devices'] = self.get_queryset().filter(location__isnull=True)
+        context['unassigned_devices'] = Device.objects.filter(place=place, location__isnull=True).order_by('-is_active', 'name')
         
+        # Add live counts to context
+        context.update(get_live_counts_context(place))
+
         # Get location if specified
         location_pk = self.request.GET.get('location', None)
         if location_pk:
             context['location'] = get_object_or_404(Location, pk=location_pk, place=place)
             
-        context['locations'] = get_annotated_locations(place)
         return context
 
 class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
@@ -111,29 +90,28 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
                 .prefetch_related(
                     Prefetch(
                         'sensors',
-                        queryset=Sensor.objects.order_by('-is_active', Lower('name'))
+                        queryset=Sensor.objects.order_by('-is_active', Lower('name')),
+                        to_attr='sensors_sorted'
                     ))
         return self._queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Now self.object is available, so we can access location
-        self._location = self.object.location
+        device = self.object
+        location = device.location
         
         context['model_name'] = 'device'
         context['place'] = self._place
-        context['location'] = self._location
-        
-        # Add sensors to context
-        # Convert to list to ensure it's iterable
-        context['sensors'] = list(self.object.sensors.all())
-        
-        # For convenience, also add active sensors separately
-        context['active_sensors'] = [s for s in context['sensors'] if s.is_active]
-        
-        # Rest of your context data setup
-        # ...
+        context['location'] = location
+
+        # Add hide_inactive state from GET param or cookie
+        hide_inactive_param = self.request.GET.get('hide_inactive')
+        if hide_inactive_param is not None:
+            context['hide_inactive'] = hide_inactive_param.lower() == 'true'
+        else:
+            hide_inactive_cookie = self.request.COOKIES.get('hideInactive_sensor', 'false')
+            context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
         
         return context
 
@@ -195,7 +173,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             # If we have a location_pk, go to location_detail
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,
-                'pk': location_pk
+                'slug': self._location.slug
             })
         else:
             # If no location_pk, go to device_list
@@ -376,6 +354,9 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         kwargs['locations'] = self._locations
         kwargs['inactive_help_text'] = self._inactive_help_text
         
+        # Pass the referrer from initial data to the form
+        kwargs['initial'] = self.get_initial()
+        
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -394,12 +375,18 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             # If we have a location_pk, go to location_detail
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,
-                'pk': location_pk
+                'slug': self._location.slug
             })
         else:
             # If no location_pk, go to device_list
             context['cancel_fallback_url'] = reverse('sensors:device_list', kwargs={
                 'place_slug': self._place.slug
+            })
+        
+        # Add a fallback cancel URL
+        context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
+            'place_slug': self._place.slug,
+            'pk': self.object.pk
             })
         
         return context

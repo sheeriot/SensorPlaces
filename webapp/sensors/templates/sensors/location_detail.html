@@ -19,7 +19,7 @@
         {% include "sensors/includes/place_nav_card.html" %}
     {% endif %}
         <!-- Include Site Plan Card -->
-        {% include "sensors/includes/siteplan_card.html" %}
+        {% include "sensors/includes/siteplan_card.html" with editable=False %}
 
     </div>
     
@@ -29,9 +29,12 @@
         {% include "sensors/includes/location_detail_card.html" %}
         
         <!-- Include Device List Card -->
-        {% include "sensors/includes/device_list_card.html" %}
+        {% include "sensors/includes/device_list_card.html" with locations=device_list_locations unassigned_devices=unassigned_devices %}
 
     </div>
 </div>
 {% endblock %}
- 
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+{% endblock %}

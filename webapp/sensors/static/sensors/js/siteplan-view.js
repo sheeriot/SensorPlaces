@@ -6,7 +6,7 @@
 const sitePlanView = {
     // State
     state: {
-        debug: false,
+        debug: true,
         map: null,
         imageOverlay: null,
         markers: new Map(), // slug -> L.Marker
@@ -212,34 +212,7 @@ const sitePlanView = {
         // --- New Sizing Logic ---
         const siteplanWrapper = container.closest('.siteplan-wrapper');
         if (siteplanWrapper) {
-            const imageWidth = this.state.imageBounds[1][1];
-            const imageHeight = this.state.imageBounds[1][0];
-            const aspectRatio = imageHeight / imageWidth;
-
-            // 1. Get the available width from the wrapper.
-            const availableWidth = siteplanWrapper.offsetWidth;
-
-            // 2. Calculate the potential height based on aspect ratio.
-            let calculatedHeight = availableWidth * aspectRatio;
-
-            // 3. Get max height (e.g., 60% of viewport height).
-            const maxHeight = window.innerHeight * 0.6;
-
-            // 4. Set the final height, capped by the max height.
-            const finalHeight = Math.min(calculatedHeight, maxHeight);
-
-            // 5. Apply the height to the wrapper element.
-            siteplanWrapper.style.height = `${finalHeight}px`;
-
-            if (this.state.debug) {
-                console.log('Site Plan Sizing:', {
-                    availableWidth,
-                    aspectRatio,
-                    calculatedHeight,
-                    maxHeight,
-                    finalHeight
-                });
-            }
+            this.setWrapperSize(siteplanWrapper, false); // Initial size for card
         }
         // --- End New Sizing Logic ---
 
@@ -259,6 +232,9 @@ const sitePlanView = {
             minZoom: -2,         // Match editor settings
             maxZoom: 2          // Match editor settings
         });
+
+        // Create zoom control but don't add it yet
+        this.state.map.zoomControl = L.control.zoom();
 
         // Add image overlay with loading handler
         this.state.imageOverlay = L.imageOverlay(imageUrl, this.state.imageBounds)
@@ -288,6 +264,92 @@ const sitePlanView = {
         window.addEventListener('resize', () => {
             requestAnimationFrame(() => this.fitMapPerfectly());
         });
+
+        // Add modal logic after map is initialized
+        const modalElement = document.getElementById('siteplan-view-modal');
+        const originalParent = siteplanWrapper ? siteplanWrapper.parentElement : null;
+
+        if (modalElement && siteplanWrapper && originalParent) {
+            const modalBody = modalElement.querySelector('.modal-body');
+
+            modalElement.addEventListener('shown.bs.modal', () => {
+                if (this.state.debug) console.log('Expanding map to modal.');
+                modalBody.appendChild(siteplanWrapper);
+                
+                this.setWrapperSize(siteplanWrapper, true); // Recalculate size for modal
+
+                this.state.map.invalidateSize();
+                this.fitMapPerfectly();
+
+                // Enable interactions
+                this.state.map.dragging.enable();
+                this.state.map.touchZoom.enable();
+                this.state.map.scrollWheelZoom.enable();
+                this.state.map.doubleClickZoom.enable();
+                this.state.map.boxZoom.enable();
+                this.state.map.keyboard.enable();
+                this.state.map.zoomControl.addTo(this.state.map);
+            });
+
+            modalElement.addEventListener('hidden.bs.modal', () => {
+                if (this.state.debug) console.log('Collapsing map back to card.');
+                originalParent.appendChild(siteplanWrapper);
+
+                this.setWrapperSize(siteplanWrapper, false); // Recalculate size for card
+
+                this.state.map.invalidateSize();
+                this.fitMapPerfectly();
+
+                // Disable interactions
+                this.state.map.dragging.disable();
+                this.state.map.touchZoom.disable();
+                this.state.map.scrollWheelZoom.disable();
+                this.state.map.doubleClickZoom.disable();
+                this.state.map.boxZoom.disable();
+                this.state.map.keyboard.disable();
+                this.state.map.zoomControl.remove();
+            });
+        }
+    },
+
+    // Set wrapper size based on context (card or modal)
+    setWrapperSize(wrapper, forModal = false) {
+        if (!wrapper || !this.state.imageBounds) return;
+
+        const imageWidth = this.state.imageBounds[1][1];
+        const imageHeight = this.state.imageBounds[1][0];
+        const aspectRatio = imageHeight / imageWidth;
+
+        if (forModal) {
+            // For modal: calculate size based on viewport
+            const modalPadding = 80; // Combined vertical/horizontal padding
+            const availableWidth = window.innerWidth - modalPadding;
+            const availableHeight = window.innerHeight - modalPadding;
+            
+            let newHeight = availableWidth * aspectRatio;
+            let newWidth = availableWidth;
+
+            if (newHeight > availableHeight) {
+                newHeight = availableHeight;
+                newWidth = newHeight / aspectRatio;
+            }
+            wrapper.style.height = `${newHeight}px`;
+            wrapper.style.width = `${newWidth}px`;
+        } else {
+            // For card: calculate based on container width
+            wrapper.style.width = '100%'; // Reset width
+            const availableWidth = wrapper.offsetWidth;
+            const calculatedHeight = availableWidth * aspectRatio;
+            const maxHeight = window.innerHeight * 0.6; // Max 60% of viewport height
+            wrapper.style.height = `${Math.min(calculatedHeight, maxHeight)}px`;
+        }
+
+        if (this.state.debug) {
+            console.log(`Set wrapper size (forModal: ${forModal})`, {
+                width: wrapper.style.width,
+                height: wrapper.style.height
+            });
+        }
     },
 
     // Update fitMapPerfectly method to match editor's implementation

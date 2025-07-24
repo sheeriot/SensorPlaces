@@ -16,11 +16,11 @@ from django.shortcuts import render
 # from typing import Dict, Any, Optional, cast
 
 # App stuff
-from ..models import Place, Location, Device, Sensor, ToastNotification
+from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxSource
 from .place_forms import PlaceForm, PlaceDeleteForm
 from ..map_fun import place_map_create
 from .mixins import PlaceAnnotationMixin
-from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places
+from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places, get_live_counts_context
 
 # utility
 import json
@@ -89,6 +89,12 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add place data from get_place_data function
         place_data = get_place_data(self.object)
         context.update(place_data)
+
+        # Add device and sensor counts to context
+        context.update(get_live_counts_context(self.object))
+        
+        # Add InfluxDB sources to the context
+        context['influxsources'] = InfluxSource.objects.filter(place=self.object)
         
         # Prepare locations data for siteplan, ensuring is_active is included
         locations = Location.objects.filter(place=self.object)
@@ -114,6 +120,8 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         except Exception as e:
             context['place_map_html'] = ""
             
+        context['editable'] = True  # Enable the edit button on the siteplan
+        
         return context
 
 class PlaceCreateView(LoginRequiredMixin, CreateView):
@@ -427,76 +435,20 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
             return self.form_invalid(form)
 
 @login_required
-@csrf_protect
 def place_stats(request, place_slug):
-    """Get statistics for a place."""
-    try:
-        # Get the place
-        place = get_object_or_404(Place, slug=place_slug)
-        
-        # Get place data using the common function from views_fun.py
-        place_data = get_place_data(place, include_json=False)
-        
-        # Get location statistics using the annotated locations
-        locations = place_data['locations'].values(
-            'id', 'name', 'is_active',
-            'devices_active_count', 'devices_inactive_count',
-            'sensors_active_count', 'sensors_inactive_count'
-        )
-        
-        # Get device statistics
-        devices = Device.objects.filter(location__place=place).annotate(
-            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True)),
-            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False))
-        ).values(
-            'id', 'name', 'is_active', 'location_id',
-            'sensors_active_count', 'sensors_inactive_count'
-        )
-        
-        # Get sensor statistics
-        sensors = Sensor.objects.filter(device__location__place=place).values(
-            'id', 'name', 'is_active', 'device_id',
-            'sensor_type', 'data_type', 'unit'
-        )
-        
-        # Get unread toast count
-        unread_count = ToastNotification.get_unread_count(
-            user=request.user,
-            place=place
-        )
-        
-        # Calculate totals from the place_data
-        total_stats = {
-            'locations': {
-                'active': sum(1 for loc in locations if loc['is_active']),
-                'inactive': sum(1 for loc in locations if not loc['is_active'])
-            },
-            'devices': {
-                'active': place_data.get('devices_active_count', 0),
-                'inactive': place_data.get('devices_inactive_count', 0)
-            },
-            'sensors': {
-                'active': place_data.get('sensors_active_count', 0),
-                'inactive': place_data.get('sensors_inactive_count', 0)
-            }
-        }
-        
-        return JsonResponse({
-            'success': True,
-            'stats': {
-                'locations': list(locations),
-                'devices': list(devices),
-                'sensors': list(sensors),
-                'unread_toast_count': unread_count,
-                'total': total_stats
-            }
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+    """Return device and sensor counts for a place."""
+    place = get_object_or_404(Place, slug=place_slug)
+    locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
+    
+    return JsonResponse({
+        'locations_active': locations_active,
+        'locations_inactive': locations_inactive,
+        'devices_active': devices_active,
+        'devices_inactive': devices_inactive,
+        'sensors_active': sensors_active,
+        'sensors_inactive': sensors_inactive
+    })
+
 
 # Utility Forms
 class LocationPositionForm(forms.Form):

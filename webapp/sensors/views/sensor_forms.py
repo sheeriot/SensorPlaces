@@ -191,3 +191,41 @@ class SensorForm(forms.ModelForm):
         if hasattr(self, 'device') and self.device and not self.instance.device_id:
             self.instance.device = self.device
         return super().is_valid()
+
+
+class LoRaWANSensorForm(forms.ModelForm):
+    class Meta:
+        model = Sensor
+        fields = ['name', 'is_active', 'sensor_type', 'influx_source', 'influx_measurement']
+
+    def __init__(self, *args, **kwargs):
+        place = kwargs.pop('place', None)
+        super().__init__(*args, **kwargs)
+        self.fields['is_active'].label = "Active"
+        self.fields['influx_source'].label = False
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Row(
+                Column('name', css_class='col-8'),
+                Column('is_active', css_class='col-4 pt-4'),
+            ),
+            'sensor_type',
+            Div(
+                HTML("""
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label for="id_influx_source" class="form-label mb-0">Influx source</label>
+                        <a href="{% url 'sensors:influxsource_create' place_slug=view.place.slug %}"
+                           class="btn btn-sm btn-outline-primary" 
+                           id="add-influx-source-btn">
+                            <i class="bi bi-plus-circle"></i> Source
+                        </a>
+                    </div>
+                """),
+                Field('influx_source'),
+                css_class="mb-3"
+            ),
+            'influx_measurement',
+            HTML('<hr>'),
+            HTML('<button type="submit" class="btn btn-primary">Save</button>'),
+            HTML('<a class="btn btn-secondary" href="{{ request.META.HTTP_REFERER }}">Cancel</a>')
+        )

@@ -24,31 +24,15 @@ def get_annotated_places():
     ).order_by('-is_active', Lower('name'))
 
 def get_annotated_locations(place):
-    """Get annotated locations for a place."""
-    locations = Location.objects.filter(place=place).annotate(
-        devices_active_count=Count(
-            'devices',
-            filter=Q(devices__is_active=True),
-            distinct=True
-        ),
-        devices_inactive_count=Count(
-            'devices',
-            filter=Q(devices__is_active=False),
-            distinct=True
-        ),
-        sensors_active_count=Count(
-            'devices__sensors',
-            filter=Q(devices__sensors__is_active=True),
-            distinct=True
-        ),
-        sensors_inactive_count=Count(
-            'devices__sensors',
-            filter=Q(devices__sensors__is_active=False),
-            distinct=True
-        )
+    """
+    Returns a queryset of locations for a given place, annotated with device and sensor counts.
+    """
+    return Location.objects.filter(place=place).annotate(
+        devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
+        devices_inactive_count=Count('devices', filter=Q(devices__is_active=False)),
+        sensors_active_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
+        sensors_inactive_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
     ).order_by('-is_active', Lower('name'))
-
-    return locations
 
 def get_location_data(location) -> Dict[str, Any]:
     """Convert a Location instance to a JSON-serializable dictionary."""
@@ -65,30 +49,22 @@ def get_location_data(location) -> Dict[str, Any]:
 def get_place_counts(place):
     """Get device and sensor counts for a place.
     
-    Returns a dictionary with:
+    Returns a tuple of six values:
+    - locations_active_count
+    - locations_inactive_count
     - devices_active_count
     - devices_inactive_count
     - sensors_active_count
     - sensors_inactive_count
     """
-    return {
-        'devices_active_count': Device.objects.filter(
-            location__place=place, 
-            is_active=True
-        ).distinct().count(),
-        'devices_inactive_count': Device.objects.filter(
-            location__place=place, 
-            is_active=False
-        ).distinct().count(),
-        'sensors_active_count': Sensor.objects.filter(
-            device__location__place=place, 
-            is_active=True
-        ).distinct().count(),
-        'sensors_inactive_count': Sensor.objects.filter(
-            device__location__place=place, 
-            is_active=False
-        ).distinct().count(),
-    }
+    locations_active_count = Location.objects.filter(place=place, is_active=True).distinct().count()
+    locations_inactive_count = Location.objects.filter(place=place, is_active=False).distinct().count()
+    devices_active_count = Device.objects.filter(location__place=place, is_active=True).distinct().count()
+    devices_inactive_count = Device.objects.filter(location__place=place, is_active=False).distinct().count()
+    sensors_active_count = Sensor.objects.filter(device__location__place=place, is_active=True).distinct().count()
+    sensors_inactive_count = Sensor.objects.filter(device__location__place=place, is_active=False).distinct().count()
+    
+    return locations_active_count, locations_inactive_count, devices_active_count, devices_inactive_count, sensors_active_count, sensors_inactive_count
 
 def get_place_data(place, include_json=True):
     """Get complete place data including locations and statistics.
@@ -110,7 +86,25 @@ def get_place_data(place, include_json=True):
         result['locations_json'] = json.dumps(locations_data)
     
     # Add statistics
-    counts = get_place_counts(place)
-    result.update(counts)
+    locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
+    result.update({
+        'locations_active_count': locations_active,
+        'locations_inactive_count': locations_inactive,
+        'devices_active_count': devices_active,
+        'devices_inactive_count': devices_inactive,
+        'sensors_active_count': sensors_active,
+        'sensors_inactive_count': sensors_inactive
+    })
     
     return result
+
+def get_live_counts_context(place):
+    locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
+    return {
+        'locations_active_count': locations_active,
+        'locations_inactive_count': locations_inactive,
+        'active_devices_count': devices_active,
+        'inactive_devices_count': devices_inactive,
+        'active_sensors_count': sensors_active,
+        'inactive_sensors_count': sensors_inactive
+    }

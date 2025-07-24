@@ -8,11 +8,12 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.utils.safestring import mark_safe
+import json
 
 from ..models import Place, Location, Device, Sensor
 from .location_forms import LocationForm
 from .mixins import PlaceAnnotationMixin, FormDataMixin
-from .views_fun import get_place_counts, get_annotated_locations
+from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
 
 from icecream import ic
 
@@ -24,31 +25,23 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
 
     def get_queryset(self) -> QuerySet[Location]:
         """Get locations with device and sensor counts."""
-        place = self._place
-        
-        return Location.objects.filter(
-            place=place
-        ).annotate(
-            devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
-            devices_inactive_count=Count('devices', filter=Q(devices__is_active=False)),
-            sensors_active_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
-            sensors_inactive_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
-        ).order_by(
-            '-is_active',
-            Lower('name')
-        )
+        return get_annotated_locations(self._place)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         place = context['place']
 
-        # Add hide_inactive state from cookie
-        hide_inactive_cookie = self.request.COOKIES.get('hideInactive_location', 'false')
-        context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+        # Add hide_inactive state from GET param or cookie
+        hide_inactive_param = self.request.GET.get('hide_inactive')
+        if hide_inactive_param is not None:
+            context['hide_inactive'] = hide_inactive_param.lower() == 'true'
+        else:
+            hide_inactive_cookie = self.request.COOKIES.get('hideInactive_location', 'false')
+            context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
 
-        # Add place statistics from views_fun.py
-        context.update(get_place_counts(place))
+        # Add live counts to context
+        context.update(get_live_counts_context(place))
         
         return context
 
@@ -66,12 +59,12 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
         context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
         
-        # Use the annotated location data from views_fun.py
-        location = get_annotated_locations(self._place).get(slug=self.object.slug)
-        context['location'] = location
+        # Get the specific location for the detail view
+        detailed_location = get_annotated_locations(self._place).get(slug=self.object.slug)
+        context['location'] = detailed_location
 
-        # Add annotated devices to context
-        context['devices'] = Device.objects.filter(
+        # Get devices for this location and attach them for the device_list_card
+        detailed_location.devices_sorted = Device.objects.filter(
             location=self.object
         ).select_related(
             'device_type'
@@ -83,6 +76,27 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         ).order_by(
             '-is_active', 
             Lower('name')
+        )
+        
+        # Create a specific context for the device_list_card.html partial
+        # This avoids overwriting the main `locations` context variable used by the nav card
+        context['device_list_locations'] = [detailed_location]
+        context['unassigned_devices'] = [] # No unassigned devices in this context
+
+        # Add locations_json for siteplan
+        all_locations = Location.objects.filter(place=self._place)
+        context['locations_json'] = json.dumps(
+            [
+                {
+                    "name": loc.name,
+                    "slug": loc.slug,
+                    "is_active": loc.is_active,
+                    "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+                    "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+                    "url": reverse('sensors:location_detail', args=[self._place.slug, loc.slug])
+                }
+                for loc in all_locations
+            ]
         )
         
         return context
@@ -416,6 +430,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         original_values = {
             'name': location.name,
             'is_active': location.is_active,
+            'slug': location.slug,
         }
         
         # Save the form

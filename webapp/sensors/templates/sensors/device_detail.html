@@ -13,13 +13,14 @@
     <div class="row">
         <!-- Left Column -->
         <div class="col-md-4">
+            {% include "sensors/includes/location_detail_card.html" %}
             <!-- Place Navigation Card -->
             {% if place.is_active %}
                 {% include "sensors/includes/place_nav_card.html" %}
             {% else %}
                 {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
             {% endif %}
-            {% include "sensors/includes/location_detail_card.html" %}
+
         </div>
 
         <!-- Right Column -->

@@ -3,42 +3,46 @@ This template expects:
 - location: Location object with devices_active_count and devices_inactive_count annotations
 - place: Place object
 {% endcomment %}
-<div id="location-{{ location.pk }}"
-   class="list-group-item location-row py-2 {% if not location.is_active %}opacity-50 text-muted{% if hide_inactive %} d-none{% endif %}{% endif %}"
-   data-location-active="{{ location.is_active|lower }}"
-   data-location-id="{{ location.pk }}">
-    <div class="row align-items-center g-0">
-        <!-- Location Name (takes up available space) -->
+<div class="list-group-item list-group-item-action {% if not location.is_active and hide_inactive %}d-none{% elif not location.is_active %}list-group-item-light text-muted opacity-75{% endif %}"
+     id="location-row-{{ location.id }}">
+    <div class="row g-0 align-items-center">
+        <!-- Name (takes up remaining space) -->
         <div class="col-6 text-truncate">
-            <i class="bi bi-circle-fill me-1 small {{ location.is_active|yesno:'text-success,text-secondary' }}"></i>
+            <div class="d-flex align-items-center">
+                <i class="bi bi-circle-fill me-2 small {{ location.is_active|yesno:'text-success,text-secondary' }}"></i>
             <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="fw-bold text-decoration-none text-dark">{{ location.name }}</a>
+            </div>
         </div>
 
         <!-- Counts (fixed width, appears before buttons) -->
-        <div class="col-2 small text-nowrap">
-            <div title="Devices">
+        <div class="col-2 small text-nowrap" title="Devices">
+            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-decoration-none text-dark">
                 <i class="bi bi-hdd-stack me-1"></i>
                 <span class="text-dark">{{ location.devices_active_count }}</span>
-                {% if location.devices_inactive_count > 0 %}
-                    <span class="text-muted small">(+{{ location.devices_inactive_count }})</span>
-                {% endif %}
-            </div>
+            </a>
+            {% if location.devices_inactive_count > 0 %}
+            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}?hide_inactive=false" class="text-decoration-none">
+                <span class="text-muted small">(+{{ location.devices_inactive_count }})</span>
+            </a>
+            {% endif %}
         </div>
-        <div class="col-2 small text-nowrap">
-            <div title="Sensors">
+        <div class="col-2 small text-nowrap" title="Sensors">
                 <i class="bi bi-cpu me-1"></i>
-                <span class="text-dark">{% if location.sensors_active_count %}{{ location.sensors_active_count }}{% else %}0{% endif %}</span>
-                {% if location.sensors_inactive_count and location.sensors_inactive_count > 0 %}
-                    <span class="text-muted small">(+{{ location.sensors_inactive_count }})</span>
-                {% endif %}
-            </div>
+            <span class="text-dark">{{ location.sensors_active_count }}</span>
+            {% if location.sensors_inactive_count > 0 %}
+                <span class="text-muted small">(+{{ location.sensors_inactive_count }})</span>
+            {% endif %}
         </div>
 
-        <!-- Action Buttons (on the far right) -->
+        <!-- Actions (fixed width at the end) -->
         <div class="col-2 text-end">
             <div class="btn-group btn-group-sm">
-                <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-primary py-0 px-1" title="Edit {{ location.name }}"><i class="bi bi-pencil"></i></a>
-                <a href="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete {{ location.name }}"><i class="bi bi-trash"></i></a>
+                <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil-fill"></i>
+                </a>
+                <a href="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash-fill"></i>
+                </a>
             </div>
         </div>
     </div>

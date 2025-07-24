@@ -1,31 +1,23 @@
 <div class="list-group-item device-row py-2 {% if not device.is_active and hide_inactive %}d-none{% elif not device.is_active %}list-group-item-light text-muted opacity-50{% endif %}"
     data-device-active="{{ device.is_active|lower }}"
     data-device-id="{{ device.pk }}"
-    data-location-active="{% if device.location %}{{ device.location.is_active|lower }}{% else %}true{% endif %}"
-    data-location-id="{% if device.location %}{{ device.location.pk }}{% else %}unassigned{% endif %}">
+    data-location-active="false"
+    data-location-id="unassigned">
     <div class="row g-0 align-items-center">
         <!-- Name -->
-        <div class="col-4 text-truncate">
+        <div class="col-6 text-truncate">
             <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none fw-bold">
                 <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}
             </a>
         </div>
-        <!-- Model -->
-        <div class="col-3 text-truncate">
-            <small class="text-muted">{{ device.model|default:"-" }}</small>
-        </div>
         <!-- Active Toggle -->
-        <div class="col-1">
-            {% if not device.location or device.location.is_active %}
-                {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug %}
-            {% else %}
-                <span class="badge bg-secondary">inactive</span>
-            {% endif %}
+        <div class="col-2">
+            {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug %}
         </div>
         <!-- Sensor Counts -->
         <div class="col-2 text-center">
             <a href="{% url 'sensors:device_sensors' place_slug=place.slug device_pk=device.pk %}" class="text-decoration-none text-dark">
-                <i class="bi bi-thermometer"></i> {{ device.sensors_active_count }}
+                <i class="bi bi-cpu"></i> {{ device.sensors_active_count }}
                 <span class="text-muted">({{ device.sensors_inactive_count }})</span>
             </a>
         </div>
@@ -41,4 +33,4 @@
             </div>
         </div>
     </div>
-</div>
+</div> 

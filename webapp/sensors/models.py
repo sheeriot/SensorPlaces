@@ -246,6 +246,7 @@ class Device(models.Model):
         ordering = ['place', 'location', '-is_active', Lower('name')]
 
 class InfluxSource(models.Model):
+    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='influx_sources')
     name = models.CharField(max_length=100)
     url = models.CharField(max_length=255)
     org = models.CharField(max_length=100)

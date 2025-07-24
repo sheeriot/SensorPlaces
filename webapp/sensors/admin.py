@@ -93,12 +93,12 @@ class SensorReadingAdmin(admin.ModelAdmin):
 
 @admin.register(InfluxSource)
 class InfluxSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'url', 'bucket_name', 'org')
-    search_fields = ('name', 'url', 'bucket_name')
+    list_display = ('name', 'place', 'url', 'bucket_name', 'org')
+    search_fields = ('name', 'url', 'bucket_name', 'place__name')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {
-            'fields': ('name', 'url', 'bucket_name', 'org', 'token')
+            'fields': ('place', 'name', 'url', 'bucket_name', 'org', 'token')
         }),
     )
 
