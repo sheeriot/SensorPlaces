@@ -20,7 +20,7 @@
                 {% if model_name != 'place' %}
                     <i class="bi bi-chevron-right"></i>
                     {% if location %}
-                        <a href="{% url 'sensors:location_detail' place.slug location.pk %}" class="text-decoration-none text-reset">
+                        <a href="{% url 'sensors:location_detail' place.slug location.slug %}" class="text-decoration-none text-reset">
                             <i class="bi bi-geo-alt"></i> {{ location.name }}
                         </a>
                     {% else %}

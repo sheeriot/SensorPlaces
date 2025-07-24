@@ -1,0 +1,13 @@
+{% extends "sensors/base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Delete InfluxDB Source</h1>
+    <p>Are you sure you want to delete "{{ object.name }}"?</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Confirm Delete</button>
+        <a href="{% url 'sensors:influxsource_detail' object.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %} 

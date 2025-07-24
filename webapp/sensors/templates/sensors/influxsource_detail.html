@@ -1,0 +1,16 @@
+{% extends "sensors/base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ influxsource.name }}</h1>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Source Details</h5>
+            <p><strong>URL:</strong> {{ influxsource.url }}</p>
+            <p><strong>Organization:</strong> {{ influxsource.org }}</p>
+            <p><strong>Bucket:</strong> {{ influxsource.bucket_name }}</p>
+        </div>
+    </div>
+    <a href="{% url 'sensors:influxsource_list' place_slug=place.slug %}" class="btn btn-secondary mt-3">Back to List</a>
+</div>
+{% endblock %} 

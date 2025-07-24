@@ -21,6 +21,13 @@
                     <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-outline-secondary d-none" id="reset-zoom-btn">Reset Zoom</button>
                     </div>
+                    {% if sensor.device.is_lorawan %}
+                    <div class="btn-group btn-group-sm ms-2" role="group">
+                        <a href="{% url 'sensors:lorawan_sensor_graph' place_slug=place.slug pk=sensor.pk %}" class="btn btn-outline-primary">
+                            <i class="bi bi-graph-up"></i> View Graph
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% include "sensors/includes/sensor_readings_card.html" %}

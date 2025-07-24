@@ -3,13 +3,13 @@
 {% block title %}{{ location.name }}{% endblock %}
 
 {% block content %}
-<div class="row">
-
+<div class="row my-1">
     <!-- Place Title Card -->
     <div class="col-12">
         {% include "sensors/partials/place_title_card.html" %}
     </div>
-
+</div>
+<div class="row gx-2 my-1">
     <!-- Left Column -->
     <div class="col-md-4">
     <!-- Place Navigation Card -->
@@ -19,8 +19,7 @@
         {% include "sensors/includes/place_nav_card.html" %}
     {% endif %}
         <!-- Include Site Plan Card -->
-        {% include "sensors/includes/siteplan_card.html" %}
-
+        {% include "sensors/includes/siteplan_card.html" with editable=False %}
     </div>
     
     <!-- Right Column -->
@@ -34,4 +33,7 @@
     </div>
 </div>
 {% endblock %}
- 
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+{% endblock %}

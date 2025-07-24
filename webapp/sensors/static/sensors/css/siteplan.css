@@ -134,4 +134,23 @@
     height: 10px;
     display: inline-block;
     margin-right: 3px;
+}
+
+.siteplan-wrapper #siteplan-editor-map {
+    max-height: 70vh; /* 70% of the viewport height */
+    position: relative;
+    padding-bottom: 0 !important; /* Override inline style */
+} 
+
+/*
+ * Custom styles for the site plan component.
+ */
+
+.siteplan-wrapper {
+    position: relative;
+}
+
+#siteplan-container {
+    height: 100%;
+    width: 100%;
 } 

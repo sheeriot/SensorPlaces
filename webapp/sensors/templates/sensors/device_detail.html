@@ -8,9 +8,11 @@
 <div class="container-fluid">
 
     <!-- Place Title Card - Spans both columns -->
-    {% include 'sensors/partials/place_title_card.html' %}
+    <div class="row my-1">
+        {% include 'sensors/partials/place_title_card.html' %}
+    </div>
 
-    <div class="row">
+    <div class="row gx-2 my-1">
         <!-- Left Column -->
         <div class="col-md-4">
             <!-- Place Navigation Card -->
@@ -19,7 +21,7 @@
             {% else %}
                 {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
             {% endif %}
-            {% include "sensors/includes/location_detail_card.html" %}
+            {% include "sensors/includes/live_counts_card.html" %}
         </div>
 
         <!-- Right Column -->

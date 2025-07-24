@@ -11,7 +11,7 @@
                     {{ device.name }}
                 </a> 
                 <i class="bi bi-chevron-right"></i>
-        <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=device.location.pk %}">
+        <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=device.location.slug %}">
             <i class="bi bi-geo-alt-fill"></i>
             {{ location.name }}
         </a> 

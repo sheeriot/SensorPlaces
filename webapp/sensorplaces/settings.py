@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 
+from icecream import ic
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -31,8 +33,7 @@ if os.environ.get('DJANGO_DEBUG') == 'False':
 else:
     DEBUG = True
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+ic("DEBUG: ", DEBUG)
 
 SERVERNAME1 = os.environ.get('SERVERNAME1')
 SERVERNAME2 = os.environ.get('SERVERNAME2')
@@ -98,7 +99,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
+    # 'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -109,6 +110,9 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'sensors.middleware.ToastMiddleware',
 ]
+
+if not DEBUG:
+    MIDDLEWARE.insert(0, 'django.middleware.security.SecurityMiddleware')
 
 ROOT_URLCONF = 'sensorplaces.urls'
 
@@ -126,9 +130,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'django.template.context_processors.static',
-                'sensors.context_processors.place_context',
-                'sensors.context_processors.toast_messages',
             ],
             'builtins': [
                 'django.templatetags.static',
@@ -289,5 +290,14 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # Security Policy headers
-SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+# Browsers will ignore this on non-HTTPS sites, this will avoid the console warning.
+# SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
+if DEBUG:
+    ic("disable SECURE_CROSS_ORIGIN_OPENER_POLICY")
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+else:
+    ic("enable SECURE_CROSS_ORIGIN_OPENER_POLICY")
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
 SECURE_REFERRER_POLICY = 'same-origin'

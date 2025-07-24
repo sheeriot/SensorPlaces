@@ -1,0 +1,74 @@
+{% extends "sensors/base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>{{ sensor.name }} - Data Graph</h2>
+    <div class="card">
+        <div class="card-header">
+            <form method="get" class="form-inline">
+                <label for="time_range">Time Range:</label>
+                <select name="time_range" id="time_range" class="form-control" onchange="this.form.submit()">
+                    <option value="1h" {% if time_range == '1h' %}selected{% endif %}>Last Hour</option>
+                    <option value="6h" {% if time_range == '6h' %}selected{% endif %}>Last 6 Hours</option>
+                    <option value="24h" {% if time_range == '24h' %}selected{% endif %}>Last 24 Hours</option>
+                    <option value="7d" {% if time_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+                </select>
+            </form>
+        </div>
+        <div class="card-body">
+            {% if chart_data %}
+                <canvas id="lorawanSensorChart"></canvas>
+                {{ chart_data|json_script:"chart-data" }}
+            {% else %}
+                <p>No data available for this sensor.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const chartData = JSON.parse(document.getElementById('chart-data').textContent);
+        var ctx = document.getElementById('lorawanSensorChart').getContext('2d');
+
+        if (chartData) {
+            var labels = chartData.map(function(item) {
+                return new Date(item[0]);
+            });
+
+            var data = chartData.map(function(item) {
+                return item[1];
+            });
+
+            var myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '{{ sensor.name }}',
+                        data: data,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'hour'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %} 

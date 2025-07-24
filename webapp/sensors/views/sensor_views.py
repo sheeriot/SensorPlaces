@@ -5,7 +5,8 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
 
-from django.db.models import OuterRef, Subquery, Count, Min, Max
+from django.db.models import OuterRef, Subquery, Count, Min, Max, Prefetch, Q
+from django.db.models.functions import Lower
 
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -14,19 +15,20 @@ from django.http import JsonResponse, HttpResponseRedirect, HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
-from ..models import Device, Sensor, SensorReading
+from ..models import Device, Sensor, SensorReading, Place, Location
 from .mixins import PlaceAnnotationMixin
-from .sensor_forms import SensorForm
+from .sensor_forms import SensorForm, LoRaWANSensorForm
 from ..utils import get_sensor_readings, generate_sparkline
-from .views_fun import get_annotated_locations
+from ..influx_graphs import get_lorawan_sensor_data
+from .views_fun import get_annotated_locations, get_live_counts_context
 
 from datetime import datetime, timedelta
 
 from icecream import ic
 
 class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
-    model = Sensor
-    context_object_name = 'sensors'
+    model = Location
+    context_object_name = 'locations'
     template_name = 'sensors/sensor_list.html'
 
     def setup(self, request, *args, **kwargs):
@@ -34,52 +36,47 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         # Check if we're filtering by device
         device_pk = self.kwargs.get('device_pk')
         if device_pk:
-            self._device = get_object_or_404(Device, pk=device_pk, location__place=self._place)
+            device_qs = Device.objects.annotate(
+                active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+            ).prefetch_related(
+                Prefetch(
+                    'sensors',
+                    queryset=Sensor.objects.order_by('-is_active', Lower('name')),
+                    to_attr='sensors_sorted'
+                )
+            )
+            self._device = get_object_or_404(device_qs, pk=device_pk, location__place=self._place)
         else:
             self._device = None
 
     def get_queryset(self):
-        """Get sensors filtered by place and optional device."""
-        # Use the cached place
-        place = self._place
-        base_queryset = super().get_queryset()
-        
-        # If we have a device_pk, filter by that device
-        if hasattr(self, '_device') and self._device:
-            queryset = base_queryset.filter(device=self._device)
-        else:
-            # Otherwise, get all sensors for the place
-            queryset = base_queryset.filter(device__location__place=place)
-            
-        return queryset.select_related(
-            'device',
-            'device__location',
-            'device__location__place',
-        ).annotate(
-            reading_count=Count('readings')
-        ).order_by(
-            '-device__location__is_active',  # Active locations first
-            'device__location__name',
-            '-device__is_active',            # Active devices first
-            'device__name',
-            '-is_active',                    # Active sensors first
-            'name'
-        )
+        """
+        Get locations for the place, with devices and sensors prefetched
+        to allow for grouping in the template.
+        """
+        return get_annotated_locations(self._place)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
         
+        # Add hide_inactive state from GET param or cookie
+        hide_inactive_param = self.request.GET.get('hide_inactive')
+        if hide_inactive_param is not None:
+            context['hide_inactive'] = hide_inactive_param.lower() == 'true'
+        else:
+            hide_inactive_cookie = self.request.COOKIES.get('hideInactive_sensor', 'false')
+            context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+
         # If we're looking at a specific device's sensors, add it to context
         if hasattr(self, '_device') and self._device:
             context['device'] = self._device
             context['location'] = self._device.location
+            context['sensors'] = self._device.sensors_sorted
         
-        # Add sensor statistics
-        context.update({
-            'sensors_active': self.get_queryset().filter(is_active=True).count(),
-            'sensors_inactive': self.get_queryset().filter(is_active=False).count(),
-        })
+        # Add live counts to context
+        context.update(get_live_counts_context(self._place))
         
         return context
 
@@ -299,6 +296,37 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             'place_slug': self._place.slug,
             'pk': self.object.pk
         })
+
+class LoRaWANSensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
+    model = Sensor
+    form_class = LoRaWANSensorForm
+    template_name = 'sensors/lorawan_sensor_form.html'
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.place = self.get_place()
+        self.device = get_object_or_404(Device, pk=self.kwargs['device_pk'])
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['place'] = self.place
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['place'] = self.place
+        context['device'] = self.device
+        return context
+
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        self.object.device = self.device
+        self.object.save()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('sensors:device_detail', kwargs={'place_slug': self.place.slug, 'pk': self.device.pk})
+
 
 class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     model = Sensor
@@ -852,6 +880,26 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
     except Exception as e:
         ic(f"Error fetching sensor readings: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def lorawan_sensor_graph_view(request, place_slug, pk):
+    place = get_object_or_404(Place, slug=place_slug)
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place=place)
+    time_range = request.GET.get('time_range', '1h')
+
+    chart_data = None
+    if sensor.device.is_lorawan:
+        chart_data = get_lorawan_sensor_data(sensor, time_range)
+
+    context = {
+        'place': place,
+        'sensor': sensor,
+        'device': sensor.device,
+        'location': sensor.device.location,
+        'chart_data': chart_data,
+        'time_range': time_range,
+    }
+    return render(request, 'sensors/lorawan_sensor_graph.html', context)
 
 @login_required
 def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: int) -> JsonResponse:

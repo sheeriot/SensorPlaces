@@ -1,35 +1,27 @@
 {# {% load widget_tweaks %} #}
 
 <div id="locationCard_{{ location.pk }}"
-     class="card rounded-3 shadow-sm mb-4 {% if not location.is_active %}opacity-50 text-muted{% endif %}">
+     class="card rounded-3 shadow-sm my-1 {% if not location.is_active %}opacity-50 text-muted{% endif %}">
     <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
-            <i class="bi bi-geo-alt me-2"></i>
-            Location: 
-            <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}">
+        <h5 class="card-title mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-geo-alt"></i>
+            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-dark text-decoration-none">
                 {{ location.name }}
             </a>
-            <small class="text-body-secondary ms-2">
-                <i class="bi bi-chevron-right ms-2"></i>
-                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}">
-                    <i class="bi bi-house-gear me-1"></i>
-                    {{ place.name }}
-                </a>
-            </small>
-
+            {% include "sensors/partials/status_active_badge.html" with object=location %}
         </h5>
         <div class="btn-group">
             {% if model_name == 'location' %}
-                <a href="{% url 'sensors:location_update' place_slug=place.slug pk=location.pk %}" 
+                <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}" 
                    class="btn btn-warning btn-sm">
                     <i class="bi bi-pencil"></i>
                 </a>
-                <a href="{% url 'sensors:location_delete' place_slug=place.slug pk=location.pk %}" 
+                <a href="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}" 
                    class="btn btn-danger btn-sm">
                     <i class="bi bi-trash"></i>
                 </a>
             {% else %}
-                <a href="{% url 'sensors:location_detail' place_slug=place.slug pk=location.pk %}" 
+                <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" 
                    class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-arrow-right"></i>
                 </a>
@@ -37,31 +29,27 @@
         </div>
     </div>
     <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-start">
-            <!-- Name -->
-            <div class="flex-grow-1">
-                <div class="text-body-secondary small text-uppercase mb-1">Name</div>
-                <div>{{ location.name }}</div>
+        <div class="row">
+            <!-- Left side: Name & Place -->
+            <div class="col-7">
+                <div class="mb-2">
+                    <div class="text-body-secondary small text-uppercase">Name</div>
+                    <div>{{ location.name }}</div>
+                </div>
+                <div>
+                    <div class="text-body-secondary small text-uppercase">Place</div>
+                    <div>{{ location.place.name }}</div>
+                </div>
             </div>
             
-            <!-- Place -->
-            <div class="flex-grow-1">
-                <div class="text-body-secondary small text-uppercase mb-1">Place</div>
-                <div>{{ location.place.name }}</div>
-            </div>
-
-            <!-- Status -->
-            <div class="flex-grow-1">
-                <div class="text-body-secondary small text-uppercase mb-1">Status</div>
-                {% include "sensors/partials/status_active_badge.html" with object=location show_active=True %}
-            </div>
-
-            <!-- Device Counts -->
-            <div class="flex-grow-1">
-                <div class="text-body-secondary small text-uppercase mb-1">Devices</div>
-                <div class="small">
-                    Active: {{ location.devices_active_count }}<br>
-                    inactive: {{ location.devices_inactive_count }}
+            <!-- Right side: Status & Counts -->
+            <div class="col-5">
+                <div>
+                    <div class="text-body-secondary small text-uppercase">Devices</div>
+                    <div class="small">
+                        Active: {{ location.devices_active_count }}<br>
+                        inactive: {{ location.devices_inactive_count }}
+                    </div>
                 </div>
             </div>
         </div>

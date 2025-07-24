@@ -93,27 +93,14 @@ class SensorReadingAdmin(admin.ModelAdmin):
 
 @admin.register(InfluxSource)
 class InfluxSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'server_dns', 'server_port', 'bucket_name', 'org')
-    search_fields = ('name', 'server_dns', 'bucket_name')
+    list_display = ('name', 'place', 'url', 'bucket_name', 'org')
+    search_fields = ('name', 'url', 'bucket_name', 'place__name')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {
-            'fields': ('name', 'server_dns',
-                       'server_port', 'bucket_name', 'org')
+            'fields': ('place', 'name', 'url', 'bucket_name', 'org', 'token')
         }),
     )
-    # (None, {
-    #     'fields': ('name', 'server_dns', 'server_port', 'bucket_name', 'org')
-    # }),
-    # ('Authentication', {
-    #     'fields': ('read_token', 'write_token'),
-    #     'classes': ('collapse',)
-    #     'description': 'Authentication tokens for InfluxDB access'
-    # }),
-    # ('Metadata', {
-    #     'fields': ('created_at', 'updated_at'),
-    #     'classes': ('collapse',)
-    # })
 
     def get_readonly_fields(self, request, obj=None):
         if obj:  # editing an existing object

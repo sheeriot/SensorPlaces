@@ -4,8 +4,12 @@
 
 {% block title %}Sensor Places - {{ place.name }}{% endblock %}
 
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="row">
+<div class="row gx-2 my-1">
     <!-- Header with Title and Navigation -->
 
     <!-- Place Title Card -->
@@ -19,9 +23,11 @@
         <!-- Place Details Card -->
         {% include "sensors/includes/place_detail_card.html" with place=place place_map_html=place_map_html %}
         {% if place.is_active %}
-            <!-- Include the live counts partial -->
-            {% include 'sensors/includes/live_counts_card.html' %}
+            {% include 'sensors/includes/place_nav_card.html' %}
+        {% else %}
+            {% include 'sensors/includes/place_nav_card.html' with show_hidden=True %}
         {% endif %}
+        {% include "sensors/includes/live_counts_card.html" %}
     </div>
 
     <!-- Right Column: Locations and Site Plan/Map -->
@@ -44,10 +50,15 @@
                 </div>
             </div>
         {% endif %}
+        
+        <!-- InfluxDB Sources Card -->
+        {% include "sensors/influxsource_list.html" with place=place influxsources=influxsources %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'sensors/js/siteplan-editor.js' %}"></script>
+<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+<script src="{% static 'sensors/js/live-counts-updater.js' %}"></script>
 {% endblock %}

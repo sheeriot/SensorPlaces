@@ -10,14 +10,17 @@ from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.utils.safestring import mark_safe
+from django import forms
+from django.db import transaction
+from django.shortcuts import render
 # from typing import Dict, Any, Optional, cast
 
 # App stuff
-from ..models import Place, Location, Device, Sensor, ToastNotification
+from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxSource
 from .place_forms import PlaceForm, PlaceDeleteForm
 from ..map_fun import place_map_create
 from .mixins import PlaceAnnotationMixin
-from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places
+from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places, get_live_counts_context
 
 # utility
 import json
@@ -45,6 +48,26 @@ class PlaceListView(LoginRequiredMixin, ListView):
         
         return context
 
+@login_required
+def siteplan_view(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    locations = Location.objects.filter(place=place)
+    locations_json = json.dumps(
+        [
+            {
+                "name": loc.name,
+                "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+                "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+                "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
+            }
+            for loc in locations
+        ]
+    )
+    return render(request, 'sensors/siteplan.html', {
+        'place': place,
+        'locations_json': locations_json
+    })
+
 class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Place
     context_object_name = 'place'
@@ -59,9 +82,36 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
         
+        # Check for hide_inactive cookie for locations
+        hide_inactive_cookie = self.request.COOKIES.get('hideInactive_location', 'false')
+        context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+        
         # Add place data from get_place_data function
         place_data = get_place_data(self.object)
         context.update(place_data)
+
+        # Add device and sensor counts to context
+        context.update(get_live_counts_context(self.object))
+        
+        # Add InfluxDB sources to the context
+        context['influxsources'] = InfluxSource.objects.filter(place=self.object)
+        
+        # Prepare locations data for siteplan, ensuring is_active is included
+        locations = Location.objects.filter(place=self.object)
+        locations_json = json.dumps(
+            [
+                {
+                    "name": loc.name,
+                    "slug": loc.slug,
+                    "is_active": loc.is_active,
+                    "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+                    "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+                    "url": reverse('sensors:location_detail', args=[self.object.slug, loc.slug])
+                }
+                for loc in locations
+            ]
+        )
+        context['locations_json'] = locations_json
         
         # Add place_map_html to the context
         try:
@@ -70,6 +120,8 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         except Exception as e:
             context['place_map_html'] = ""
             
+        context['editable'] = True  # Enable the edit button on the siteplan
+        
         return context
 
 class PlaceCreateView(LoginRequiredMixin, CreateView):
@@ -383,81 +435,26 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
             return self.form_invalid(form)
 
 @login_required
-@csrf_protect
 def place_stats(request, place_slug):
-    """Get statistics for a place."""
-    try:
-        # Get the place
-        place = get_object_or_404(Place, slug=place_slug)
-        
-        # Get place data using the common function from views_fun.py
-        place_data = get_place_data(place, include_json=False)
-        
-        # Get location statistics using the annotated locations
-        locations = place_data['locations'].values(
-            'id', 'name', 'is_active',
-            'devices_active_count', 'devices_inactive_count',
-            'sensors_active_count', 'sensors_inactive_count'
-        )
-        
-        # Get device statistics
-        devices = Device.objects.filter(location__place=place).annotate(
-            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True)),
-            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False))
-        ).values(
-            'id', 'name', 'is_active', 'location_id',
-            'sensors_active_count', 'sensors_inactive_count'
-        )
-        
-        # Get sensor statistics
-        sensors = Sensor.objects.filter(device__location__place=place).values(
-            'id', 'name', 'is_active', 'device_id',
-            'sensor_type', 'data_type', 'unit'
-        )
-        
-        # Get unread toast count
-        unread_count = ToastNotification.get_unread_count(
-            user=request.user,
-            place=place
-        )
-        
-        # Calculate totals from the place_data
-        total_stats = {
-            'locations': {
-                'active': sum(1 for loc in locations if loc['is_active']),
-                'inactive': sum(1 for loc in locations if not loc['is_active'])
-            },
-            'devices': {
-                'active': place_data.get('devices_active_count', 0),
-                'inactive': place_data.get('devices_inactive_count', 0)
-            },
-            'sensors': {
-                'active': place_data.get('sensors_active_count', 0),
-                'inactive': place_data.get('sensors_inactive_count', 0)
-            }
-        }
-        
-        return JsonResponse({
-            'success': True,
-            'stats': {
-                'locations': list(locations),
-                'devices': list(devices),
-                'sensors': list(sensors),
-                'unread_toast_count': unread_count,
-                'total': total_stats
-            }
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+    """Return device and sensor counts for a place."""
+    place = get_object_or_404(Place, slug=place_slug)
+    locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
+    
+    context = {
+        'locations_active': locations_active,
+        'locations_inactive': locations_inactive,
+        'devices_active': devices_active,
+        'devices_inactive': devices_inactive,
+        'sensors_active': sensors_active,
+        'sensors_inactive': sensors_inactive
+    }
+    # ic(context) # This line was removed as per the edit hint
+    return JsonResponse(context)
 
-from django import forms
 
+# Utility Forms
 class LocationPositionForm(forms.Form):
-    id = forms.IntegerField()
+    slug = forms.SlugField()
     x_pos = forms.DecimalField(max_digits=5, decimal_places=2)
     y_pos = forms.DecimalField(max_digits=5, decimal_places=2)
 
@@ -469,126 +466,86 @@ class LocationPositionForm(forms.Form):
         y_pos = self.cleaned_data['y_pos']
         return Decimal(str(round(float(y_pos), 2)))
 
-@login_required
 @csrf_protect
 def siteplan_update(request, place_slug):
+    """
+    Handles AJAX requests to update the x, y positions of locations on a site plan.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'type': 'error', 'message': 'Invalid request method.'}, status=405)
+
     try:
-        # Get the place
+        data = json.loads(request.body)
+        locations_data = data.get('locations', [])
         place = get_object_or_404(Place, slug=place_slug)
         
-        # Parse the incoming JSON data
-        data = json.loads(request.body)
-        changed_locations = data.get('locations', [])
+        updated_locations_info = []
         
-        if not changed_locations:
-            return JsonResponse({
-                'message': 'No changes to save',
-                'type': 'info'
-            })
-        
-        # Track changes for message
-        location_changes = []
-        
-        # Validate and update each location's position
-        for loc_data in changed_locations:
-            # Validate the data using the form
-            form = LocationPositionForm(loc_data)
-            if not form.is_valid():
-                return JsonResponse({
-                    'message': f"Invalid position data: {form.errors}",
-                    'type': 'danger'
-                }, status=400)
-            
-            location = get_object_or_404(Location, id=form.cleaned_data['id'], place=place)
-            old_x = float(location.x_pos)
-            old_y = float(location.y_pos)
-            new_x = float(form.cleaned_data['x_pos'])
-            new_y = float(form.cleaned_data['y_pos'])
-            
-            # Only process if position actually changed
-            if abs(old_x - new_x) > 0.01 or abs(old_y - new_y) > 0.01:
-                # Update position with cleaned (rounded) values
-                location.x_pos = form.cleaned_data['x_pos']
-                location.y_pos = form.cleaned_data['y_pos']
-                location.save()
-                
-                # Add to changes list with ID
-                location_changes.append({
-                    'id': location.id,
-                    'name': location.name,
-                    'old_pos': {'x': old_x, 'y': old_y},
-                    'new_pos': {'x': new_x, 'y': new_y}
-                })
+        with transaction.atomic():
+            for loc_data in locations_data:
+                form = LocationPositionForm(loc_data)
+                if form.is_valid():
+                    slug = form.cleaned_data['slug']
+                    x_pos = form.cleaned_data['x_pos']
+                    y_pos = form.cleaned_data['y_pos']
+                    
+                    try:
+                        location = Location.objects.select_for_update().get(place=place, slug=slug)
+                        
+                        original_position = {'x_pos': location.x_pos, 'y_pos': location.y_pos}
+                        
+                        location.x_pos = x_pos
+                        location.y_pos = y_pos
+                        location.save(update_fields=['x_pos', 'y_pos'])
+                        
+                        updated_locations_info.append({
+                            'slug': location.slug,
+                            'name': location.name,
+                            'original_position': {
+                                'x_pos': float(original_position['x_pos']),
+                                'y_pos': float(original_position['y_pos'])
+                            },
+                            'new_position': {
+                                'x_pos': float(location.x_pos),
+                                'y_pos': float(location.y_pos)
+                            }
+                        })
+                        
+                    except Location.DoesNotExist:
+                        # This case is logged on the client-side, so just continue
+                        continue
+                else:
+                    # Also logged on the client-side
+                    continue
 
-        # If no actual changes were made, return early
-        if not location_changes:
+        if not updated_locations_info:
             return JsonResponse({
-                'message': 'No position changes detected',
-                'type': 'info'
+                'type': 'info',
+                'message': 'No locations were updated.'
             })
-
-        # Build detailed message
-        message = (
-            f"Updated site plan for <strong><i class='bi bi-house-gear'></i> {place.name}</strong><br>"
-            f"<small class='text-muted'>Changed locations:<ul class='mb-0'>"
+            
+        # Build a more detailed message
+        changes_list = ''.join([
+            f"<li>{info['name']}: position: ({info['original_position']['x_pos']}, {info['original_position']['y_pos']}) → ({info['new_position']['x_pos']}, {info['new_position']['y_pos']})</li>"
+            for info in updated_locations_info
+        ])
+        
+        message = mark_safe(
+            f"Updated site plan for <strong>{place.name}</strong><br>"
+            f"<small><ul class='list-unstyled mb-0'>{changes_list}</ul></small>"
         )
         
-        for change in location_changes:
-            message += (
-                f"<li><i class='bi bi-geo-alt'></i> {change['name']}<br>"
-                f"Position: ({change['old_pos']['x']:.1f}, {change['old_pos']['y']:.1f}) → "
-                f"({change['new_pos']['x']:.1f}, {change['new_pos']['y']:.1f})</li>"
-            )
-        
-        message += "</ul></small>"
-        
-        # Get updated place statistics
-        place_stats = get_place_counts(place)
-        
-        # Get updated location statistics
-        locations = get_annotated_locations(place).values(
-            'id', 'name', 'is_active', 
-            'devices_active_count', 'devices_inactive_count'
-        )
+        # Add device/sensor counts for context
+        counts = get_place_counts(place)
         
         return JsonResponse({
             'message': message,
             'type': 'warning',
-            'changes': {
-                'locations': [
-                    {
-                        'id': change['id'],
-                        'name': change['name'],
-                        'new_position': {
-                            'x_pos': change['new_pos']['x'],
-                            'y_pos': change['new_pos']['y']
-                        }
-                    } for change in location_changes
-                ]
-            },
-            'devices_active': place_stats['devices_active_count'],
-            'devices_inactive': place_stats['devices_inactive_count'],
-            'sensors_active': place_stats['sensors_active_count'],
-            'sensors_inactive': place_stats['sensors_inactive_count'],
-            'locations': list(locations)
+            'changes': {'locations': updated_locations_info},
+            **counts
         })
 
     except json.JSONDecodeError:
-        return JsonResponse({
-            'message': (
-                f"Invalid data received while updating site plan for "
-                f"<i class='bi bi-house-gear'></i> {place_slug}"
-            ),
-            'type': 'danger',
-            'tags': 'error layout-update'
-        }, status=400)
+        return JsonResponse({'type': 'error', 'message': 'Invalid JSON data.'}, status=400)
     except Exception as e:
-        return JsonResponse({
-            'message': (
-                f"Error updating site plan for "
-                f"<i class='bi bi-house-gear'></i> {place.name if 'place' in locals() else place_slug}<br>"
-                f"<small class='text-muted'>{str(e)}</small>"
-            ),
-            'type': 'danger',
-            'tags': 'error layout-update'
-        }, status=500)
+        return JsonResponse({'type': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)

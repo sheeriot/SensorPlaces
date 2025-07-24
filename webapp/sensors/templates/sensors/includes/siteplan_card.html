@@ -2,9 +2,9 @@
 
 <!-- Siteplan Card -->
 <div id="siteplan-card"
-     class="card {% if not place.is_active %}opacity-50 text-muted{% endif %}">
+     class="card my-1 {% if not place.is_active %}opacity-50 text-muted{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
+        <h5 class="card-title mb-0 text-nowrap">
             <i class="bi bi-map me-2"></i>
             Site Plan
         </h5>
@@ -12,15 +12,16 @@
         <button id="siteplan-edit" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-grid"></i> Edit Layout
         </button>
+        {% else %}
+        <a href="#" class="btn btn-sm btn-outline-secondary p-1" data-bs-toggle="modal" data-bs-target="#siteplan-view-modal">
+            <i class="bi bi-arrows-fullscreen"></i>
+        </a>
         {% endif %}
     </div>
     {% if place.siteplan_image %}
     <div class="card-body p-0">
-        <!-- Siteplan wrapper with dynamic aspect ratio -->
-        <div class="siteplan-wrapper position-relative bg-light border-top">
-            <!-- Leaflet map container with absolute positioning -->
-            <div id="siteplan-container" 
-                 class="position-absolute top-0 start-0 w-100 h-100 leaflet-container"
+        <div class="siteplan-wrapper bg-light border-top">
+            <div id="siteplan-container"
                  data-place-slug="{{ place.slug }}"
                  data-image-url="{{ place.get_siteplan_url }}"
                  data-locations="{{ locations_json|escapejs }}">
@@ -28,12 +29,26 @@
         </div>
     </div>
     {% else %}
-    <div class="card-body p-0">
-        <p class="text-center text-muted">No site plan image available</p>
+    <div class="card-body text-center text-muted">
+        <p class="mb-0">No site plan image available</p>
     </div>
     {% endif %}
 </div>
 
+<!-- Siteplan View Modal -->
+<div class="modal fade" id="siteplan-view-modal" tabindex="-1" aria-labelledby="siteplan-view-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="siteplan-view-modal-label">{{ place.name }} Site Plan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <!-- The map container will be moved here by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Siteplan Editor Modal -->
 <div class="modal fade" id="siteplan-editor" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">

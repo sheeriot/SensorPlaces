@@ -1,0 +1,50 @@
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-database me-2"></i>InfluxDB Sources
+        </h5>
+        <a href="{% url 'sensors:influxsource_create' place_slug=place.slug %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Add New
+        </a>
+    </div>
+    <div class="list-group list-group-flush">
+        <!-- Header -->
+        <div class="list-group-item bg-light d-none d-md-block">
+            <div class="row align-items-center">
+                <div class="col-md-2"><strong>Name</strong></div>
+                <div class="col-md-4"><strong>URL</strong></div>
+                <div class="col-md-2"><strong>Organization</strong></div>
+                <div class="col-md-2"><strong>Bucket</strong></div>
+                <div class="col-md-2 text-end"><strong>Actions</strong></div>
+            </div>
+        </div>
+        <!-- Data Rows -->
+        {% for source in influxsources %}
+        <div class="list-group-item">
+            <div class="row align-items-center">
+                <div class="col-md-2">{{ source.name }}</div>
+                <div class="col-md-4 text-muted small text-truncate">{{ source.url }}</div>
+                <div class="col-md-2 text-truncate">{{ source.org }}</div>
+                <div class="col-md-2">{{ source.bucket_name }}</div>
+                <div class="col-md-2 text-end">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="{% url 'sensors:influxsource_detail' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-info" title="View">
+                            <i class="bi bi-eye-fill"></i>
+                        </a>
+                        <a href="{% url 'sensors:influxsource_update' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-warning" title="Edit">
+                            <i class="bi bi-pencil-fill"></i>
+                        </a>
+                        <a href="{% url 'sensors:influxsource_delete' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-danger" title="Delete">
+                            <i class="bi bi-trash-fill"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="list-group-item text-center text-muted">
+            No InfluxDB sources found.
+        </div>
+        {% endfor %}
+    </div>
+</div> 

@@ -19,6 +19,15 @@
     --alert-static-opacity: 1;
 }
 
+#sensor-list-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.table > :not(caption) > * > * {
+    padding: .5rem .5rem;
+    background-color: var(--bs-table-bg);
+}
 
 .text-light-purple { color: #DDA0DD; }
 .text-light-blue { color: #66B2E8; }

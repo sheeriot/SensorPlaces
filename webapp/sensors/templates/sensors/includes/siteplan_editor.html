@@ -3,6 +3,14 @@
     <h5 class="modal-title">
         <i class="bi bi-grid"></i> Edit Site Plan Layout
     </h5>
+    <div class="ms-auto">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancel
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" id="siteplan-save">
+            <i class="bi bi-save"></i> Save Changes
+        </button>
+    </div>
     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
 
@@ -10,18 +18,8 @@
 <div class="modal-body p-0">
     <!-- Match the same wrapper/container structure as view -->
     <div class="siteplan-wrapper position-relative bg-light">
-        <div id="siteplan-editor-map" class="position-absolute top-0 start-0 w-100 h-100">
+        <div id="siteplan-editor-map" class="position-absolute top-0 start-0 w-100">
             <!-- Map will be initialized here -->
         </div>
     </div>
-</div>
-
-<!-- Siteplan Editor Footer -->
-<div class="modal-footer py-2">
-    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-        <i class="bi bi-x-circle"></i> Cancel
-    </button>
-    <button type="button" class="btn btn-primary" id="siteplan-save">
-        <i class="bi bi-save"></i> Save Changes
-    </button>
 </div> 

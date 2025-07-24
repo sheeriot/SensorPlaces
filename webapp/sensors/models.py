@@ -89,6 +89,7 @@ class Place(models.Model):
 
 class Location(models.Model):
     name: CharField = models.CharField(max_length=100)
+    slug: CharField = models.SlugField(max_length=100, blank=True)
     place: ForeignKey = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='locations')
     x_pos: DecimalField = models.DecimalField(
         max_digits=5,
@@ -127,6 +128,18 @@ class Location(models.Model):
         if hasattr(self, 'place') and self.place and not self.place.is_active:
             self.is_active = False
         
+        # Auto-generate slug if it's not set
+        if not self.slug:
+            self.slug = slugify(self.name)
+            # Ensure slug is unique for the place
+            original_slug = self.slug
+            queryset = Location.objects.filter(place=self.place, slug=self.slug).exclude(pk=self.pk)
+            counter = 1
+            while queryset.exists():
+                self.slug = f'{original_slug}-{counter}'
+                counter += 1
+                queryset = Location.objects.filter(place=self.place, slug=self.slug).exclude(pk=self.pk)
+
         # If location is being deactivated, deactivate all its devices
         if not self.is_active and self.pk:  # Only for existing locations
             Device.objects.filter(location=self).update(is_active=False)
@@ -147,6 +160,7 @@ class Location(models.Model):
     class Meta:
         verbose_name_plural = '2. Locations'
         ordering = ['-is_active', 'name']
+        unique_together = ('place', 'slug')
 
 class DeviceType(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -186,6 +200,7 @@ class Device(models.Model):
         related_name='devices',
         null=True
     )
+    is_lorawan: BooleanField = models.BooleanField(default=False, verbose_name="LoRaWAN Device")
     is_active: BooleanField = models.BooleanField(
         default=True,
         help_text="inactive devices will be hidden by default"
@@ -200,15 +215,10 @@ class Device(models.Model):
             raise ValidationError({
                 'is_active': 'Device cannot be active when its location is inactive.'
             })
-        
-        if self.location and self.location.place != self.place:
-            raise ValidationError({
-                'location': "The selected location does not belong to the device's place."
-            })
 
     def save(self, *args, **kwargs):
         # If location is set, ensure place is consistent
-        if self.location and self.place != self.location.place:
+        if self.location:
             self.place = self.location.place
 
         if self.device_id:
@@ -236,18 +246,17 @@ class Device(models.Model):
         ordering = ['place', 'location', '-is_active', Lower('name')]
 
 class InfluxSource(models.Model):
+    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='influx_sources')
     name = models.CharField(max_length=100)
-    server_dns = models.CharField(max_length=255)
-    server_port = models.IntegerField(default=8086)
-    bucket_name = models.CharField(max_length=100)
+    url = models.CharField(max_length=255)
     org = models.CharField(max_length=100)
-    read_token = models.CharField(max_length=255)
-    write_token = models.CharField(max_length=255, blank=True, null=True)  # Optional
+    bucket_name = models.CharField(max_length=100)
+    token = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name} ({self.server_dns})"
+        return f"{self.name} ({self.url})"
 
     class Meta:
         verbose_name_plural = 'InfluxDB Sources'
@@ -285,11 +294,7 @@ class Sensor(models.Model):
         ('UGM3', 'μg/m³'),
         ('NONE', '(None)'),
     ]
-    INFLUX_SOURCES = [
-        ('MAIN', 'Main InfluxDB'),
-        ('SECONDARY', 'Secondary InfluxDB'),
-    ]
-    
+
     name: CharField = models.CharField(max_length=100)
     device: ForeignKey = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='sensors')
     is_active: BooleanField = models.BooleanField(default=True, verbose_name='Active Status')
@@ -298,7 +303,7 @@ class Sensor(models.Model):
     
     # For data source
     data_type: CharField = models.CharField(max_length=10, choices=DATA_TYPES, default='DIRECT')
-    influx_source: CharField = models.CharField(max_length=20, choices=INFLUX_SOURCES, null=True, blank=True)
+    influx_source: ForeignKey = models.ForeignKey(InfluxSource, on_delete=models.SET_NULL, null=True, blank=True, related_name='sensors')
     influx_measurement: CharField = models.CharField(max_length=100, null=True, blank=True)
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)

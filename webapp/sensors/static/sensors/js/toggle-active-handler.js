@@ -254,8 +254,22 @@ const toggleActiveManager = {
                     // Update classes based on active state
                     if (response.is_active) {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
+                        // Also remove from cells for consistency
+                        Array.from(row.children).forEach(cell => {
+                            cell.classList.remove('opacity-50', 'text-muted');
+                        });
                     } else {
-                        row.classList.add('opacity-50', 'text-muted');
+                        // Don't apply to the whole row, apply to cells instead to keep toggle visible
+                        row.classList.remove('opacity-50', 'text-muted');
+                        Array.from(row.children).forEach(cell => {
+                            if (cell.querySelector('.toggle-button-wrapper')) {
+                                // This cell contains the toggle, so don't fade it.
+                                cell.classList.remove('opacity-50', 'text-muted');
+                            } else {
+                                // Fade all other cells.
+                                cell.classList.add('opacity-50', 'text-muted');
+                            }
+                        });
                         
                         // Check if hideInactive is enabled for this type
                         if (hideInactiveState) {
@@ -282,52 +296,38 @@ const toggleActiveManager = {
 
                     // Handle device detail card if it exists
                     if (modelType === 'device') {
-                        const deviceCard = document.getElementById(`deviceCard_${id}`);
-                        if (deviceCard) {
-                            if (toggleActiveConfig.debug) {
-                                console.group('Device Card Update');
-                                console.debug('Found device card:', deviceCard);
-                            }
-
-                            // Find badge within the device card
-                            const isactiveBadge = deviceCard.querySelector('.isactive-badge span.badge');
-                            if (isactiveBadge) {
-                                if (toggleActiveConfig.debug) {
-                                    console.debug('Found badge:', {
-                                        before: {
-                                            classes: Array.from(isactiveBadge.classList),
-                                            hidden: isactiveBadge.classList.contains('d-none'),
-                                            text: isactiveBadge.textContent
-                                        }
-                                    });
-                                }
-
-                                if (response.is_active) {
-                                    isactiveBadge.classList.add('d-none');
-                                } else {
-                                    isactiveBadge.classList.remove('d-none');
-                                }
-
-                                if (toggleActiveConfig.debug) {
-                                    console.debug('After badge update:', {
-                                        after: {
-                                            classes: Array.from(isactiveBadge.classList),
-                                            hidden: isactiveBadge.classList.contains('d-none'),
-                                            text: isactiveBadge.textContent
-                                        }
-                                    });
-                                }
-                            }
-
-                            if (toggleActiveConfig.debug) {
-                                console.groupEnd();
-                            }
-
-                            // Update card opacity
+                        const deviceDetailCard = document.getElementById('device-detail-card');
+                        const sensorsCard = document.getElementById('sensors-card');
+                        
+                        if (deviceDetailCard && sensorsCard) {
                             if (response.is_active) {
-                                deviceCard.classList.remove('opacity-75');
+                                // If device is now active, remove opacity and show the switch
+                                deviceDetailCard.classList.remove('opacity-50');
+                                sensorsCard.classList.remove('opacity-50');
+
+                                const hideInactiveSwitch = sensorsCard.querySelector('#hide-inactive-switch-container');
+                                if (hideInactiveSwitch) {
+                                    hideInactiveSwitch.classList.remove('d-none');
+                                }
+
+                                const inactiveBadge = deviceDetailCard.querySelector('#device-inactive-badge');
+                                if (inactiveBadge) {
+                                    inactiveBadge.classList.add('d-none');
+                                }
                             } else {
-                                deviceCard.classList.add('opacity-75');
+                                // If device is now inactive, add opacity and hide the switch
+                                deviceDetailCard.classList.add('opacity-50');
+                                sensorsCard.classList.add('opacity-50');
+
+                                const hideInactiveSwitch = sensorsCard.querySelector('#hide-inactive-switch-container');
+                                if (hideInactiveSwitch) {
+                                    hideInactiveSwitch.classList.add('d-none');
+                                }
+
+                                const inactiveBadge = deviceDetailCard.querySelector('#device-inactive-badge');
+                                if (inactiveBadge) {
+                                    inactiveBadge.classList.remove('d-none');
+                                }
                             }
                         }
                     }

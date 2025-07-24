@@ -12,9 +12,10 @@ class LocationForm(forms.ModelForm):
 
     class Meta:
         model = Location
-        fields = ['name', 'place', 'is_active']
+        fields = ['name', 'slug', 'place', 'is_active']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter location name', 'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'placeholder': 'auto-generated from name', 'class': 'form-control'}),
             'place': forms.HiddenInput(),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input active-checkbox',
@@ -46,6 +47,11 @@ class LocationForm(forms.ModelForm):
             'data-location-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
         })
         
+        # If this is a new location, make slug read-only
+        if not self.instance.pk:
+            self.fields['slug'].widget.attrs['readonly'] = True
+            self.fields['slug'].help_text = 'The slug is auto-generated from the name upon creation.'
+
         # If we have a place, pre-select it and handle cascading inactive state
         if self.place:
             self.fields['place'].initial = self.place
@@ -89,7 +95,8 @@ class LocationForm(forms.ModelForm):
             Field('referrer', type='hidden'),
             Field('place', type='hidden'),
             Row(
-                Column('name', css_class='col-md-12'),
+                Column('name', css_class='col-md-8'),
+                Column('slug', css_class='col-md-4'),
                 css_class='mb-3'
             ),
             Row(

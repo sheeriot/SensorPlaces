@@ -6,27 +6,14 @@
 const sitePlanView = {
     // State
     state: {
+        debug: true,
         map: null,
         imageOverlay: null,
-        markers: new Map(), // id -> L.Marker
-        locations: new Map(), // id -> location data
+        markers: new Map(), // slug -> L.Marker
+        locations: new Map(), // slug -> location data
         imageBounds: null,
         initialized: false,
-        debug: true,  // Add debug flag
         placeSlug: null
-    },
-
-    // Debug logging helper
-    log(...args) {
-        if (this.state.debug) {
-            console.log(...args);
-        }
-    },
-
-    error(...args) {
-        if (this.state.debug) {
-            console.error(...args);
-        }
     },
 
     // Helper Methods
@@ -52,21 +39,25 @@ const sitePlanView = {
     getRandomIcon(locationName) {
         const idx = Math.floor(Math.random() * this.buildingIcons.length);
         const selectedIcon = this.buildingIcons[idx];
-        this.log(`Assigning icon '${selectedIcon}' to location '${locationName}' (index ${idx} of ${this.buildingIcons.length})`);
+        if (this.state.debug) {
+            console.log(`Assigning icon '${selectedIcon}' to location '${locationName}' (index ${idx} of ${this.buildingIcons.length})`);
+        }
         return selectedIcon;
     },
 
     // Create marker icon
     createIcon(isActive, iconType, locationName) {
-        this.log(`Creating ${isActive ? 'active' : 'inactive'} icon for '${locationName}' with type: ${iconType}`);
+        if (this.state.debug) {
+            console.log(`Creating ${isActive ? 'active' : 'inactive'} icon for '${locationName}' with type: ${iconType}`);
+        }
         return L.divIcon({
-            className: `location-marker bg-${isActive ? 'primary' : 'secondary'} border border-2 border-white rounded-3 shadow-sm p-2`,
+            className: 'location-marker', // Keep a base class for potential future styling
             iconSize: null,  // Let it size to content
             iconAnchor: null, // Will be set automatically
             html: `
-                <div class="d-flex flex-column align-items-center">
+                <div class="d-inline-flex flex-column align-items-center bg-${isActive ? 'primary' : 'secondary'} border border-2 border-white rounded-3 shadow-sm p-2">
                     <i class="bi bi-${iconType}${isActive ? '-fill' : ''} text-white fs-5"></i>
-                    <div class="marker-label text-white small mt-1">
+                    <div class="marker-label text-white small mt-1 text-nowrap">
                         ${locationName}
                     </div>
                 </div>
@@ -94,7 +85,9 @@ const sitePlanView = {
     initialize() {
         // Prevent multiple initializations
         if (this.state.initialized) {
-            this.log('Site plan view already initialized');
+            if (this.state.debug) {
+                console.log('Site plan view already initialized');
+            }
             return Promise.resolve();
         }
 
@@ -107,9 +100,12 @@ const sitePlanView = {
 
         // Listen for siteplan updates
         window.addEventListener('siteplan-update', (event) => {
-            this.log('Received siteplan update event:', event.detail);
-            this.log('Current locations state:', Array.from(this.state.locations.entries()));
-            this.log('Current markers state:', Array.from(this.state.markers.entries()));
+            if (this.state.debug) {
+                console.log('Received siteplan update event:', event.detail);
+                console.log('Current locations state:');
+                console.table(Array.from(this.state.locations.values()));
+                console.log('Current markers state:', Array.from(this.state.markers.entries()));
+            }
             
             if (event.detail.locations) {
                 this.updateLocations(event.detail.locations);
@@ -119,7 +115,9 @@ const sitePlanView = {
         return new Promise((resolve) => {
             const container = document.getElementById('siteplan-container');
             if (!container) {
-                this.log('No site plan container found - is the template including siteplan_card.html?');
+                if (this.state.debug) {
+                    console.log('No site plan container found - is the template including siteplan_card.html?');
+                }
                 this.state.initialized = true;
                 resolve();
                 return;
@@ -129,17 +127,20 @@ const sitePlanView = {
             const imageUrl = container.dataset.imageUrl;
             this.state.placeSlug = container.dataset.placeSlug;
             if (!imageUrl) {
-                this.log('No siteplan image configured for this place');
+                if (this.state.debug) {
+                    console.log('No siteplan image configured for this place');
+                }
                 this.state.initialized = true;
                 resolve();
                 return;
             }
 
             // Debug logging
-            this.log('Found container:', container);
-            this.log('Image URL:', imageUrl);
-            this.log('Place Slug:', this.state.placeSlug);
-            this.log('Locations data:', container.dataset.locations);
+            if (this.state.debug) {
+                console.log('Found container');
+                console.log('Image URL:', imageUrl);
+                console.log('Place Slug:', this.state.placeSlug);
+            }
 
             // Create a temporary image to get dimensions
             const img = new Image();
@@ -153,16 +154,17 @@ const sitePlanView = {
                 // Add markers if we have location data
                 try {
                     const rawData = container.dataset.locations || '[]';
-                    this.log('Attempting to parse:', rawData);
                     // Unescape the JSON string before parsing
                     const unescapedData = rawData.replace(/\\u(\w{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-                    this.log('Unescaped data:', unescapedData);
                     const locations = JSON.parse(unescapedData);
-                    this.log('Parsed locations:', locations);
+                    if (this.state.debug) {
+                        console.log('Parsed locations:');
+                        console.table(locations);
+                    }
                     
-                    // Store locations in state
+                    // Store locations in state using string IDs
                     locations.forEach(location => {
-                        this.state.locations.set(location.id, location);
+                        this.state.locations.set(location.slug, location);
                     });
                     
                     this.addMarkers(locations);
@@ -177,15 +179,19 @@ const sitePlanView = {
                         this.updateMarkersVisibility(true);
                     }
                 } catch (error) {
-                    this.error('Failed to parse locations data:', error);
-                    this.error('Raw data was:', container.dataset.locations);
+                    if (this.state.debug) {
+                        console.error('Failed to parse locations data:', error);
+                        console.error('Raw data was:', container.dataset.locations);
+                    }
                 }
 
                 this.state.initialized = true;
                 resolve();
             };
             img.onerror = () => {
-                this.log('No siteplan image available or failed to load:', imageUrl);
+                if (this.state.debug) {
+                    console.log('No siteplan image available or failed to load:', imageUrl);
+                }
                 this.state.initialized = true;
                 resolve();
             };
@@ -197,12 +203,18 @@ const sitePlanView = {
     initializeMap(container, imageUrl) {
         // Check if map is already initialized
         if (this.state.map) {
-            this.log('Map already initialized');
+            if (this.state.debug) {
+                console.log('Map already initialized');
+            }
             return;
         }
 
-        // Get wrapper for loading state
-        const wrapper = container.closest('.siteplan-wrapper');
+        // --- New Sizing Logic ---
+        const siteplanWrapper = container.closest('.siteplan-wrapper');
+        if (siteplanWrapper) {
+            this.setWrapperSize(siteplanWrapper, false); // Initial size for card
+        }
+        // --- End New Sizing Logic ---
 
         // Initialize the map with minimal controls
         this.state.map = L.map(container, {
@@ -221,27 +233,21 @@ const sitePlanView = {
             maxZoom: 2          // Match editor settings
         });
 
+        // Create zoom control but don't add it yet
+        this.state.map.zoomControl = L.control.zoom();
+
         // Add image overlay with loading handler
         this.state.imageOverlay = L.imageOverlay(imageUrl, this.state.imageBounds)
             .addTo(this.state.map)
             .on('load', () => {
                 // Mark as loaded once image is ready
-                if (wrapper) {
-                    wrapper.classList.add('loaded');
+                if (siteplanWrapper) {
+                    siteplanWrapper.classList.add('loaded');
                 }
             });
 
-        if (wrapper) {
-            const aspectRatio = (this.state.imageBounds[1][0] / this.state.imageBounds[1][1]) * 100;
-            wrapper.style.paddingBottom = `${aspectRatio}%`;
-            
-            // Clear any existing styles that might interfere
-            wrapper.style.height = '';
-            wrapper.style.minHeight = '';
-            wrapper.style.maxHeight = '';
-            container.style.position = 'absolute';
-        }
-
+        // The aspect ratio is now handled by the explicit height calculation above
+        
         // Initial fit
         this.fitMapPerfectly();
 
@@ -251,13 +257,99 @@ const sitePlanView = {
         });
 
         // Observe both wrapper and container
-        if (wrapper) resizeObserver.observe(wrapper);
+        if (siteplanWrapper) resizeObserver.observe(siteplanWrapper);
         resizeObserver.observe(container);
 
         // Also handle window resize
         window.addEventListener('resize', () => {
             requestAnimationFrame(() => this.fitMapPerfectly());
         });
+
+        // Add modal logic after map is initialized
+        const modalElement = document.getElementById('siteplan-view-modal');
+        const originalParent = siteplanWrapper ? siteplanWrapper.parentElement : null;
+
+        if (modalElement && siteplanWrapper && originalParent) {
+            const modalBody = modalElement.querySelector('.modal-body');
+
+            modalElement.addEventListener('shown.bs.modal', () => {
+                if (this.state.debug) console.log('Expanding map to modal.');
+                modalBody.appendChild(siteplanWrapper);
+                
+                this.setWrapperSize(siteplanWrapper, true); // Recalculate size for modal
+
+                this.state.map.invalidateSize();
+                this.fitMapPerfectly();
+
+                // Enable interactions
+                this.state.map.dragging.enable();
+                this.state.map.touchZoom.enable();
+                this.state.map.scrollWheelZoom.enable();
+                this.state.map.doubleClickZoom.enable();
+                this.state.map.boxZoom.enable();
+                this.state.map.keyboard.enable();
+                this.state.map.zoomControl.addTo(this.state.map);
+            });
+
+            modalElement.addEventListener('hidden.bs.modal', () => {
+                if (this.state.debug) console.log('Collapsing map back to card.');
+                originalParent.appendChild(siteplanWrapper);
+
+                this.setWrapperSize(siteplanWrapper, false); // Recalculate size for card
+
+                this.state.map.invalidateSize();
+                this.fitMapPerfectly();
+
+                // Disable interactions
+                this.state.map.dragging.disable();
+                this.state.map.touchZoom.disable();
+                this.state.map.scrollWheelZoom.disable();
+                this.state.map.doubleClickZoom.disable();
+                this.state.map.boxZoom.disable();
+                this.state.map.keyboard.disable();
+                this.state.map.zoomControl.remove();
+            });
+        }
+    },
+
+    // Set wrapper size based on context (card or modal)
+    setWrapperSize(wrapper, forModal = false) {
+        if (!wrapper || !this.state.imageBounds) return;
+
+        const imageWidth = this.state.imageBounds[1][1];
+        const imageHeight = this.state.imageBounds[1][0];
+        const aspectRatio = imageHeight / imageWidth;
+
+        if (forModal) {
+            // For modal: calculate size based on viewport
+            const modalPadding = 80; // Combined vertical/horizontal padding
+            const availableWidth = window.innerWidth - modalPadding;
+            const availableHeight = window.innerHeight - modalPadding;
+            
+            let newHeight = availableWidth * aspectRatio;
+            let newWidth = availableWidth;
+
+            if (newHeight > availableHeight) {
+                newHeight = availableHeight;
+                newWidth = newHeight / aspectRatio;
+            }
+            wrapper.style.height = `${newHeight}px`;
+            wrapper.style.width = `${newWidth}px`;
+        } else {
+            // For card: calculate based on container width
+            wrapper.style.width = '100%'; // Reset width
+            const availableWidth = wrapper.offsetWidth;
+            const calculatedHeight = availableWidth * aspectRatio;
+            const maxHeight = window.innerHeight * 0.6; // Max 60% of viewport height
+            wrapper.style.height = `${Math.min(calculatedHeight, maxHeight)}px`;
+        }
+
+        if (this.state.debug) {
+            console.log(`Set wrapper size (forModal: ${forModal})`, {
+                width: wrapper.style.width,
+                height: wrapper.style.height
+            });
+        }
     },
 
     // Update fitMapPerfectly method to match editor's implementation
@@ -284,7 +376,10 @@ const sitePlanView = {
             .sort((a, b) => a.sort - b.sort)
             .map(({ value }) => value);
         
-        this.log('Available icons after shuffle:', this.buildingIcons);
+        if (this.state.debug) {
+            console.log('Available icons after shuffle:');
+            console.table(this.buildingIcons);
+        }
         
         locations.forEach(location => {
             const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
@@ -319,11 +414,15 @@ const sitePlanView = {
 
             // Add click event to scroll to the location
             marker.on('click', () => {
-                this.log(`Marker clicked for location ${location.id}`);
+                if (this.state.debug) {
+                    console.log(`Marker clicked for location ${location.slug}`);
+                }
                 if (this.state.placeSlug) {
-                    window.location.href = `/${this.state.placeSlug}/location/${location.id}/`;
+                    window.location.href = `/${this.state.placeSlug}/location/${location.slug}/`;
                 } else {
-                    this.error('Cannot navigate to location detail, place slug not found.');
+                    if (this.state.debug) {
+                        console.error('Cannot navigate to location detail, place slug not found.');
+                    }
                 }
             });
 
@@ -332,14 +431,14 @@ const sitePlanView = {
 
             // Storing for later reference
             marker.iconType = iconType;
-            this.state.markers.set(location.id, marker);
+            this.state.markers.set(location.slug, marker);
         });
     },
 
     // Update markers visibility based on hide-inactive state
     updateMarkersVisibility(hideInactive) {
-        this.state.markers.forEach((marker, id) => {
-            const location = this.state.locations.get(id);
+        this.state.markers.forEach((marker, slug) => {
+            const location = this.state.locations.get(slug);
 
             // A location might not (yet) exist for a marker during updates, so we check.
             if (location && !location.is_active) {
@@ -352,59 +451,48 @@ const sitePlanView = {
     },
 
     updateLocations(updates) {
-        this.log('Starting updateLocations with:', updates);
-        this.log('Current locations state:', Array.from(this.state.locations.entries()));
-        this.log('Current markers state:', Array.from(this.state.markers.entries()));
-        
-        let changed = false;
-        
-        // Update locations that already exist
-        Object.entries(updates).forEach(([id, location]) => {
-            if (this.state.locations.has(id)) {
-                // Update local data store
-                this.state.locations.set(id, { ...this.state.locations.get(id), ...location });
-                const updatedLocation = this.state.locations.get(id);
+        if (this.state.debug) {
+            console.log('Starting updateLocations with:', updates);
+        }
 
-                // Update marker on map
-                const existingMarker = this.state.markers.get(id);
-                if (existingMarker) {
-                    const coords = this.percentToImageCoords(updatedLocation.x_pos, updatedLocation.y_pos);
-                    const icon = this.createIcon(updatedLocation.is_active, existingMarker.iconType, updatedLocation.name);
-                    existingMarker.setLatLng(coords);
-                    existingMarker.setIcon(icon);
-                    this.log(`Updated marker for ${updatedLocation.name}`);
+        let needsVisibilityCheck = false;
+
+        // The 'updates' object contains key-value pairs of { slug: locationData }
+        Object.entries(updates).forEach(([slug, updatedData]) => {
+            const existingLocation = this.state.locations.get(slug);
+            const existingMarker = this.state.markers.get(slug);
+
+            if (existingLocation && existingMarker) {
+                // Merge the updated data into our local state
+                const newLocationData = { ...existingLocation, ...updatedData };
+                this.state.locations.set(slug, newLocationData);
+
+                // Update the marker's visual representation
+                const coords = this.percentToImageCoords(newLocationData.x_pos, newLocationData.y_pos);
+                const icon = this.createIcon(newLocationData.is_active, existingMarker.iconType, newLocationData.name);
+                
+                existingMarker.setLatLng(coords);
+                existingMarker.setIcon(icon);
+
+                // Also update the popup content
+                existingMarker.setPopupContent(this.createMarkerPopup(newLocationData));
+                
+                if (this.state.debug) {
+                    console.log(`Updated location ${slug} with new data:`, newLocationData);
                 }
+                
+                needsVisibilityCheck = true;
             } else {
-                // If location is new, add it
-                this.addMarkers([location]);
-                this.log(`Added new marker for ${location.name}`);
+                if (this.state.debug) {
+                    console.warn(`Location or marker with slug ${slug} not found, skipping update.`);
+                }
             }
         });
 
-        // Remove markers for deleted locations
-        const updatedIds = new Set(Object.keys(updates).map(id => parseInt(id, 10)));
-        const currentIds = Array.from(this.state.locations.keys());
-        const deletedIds = currentIds.filter(id => !updatedIds.has(id));
-
-        deletedIds.forEach(id => {
-            const marker = this.state.markers.get(id);
-            if (marker) {
-                marker.remove();
-                this.state.markers.delete(id);
-                this.state.locations.delete(id);
-                this.log(`Removed marker for deleted location ID: ${id}`);
-            }
-        });
-        
-        if (changed) {
-            // Update visibility based on current switch state
+        if (needsVisibilityCheck) {
+            // After all updates, re-evaluate visibility based on the current switch state
             const locationSwitch = document.querySelector('.hideInactive-switch[data-model="location"]');
-            if (locationSwitch && locationSwitch.checked) {
-                this.updateMarkersVisibility(true);
-            }
-            
-            this.log('Final locations state:', Array.from(this.state.locations.entries()));
-            this.log('Final markers state:', Array.from(this.state.markers.entries()));
+            this.updateMarkersVisibility(locationSwitch ? locationSwitch.checked : true);
         }
     }
 };
@@ -414,7 +502,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Only initialize if not already initialized
     if (!sitePlanView.state.initialized) {
         sitePlanView.initialize().then(() => {
-            sitePlanView.log('Site plan view initialization complete');
+            if (sitePlanView.state.debug) {
+                console.log('Site plan view initialization complete');
+            }
         });
     }
 });

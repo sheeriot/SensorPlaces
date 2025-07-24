@@ -3,13 +3,13 @@ Usage: {% include "sensors/partials/hide_inactive_switch.html" with model="place
 Supported models: place, location, device, sensor
 {% endcomment %}
 
-<div class="form-check form-switch">
-    <input type="checkbox" 
-           class="form-check-input hide-inactive-switch hide-inactive-{{ model }}-switch"
-           data-model="{{ model }}"
-           aria-label="Hide inactive {{ model }}s"
-           checked>
-    <label class="form-check-label">
-        Hide inactive
-    </label>
+<div id="hide-inactive-switch-container">
+    <div class="form-check form-switch">
+        <input class="form-check-input hide-inactive-switch hide-inactive-{{ model }}-switch" 
+               type="checkbox" 
+               id="hideInactive{{ model|capfirst }}Switch" 
+               data-model="{{ model }}"
+               {% if hide_inactive %}checked{% endif %}>
+        <label class="form-check-label" for="hideInactive{{ model|capfirst }}Switch">Hide inactive</label>
+    </div>
 </div> 
