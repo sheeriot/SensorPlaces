@@ -16,8 +16,7 @@
         {% else %}
             {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
         {% endif %}
-        {% load live_counts_tags %}
-        {% live_counts_card place %}
+        {% include "sensors/includes/live_counts_card.html" %}
 
             <div>
                 {% include "sensors/includes/unassigned_devices_card.html" %}

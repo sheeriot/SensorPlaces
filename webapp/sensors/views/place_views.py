@@ -440,14 +440,16 @@ def place_stats(request, place_slug):
     place = get_object_or_404(Place, slug=place_slug)
     locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
     
-    return JsonResponse({
+    context = {
         'locations_active': locations_active,
         'locations_inactive': locations_inactive,
         'devices_active': devices_active,
         'devices_inactive': devices_inactive,
         'sensors_active': sensors_active,
         'sensors_inactive': sensors_inactive
-    })
+    }
+    # ic(context) # This line was removed as per the edit hint
+    return JsonResponse(context)
 
 
 # Utility Forms

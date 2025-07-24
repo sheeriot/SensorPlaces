@@ -101,10 +101,10 @@ def get_place_data(place, include_json=True):
 def get_live_counts_context(place):
     locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
     return {
-        'locations_active_count': locations_active,
-        'locations_inactive_count': locations_inactive,
-        'active_devices_count': devices_active,
-        'inactive_devices_count': devices_inactive,
-        'active_sensors_count': sensors_active,
-        'inactive_sensors_count': sensors_inactive
+        'locations_active': locations_active,
+        'locations_inactive': locations_inactive,
+        'devices_active': devices_active,
+        'devices_inactive': devices_inactive,
+        'sensors_active': sensors_active,
+        'sensors_inactive': sensors_inactive
     }

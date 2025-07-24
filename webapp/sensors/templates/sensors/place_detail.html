@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row gx-2 my-1">
     <!-- Header with Title and Navigation -->
 
     <!-- Place Title Card -->
@@ -27,8 +27,7 @@
         {% else %}
             {% include 'sensors/includes/place_nav_card.html' with show_hidden=True %}
         {% endif %}
-        {% load live_counts_tags %}
-        {% live_counts_card place %}
+        {% include "sensors/includes/live_counts_card.html" %}
     </div>
 
     <!-- Right Column: Locations and Site Plan/Map -->

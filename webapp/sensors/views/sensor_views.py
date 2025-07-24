@@ -5,7 +5,8 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
 
-from django.db.models import OuterRef, Subquery, Count, Min, Max, Prefetch
+from django.db.models import OuterRef, Subquery, Count, Min, Max, Prefetch, Q
+from django.db.models.functions import Lower
 
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -35,7 +36,17 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         # Check if we're filtering by device
         device_pk = self.kwargs.get('device_pk')
         if device_pk:
-            self._device = get_object_or_404(Device, pk=device_pk, location__place=self._place)
+            device_qs = Device.objects.annotate(
+                active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+            ).prefetch_related(
+                Prefetch(
+                    'sensors',
+                    queryset=Sensor.objects.order_by('-is_active', Lower('name')),
+                    to_attr='sensors_sorted'
+                )
+            )
+            self._device = get_object_or_404(device_qs, pk=device_pk, location__place=self._place)
         else:
             self._device = None
 
@@ -44,41 +55,7 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         Get locations for the place, with devices and sensors prefetched
         to allow for grouping in the template.
         """
-        place = self._place
-        location_pk = self.kwargs.get('location_pk')
-
-        # Prefetch sensors, ordered correctly
-        sensors_prefetch = Prefetch(
-            'sensors',
-            queryset=Sensor.objects.order_by('-is_active', 'name'),
-            to_attr='sensors_sorted'
-        )
-
-        # Base queryset for devices
-        devices_qs = Device.objects.prefetch_related(sensors_prefetch).order_by('-is_active', 'name')
-        
-        # If filtering by a specific device, filter the device queryset
-        if self._device:
-            devices_qs = devices_qs.filter(pk=self._device.pk)
-
-        # Prefetch devices, with the prefetched sensors, ordered correctly
-        devices_prefetch = Prefetch(
-            'devices',
-            queryset=devices_qs,
-            to_attr='devices_sorted'
-        )
-        
-        # Base queryset for locations
-        locations_qs = get_annotated_locations(self._place)
-        
-        # If filtering by a specific device, only get its location
-        if self._device:
-            return locations_qs.filter(pk=self._device.location.pk).prefetch_related(devices_prefetch)
-        # If filtering by a specific location
-        elif location_pk:
-            return locations_qs.filter(pk=location_pk).prefetch_related(devices_prefetch)
-            
-        return locations_qs.prefetch_related(devices_prefetch)
+        return get_annotated_locations(self._place)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -96,6 +73,7 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         if hasattr(self, '_device') and self._device:
             context['device'] = self._device
             context['location'] = self._device.location
+            context['sensors'] = self._device.sensors_sorted
         
         # Add live counts to context
         context.update(get_live_counts_context(self._place))

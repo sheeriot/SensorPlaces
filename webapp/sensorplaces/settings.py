@@ -133,7 +133,6 @@ TEMPLATES = [
             ],
             'builtins': [
                 'django.templatetags.static',
-                'sensors.templatetags.live_counts_tags',
             ],
         },
     },

@@ -1,20 +1,23 @@
 {# {% load widget_tweaks %} #}
 
-<div id="device-detail-card" class="card {% if not device.is_active %}opacity-50{% endif %}">
+<div id="device-detail-card" class="card my-1 {% if not device.is_active %}opacity-50{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
-            <i class="bi bi-hdd-rack me-2"></i>
-            {{ device.name }}
+            <div class="text-nowrap">
+                <i class="bi bi-hdd-rack me-2"></i>
+                {{ device.name }}
+                {% include "sensors/partials/lorawan_badge.html" with device=device %}
+            </div>
+            <div class="text-nowrap">
+                <i class="bi bi-geo-alt me-2"></i>
+                {{ device.location.name }}
+            </div>
         </h5>
         <div class="d-flex align-items-center">
-            <span class="text-muted me-2" title="Location">
-                <i class="bi bi-geo-alt me-1"></i>
-                {{ device.location.name }}
-            </span>
             <span id="device-inactive-badge" class="badge bg-secondary me-2 {% if device.is_active %}d-none{% endif %}">
                 inactive
             </span>
-            <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-primary me-2" title="Edit Device">
+            <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-warning me-1" title="Edit Device">
                 <i class="bi bi-pencil"></i>
             </a>
             <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-danger" title="Delete Device">
@@ -23,38 +26,39 @@
         </div>
     </div>
     <div class="card-body">
-        <div class="row">
-            <div class="col-6">
-                <div class="text-body-secondary small text-uppercase mb-1">Device Type</div>
-                <div class="fs-6">
-                    {{ device.device_type.name }}
-                    {% if device.is_lorawan %}
-                        <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill">
-                            <i class="bi bi-broadcast me-1"></i>LoRaWAN
-                        </span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="text-body-secondary small text-uppercase mb-1">Model</div>
-                <div class="fs-6">{{ device.model|default:"-" }}</div>
-            </div>
-        </div>
-        <div class="row mt-2">
-            <div class="col-6">
-                <div class="text-body-secondary small text-uppercase mb-1">Sensor Count</div>
-                <div class="fs-6">{{ device.sensors.count }}</div>
-            </div>
-            <div class="col-6">
-                <div class="text-body-secondary small text-uppercase mb-1">Active</div>
-                {% if readonly %}
-                    <span class="badge {% if device.is_active %}bg-success{% else %}bg-secondary{% endif %}">
-                        {% if device.is_active %}Active{% else %}inactive{% endif %}
-                    </span>
-                {% else %}
-                    {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug %}
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Device Type</dt>
+            <dd class="col-sm-8">{{ device.device_type.name }}</dd>
+
+            {% if device.is_lorawan %}
+            <dt class="col-sm-4">Network</dt>
+            <dd class="col-sm-8">LoRaWAN</dd>
+            {% endif %}
+
+            <dt class="col-sm-4">Model</dt>
+            <dd class="col-sm-8">
+                {{ device.model }}
+                {% if device.manufacturer %}
+                    <br><small class="text-muted">{{ device.manufacturer }}</small>
                 {% endif %}
-            </div>
-        </div>
+            </dd>
+
+            <dt class="col-sm-4">Sensor Count</dt>
+            <dd class="col-sm-8">
+                {{ device.active_sensors_count }}
+                {% if device.inactive_sensors_count > 0 %}
+                    <span class="text-muted">({{ device.inactive_sensors_count }})</span>
+                {% endif %}
+            </dd>
+
+            <dt class="col-sm-4">Status</dt>
+            <dd class="col-sm-8">
+                {% if device.is_active %}
+                    <span class="badge bg-success">Active</span>
+                {% else %}
+                    {% include "sensors/partials/status_active_badge.html" with object=device %}
+                {% endif %}
+            </dd>
+        </dl>
     </div>
 </div> 

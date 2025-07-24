@@ -13,7 +13,6 @@ from ..models import Place, Location, Device, Sensor
 from .device_forms import DeviceForm
 from .mixins import PlaceAnnotationMixin
 from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
-
 from icecream import ic
 
 # Device Views
@@ -33,7 +32,8 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             to_attr='devices_sorted'
         )
 
-        return get_annotated_locations(self._place).prefetch_related(devices_prefetch)
+        qs = get_annotated_locations(self._place).prefetch_related(devices_prefetch)
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -47,12 +47,11 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
             context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
         
-        # ic('device_list_context', context)
-
         # Add place to context
         place = self.get_place()
         context['place'] = place
-        context['unassigned_devices'] = Device.objects.filter(place=place, location__isnull=True).order_by('-is_active', 'name')
+        unassigned_devices = Device.objects.filter(place=place, location__isnull=True).order_by('-is_active', 'name')
+        context['unassigned_devices'] = unassigned_devices
         
         # Add live counts to context
         context.update(get_live_counts_context(place))
@@ -70,24 +69,15 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     template_name = 'sensors/device_detail.html'
     object: Device
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-        # Get and cache place
-        self._place = self.get_place()
-        
-        # Don't try to access self.object here - it doesn't exist yet
-        # We'll set location in get_context_data instead
-        
-        # Initialize other attributes
-        self._inactive_help_text = None
-
     def get_queryset(self) -> QuerySet[Device]:
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
             base_queryset = super().get_queryset()
             self._queryset = base_queryset.filter(place=place)\
-                .annotate(active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)))\
-                .prefetch_related(
+                .annotate(
+                    active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                    inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+                ).prefetch_related(
                     Prefetch(
                         'sensors',
                         queryset=Sensor.objects.order_by('-is_active', Lower('name')),
@@ -104,6 +94,8 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['model_name'] = 'device'
         context['place'] = self._place
         context['location'] = location
+        context['sensors'] = device.sensors_sorted
+        context['locations'] = get_annotated_locations(self._place)
 
         # Add hide_inactive state from GET param or cookie
         hide_inactive_param = self.request.GET.get('hide_inactive')
@@ -113,6 +105,12 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
             hide_inactive_cookie = self.request.COOKIES.get('hideInactive_sensor', 'false')
             context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
         
+        # Add live counts to context
+        context.update(get_live_counts_context(self._place))
+        
+        ic(context['device'].__dict__)
+        ic(context['sensors'])
+        ic(context['locations'])
         return context
 
 class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
@@ -242,8 +240,6 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         return HttpResponseRedirect(success_url)
 
     def form_invalid(self, form):
-        ic("DeviceCreateView: form_invalid")
-        ic(form.errors)
         return super().form_invalid(form)
 
 
@@ -252,6 +248,19 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
     object: Device
+
+    def get_queryset(self) -> QuerySet[Device]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            base_queryset = super().get_queryset()
+            self._queryset = base_queryset.filter(place=place).prefetch_related(
+                Prefetch(
+                    'sensors',
+                    queryset=Sensor.objects.order_by('-is_active', Lower('name')),
+                    to_attr='sensors_sorted'
+                )
+            )
+        return self._queryset
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
@@ -365,6 +374,10 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         context['place'] = self._place
         device = self.get_object()
         
+        # Add sensors to context
+        if hasattr(device, 'sensors_sorted'):
+            context['sensors'] = device.sensors_sorted
+            
         # Add location to context
         if device and device.location:
             context['location'] = device.location
@@ -440,8 +453,6 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         return HttpResponseRedirect(self.get_success_url())
 
     def form_invalid(self, form):
-        ic("DeviceUpdateView: form_invalid")
-        ic(form.errors)
         return super().form_invalid(form)
 
     def construct_toast_message(self, form, status_changed, location_changed, original_location):

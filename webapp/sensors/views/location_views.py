@@ -43,6 +43,14 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         # Add live counts to context
         context.update(get_live_counts_context(place))
         
+        # Add locations_json for siteplan
+        from .views_fun import get_location_data
+        import json
+        
+        locations = context['locations']
+        locations_data = [get_location_data(loc) for loc in locations]
+        context['locations_json'] = json.dumps(locations_data)
+        
         return context
 
 class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
@@ -50,6 +58,12 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     context_object_name = 'location'
     template_name = 'sensors/location_detail.html'
     slug_url_kwarg = 'slug'
+
+    def get_queryset(self):
+        """
+        Get the queryset for the view, filtered by the place slug from the URL.
+        """
+        return Location.objects.filter(place__slug=self.kwargs['place_slug'])
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -78,9 +92,7 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
             Lower('name')
         )
         
-        # Create a specific context for the device_list_card.html partial
-        # This avoids overwriting the main `locations` context variable used by the nav card
-        context['device_list_locations'] = [detailed_location]
+        context['object_list'] = [detailed_location]
         context['unassigned_devices'] = [] # No unassigned devices in this context
 
         # Add locations_json for siteplan

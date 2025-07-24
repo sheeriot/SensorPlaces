@@ -1,37 +1,29 @@
 {% extends "sensors/base.html" %}
+{% load static %}
+{% load sensor_filters %}
 
-{% block title %}Locations @ {{ place.name }}{% endblock %}
+{% block title %}Sensor Places - Locations{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Place Title Card -->
-    <div class="col-12 mb-1">
+<div class="row my-1">
+    <div class="col-12">
         {% include "sensors/partials/place_title_card.html" %}
     </div>
 </div>
-<div class="row">
+<div class="row gx-2 my-1">
     <div class="col-md-4">
-        <!-- Place Navigation Card -->
-        {% if place.is_active %}
-            {% include "sensors/includes/place_nav_card.html" %}
-        {% else %}
-            {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
-        {% endif %}
-        {% load live_counts_tags %}
-        {% live_counts_card place %}
+        <!-- Siteplan Card -->
+        {% include "sensors/includes/siteplan_card.html" %}
+
+        {% include "sensors/includes/live_counts_card.html" %}
     </div>
     <!-- Right Column: Locations and Site Plan -->
     <div class="col-md-8">
-        {% if not place.is_active %}
-            {% include "sensors/includes/location_list_card.html" with show_inactive=True %}
-        {% else %}
-            {% include "sensors/includes/location_list_card.html" with hide_inactive=hide_inactive %}
-        {% endif %}
-        {% if not place.is_active %}
-            {% include "sensors/includes/device_list_card.html" with show_inactive=True %}
-        {% else %}
-            {% include "sensors/includes/device_list_card.html" %}
-        {% endif %}
+        {% include "sensors/includes/location_list_card.html" %}
     </div>
 </div>
 {% endblock %}

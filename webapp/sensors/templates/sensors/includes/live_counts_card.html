@@ -1,31 +1,23 @@
 {% load sensor_filters %}
 
 <!-- Left Column: Live Counts -->
-<div class="card mb-4 mt-2" id="live_counts_card">
+<div class="card my-1" id="live_counts_card">
     <div class="card-header p-0" id="live_counts_card_header">
-        <h5 class="card-title p-2 mb-0">
-            <i class="bi bi-graph-up me-2"></i>
-            Live Counts
+        <h5 class="card-title p-2 mb-0 text-nowrap">
+            <i class="bi bi-graph-up me-2"></i>Live Counts
         </h5>
     </div>
-    <div class="card-body p-0" id="liveCountsCardBody">
-        <table class="table table-sm mb-0">
-            <thead class="table-light">
+    <div class="card-body p-0">
+        <table class="table table-sm table-borderless mb-0">
+            <tbody>
                 <tr>
-                    <th class="ps-3 w-75">Category</th>
-                    <th class="text-center text-success w-12 fs-4">A</th>
-                    <th class="text-center text-secondary w-12 fs-4">i</th>
-                </tr>
-            </thead>
-            <tbody class="table-group-divider font-weight-bold">
-                <tr>
-                    <td class="ps-3">
+                    <td class="ps-3 d-flex align-items-center">
                         <a href="{% url 'sensors:location_list' place_slug=place.slug %}" class="text-decoration-none">
-                        <i class="bi bi-geo-alt me-1"></i>Locations
+                            <i class="bi bi-geo-alt me-1"></i>Locations
                         </a>
                     </td>
                     <td class="text-center font-monospace" style="width: 12%">
-                        <a href="{% url 'sensors:location_list' place_slug=place.slug %}?hide_inactive=true" class="text-decoration-none">
+                        <a href="{% url 'sensors:location_list' place_slug=place.slug %}" class="text-decoration-none">
                             <span id="locations-active" class="text-success locations-active">
                                 {{ locations_active }}
                         </span>
@@ -40,36 +32,44 @@
                     </td>
                 </tr>
                 <tr>
-                    <td class="ps-3">
+                    <td class="ps-3 d-flex align-items-center">
                         <a href="{% url 'sensors:device_list' place_slug=place.slug %}" class="text-decoration-none">
                         <i class="bi bi-hdd-rack me-1"></i>Devices
                         </a>
                     </td>
                     <td class="text-center font-monospace" style="width: 12%">
-                        <a href="{% url 'sensors:device_list' place_slug=place.slug %}?hide_inactive=true" class="text-decoration-none">
-                        <span id="devices-active" class="text-success">{{ devices_active }}</span>
+                        <a href="{% url 'sensors:device_list' place_slug=place.slug %}" class="text-decoration-none">
+                            <span id="devices-active" class="text-success devices-active">
+                                {{ devices_active }}
+                            </span>
                         </a>
                     </td>
                     <td class="text-center font-monospace" style="width: 12%">
                         <a href="{% url 'sensors:device_list' place_slug=place.slug %}?hide_inactive=false" class="text-decoration-none">
-                        <span id="devices-inactive" class="text-secondary">{{ devices_inactive }}</span>
+                        <span id="devices-inactive" class="text-secondary devices-inactive">
+                                {{ devices_inactive }}
+                            </span>
                         </a>
                     </td>
                 </tr>
                 <tr>
-                    <td class="ps-3">
+                    <td class="ps-3 d-flex align-items-center">
                         <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}" class="text-decoration-none">
-                        <i class="bi bi-thermometer me-1"></i>Sensors
+                        <i class="bi bi-thermometer-half me-1"></i>Sensors
                         </a>
                     </td>
                     <td class="text-center font-monospace" style="width: 12%">
-                        <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}?hide_inactive=true" class="text-decoration-none">
-                        <span id="sensors-active" class="text-success">{{ sensors_active }}</span>
+                        <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}" class="text-decoration-none">
+                        <span id="sensors-active" class="text-success sensors-active">
+                                {{ sensors_active }}
+                            </span>
                         </a>
                     </td>
                     <td class="text-center font-monospace" style="width: 12%">
                         <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}?hide_inactive=false" class="text-decoration-none">
-                        <span id="sensors-inactive" class="text-secondary">{{ sensors_inactive }}</span>
+                        <span id="sensors-inactive" class="text-secondary sensors-inactive">
+                                {{ sensors_inactive }}
+                            </span>
                         </a>
                     </td>
                 </tr>

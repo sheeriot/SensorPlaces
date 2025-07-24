@@ -5,9 +5,10 @@
     data-location-id="unassigned">
     <div class="row g-0 align-items-center">
         <!-- Name -->
-        <div class="col-6 text-truncate">
-            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none fw-bold">
-                <i class="bi bi-hdd-rack me-2"></i>{{ device.name }}
+        <div class="col-6">
+            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="d-flex align-items-start text-decoration-none fw-bold">
+                <i class="bi bi-hdd-rack me-2"></i>
+                <span>{{ device.name }}</span>
             </a>
         </div>
         <!-- Active Toggle -->

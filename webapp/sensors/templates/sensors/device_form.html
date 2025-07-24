@@ -30,7 +30,7 @@
 
     <div class="col-md-8">
         {% include "sensors/includes/device_form_card.html" %}
-        {% include "sensors/includes/sensor_list_card.html" %}
+        {% include "sensors/includes/sensor_list_card.html" with readonly=True %}
     </div>
 </div>
 {% endblock %}

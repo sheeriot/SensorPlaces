@@ -11,7 +11,7 @@
 
 const liveCountsUpdater = {
     config: {
-        debug: false,
+        debug: true,
         updateInterval: 60000, // 1 minute
     },
 
@@ -31,7 +31,6 @@ const liveCountsUpdater = {
         if (this.config.debug) {
             console.log(`LiveCountsUpdater: Starting polling for place ${this.placeSlug} every ${this.config.updateInterval / 1000}s.`);
         }
-        this.fetchCounts(); // Fetch immediately on init
         setInterval(() => this.fetchCounts(), this.config.updateInterval);
     },
 
@@ -57,12 +56,12 @@ const liveCountsUpdater = {
         if (this.config.debug) {
             console.log('LiveCountsUpdater: Updating UI with data:', data);
         }
-        this.updateCount('locations-active', data.locations_active_count);
-        this.updateCount('locations-inactive', data.locations_inactive_count);
-        this.updateCount('devices-active', data.devices_active_count);
-        this.updateCount('devices-inactive', data.devices_inactive_count);
-        this.updateCount('sensors-active', data.sensors_active_count);
-        this.updateCount('sensors-inactive', data.sensors_inactive_count);
+        this.updateCount('locations-active', data.locations_active);
+        this.updateCount('locations-inactive', data.locations_inactive);
+        this.updateCount('devices-active', data.devices_active);
+        this.updateCount('devices-inactive', data.devices_inactive);
+        this.updateCount('sensors-active', data.sensors_active);
+        this.updateCount('sensors-inactive', data.sensors_inactive);
     },
 
     updateCount(elementId, newValue) {

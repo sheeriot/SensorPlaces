@@ -37,7 +37,7 @@ This template expects:
         <!-- Actions (fixed width at the end) -->
         <div class="col-2 text-end">
             <div class="btn-group btn-group-sm">
-                <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-primary">
+                <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-warning">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
                 <a href="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-danger">

@@ -17,8 +17,6 @@
         {% else %}
             {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
         {% endif %}
-        {% load live_counts_tags %}
-        {% live_counts_card place %}
     </div>
     <div class="col-md-8">
         {% include 'sensors/includes/location_form_card.html' %}
