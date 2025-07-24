@@ -254,8 +254,22 @@ const toggleActiveManager = {
                     // Update classes based on active state
                     if (response.is_active) {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
+                        // Also remove from cells for consistency
+                        Array.from(row.children).forEach(cell => {
+                            cell.classList.remove('opacity-50', 'text-muted');
+                        });
                     } else {
-                        row.classList.add('opacity-50', 'text-muted');
+                        // Don't apply to the whole row, apply to cells instead to keep toggle visible
+                        row.classList.remove('opacity-50', 'text-muted');
+                        Array.from(row.children).forEach(cell => {
+                            if (cell.querySelector('.toggle-button-wrapper')) {
+                                // This cell contains the toggle, so don't fade it.
+                                cell.classList.remove('opacity-50', 'text-muted');
+                            } else {
+                                // Fade all other cells.
+                                cell.classList.add('opacity-50', 'text-muted');
+                            }
+                        });
                         
                         // Check if hideInactive is enabled for this type
                         if (hideInactiveState) {
