@@ -23,8 +23,11 @@
                     </div>
                     {% if sensor.device.is_lorawan %}
                     <div class="btn-group btn-group-sm ms-2" role="group">
-                        <a href="{% url 'sensors:lorawan_sensor_graph' place_slug=place.slug pk=sensor.pk %}" class="btn btn-outline-primary">
-                            <i class="bi bi-graph-up"></i> View Graph
+                        <a href="#" class="btn btn-outline-secondary disabled" aria-disabled="true">
+                            <i class="bi bi-graph-up"></i> View Graph (coming soon)
+                        </a>
+                        <a href="{% url 'sensors:sensor_reading_list' place_slug=place.slug sensor_pk=sensor.pk %}" class="btn btn-outline-primary">
+                            <i class="bi bi-card-list"></i> View Readings
                         </a>
                     </div>
                     {% endif %}

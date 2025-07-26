@@ -153,4 +153,9 @@
 #siteplan-container {
     height: 100%;
     width: 100%;
+}
+
+/* Move Folium/Leaflet zoom controls to the top-left corner */
+.leaflet-top.leaflet-left .leaflet-control {
+    margin: 5px;
 } 

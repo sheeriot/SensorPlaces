@@ -6,9 +6,9 @@ This template expects the following context variables:
 {% endcomment %}
 
 <div id="location-list-card"
-     class="card my-1{% if not place.is_active %}opacity-50 text-muted{% endif %}">
-    <div class="card-header d-flex justify-content-between align-items-center py-2">
-        <h5 class="card-title mb-0 fs-6 d-flex align-items-center">
+     class="card my-1 {% if not place.is_active %}opacity-50 text-muted{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center py-1">
+        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
             <i class="bi bi-geo-alt me-2"></i>
             Locations
         </h5>
@@ -19,7 +19,7 @@ This template expects the following context variables:
             {% include "sensors/partials/location_add_button.html" %}
         </div>
     </div>
-    <div class="list-group-item d-none d-md-block bg-light small text-muted py-1">
+    <div class="d-none d-md-block bg-light small text-muted py-1 px-2 border-top">
         <div class="row g-0">
             <div class="col-6">NAME</div>
             <div class="col-2">DEVICES</div>
@@ -27,7 +27,7 @@ This template expects the following context variables:
             <div class="col-2 text-end">ACTIONS</div>
         </div>
     </div>
-    <div class="list-group list-group-flush overflow-auto">
+    <div class="overflow-auto">
         {% for location in locations %}
             {% if place.is_active %}
                 {% include "sensors/partials/location_row.html" with place=place location=location hide_inactive=hide_inactive %}
@@ -35,7 +35,7 @@ This template expects the following context variables:
                 {% include "sensors/partials/location_row.html" with place=place location=location show_inactive=True %}
             {% endif %}
         {% empty %}
-            <div class="text-center p-3 text-muted">
+            <div class="text-center p-3 text-muted border-top">
                 <p class="mb-1">No locations found.</p>
                 <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-sm btn-primary">
                     <i class="bi bi-plus-circle me-1"></i> Add Location

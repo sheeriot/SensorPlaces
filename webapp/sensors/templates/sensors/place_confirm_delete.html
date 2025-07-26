@@ -4,13 +4,7 @@
 {% block title %}Delete {{ model_name|title }}{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Place Title Card -->
-    <div class="col-12">
-        {% include "sensors/partials/place_title_card.html" with place=place %}
-    </div>
-</div>
-<div class="row">
+<div class="row gx-2 my-1">
     <!-- Two Column Layout -->
     <div class="col-md-4">
         {% include "sensors/includes/place_nav_card.html" with place=place locations=locations location=location show_hidden=1 %}

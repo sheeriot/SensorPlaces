@@ -25,7 +25,7 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
 
     def get_queryset(self) -> QuerySet[Location]:
         """Get locations with device and sensor counts."""
-        return get_annotated_locations(self._place)
+        return get_annotated_locations(self._place).order_by('-is_active', Lower('name'))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

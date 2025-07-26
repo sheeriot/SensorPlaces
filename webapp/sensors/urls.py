@@ -28,7 +28,7 @@ urlpatterns = [
     path('<slug:place_slug>/siteplan/', place_views.siteplan_view, name='siteplan'),
     path('<slug:place_slug>/siteplan/update', place_views.siteplan_update, name='siteplan_update'),
     path('api/<slug:place_slug>/stats/', place_views.place_stats, name='place_stats_api'),
-    path('<slug:place_slug>/stats/', place_views.place_stats, name='place_stats'),
+    # path('<slug:place_slug>/stats/', place_views.place_stats, name='place_stats'),
     
     # Location URLs
     path('<slug:place_slug>/location/', location_views.LocationListView.as_view(), name='location_list'),
@@ -38,9 +38,9 @@ urlpatterns = [
     path('<slug:place_slug>/location/<slug:slug>/delete/', location_views.LocationDeleteView.as_view(), name='location_delete'),
     
     # Device URLs
-    path('<slug:place_slug>/device/', device_views.DeviceListView.as_view(), name='device_list'),
+    path('<slug:place_slug>/devices/', device_views.DeviceListView.as_view(), name='device_list'),
     path('<slug:place_slug>/device/create/', device_views.DeviceCreateView.as_view(), name='device_create'),
-    path('<slug:place_slug>/location/<int:location_pk>/device/create/', device_views.DeviceCreateView.as_view(), name='device_create_in_location'),
+    path('<slug:place_slug>/location/<slug:location_slug>/device/create/', device_views.DeviceCreateView.as_view(), name='device_create_in_location'),
     path('<slug:place_slug>/device/<int:pk>/', device_views.DeviceDetailView.as_view(), name='device_detail'),
     path('<slug:place_slug>/device/<int:pk>/update/', device_views.DeviceUpdateView.as_view(), name='device_update'),
     path('<slug:place_slug>/device/<int:pk>/delete/', device_views.DeviceDeleteView.as_view(), name='device_delete'),
@@ -54,6 +54,7 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:pk>/', SensorDetailView.as_view(), name='sensor_detail'),
     path('<slug:place_slug>/sensor/<int:pk>/update/', SensorUpdateView.as_view(), name='sensor_update'),
     path('<slug:place_slug>/sensor/<int:pk>/delete/', SensorDeleteView.as_view(), name='sensor_delete'),
+    path('<slug:place_slug>/sensor/<int:sensor_pk>/readings/', sensor_views.SensorReadingListView.as_view(), name='sensor_reading_list'),
 
     # InfluxSource URLs
     path('<slug:place_slug>/influx-sources/', influx_views.InfluxSourceListView.as_view(), name='influxsource_list'),

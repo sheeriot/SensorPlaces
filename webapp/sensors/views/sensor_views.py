@@ -55,7 +55,22 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         Get locations for the place, with devices and sensors prefetched
         to allow for grouping in the template.
         """
-        return get_annotated_locations(self._place)
+        sensors_prefetch = Prefetch(
+            'sensors',
+            queryset=Sensor.objects.order_by('-is_active', Lower('name')),
+            to_attr='sensors_sorted'
+        )
+
+        devices_prefetch = Prefetch(
+            'devices',
+            queryset=Device.objects.select_related('device_type').annotate(
+                sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False))
+            ).prefetch_related(sensors_prefetch).order_by('-is_active', Lower('name')),
+            to_attr='devices_sorted'
+        )
+
+        return get_annotated_locations(self._place).prefetch_related(devices_prefetch)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -153,7 +168,11 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         self._place = self.get_place()
         self._locations = get_annotated_locations(self._place)
         try:
-            self._device = get_object_or_404(Device, pk=self.kwargs.get('device_pk', None))
+            device_qs = Device.objects.annotate(
+                active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+            )
+            self._device = get_object_or_404(device_qs, pk=self.kwargs.get('device_pk', None))
         except Exception as e:
             # ic(f"Error getting device: {str(e)}")
             pass
@@ -234,16 +253,18 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             context['location'] = self._device.location
         
         # Add a fallback cancel URL
-        if hasattr(self, '_device') and self._device:
-            context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
-                'place_slug': self._place.slug,
-                'pk': self._device.pk
-            })
-        else:
-            # Fallback to place detail if no device specified
-            context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
-                'place_slug': self._place.slug
-            })
+        context['cancel_url'] = self.request.META.get('HTTP_REFERER')
+        if not context['cancel_url']:
+            if hasattr(self, '_device') and self._device:
+                context['cancel_url'] = reverse('sensors:device_detail', kwargs={
+                    'place_slug': self._place.slug,
+                    'pk': self._device.pk
+                })
+            else:
+                # Fallback to place detail if no device specified
+                context['cancel_url'] = reverse('sensors:place_detail', kwargs={
+                    'place_slug': self._place.slug
+                })
         
         return context
 
@@ -347,11 +368,15 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         try:
             # Try to get the sensor if we're updating
             sensor = self.get_object()
-            device = sensor.device
-            self._device = device
+            device_pk = sensor.device.pk
+            device_qs = Device.objects.annotate(
+                active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+            )
+            self._device = get_object_or_404(device_qs, pk=device_pk)
             
             # Get help text based on sensor active state and its device
-            self._inactive_help_text = self.get_sensor_inactive_help_text(sensor, device)
+            self._inactive_help_text = self.get_sensor_inactive_help_text(sensor, self._device)
             
         except Exception as e:
             # If we can't get the object yet (e.g., in a GET request before the object exists)
@@ -423,15 +448,22 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         # Place is already in context from PlaceAnnotationMixin
         
         sensor = self.get_object()
-        device = sensor.device
+        device_pk = sensor.device.pk
+        device_qs = Device.objects.annotate(
+            active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+            inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+        )
+        device = get_object_or_404(device_qs, pk=device_pk)
         context['device'] = device
         context['location'] = device.location
         
         # Add a fallback cancel URL
-        context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
-            'place_slug': self._place.slug,
-            'pk': device.pk
-        })
+        context['cancel_url'] = self.request.META.get('HTTP_REFERER')
+        if not context['cancel_url']:
+            context['cancel_url'] = reverse('sensors:device_detail', kwargs={
+                'place_slug': self._place.slug,
+                'pk': device.pk
+            })
         
         return context
 

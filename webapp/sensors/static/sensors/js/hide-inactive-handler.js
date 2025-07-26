@@ -84,7 +84,7 @@ const hideInactiveHandler = {
                     console.log(`[${model}] State overridden by URL parameter. New state: ${hide}`);
                 }
                 // Immediately update visibility based on URL override
-                this.updateAllRowVisibility(hide);
+                this.updateAllRowVisibility(hide, switchEl.closest('.card'));
             } else {
                 // Restore state from localStorage if no URL override
                 const storedStateJSON = localStorage.getItem(`hideInactive_${model}`);
@@ -113,7 +113,7 @@ const hideInactiveHandler = {
                     console.log(`[${model}] Switch state changed to: ${newState}. Stored in localStorage and cookie.`);
                 }
 
-                this.updateAllRowVisibility(newState);
+                this.updateAllRowVisibility(newState, e.target.closest('.card'));
 
                 // Dispatch state change event
                 const eventDetail = {
@@ -134,21 +134,31 @@ const hideInactiveHandler = {
         });
     },
 
-    updateAllRowVisibility(hideInactive) {
-        const table = document.getElementById('sensor-list-table');
-        if (!table) {
-            if (hideInactiveConfig.debug) console.log('sensor-list-table not found');
-            return;
+    updateAllRowVisibility(hideInactive, contextElement = document) {
+        if (!contextElement) {
+            if (hideInactiveConfig.debug) {
+                console.warn('updateAllRowVisibility called without a valid context element. Defaulting to document.');
+            }
+            contextElement = document;
         }
 
         if (hideInactiveConfig.debug) {
+            console.log(`Updating row visibility within context:`, contextElement);
             console.log(`Updating all row visibility. Hide inactive: ${hideInactive}`);
         }
 
-        const inactiveLocations = table.querySelectorAll('.location-row[data-location-active="false"]');
-        const inactiveDevices = table.querySelectorAll('.device-row[data-device-active="false"]');
-        const inactiveSensors = table.querySelectorAll('.sensor-row[data-sensor-active="false"]');
+        const inactiveLocations = contextElement.querySelectorAll('.location-row[data-location-active="false"]');
+        const inactiveDevices = contextElement.querySelectorAll('.device-row[data-device-active="false"]');
+        const inactiveSensors = contextElement.querySelectorAll('.sensor-row[data-sensor-active="false"]');
 
+        if (hideInactiveConfig.debug) {
+            console.log('Found inactive elements:', {
+                locations: inactiveLocations.length,
+                devices: inactiveDevices.length,
+                sensors: inactiveSensors.length
+            });
+        }
+        
         // First, handle hiding
         if (hideInactive) {
             inactiveLocations.forEach(row => row.classList.add('d-none'));
@@ -167,12 +177,12 @@ const hideInactiveHandler = {
         inactiveSensors.forEach(sensorRow => {
             const deviceId = sensorRow.dataset.deviceId;
             if (deviceId) {
-                const deviceRow = table.querySelector(`.device-row[data-device-id="${deviceId}"]`);
+                const deviceRow = contextElement.querySelector(`.device-row[data-device-id="${deviceId}"]`);
                 if (deviceRow) {
                     deviceRow.classList.remove('d-none');
                     const locationId = deviceRow.dataset.locationId;
                     if (locationId) {
-                        const locationRow = table.querySelector(`.location-row[data-location-id="${locationId}"]`);
+                        const locationRow = contextElement.querySelector(`.location-row[data-location-id="${locationId}"]`);
                         if (locationRow) {
                             locationRow.classList.remove('d-none');
                         }
@@ -185,7 +195,7 @@ const hideInactiveHandler = {
         inactiveDevices.forEach(deviceRow => {
             const locationId = deviceRow.dataset.locationId;
             if (locationId) {
-                const locationRow = table.querySelector(`.location-row[data-location-id="${locationId}"]`);
+                const locationRow = contextElement.querySelector(`.location-row[data-location-id="${locationId}"]`);
                 if (locationRow) {
                     locationRow.classList.remove('d-none');
                 }
@@ -201,7 +211,7 @@ const hideInactiveHandler = {
         if (hideInactiveConfig.debug) {
             console.warn('updateRowVisibility is deprecated. Use updateAllRowVisibility instead.');
         }
-        this.updateAllRowVisibility(hideInactive);
+        this.updateAllRowVisibility(hideInactive, document);
     },
 
     showParentRows(row) {

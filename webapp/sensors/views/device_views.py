@@ -50,7 +50,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         # Add place to context
         place = self.get_place()
         context['place'] = place
-        unassigned_devices = Device.objects.filter(place=place, location__isnull=True).order_by('-is_active', 'name')
+        unassigned_devices = Device.objects.filter(location__place=place, location__slug='unassigned-devices').order_by('-is_active', 'name')
         context['unassigned_devices'] = unassigned_devices
         
         # Add live counts to context
@@ -73,7 +73,7 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
             base_queryset = super().get_queryset()
-            self._queryset = base_queryset.filter(place=place)\
+            self._queryset = base_queryset.filter(location__place=place)\
                 .annotate(
                     active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
                     inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
@@ -130,9 +130,9 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         self._inactive_help_text = None
         
         # Get location if specified in URL
-        location_pk = self.kwargs.get('location_pk', None)
-        if location_pk:
-            self._location = get_object_or_404(Location, pk=location_pk, place=self._place)
+        location_slug = self.kwargs.get('location_slug', None)
+        if location_slug:
+            self._location = get_object_or_404(Location, slug=location_slug, place=self._place)
             
             # If location is inactive, create help text about that
             if self._location and not self._location.is_active:
@@ -166,8 +166,8 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         context['locations'] = self._locations
         
         # Add a fallback cancel URL based on whether we have a location_pk
-        location_pk = self.kwargs.get('location_pk', None)
-        if location_pk:
+        location_slug = self.kwargs.get('location_slug', None)
+        if location_slug:
             # If we have a location_pk, go to location_detail
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,
@@ -253,7 +253,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
             base_queryset = super().get_queryset()
-            self._queryset = base_queryset.filter(place=place).prefetch_related(
+            self._queryset = base_queryset.filter(location__place=place).prefetch_related(
                 Prefetch(
                     'sensors',
                     queryset=Sensor.objects.order_by('-is_active', Lower('name')),
@@ -379,12 +379,12 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             context['sensors'] = device.sensors_sorted
             
         # Add location to context
-        if device and device.location:
-            context['location'] = device.location
+        if device.location:
+            context['location'] = get_annotated_locations(self._place).get(pk=device.location.pk)
         
         # Add a fallback cancel URL based on whether we have a location_pk
-        location_pk = self.kwargs.get('location_pk', None)
-        if location_pk:
+        location_slug = self.kwargs.get('location_slug', None)
+        if location_slug:
             # If we have a location_pk, go to location_detail
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,
@@ -485,6 +485,13 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     template_name = 'sensors/device_confirm_delete.html'
     object: Device
 
+    def get_queryset(self) -> QuerySet[Device]:
+        if not hasattr(self, '_queryset'):
+            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            base_queryset = super().get_queryset()
+            self._queryset = base_queryset.filter(place=place)
+        return self._queryset
+
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         # Get and cache place
@@ -521,8 +528,8 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         device = self.object
+        place = self._place
         location = device.location
-        place = location.place
         
         # Before we delete the device, store its data
         device_data = {
@@ -541,7 +548,7 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         
         message = (
             f"Deleted device <strong>{device_data['name']}</strong> from "
-            f"<i class='bi bi-diagram-3'></i> {location.name}<br>"
+            f"<i class='bi bi-diagram-3'></i> {location.name if location else 'Unassigned'}<br>"
             f"<small class='text-muted'>"
             f"Type: {device_data['device_type']}<br>"
             f"Model: {device_data['model']}<br>"

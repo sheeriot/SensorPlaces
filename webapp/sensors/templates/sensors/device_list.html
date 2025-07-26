@@ -3,40 +3,29 @@
 {% block title %}Devices @ {{ place.name }}{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12 mb-1">
-        {% include "sensors/partials/place_title_card.html" with place=place %}
+<div class="row gx-2 my-1">
+    <div class="col-md-4">
+    <!-- Place Navigation Card -->
+    {% if place.is_active %}
+        {% include "sensors/includes/place_nav_card.html" %}
+    {% else %}
+        {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
+    {% endif %}
+    {% include "sensors/includes/live_counts_card.html" %}
     </div>
-    <!-- Two Column Layout for Locations and Devices -->
-    <div class="row">
-        <div class="col-md-4">
-        <!-- Place Navigation Card -->
-        {% if place.is_active %}
-            {% include "sensors/includes/place_nav_card.html" %}
-        {% else %}
-            {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
-        {% endif %}
-        {% include "sensors/includes/live_counts_card.html" %}
-
-            <div>
-                {% include "sensors/includes/unassigned_devices_card.html" %}
-            </div>
-        </div>
-        <!-- right column -->
-        <div class="col-md-8">
-            {% if location %}
-                {# Single location view #}
-                {% include "sensors/includes/device_list_card.html" with location=location devices=devices %}
-            {% else %}
-                {# List of all devices #}
-                {% include "sensors/includes/device_list_card.html" %}
-            {% endif %}
-
-        </div>
+    <!-- right column -->
+    <div class="col-md-8">
+        {% include "sensors/includes/device_list_card.html" %}
+        {% include "sensors/includes/unassigned_devices_card.html" %}
     </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+{% endblock %}
 
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="{% static 'sensors/js/place-map-popout.js' %}"></script>
 {% endblock %}

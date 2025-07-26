@@ -46,7 +46,8 @@ class SensorForm(forms.ModelForm):
                 
         # Set default device if provided
         if self.device:
-            self.fields['device'].initial = self.device
+            self.fields['device'].widget = forms.HiddenInput()
+            self.fields['device'].initial = self.device.pk
             
             # If device is inactive, sensor must be inactive
             if not self.device.is_active:
@@ -72,7 +73,7 @@ class SensorForm(forms.ModelForm):
             )
         # For existing instances that are inactive for other reasons
         elif self.instance and self.instance.pk and not self.instance.is_active:
-            self.fields['is_active'].label = 'inactive'  # Set initial label
+            self.fields['is_active'].label = 'Inactive'
         else:
             self.fields['is_active'].label = 'Active'  # Set initial label
             
@@ -106,22 +107,28 @@ class SensorForm(forms.ModelForm):
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
-            # Hidden field
+            # Hidden fields
             'referrer',
+            'device',
             # Main fields
             Row(
                 Column('name', css_class='form-group col-md-6'),
-                Column('device', css_class='form-group col-md-6'),
+                Column(
+                    HTML("""
+                        <div class="form-group">
+                            <label for="id_device_name">Device</label>
+                            <div id="id_device_name" class="form-control-plaintext">
+                                <i class="bi bi-hdd-rack me-2"></i>{{ device }}
+                            </div>
+                        </div>
+                    """),
+                    css_class='form-group col-md-6'
+                ),
                 css_class='form-row'
             ),
             Row(
                 Column(
-                    Field(
-                        'is_active',
-                        template='sensors/partials/active_status_checkbox.html',
-                        model_name='sensor',
-                        instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
-                    ),
+                    'is_active',
                     css_class='form-group col-md-12'
                 ),
                 css_class='form-row'
@@ -142,14 +149,16 @@ class SensorForm(forms.ModelForm):
                     css_class='form-row'
                 ),
                 css_class='influx-fields',
-                # Hide by default until data_type is set
-                style='display:none;'
+                style='display:none;' if not self.instance.data_type == 'INFLUX' else ''
             ),
             FormActions(
-                Submit('submit', 'Save', css_class='btn-primary'),
-                HTML('<a href="{% if referrer %}{{ referrer }}{% else %}{% url "sensors:place_detail" place_slug=place.slug %}{% endif %}" class="btn btn-secondary">Cancel</a>'),
+                Submit('submit', 'Save' if self.instance.pk else 'Create', css_class='btn-primary'),
+                HTML('<a href="{{ referrer|default:cancel_url }}" class="btn btn-secondary">Cancel</a>'),
             )
         )
+
+        if not self.instance.pk:
+            self.helper.layout[-1][0].field_classes += ' bi bi-thermometer-plus'
 
     def clean(self):
         cleaned_data = super().clean()

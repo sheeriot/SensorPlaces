@@ -1,9 +1,9 @@
 {% load widget_tweaks %}
 
-<div class="card rounded-3 shadow-sm border-0 mb-4 {% if not sensor.is_active %}opacity-50{% endif %}" id="sensor-card-{{ sensor.pk }}">
+<div class="card my-1 {% if not sensor.is_active %}opacity-50{% endif %}" id="sensor-card-{{ sensor.pk }}">
 
-    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
+    <div class="card-header d-flex justify-content-between align-items-center py-1">
+        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
             <i class="bi bi-thermometer me-2"></i>
             Sensor Details
         </h5>
@@ -20,7 +20,7 @@
             {% endif %}
         </div>
     </div>
-    <div class="card-body py-3">
+    <div class="card-body p-2">
         <!-- Sensor Name -->
         <div class="mb-1">
             <label class="text-body-secondary small text-uppercase d-block">Sensor Name</label>

@@ -1,9 +1,9 @@
 {# {% load widget_tweaks %} #}
 
 <div id="locationCard_{{ location.pk }}"
-     class="card rounded-3 shadow-sm my-1 {% if not location.is_active %}opacity-50 text-muted{% endif %}">
-    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0 d-flex align-items-center gap-2">
+     class="card my-1 {% if not location.is_active %}opacity-50 text-muted{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center py-1">
+        <h5 class="card-title mb-0 fs-5 d-flex align-items-center gap-2">
             <i class="bi bi-geo-alt"></i>
             <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-dark text-decoration-none">
                 {{ location.name }}
@@ -23,12 +23,12 @@
             {% else %}
                 <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" 
                    class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-arrow-right"></i>
+                    <i class="bi bi-eye-fill"></i>
                 </a>
             {% endif %}
         </div>
     </div>
-    <div class="card-body py-2">
+    <div class="card-body py-2 px-2">
         <div class="row">
             <!-- Left side: Name & Place -->
             <div class="col-7">
