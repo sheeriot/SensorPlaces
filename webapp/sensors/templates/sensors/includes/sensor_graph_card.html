@@ -1,0 +1,53 @@
+<div class="card my-2" id="sensor-graph-card" 
+    data-sensor-id="{{ sensor.pk }}" 
+    data-place-slug="{{ place.slug }}"
+    data-sensor-type="{{ sensor.sensor_type }}"
+    data-api-url="{% if sensor.device.is_lorawan %}{% url 'sensors:lorawan_sensor_data_api' place_slug=place.slug pk=sensor.pk %}{% else %}{% url 'sensors:sensor_readings_api' place_slug=place.slug pk=sensor.pk %}{% endif %}">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-graph-up-arrow me-2"></i>
+                {% if sensor.device.is_lorawan %}InfluxDB Graph{% else %}Recent Readings{% endif %}
+            </h5>
+            <div class="d-flex align-items-center">
+                <div class="form-check form-switch me-2">
+                    <input class="form-check-input" type="checkbox" id="filter-outliers-switch" checked>
+                    <label class="form-check-label" for="filter-outliers-switch">Filter Outliers</label>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGraph" aria-expanded="true" aria-controls="collapseGraph">
+                    <i class="bi bi-arrows-angle-expand"></i>
+                </button>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="6h">6h</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="24h">24h</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="3d">3d</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset active" data-range="7d">7d</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="14d">14d</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="30d">30d</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="60d">60d</button>
+            </div>
+            <div class="d-flex align-items-center">
+                <div class="input-group input-group-sm w-auto">
+                    <input type="date" id="start-date-picker" class="form-control">
+                    <span class="input-group-text">to</span>
+                    <input type="date" id="end-date-picker" class="form-control">
+                    <button id="apply-date-range" class="btn btn-primary">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="collapse show" id="collapseGraph">
+        <div class="card-body">
+            <canvas id="sensorChart"></canvas>
+        </div>
+        <div class="card-footer">
+            <h6 class="card-title">Data Points</h6>
+            <div id="data-points">
+                <p class="text-muted">No data loaded.</p>
+            </div>
+        </div>
+    </div>
+</div> 

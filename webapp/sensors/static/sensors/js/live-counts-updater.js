@@ -11,7 +11,7 @@
 
 const liveCountsUpdater = {
     config: {
-        debug: true,
+        debug: false,
         updateInterval: 60000, // 1 minute
     },
 

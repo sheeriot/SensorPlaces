@@ -1,5 +1,0 @@
-<a href="{% if location %}{% url 'sensors:device_create_in_location' place_slug=place.slug location_pk=location.pk %}{% else %}{% url 'sensors:device_create' place_slug=place.slug %}{% endif %}"
-   class="btn btn-sm btn-outline-primary"
-   title="Add a new device">
-    <span class="text-nowrap"><i class="bi bi-hdd-rack"></i><i class="bi bi-plus-circle-dotted"></i></span>
-</a>

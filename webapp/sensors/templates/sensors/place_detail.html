@@ -5,18 +5,12 @@
 {% block title %}Sensor Places - {{ place.name }}{% endblock %}
 
 {% block extra_css %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="row gx-2 my-1">
-    <!-- Header with Title and Navigation -->
-
-    <!-- Place Title Card -->
-    <div class="col-12">
-        {% include "sensors/partials/place_title_card.html" with place=place place_map_html=place_map_html %}
-    </div>
-
+    <div class="row gx-2 my-1">
     <!-- Left Column: Place Details -->
     <div class="col-md-4">
         
@@ -36,11 +30,9 @@
         {% include "sensors/includes/location_list_card.html" with place=place %}
         <!-- Site Plan Card -->
         {% if place.siteplan_image %}
-            <div class="mt-3">
-                {% include "sensors/includes/siteplan_card.html" with editable=True place=place %}
-            </div>
+            {% include "sensors/includes/siteplan_card.html" with editable=True place=place %}
         {% else %}
-            <div class="card mt-3">
+            <div class="card my-1">
                 <div class="card-body text-center">
                     <h5 class="card-title">No Site Plan Available</h5>
                     <p class="card-text">Upload a site plan to visualize your sensor locations.</p>
@@ -50,7 +42,7 @@
                 </div>
             </div>
         {% endif %}
-        
+    
         <!-- InfluxDB Sources Card -->
         {% include "sensors/influxsource_list.html" with place=place influxsources=influxsources %}
     </div>
@@ -58,6 +50,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="{% static 'sensors/js/siteplan-editor.js' %}"></script>
 <script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
 <script src="{% static 'sensors/js/live-counts-updater.js' %}"></script>

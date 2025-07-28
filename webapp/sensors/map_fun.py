@@ -4,7 +4,7 @@ from folium.plugins import BeautifyIcon
 from icecream import ic
 import json
 
-def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom_start=10):
+def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom_start=10, scroll_wheel_zoom=False):
     """Create a map centered on a place or set of places"""
     try:
         # Modern map configuration with Street tiles as default
@@ -14,7 +14,7 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
             'tiles': 'OpenStreetMap',
             'tiles_name': 'Street',
             'zoom_start': zoom_start,
-            'scrollWheelZoom': True,
+            'scrollWheelZoom': scroll_wheel_zoom,
             'dragging': True,
             'control_scale': True,
             'width': '100%',
@@ -57,81 +57,27 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
         m._name = "places_overview_map"
         
         # Add markers
-        for place in places:
-            popup_html = f"""
-            <div class="place-popup">
-                <h4>{place.name}</h4>
-                <p>Status: {'Active' if place.is_active else 'inactive'}</p>
-            </div>
-            """
-            
-            # Create marker with all data attributes needed by places-map-folium.js
-            icon_html = f'''
-                <div class="awesome-marker-icon-{'blue' if place.is_active else 'red'} awesome-marker place-marker"
-                    data-place-slug="{place.slug}"
-                    data-place-active="{str(place.is_active).lower()}"
-                    data-place-lat="{str(place.latitude)}"
-                    data-place-lon="{str(place.longitude)}"
-                    data-place-name="{place.name}"
-                    style="margin-left: -17px; margin-top: -42px; width: 35px; height: 45px;"
-                >
-                    <i class="bi bi-{'info-circle' if place.is_active else 'question-circle'} icon-white"></i>
-                </div>
-            '''
-            
-            marker = folium.Marker(
-                location=[float(place.latitude), float(place.longitude)],
-                popup=folium.Popup(popup_html, max_width=300),
-                icon=folium.DivIcon(html=icon_html),
-                name=f"place_marker_{place.slug}"
-            )
-            marker.add_to(m)
-        
-        # Calculate bounds for both active and all places
-        bounds_data = {
-            "initial_state": {
-                "hide_inactive": True  # Start with inactive places hidden
-            }
-        }
-        
-        # Active places bounds
-        if active_places:
-            bounds_data["active"] = {
-                "sw": [min(active_lats), min(active_lons)],
-                "ne": [max(active_lats), max(active_lons)]
-            }
-            # Fit map to active places initially
-            if len(active_places) > 1:
-                m.fit_bounds([bounds_data["active"]["sw"], bounds_data["active"]["ne"]])
-            else:
-                # For single points, add zoom info to bounds_data
-                bounds_data["single_point_zoom"] = zoom_start
-        
-        # All places bounds
         if places:
-            bounds_data["all"] = {
-                "sw": [min(all_lats), min(all_lons)],
-                "ne": [max(all_lats), max(all_lons)]
-            }
-            # If no active places, fit to all places
-            if not active_places:
-                if len(places) > 1:
-                    m.fit_bounds([bounds_data["all"]["sw"], bounds_data["all"]["ne"]])
-                else:
-                    # For single points, add zoom info to bounds_data
-                    bounds_data["single_point_zoom"] = zoom_start
+            for place in places:
+                popup_html = f"<h6>{place.name}</h6>Status: {'Active' if place.is_active else 'Inactive'}"
+                folium.Marker(
+                    location=[float(place.latitude), float(place.longitude)],
+                    popup=folium.Popup(popup_html, max_width=200),
+                    icon=BeautifyIcon(
+                        icon='info-circle',
+                        icon_shape='marker',
+                        border_color= 'blue' if place.is_active else 'red',
+                        background_color= 'blue' if place.is_active else 'red',
+                        text_color='white'
+                    )
+                ).add_to(m)
         
-        # Get the map HTML
-        map_html = m.get_root().render()
+        # Fit map to bounds if multiple places are provided
+        if places and len(places) > 1:
+            m.fit_bounds([[min(all_lats), min(all_lons)], [max(all_lats), max(all_lons)]])
+
+        return m.get_root().render()
         
-        # Add the bounds data as a proper JSON attribute for placesMapFoliumSystem to use
-        map_html = map_html.replace(
-            'class="folium-map"',
-            f'class="folium-map" data-map-bounds=\'{json.dumps(bounds_data)}\''
-        )
-        
-        # ic("Generated map HTML length:", len(map_html))
-        return map_html
     except Exception as e:
-        # ic("Error creating map:", str(e))
+        ic("Error creating map:", str(e))
         return "" 

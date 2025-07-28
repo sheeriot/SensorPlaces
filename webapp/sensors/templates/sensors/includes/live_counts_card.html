@@ -2,78 +2,88 @@
 
 <!-- Left Column: Live Counts -->
 <div class="card my-1" id="live_counts_card">
-    <div class="card-header p-0" id="live_counts_card_header">
-        <h5 class="card-title p-2 mb-0 text-nowrap">
-            <i class="bi bi-graph-up me-2"></i>Live Counts
-        </h5>
+    <div class="card-header py-1" id="live_counts_card_header">
+        <div class="row g-0 align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
+                    <i class="bi bi-graph-up me-2"></i>Live Counts
+                </h5>
+            </div>
+            <div class="col-auto text-center font-monospace small text-muted" style="width: 12%;">A</div>
+            <div class="col-auto text-center font-monospace small text-muted" style="width: 12%;">I</div>
+        </div>
     </div>
     <div class="card-body p-0">
-        <table class="table table-sm table-borderless mb-0">
-            <tbody>
-                <tr>
-                    <td class="ps-3 d-flex align-items-center">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item py-1">
+                <div class="row g-0 align-items-center">
+                    <div class="col">
                         <a href="{% url 'sensors:location_list' place_slug=place.slug %}" class="text-decoration-none">
                             <i class="bi bi-geo-alt me-1"></i>Locations
                         </a>
-                    </td>
-                    <td class="text-center font-monospace" style="width: 12%">
+                    </div>
+                    <div class="col-auto text-center font-monospace" style="width: 12%;">
                         <a href="{% url 'sensors:location_list' place_slug=place.slug %}" class="text-decoration-none">
                             <span id="locations-active" class="text-success locations-active">
                                 {{ locations_active }}
-                        </span>
+                            </span>
                         </a>
-                    </td>
-                    <td class="text-center font-monospace" style="width: 12%">
+                    </div>
+                    <div class="col-auto text-center font-monospace" style="width: 12%;">
                         <a href="{% url 'sensors:location_list' place_slug=place.slug %}?hide_inactive=false" class="text-decoration-none">
                             <span id="locations-inactive" class="text-secondary locations-inactive">
                                 {{ locations_inactive }}
-                        </span>
+                            </span>
                         </a>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="ps-3 d-flex align-items-center">
+                    </div>
+                </div>
+            </li>
+            <li class="list-group-item py-1">
+                <div class="row g-0 align-items-center">
+                    <div class="col">
                         <a href="{% url 'sensors:device_list' place_slug=place.slug %}" class="text-decoration-none">
-                        <i class="bi bi-hdd-rack me-1"></i>Devices
+                            <i class="bi bi-hdd-rack me-1"></i>Devices
                         </a>
-                    </td>
-                    <td class="text-center font-monospace" style="width: 12%">
+                    </div>
+                    <div class="col-auto text-center font-monospace" style="width: 12%;">
                         <a href="{% url 'sensors:device_list' place_slug=place.slug %}" class="text-decoration-none">
                             <span id="devices-active" class="text-success devices-active">
                                 {{ devices_active }}
                             </span>
                         </a>
-                    </td>
-                    <td class="text-center font-monospace" style="width: 12%">
+                    </div>
+                    <div class="col-auto text-center font-monospace" style="width: 12%;">
                         <a href="{% url 'sensors:device_list' place_slug=place.slug %}?hide_inactive=false" class="text-decoration-none">
-                        <span id="devices-inactive" class="text-secondary devices-inactive">
+                            <span id="devices-inactive" class="text-secondary devices-inactive">
                                 {{ devices_inactive }}
                             </span>
                         </a>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="ps-3 d-flex align-items-center">
+                    </div>
+                </div>
+            </li>
+            <li class="list-group-item py-1">
+                <div class="row g-0 align-items-center">
+                    <div class="col">
                         <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}" class="text-decoration-none">
-                        <i class="bi bi-thermometer-half me-1"></i>Sensors
+                            <i class="bi bi-thermometer-half me-1"></i>Sensors
                         </a>
-                    </td>
-                    <td class="text-center font-monospace" style="width: 12%">
+                    </div>
+                    <div class="col-auto text-center font-monospace" style="width: 12%;">
                         <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}" class="text-decoration-none">
-                        <span id="sensors-active" class="text-success sensors-active">
+                            <span id="sensors-active" class="text-success sensors-active">
                                 {{ sensors_active }}
                             </span>
                         </a>
-                    </td>
-                    <td class="text-center font-monospace" style="width: 12%">
+                    </div>
+                    <div class="col-auto text-center font-monospace" style="width: 12%;">
                         <a href="{% url 'sensors:sensor_list' place_slug=place.slug %}?hide_inactive=false" class="text-decoration-none">
-                        <span id="sensors-inactive" class="text-secondary sensors-inactive">
+                            <span id="sensors-inactive" class="text-secondary sensors-inactive">
                                 {{ sensors_inactive }}
                             </span>
                         </a>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                    </div>
+                </div>
+            </li>
+        </ul>
     </div>
 </div> 

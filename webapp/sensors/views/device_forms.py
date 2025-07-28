@@ -203,7 +203,7 @@ class DeviceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        ic(cleaned_data)
+        # ic(cleaned_data)
         if self.errors:
             ic(self.errors.as_json())
         name = cleaned_data.get('name')

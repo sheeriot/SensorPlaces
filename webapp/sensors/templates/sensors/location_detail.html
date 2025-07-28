@@ -3,12 +3,6 @@
 {% block title %}{{ location.name }}{% endblock %}
 
 {% block content %}
-<div class="row my-1">
-    <!-- Place Title Card -->
-    <div class="col-12">
-        {% include "sensors/partials/place_title_card.html" %}
-    </div>
-</div>
 <div class="row gx-2 my-1">
     <!-- Left Column -->
     <div class="col-md-4">
@@ -34,6 +28,11 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+{% endblock %}
+
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
 {% endblock %}

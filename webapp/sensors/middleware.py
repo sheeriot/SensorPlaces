@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.template.response import TemplateResponse
 from django.shortcuts import get_object_or_404
 from django.utils.deprecation import MiddlewareMixin
+from django.utils import timezone
 
 from .models import Place, ToastNotification
 
@@ -150,4 +151,22 @@ class ToastMiddleware:
         # Only handle template-specific operations here
         if isinstance(response, TemplateResponse) and not hasattr(response, 'context_data'):
             response.context_data = {}
+        return response
+
+class TimezoneMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user_timezone = request.session.get('user_timezone')
+        if user_timezone:
+            timezone.activate(user_timezone)
+        else:
+            timezone.deactivate()
+        
+        response = self.get_response(request)
+        
+        # Deactivate the timezone after the response is processed
+        timezone.deactivate()
+        
         return response

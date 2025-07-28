@@ -83,6 +83,22 @@ class Place(models.Model):
             return self.siteplan_image.url
         return None
 
+    def get_unassigned_location(self):
+        """
+        Retrieves or creates the default 'Unassigned Devices' location for this place.
+        This location is used to stage devices that belong to the place but are not yet physically installed.
+        """
+        location, created = Location.objects.get_or_create(
+            place=self,
+            slug='unassigned-devices',
+            defaults={
+                'name': 'Unassigned Devices',
+                'is_active': False,
+                'description': 'Default location for devices that are not yet physically placed.'
+            }
+        )
+        return location
+
     class Meta:
         verbose_name_plural = '1. Places'
         ordering = ['-is_active', Lower('name')]
@@ -91,6 +107,7 @@ class Location(models.Model):
     name: CharField = models.CharField(max_length=100)
     slug: CharField = models.SlugField(max_length=100, blank=True)
     place: ForeignKey = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='locations')
+    description: TextField = models.TextField(blank=True, null=True)
     x_pos: DecimalField = models.DecimalField(
         max_digits=5,
         decimal_places=2,
@@ -186,19 +203,17 @@ class Device(models.Model):
     model: CharField = models.CharField(max_length=100, null=True, blank=True)
     manufacturer: CharField = models.CharField(max_length=100, null=True, blank=True)
     device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    place: ForeignKey = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='devices', null=True, blank=True)
     location: ForeignKey = models.ForeignKey(
         Location, 
-        on_delete=models.SET_NULL, 
+        on_delete=models.CASCADE, 
         related_name='devices',
-        null=True,
-        blank=True
     )
     device_type = models.ForeignKey(
         DeviceType,
         on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='devices',
-        null=True
     )
     is_lorawan: BooleanField = models.BooleanField(default=False, verbose_name="LoRaWAN Device")
     is_active: BooleanField = models.BooleanField(
@@ -217,10 +232,6 @@ class Device(models.Model):
             })
 
     def save(self, *args, **kwargs):
-        # If location is set, ensure place is consistent
-        if self.location:
-            self.place = self.location.place
-
         if self.device_id:
             self.device_id = self.device_id.lower()
 
@@ -243,7 +254,7 @@ class Device(models.Model):
 
     class Meta:
         verbose_name_plural = '4. Devices'
-        ordering = ['place', 'location', '-is_active', Lower('name')]
+        ordering = ['location__place', 'location', '-is_active', Lower('name')]
 
 class InfluxSource(models.Model):
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='influx_sources')

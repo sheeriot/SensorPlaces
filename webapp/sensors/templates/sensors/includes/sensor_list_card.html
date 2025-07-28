@@ -6,17 +6,26 @@
             <i class="bi bi-thermometer me-2"></i>
             Sensors
         </h5>
-        {% if not device or device.is_active %}
-            {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" hide_inactive=hide_inactive %}
+        {% if device and device.is_active %}
+            {% include 'sensors/partials/sensor_add_button.html' %}
         {% endif %}
     </div>
     <div class="card-body p-0">
         <table id="sensor-list-table" class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    {% if not narrow_view %}
+                    <th class="text-end">Active</th>
+                    <th class="text-end text-nowrap" style="width: 15%;">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
             <tbody>
             {# Renders sensors for a single device #}
             {% if device %}
                 {% for sensor in sensors %}
-                    {% include 'sensors/includes/sensor_row.html' with sensor=sensor device=device hide_inactive=hide_inactive %}
+                    {% include 'sensors/partials/sensor_row.html' with sensor=sensor device=device hide_inactive=hide_inactive %}
                 {% empty %}
                     <tr>
                         <td colspan="4" class="text-center text-muted p-3">
@@ -37,7 +46,7 @@
                         <td colspan="4" class="text-center text-muted p-3">
                             <i class="bi bi-info-circle me-1"></i>
                             This location has no devices.
-                            <a href="{% url 'sensors:device_create' place_slug=place.slug location_pk=location.pk %}" class="btn btn-sm btn-outline-primary ms-2">
+                            <a href="{% url 'sensors:device_create_in_location' place_slug=place.slug location_pk=location.pk %}" class="btn btn-sm btn-outline-primary ms-2">
                                 <i class="bi bi-plus-lg me-1"></i>Add Device
                             </a>
                         </td>
@@ -46,27 +55,9 @@
             {# Renders a list of locations with their devices and sensors #}
             {% elif locations %}
                 {% for location in locations %}
-                    <tr class="table-primary location-row {% if not location.is_active %}text-muted opacity-50{% endif %} {% if not location.is_active and hide_inactive %}d-none{% endif %}" data-location-id="{{ location.pk }}" data-location-active="{{ location.is_active|lower }}">
-                        <td>
-                            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-decoration-none text-dark d-flex align-items-center">
-                                <i class="bi bi-geo-alt me-2"></i>
-                                <strong class="text-break">{{ location.name }}</strong>
-                            </a>
-                        </td>
-                        <td class="d-none d-lg-table-cell">
-                            {% if not location.is_active %}
-                                <span class="badge bg-secondary">inactive</span>
-                            {% endif %}
-                        </td>
-                        <td class="d-none d-md-table-cell">
-                            {% if not location.devices_sorted %}
-                                <span class="text-muted fst-italic">no devices</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-end"></td>
-                    </tr>
+                    {% include 'sensors/includes/sensor_list_location_row.html' with location=location hide_inactive=hide_inactive %}
                     {% for device in location.devices_sorted %}
-                        {% include 'sensors/includes/sensor_list_device_row.html' with device=device parent_is_active=location.is_active %}
+                        {% include 'sensors/includes/sensor_list_device_row.html' with device=device parent_is_active=location.is_active hide_inactive=hide_inactive %}
                     {% endfor %}
                 {% endfor %}
             {% endif %}

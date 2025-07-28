@@ -12,10 +12,11 @@ class LocationForm(forms.ModelForm):
 
     class Meta:
         model = Location
-        fields = ['name', 'slug', 'place', 'is_active']
+        fields = ['name', 'slug', 'place', 'is_active', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter location name', 'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'placeholder': 'auto-generated from name', 'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'placeholder': 'Enter a brief description of this location', 'class': 'form-control', 'rows': 3}),
             'place': forms.HiddenInput(),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input active-checkbox',
@@ -99,6 +100,7 @@ class LocationForm(forms.ModelForm):
                 Column('slug', css_class='col-md-4'),
                 css_class='mb-3'
             ),
+            Field('description', css_class='mb-3'),
             Row(
                 Field(
                     'is_active',

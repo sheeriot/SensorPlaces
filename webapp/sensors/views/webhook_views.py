@@ -39,7 +39,7 @@ class WebhookReceiverView(View):
             ic(f"Device with id '{device_id}' in place '{place_slug}' not found.")
             return JsonResponse({'status': 'error', 'message': 'Device not found'}, status=404)
 
-        ic(request.headers)
+        # ic(request.headers)
         
         for sensor_name, value in query_params.items():
             if sensor_name in self.IGNORED_KEYS:
@@ -117,26 +117,20 @@ class WebhookReceiverView(View):
                 # If device not found, create a new one in a default location
                 try:
                     place = Place.objects.get(slug=place_slug)
-                    not_set_location, created = Location.objects.get_or_create(
-                        place=place,
-                        name='not_set',
-                        defaults={'description': 'Default location for auto-created devices'}
-                    )
-                    if created:
-                        ic(f"Created 'not_set' location in place '{place.name}'")
+                    unassigned_location = place.get_unassigned_location()
                     
                     # Create the new device
                     device = Device.objects.create(
                         name=f"New Device {device_id}",
                         device_id=device_id,
-                        location=not_set_location,
+                        location=unassigned_location,
                         is_active=True,  # Or False, depending on desired behavior
                         model='Auto-created',
                         manufacturer='Unknown'
                     )
                     ic("Created new device", device)
                 except Exception as e:
-                    ic(f"Error creating new device or 'not_set' location: {e}")
+                    ic(f"Error creating new device or 'Unassigned' location: {e}")
                     return JsonResponse({'status': 'error', 'message': 'Failed to auto-create device'}, status=500)
         else:
             ic("No device_id in URL or payload. Logging payload and exiting.")

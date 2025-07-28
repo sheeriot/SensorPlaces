@@ -1,0 +1,67 @@
+{% load widget_tweaks %}
+
+<tr id="sensor-row-{{ sensor.pk }}" 
+    class="sensor-row {% if not sensor.is_active %}opacity-50{% endif %} {% if sensor.pk == object.pk %}table-info{% endif %}"
+    data-sensor-id="{{ sensor.pk }}"
+    data-sensor-name="{{ sensor.name }}"
+    data-sensor-active="{{ sensor.is_active|lower }}">
+    <td class="text-nowrap">
+        <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none d-flex align-items-center">
+            <i class="bi bi-thermometer me-2"></i>
+            <div>
+                <strong>{{ sensor.name }}</strong>
+                <div class="small text-muted">{{ sensor.get_sensor_type_display }}</div>
+            </div>
+        </a>
+    </td>
+    {% if not narrow_view %}
+    <td class="text-end">
+        {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug %}
+    </td>
+    <td class="text-end">
+        <div class="btn-group btn-group-sm">
+            <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="btn btn-info" title="View Sensor">
+                <i class="bi bi-eye"></i>
+            </a>
+            <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-warning" title="Edit Sensor">
+                <i class="bi bi-pencil"></i>
+            </a>
+        </div>
+    </td>
+    {% endif %}
+</tr>
+
+{% if sensor.is_active and device_is_active and parent_is_active %}
+<tr id="readings-results-{{ sensor.pk }}" class="readings-results d-none sensor-row" data-device-id="{{ device.pk }}">
+    <td colspan="5">
+        <div class="alert mb-3" role="alert"></div>
+        <div class="readings-summary d-none">
+            <h6>Summary</h6>
+            <dl class="row mb-3">
+                <dt class="col-sm-3">Count</dt>
+                <dd class="col-sm-9 count">-</dd>
+                <dt class="col-sm-3">Range</dt>
+                <dd class="col-sm-9">
+                    <span class="min">-</span> to <span class="max">-</span>
+                </dd>
+                <dt class="col-sm-3">Average</dt>
+                <dd class="col-sm-9 avg">-</dd>
+                <dt class="col-sm-3">Time Range</dt>
+                <dd class="col-sm-9 timerange">-</dd>
+            </dl>
+        </div>
+        <div class="recent-readings d-none">
+            <h6>Recent Readings</h6>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </td>
+</tr>
+{% endif %} 

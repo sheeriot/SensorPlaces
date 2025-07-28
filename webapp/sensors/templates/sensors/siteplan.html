@@ -3,30 +3,24 @@
 
 {% block title %}Site Plan - {{ place.name }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+{% endblock %}
+
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h5 class="card-title mb-0">
-            <i class="bi bi-map me-2"></i>
-            Site Plan: {{ place.name }}
-        </h5>
+<div class="row gx-2 my-1">
+    <div class="col-md-4">
+        {% include "sensors/includes/location_list_card.html" %}
     </div>
-    <div class="card-body p-0">
-        {% if place.siteplan_image %}
-            <div class="siteplan-wrapper bg-light border-top">
-                <div id="siteplan-container"
-                     data-place-slug="{{ place.slug }}"
-                     data-image-url="{{ place.get_siteplan_url }}"
-                     data-locations="{{ locations_json|escapejs }}">
-                </div>
-            </div>
-        {% else %}
-            <p class="text-center text-muted p-4">No site plan image available for this place.</p>
-        {% endif %}
+    <div class="col-md-8">
+        {% include "sensors/includes/siteplan_card.html" %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'sensors/js/siteplan-viewer.js' %}"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+<script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
+<script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
 {% endblock %} 

@@ -28,10 +28,10 @@ def get_annotated_locations(place):
     Returns a queryset of locations for a given place, annotated with device and sensor counts.
     """
     return Location.objects.filter(place=place).annotate(
-        devices_active_count=Count('devices', filter=Q(devices__is_active=True)),
-        devices_inactive_count=Count('devices', filter=Q(devices__is_active=False)),
-        sensors_active_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True)),
-        sensors_inactive_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False))
+        devices_active_count=Count('devices', filter=Q(devices__is_active=True), distinct=True),
+        devices_inactive_count=Count('devices', filter=Q(devices__is_active=False), distinct=True),
+        sensors_active_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=True), distinct=True),
+        sensors_inactive_count=Count('devices__sensors', filter=Q(devices__sensors__is_active=False), distinct=True)
     ).order_by('-is_active', Lower('name'))
 
 def get_location_data(location) -> Dict[str, Any]:
@@ -57,16 +57,21 @@ def get_place_counts(place):
     - sensors_active_count
     - sensors_inactive_count
     """
-    locations_active_count = Location.objects.filter(place=place, is_active=True).distinct().count()
-    locations_inactive_count = Location.objects.filter(place=place, is_active=False).distinct().count()
-    devices_active_count = Device.objects.filter(location__place=place, is_active=True).distinct().count()
-    devices_inactive_count = Device.objects.filter(location__place=place, is_active=False).distinct().count()
-    sensors_active_count = Sensor.objects.filter(device__location__place=place, is_active=True).distinct().count()
-    sensors_inactive_count = Sensor.objects.filter(device__location__place=place, is_active=False).distinct().count()
+    locations_active_count = Location.objects.filter(place=place, is_active=True).count()
+    locations_inactive_count = Location.objects.filter(place=place, is_active=False).count()
+    
+    # This query ensures we count all devices linked to the place, either directly
+    # or through their location, avoiding double counts.
+    devices_active_count = Device.objects.filter(location__place=place, is_active=True).count()
+    devices_inactive_count = Device.objects.filter(location__place=place, is_active=False).count()
+    
+    # Sensor counts should also be robust
+    sensors_active_count = Sensor.objects.filter(device__location__place=place, is_active=True).count()
+    sensors_inactive_count = Sensor.objects.filter(device__location__place=place, is_active=False).count()
     
     return locations_active_count, locations_inactive_count, devices_active_count, devices_inactive_count, sensors_active_count, sensors_inactive_count
 
-def get_place_data(place, include_json=True):
+def get_place_data(place, request=None, include_json=True):
     """Get complete place data including locations and statistics.
     
     Returns a dictionary with all place-related data.
@@ -74,12 +79,19 @@ def get_place_data(place, include_json=True):
     import json
     
     # Get annotated locations
-    locations = get_annotated_locations(place)
+    locations = get_annotated_locations(place).order_by('-is_active', Lower('name'))
     
     # Build result dictionary with proper type annotations
     result = {}
     result['locations'] = locations
     
+    # Add hide_inactive state from request if available
+    if request:
+        hide_inactive_cookie = request.COOKIES.get('hideInactive_location', 'false')
+        result['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
+    else:
+        result['hide_inactive'] = False # Default if no request
+        
     # Add JSON data if requested
     if include_json:
         locations_data = [get_location_data(loc) for loc in locations]

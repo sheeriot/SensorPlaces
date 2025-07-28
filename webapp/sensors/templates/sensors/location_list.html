@@ -5,15 +5,11 @@
 {% block title %}Sensor Places - Locations{% endblock %}
 
 {% block extra_css %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="row my-1">
-    <div class="col-12">
-        {% include "sensors/partials/place_title_card.html" %}
-    </div>
-</div>
 <div class="row gx-2 my-1">
     <div class="col-md-4">
         <!-- Siteplan Card -->
@@ -29,6 +25,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
 <script src="{% static 'sensors/js/live-counts-updater.js' %}"></script>
 {% endblock %}

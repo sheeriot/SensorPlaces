@@ -13,11 +13,8 @@
 
 
 {% block content %}
-{% if object %}
-    {% include "sensors/partials/place_title_card.html" with place=object %}
-{% endif %}
 
-<div class="row justify-content-center">
+<div class="row gx-2 my-1">
     <div class="col-md-8">
         {% include "sensors/includes/place_form_card.html" %}
     </div>

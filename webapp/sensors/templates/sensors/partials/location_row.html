@@ -2,8 +2,12 @@
 This template expects:
 - location: Location object with devices_active_count and devices_inactive_count annotations
 - place: Place object
+- hide_inactive: boolean
 {% endcomment %}
-<div class="list-group-item list-group-item-action {% if not location.is_active and hide_inactive %}d-none{% elif not location.is_active %}list-group-item-light text-muted opacity-75{% endif %}"
+<div class="location-row px-2 py-2 border-top {% if not location.is_active %}bg-light text-muted opacity-75{% endif %} {% if not location.is_active and hide_inactive %}d-none{% endif %}"
+     data-location-id="{{ location.id }}"
+     data-location-slug="{{ location.slug }}"
+     data-location-active="{{ location.is_active|lower }}"
      id="location-row-{{ location.id }}">
     <div class="row g-0 align-items-center">
         <!-- Name (takes up remaining space) -->
@@ -15,22 +19,15 @@ This template expects:
         </div>
 
         <!-- Counts (fixed width, appears before buttons) -->
-        <div class="col-2 small text-nowrap" title="Devices">
-            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-decoration-none text-dark">
-                <i class="bi bi-hdd-stack me-1"></i>
-                <span class="text-dark">{{ location.devices_active_count }}</span>
-            </a>
-            {% if location.devices_inactive_count > 0 %}
-            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}?hide_inactive=false" class="text-decoration-none">
-                <span class="text-muted small">(+{{ location.devices_inactive_count }})</span>
-            </a>
-            {% endif %}
+        <div class="col-auto text-end">
+            <span class="device-counts me-2 text-success font-monospace fw-bold" id="location-{{ location.pk }}-active-devices-count">{{ location.devices_active_count|default:0 }}</span>
+            <i class="bi bi-hdd-rack me-1"></i>
         </div>
         <div class="col-2 small text-nowrap" title="Sensors">
                 <i class="bi bi-cpu me-1"></i>
-            <span class="text-dark">{{ location.sensors_active_count }}</span>
+            <span class="text-dark">{{ location.sensors_active_count|default:0 }}</span>
             {% if location.sensors_inactive_count > 0 %}
-                <span class="text-muted small">(+{{ location.sensors_inactive_count }})</span>
+                <span class="text-muted small">(+{{ location.sensors_inactive_count|default:0 }})</span>
             {% endif %}
         </div>
 

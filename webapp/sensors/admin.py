@@ -36,12 +36,18 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'place', 'location', 'device_type', 'is_active', 'model', 'manufacturer', 'device_id')
-    list_filter = ('is_active', 'place', 'location', 'device_type', 'manufacturer')
-    search_fields = ('name', 'device_id', 'place__name', 'location__name')
+    list_display = ('name', 'place_name', 'location', 'device_type', 'is_active', 'model', 'manufacturer', 'device_id')
+    list_filter = ('is_active', 'location__place', 'location', 'device_type', 'manufacturer')
+    search_fields = ('name', 'device_id', 'location__place__name', 'location__name')
     list_editable = ('is_active',)
-    autocomplete_fields = ('place', 'location', 'device_type')
+    autocomplete_fields = ('location', 'device_type')
     ordering = ('name',)
+
+    def place_name(self, obj):
+        if obj.location:
+            return obj.location.place.name
+        return "N/A"
+    place_name.short_description = 'Place'
 
     class Meta:
         verbose_name_plural = '3. Devices'

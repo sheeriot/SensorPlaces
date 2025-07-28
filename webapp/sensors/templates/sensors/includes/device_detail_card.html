@@ -1,16 +1,12 @@
 {# {% load widget_tweaks %} #}
 
 <div id="device-detail-card" class="card my-1 {% if not device.is_active %}opacity-50{% endif %}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
+    <div class="card-header d-flex justify-content-between align-items-center py-1">
+        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
             <div class="text-nowrap">
                 <i class="bi bi-hdd-rack me-2"></i>
                 {{ device.name }}
                 {% include "sensors/partials/lorawan_badge.html" with device=device %}
-            </div>
-            <div class="text-nowrap">
-                <i class="bi bi-geo-alt me-2"></i>
-                {{ device.location.name }}
             </div>
         </h5>
         <div class="d-flex align-items-center">
@@ -25,9 +21,14 @@
             </a>
         </div>
     </div>
-    <div class="card-body">
+    <div class="card-body p-2">
         <dl class="row mb-0">
-            <dt class="col-sm-4">Device Type</dt>
+            <dt class="col-sm-4">Location</dt>
+            <dd class="col-sm-8">
+                <i class="bi bi-geo-alt me-2"></i>{{ device.location.name }}
+            </dd>
+            
+            <dt class="col-sm-4">Type</dt>
             <dd class="col-sm-8">{{ device.device_type.name }}</dd>
 
             {% if device.is_lorawan %}
@@ -43,7 +44,7 @@
                 {% endif %}
             </dd>
 
-            <dt class="col-sm-4">Sensor Count</dt>
+            <dt class="col-sm-4">Sensors</dt>
             <dd class="col-sm-8">
                 {{ device.active_sensors_count }}
                 {% if device.inactive_sensors_count > 0 %}

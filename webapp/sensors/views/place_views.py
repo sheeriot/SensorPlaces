@@ -51,11 +51,21 @@ class PlaceListView(LoginRequiredMixin, ListView):
 @login_required
 def siteplan_view(request, place_slug):
     place = get_object_or_404(Place, slug=place_slug)
-    locations = Location.objects.filter(place=place)
+    
+    # Annotate locations with active/inactive device counts
+    locations = Location.objects.filter(place=place).annotate(
+        devices_active_count=Count('device', filter=Q(device__is_active=True)),
+        devices_inactive_count=Count('device', filter=Q(device__is_active=False))
+    )
+    
     locations_json = json.dumps(
         [
             {
                 "name": loc.name,
+                "slug": loc.slug,
+                "description": loc.description or "",
+                "is_active": loc.is_active,
+                "devices_active_count": loc.devices_active_count,
                 "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
                 "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
                 "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
@@ -63,9 +73,12 @@ def siteplan_view(request, place_slug):
             for loc in locations
         ]
     )
+    
     return render(request, 'sensors/siteplan.html', {
         'place': place,
-        'locations_json': locations_json
+        'locations': locations, # Pass the queryset for the list card
+        'locations_json': locations_json,
+        'editable': True
     })
 
 class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
@@ -82,36 +95,17 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
         
-        # Check for hide_inactive cookie for locations
-        hide_inactive_cookie = self.request.COOKIES.get('hideInactive_location', 'false')
-        context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
-        
-        # Add place data from get_place_data function
-        place_data = get_place_data(self.object)
+        # Add place data from get_place_data function.
+        # This adds the correctly annotated 'locations' queryset, 'locations_json',
+        # 'hide_inactive' state, and other counts to the context.
+        place_data = get_place_data(self.object, self.request)
         context.update(place_data)
 
-        # Add device and sensor counts to context
+        # Add device and sensor counts to context for the live counts card
         context.update(get_live_counts_context(self.object))
         
         # Add InfluxDB sources to the context
         context['influxsources'] = InfluxSource.objects.filter(place=self.object)
-        
-        # Prepare locations data for siteplan, ensuring is_active is included
-        locations = Location.objects.filter(place=self.object)
-        locations_json = json.dumps(
-            [
-                {
-                    "name": loc.name,
-                    "slug": loc.slug,
-                    "is_active": loc.is_active,
-                    "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
-                    "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
-                    "url": reverse('sensors:location_detail', args=[self.object.slug, loc.slug])
-                }
-                for loc in locations
-            ]
-        )
-        context['locations_json'] = locations_json
         
         # Add place_map_html to the context
         try:

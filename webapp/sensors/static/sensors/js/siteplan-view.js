@@ -6,7 +6,7 @@
 const sitePlanView = {
     // State
     state: {
-        debug: true,
+        debug: false,
         map: null,
         imageOverlay: null,
         markers: new Map(), // slug -> L.Marker
