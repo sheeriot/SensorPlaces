@@ -138,10 +138,62 @@ const timeDisplay = {
     }
 };
 
+// Function to send timezone to backend
+function sendTimezoneToServer() {
+    if (sessionStorage.getItem('timezoneSet')) {
+        if (timeDisplayConfig.debug) console.log('Timezone already set in this session.');
+        return;
+    }
+
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timeDisplayConfig.debug) console.log('Detected timezone:', userTimezone);
+
+    fetch('/api/set-timezone/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ timezone: userTimezone })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            sessionStorage.setItem('timezoneSet', 'true');
+            if (timeDisplayConfig.debug) console.log('Timezone successfully set on server.');
+        } else {
+            if (timeDisplayConfig.debug) console.error('Failed to set timezone on server:', data.message);
+        }
+    })
+    .catch(error => {
+        if (timeDisplayConfig.debug) console.error('Error sending timezone to server:', error);
+    });
+}
+
+// Helper function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+
 // Initialize time display when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     if (timeDisplayConfig.debug) console.log('Initializing time display system');
     
+    // Send timezone to server
+    sendTimezoneToServer();
+
     // Initialize the tooltip
     const timeSpan = document.getElementById('localTime');
     if (timeSpan) {

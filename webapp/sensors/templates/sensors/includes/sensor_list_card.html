@@ -7,17 +7,18 @@
             Sensors
         </h5>
         {% if device and device.is_active %}
-            {% include 'sensors/partials/sensor_create_button.html' %}
+            {% include 'sensors/partials/sensor_add_button.html' %}
         {% endif %}
     </div>
     <div class="card-body p-0">
         <table id="sensor-list-table" class="table table-hover mb-0">
             <thead>
                 <tr>
-                    <th style="width: 50%;">Name</th>
+                    <th>Name</th>
+                    {% if not narrow_view %}
                     <th class="text-end">Active</th>
-                    <th style="width: 20%;">Type</th>
                     <th class="text-end text-nowrap" style="width: 15%;">Actions</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -31,7 +32,7 @@
                             <i class="bi bi-info-circle me-1"></i>
                             This device has no sensors.
                             {% if not readonly %}
-                                {% include 'sensors/partials/sensor_create_button.html' %}
+                                {% include 'sensors/partials/sensor_add_button.html' %}
                             {% endif %}
                         </td>
                     </tr>

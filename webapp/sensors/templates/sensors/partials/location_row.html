@@ -19,16 +19,9 @@ This template expects:
         </div>
 
         <!-- Counts (fixed width, appears before buttons) -->
-        <div class="col-2 small text-nowrap" title="Devices">
-            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-decoration-none text-dark">
-                <i class="bi bi-hdd-stack me-1"></i>
-                <span class="text-dark">{{ location.devices_active_count }}</span>
-            </a>
-            {% if location.devices_inactive_count > 0 %}
-            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}?hide_inactive=false" class="text-decoration-none">
-                <span class="text-muted small">(+{{ location.devices_inactive_count }})</span>
-            </a>
-            {% endif %}
+        <div class="col-auto text-end">
+            <span class="device-counts me-2 text-success font-monospace fw-bold" id="location-{{ location.pk }}-active-devices-count">{{ location.devices_active_count|default:0 }}</span>
+            <i class="bi bi-hdd-rack me-1"></i>
         </div>
         <div class="col-2 small text-nowrap" title="Sensors">
                 <i class="bi bi-cpu me-1"></i>

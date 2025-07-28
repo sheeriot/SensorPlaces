@@ -342,6 +342,30 @@ const toggleActiveManager = {
                     }
                 });
 
+                // Handle card-level updates
+                const card = document.querySelector(`.card[data-${modelType}-id="${id}"]`);
+                if (card) {
+                    if (response.is_active) {
+                        card.classList.remove('opacity-50', 'text-muted');
+                    } else {
+                        card.classList.add('opacity-50', 'text-muted');
+                    }
+                }
+
+                // Update label text
+                const toggleContainer = document.getElementById(`toggle-container-${modelType}-${id}`);
+                if (toggleContainer) {
+                    const label = toggleContainer.querySelector('label');
+                    if (label) {
+                        label.textContent = response.is_active ? 'Active' : 'inactive';
+                        if (response.is_active) {
+                            label.classList.remove('text-danger');
+                        } else {
+                            label.classList.add('text-danger');
+                        }
+                    }
+                }
+
                 // Handle child toggles based on parent type
                 if (modelType === 'location') {
                     this.updateChildTogglesForLocation(id, response.is_active);

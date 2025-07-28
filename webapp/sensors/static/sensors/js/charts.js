@@ -255,6 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const sensorId = readingsChartContainer.dataset.sensorId;
     const placeSlug = readingsChartContainer.dataset.placeSlug;
+    const readingsUrl = readingsChartContainer.dataset.readingsUrl;
+    const readingsTableUrl = readingsChartContainer.dataset.readingsTableUrl;
     const sensorUnit = readingsChartContainer.dataset.unit || '';
     const sensorName = readingsChartContainer.dataset.name || 'Sensor Readings';
 
@@ -275,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     const updateReadingsTable = (start, end) => {
-        let url = `/api/${placeSlug}/sensor/${sensorId}/readings_table/`;
+        let url = readingsTableUrl;
         if (start && end) {
             url += `?start=${start.toISOString()}&end=${end.toISOString()}`;
         }
@@ -307,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update both chart and table
         updateReadingsTable(start, now);
         
-        fetchSensorReadings(sensorId, placeSlug, start, now).then(data => {
+        fetchSensorReadings(readingsUrl, start, now).then(data => {
             if (debug) {
                 console.log("Fetched Data Points:", data.length);
             }
@@ -343,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if(debug) console.log(`Refreshing data for range: ${currentRangeDays} day(s)`);
 
-        fetchSensorReadings(sensorId, placeSlug, start, now).then(newData => {
+        fetchSensorReadings(readingsUrl, start, now).then(newData => {
             if (chartInstance) {
                 chartInstance.update(newData);
                  if(debug) console.log('Chart data refreshed.');
@@ -397,8 +399,8 @@ function getAdaptiveTimeStep(min, max) {
 }
 
 // Helper function to fetch sensor readings
-async function fetchSensorReadings(sensorId, placeSlug, start, end) {
-    let url = `/api/${placeSlug}/sensor/${sensorId}/readings/`;
+async function fetchSensorReadings(readingsUrl, start, end) {
+    let url = readingsUrl;
     if (start && end) {
         url += `?start=${start.toISOString()}&end=${end.toISOString()}`;
     }

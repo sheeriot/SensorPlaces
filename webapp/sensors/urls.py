@@ -7,6 +7,7 @@ from .views import (
     influx_views,
     webhook_views,
     toggle_active,
+    timezone_views,
 )
 from .views.sensor_views import (
     SensorListView,
@@ -14,6 +15,8 @@ from .views.sensor_views import (
     SensorCreateView,
     SensorUpdateView,
     SensorDeleteView,
+    sensor_readings_api,
+    sensor_readings_table_api,
 )
 
 app_name = 'sensors'
@@ -56,6 +59,11 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:pk>/delete/', SensorDeleteView.as_view(), name='sensor_delete'),
     path('<slug:place_slug>/sensor/<int:sensor_pk>/readings/', sensor_views.SensorReadingListView.as_view(), name='sensor_reading_list'),
 
+    # API endpoints for sensor readings
+    path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_readings_api, name='sensor_readings_api'),
+    path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_readings_table_api, name='sensor_readings_table_api'),
+    path('api/<slug:place_slug>/sensor/<int:pk>/lorawan_data/', sensor_views.lorawan_sensor_data_api, name='lorawan_sensor_data_api'),
+
     # InfluxSource URLs
     path('<slug:place_slug>/influx-sources/', influx_views.InfluxSourceListView.as_view(), name='influxsource_list'),
     path('<slug:place_slug>/influx-sources/new/', influx_views.InfluxSourceCreateView.as_view(), name='influxsource_create'),
@@ -68,4 +76,7 @@ urlpatterns = [
 
     # Toggle Active State
     path('api/<slug:place_slug>/toggle-active/', toggle_active.ToggleActiveView.as_view(), name='toggle_active'),
+    
+    # Timezone
+    path('api/set-timezone/', timezone_views.set_user_timezone, name='set_user_timezone'),
 ]

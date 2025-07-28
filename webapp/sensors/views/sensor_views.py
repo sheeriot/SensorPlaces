@@ -8,7 +8,7 @@ from django.utils.decorators import method_decorator
 from django.db.models import OuterRef, Subquery, Count, Min, Max, Prefetch, Q
 from django.db.models.functions import Lower
 
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect, HttpRequest
 
@@ -19,7 +19,7 @@ from ..models import Device, Sensor, SensorReading, Place, Location
 from .mixins import PlaceAnnotationMixin
 from .sensor_forms import SensorForm, LoRaWANSensorForm
 from ..utils import get_sensor_readings, generate_sparkline
-from ..influx_graphs import get_lorawan_sensor_data
+from ..influx_graphs import get_lorawan_sensor_data, get_lorawan_sensor_stats
 from .views_fun import get_annotated_locations, get_live_counts_context
 
 from datetime import datetime, timedelta
@@ -134,8 +134,19 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         
         # Add device and location to context
         sensor = self.get_object()
-        context['device'] = sensor.device
-        context['location'] = sensor.device.location
+
+        device_qs = Device.objects.annotate(
+            active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
+            inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
+        )
+        device = get_object_or_404(device_qs, pk=sensor.device.pk)
+
+        context['device'] = device
+        context['location'] = device.location
+        
+        # Add all sensors for the device to the context
+        context['sensors'] = Sensor.objects.filter(device=device).order_by(Lower('name'))
+        context['narrow_view'] = True
         
         # Get all readings for statistics and sparkline
         readings = SensorReading.objects.filter(sensor=sensor).order_by('timestamp')
@@ -143,16 +154,35 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['readings'] = readings
 
         # Get sensor reading statistics
-        stats = SensorReading.objects.filter(sensor=sensor).aggregate(
-            first_reading=Min('timestamp'),
-            last_reading=Max('timestamp'),
-            reading_count=Count('id')
-        )
+        if sensor.device.is_lorawan:
+            stats_data = get_lorawan_sensor_stats(sensor)
+            if stats_data:
+                stats = {
+                    'reading_count': stats_data.get('reading_count'),
+                    'first_reading': stats_data.get('first_reading'),
+                    'last_reading': stats_data.get('last_reading')
+                }
+            else:
+                stats = {
+                    'reading_count': 'N/A',
+                    'first_reading': 'N/A',
+                    'last_reading': 'N/A'
+                }
+        else:
+            stats = SensorReading.objects.filter(sensor=sensor).aggregate(
+                first_reading=Min('timestamp'),
+                last_reading=Max('timestamp'),
+                reading_count=Count('id')
+            )
         context['reading_stats'] = stats
 
         # Generate sparkline
-        timestamps = [reading.timestamp for reading in readings]
-        context['sparkline_image'] = generate_sparkline(timestamps)
+        if not sensor.device.is_lorawan:
+            timestamps = [reading.timestamp for reading in readings]
+            context['sparkline_image'] = generate_sparkline(timestamps)
+        
+        # Add locations for the place_nav_card
+        context['locations'] = get_annotated_locations(self._place)
         
         return context
 
@@ -914,24 +944,38 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
-def lorawan_sensor_graph_view(request, place_slug, pk):
-    place = get_object_or_404(Place, slug=place_slug)
-    sensor = get_object_or_404(Sensor, pk=pk, device__location__place=place)
-    time_range = request.GET.get('time_range', '1h')
+def lorawan_sensor_data_api(request, place_slug, pk):
+    """
+    API endpoint to get sensor readings from InfluxDB for a given LoRaWAN sensor.
+    """
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
 
-    chart_data = None
-    if sensor.device.is_lorawan:
-        chart_data = get_lorawan_sensor_data(sensor, time_range)
+    if not start_str or not end_str:
+        return JsonResponse({'error': 'Start and end date parameters are required.'}, status=400)
 
-    context = {
-        'place': place,
-        'sensor': sensor,
-        'device': sensor.device,
-        'location': sensor.device.location,
-        'chart_data': chart_data,
-        'time_range': time_range,
-    }
-    return render(request, 'sensors/lorawan_sensor_graph.html', context)
+    if not sensor.device.is_lorawan:
+        return JsonResponse({'error': 'Sensor is not a LoRaWAN sensor.'}, status=400)
+
+    # Convert start and end strings to datetime objects
+    from datetime import datetime
+    start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+    end = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+    
+    time_range = end - start
+    time_range_str = f"{int(time_range.total_seconds())}s"
+
+    chart_data = get_lorawan_sensor_data(sensor, time_range_str)
+    
+    if chart_data is None:
+        return JsonResponse({'error': 'Could not retrieve data from InfluxDB.'}, status=500)
+
+    # Convert timestamp objects to ISO 8601 strings
+    chart_data = [(ts.isoformat(), value) for ts, value in chart_data]
+
+    return JsonResponse(chart_data, safe=False)
+
 
 @login_required
 def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: int) -> JsonResponse:

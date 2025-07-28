@@ -39,7 +39,7 @@ class WebhookReceiverView(View):
             ic(f"Device with id '{device_id}' in place '{place_slug}' not found.")
             return JsonResponse({'status': 'error', 'message': 'Device not found'}, status=404)
 
-        ic(request.headers)
+        # ic(request.headers)
         
         for sensor_name, value in query_params.items():
             if sensor_name in self.IGNORED_KEYS:
