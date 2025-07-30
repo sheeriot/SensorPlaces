@@ -302,3 +302,8 @@ else:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
 SECURE_REFERRER_POLICY = 'same-origin'
+
+# Static files storage
+# https://docs.djangoproject.com/en/5.0/ref/contrib/staticfiles/#staticfiles-storage
+if os.environ.get('STATIC_BUSTER') == 'True':
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
