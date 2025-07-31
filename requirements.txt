@@ -13,3 +13,4 @@ pylint-django
 django-cors-headers
 matplotlib
 pandas
+gunicorn
