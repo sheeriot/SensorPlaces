@@ -1,4 +1,6 @@
 {% extends "sensors/base.html" %}
+{% load static %}
+{% load cache_bust %}
 
 {% block title %}Places{% endblock %}
 
@@ -26,5 +28,5 @@
 
 {% block extra_js %}
     <!-- place_list.html -->
-    <script src="{% static 'sensors/js/places-map-folium.js' %}"></script>
+    <script src="{% bust 'sensors/js/places-map-folium.js' %}"></script>
 {% endblock %}

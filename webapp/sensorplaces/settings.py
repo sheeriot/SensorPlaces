@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+import time
 
 from icecream import ic
 
@@ -23,30 +24,34 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-if os.environ.get('DJANGO_DEBUG') == 'False':
-    DEBUG = False
-else:
-    DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 't')
 
 ic("DEBUG: ", DEBUG)
 
 SERVERNAME1 = os.environ.get('SERVERNAME1')
 SERVERNAME2 = os.environ.get('SERVERNAME2')
 
-ALLOWED_HOSTS = ["127.0.0.1", SERVERNAME1, SERVERNAME2]
+ALLOWED_HOSTS = [h for h in ["127.0.0.1", SERVERNAME1, SERVERNAME2] if h]
+
 CSRF_TRUSTED_ORIGINS = [
-    'https://' + SERVERNAME1,
-    'https://' + SERVERNAME2,
-    'http://' + SERVERNAME1,
-    'http://' + SERVERNAME2,
     'http://127.0.0.1',
     'http://localhost',
 ]
+if SERVERNAME1:
+    CSRF_TRUSTED_ORIGINS.extend([
+        'https://' + SERVERNAME1,
+        'http://' + SERVERNAME1,
+    ])
+if SERVERNAME2:
+    CSRF_TRUSTED_ORIGINS.extend([
+        'https://' + SERVERNAME2,
+        'http://' + SERVERNAME2,
+    ])
 
 # CSRF Settings
 CSRF_COOKIE_SECURE = False  # Set to False for HTTP
@@ -111,9 +116,6 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'sensors.middleware.ToastMiddleware',
 ]
-
-if not DEBUG:
-    MIDDLEWARE.insert(0, 'django.middleware.security.SecurityMiddleware')
 
 ROOT_URLCONF = 'sensorplaces.urls'
 
@@ -303,7 +305,7 @@ else:
 
 SECURE_REFERRER_POLICY = 'same-origin'
 
-# Static files storage
-# https://docs.djangoproject.com/en/5.0/ref/contrib/staticfiles/#staticfiles-storage
-if os.environ.get('STATIC_BUSTER') == 'True':
-    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+# Cache busting version
+CACHE_VERSION = os.environ.get('CACHE_VERSION', str(int(time.time())))
+
+

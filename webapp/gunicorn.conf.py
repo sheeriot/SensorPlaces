@@ -9,7 +9,7 @@ import os
 workers = int(os.environ.get('WORKERS', multiprocessing.cpu_count() * 2 + 1))
 
 # The socket to bind
-bind = "0.0.0.0:8000"
+bind = "0.0.0.0:8002"
 
 # Whether to print verbose debug output
 debug = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'

@@ -6,8 +6,10 @@ services:
       context: .
     env_file:
       - env/django.env
+    # environment:
+    #   - STATIC_BUSTER=True
     entrypoint: /opt/app/docker-entrypoint.sh
-    command: gunicorn -c /opt/app/webapp/gunicorn.conf.py sensorplaces.wsgi
+    command: gunicorn --preload -c /opt/app/webapp/gunicorn.conf.py sensorplaces.wsgi
     # command: python manage.py runserver 0.0.0.0:8010
     restart: unless-stopped
     ports:

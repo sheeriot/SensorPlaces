@@ -45,6 +45,8 @@ def get_lorawan_sensor_stats(sensor):
     """
     Queries InfluxDB for a given LoRaWAN sensor's statistics.
     """
+    if not sensor.influx_source:
+        return None
     influx_source = sensor.influx_source
     if not all([influx_source, influx_source.url, influx_source.token, influx_source.org, influx_source.bucket_name, sensor.influx_measurement]):
         return None
