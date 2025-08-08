@@ -142,6 +142,28 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
                     '</div>'
                 )
 
+    def get_initial(self):
+        initial = super().get_initial()
+        duplicate_pk = self.request.GET.get('duplicate')
+
+        if duplicate_pk:
+            try:
+                device_to_duplicate = get_object_or_404(Device, pk=duplicate_pk, location__place=self._place)
+                
+                initial['name'] = f"{device_to_duplicate.name}_Dup"
+                initial['is_active'] = device_to_duplicate.is_active
+                initial['is_lorawan'] = device_to_duplicate.is_lorawan
+                initial['location'] = device_to_duplicate.location
+                initial['device_type'] = device_to_duplicate.device_type
+                initial['manufacturer'] = device_to_duplicate.manufacturer
+                initial['model'] = device_to_duplicate.model
+                initial['device_id'] = '' # Intentionally left blank
+                
+            except Device.DoesNotExist:
+                pass # Or handle error appropriately
+        
+        return initial
+        
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self._place
@@ -149,11 +171,10 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         kwargs['inactive_help_text'] = self._inactive_help_text
         
         # Set initial data properly
-        kwargs['initial'] = kwargs.get('initial', {})
-        kwargs['initial'].update({
-            'location': self._location,
-            'referrer': self.request.GET.get('next', '')
-        })
+        initial = self.get_initial()
+        initial.update(kwargs.get('initial', {}))
+        initial['referrer'] = self.request.GET.get('next', self.request.META.get('HTTP_REFERER', ''))
+        kwargs['initial'] = initial
         
         return kwargs
 
@@ -161,20 +182,24 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'device'
         context['place'] = self._place
-        if self._location:
-            context['location'] = self._location
         context['locations'] = self._locations
-        
-        # Add a fallback cancel URL based on whether we have a location_pk
-        location_slug = self.kwargs.get('location_slug', None)
-        if location_slug:
-            # If we have a location_pk, go to location_detail
+
+        # Determine the location from the form's initial data if available
+        location = self._location
+        if not location and 'form' in context:
+            location = context['form'].initial.get('location')
+
+        if location:
+            context['location'] = location
+
+        # Set a fallback cancel URL
+        # If location has a slug, go to location_detail, otherwise go to device_list
+        if location and hasattr(location, 'slug') and location.slug:
             context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,
-                'slug': self._location.slug
+                'slug': location.slug
             })
         else:
-            # If no location_pk, go to device_list
             context['cancel_fallback_url'] = reverse('sensors:device_list', kwargs={
                 'place_slug': self._place.slug
             })
@@ -192,13 +217,14 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             return referrer_url
         
         return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.object.place.slug, 
+            'place_slug': self.object.location.place.slug, 
             'pk': self.object.pk
         })
 
     def form_valid(self, form):
-        # Set the place on the instance before saving
-        form.instance.place = self._place
+        # If no location is provided, assign the 'Unassigned' location for the place
+        if not form.instance.location:
+            form.instance.location = self._place.get_unassigned_location()
         
         # Save the form to get the object
         self.object = form.save()
@@ -208,13 +234,13 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         if device.location:
             message = (
                 f"Created device <strong>{device.name}</strong> in "
-                f"<i class='bi bi-house-gear'></i> {device.place.name} > "
+                f"<i class='bi bi-house-gear'></i> {device.location.place.name} > "
                 f"<i class='bi bi-geo-alt'></i> {device.location.name}<br>"
             )
         else:
             message = (
                 f"Created unassigned device <strong>{device.name}</strong> in "
-                f"<i class='bi bi-house-gear'></i> {device.place.name}<br>"
+                f"<i class='bi bi-house-gear'></i> {self._place.name}<br>"
             )
 
         message += (
@@ -406,7 +432,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
 
     def get_success_url(self):
         return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.kwargs['place_slug'],
+            'place_slug': self.object.location.place.slug,
             'pk': self.object.pk
         })
 
@@ -423,14 +449,11 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
 
         # Handle the case where location is cleared (set to None)
         if 'location' in form.changed_data and form.cleaned_data['location'] is None:
-            device.location = None
+            device.location = place.get_unassigned_location()
         
         # If location is not cleared, or it's a new location, set it
         elif 'location' in form.cleaned_data and form.cleaned_data['location']:
             device.location = form.cleaned_data['location']
-
-        # Ensure the device always has a place
-        device.place = place
 
         # Now, save the device with all changes
         device.save()
@@ -461,7 +484,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         details = []
 
         if location_changed:
-            if device.location:
+            if device.location and device.location.slug != 'unassigned-devices':
                 details.append(f"Moved to <i class='bi bi-geo-alt'></i> {device.location.name}")
             else:
                 details.append("Moved to <i class='bi bi-question-circle'></i> Unassigned")
@@ -489,7 +512,7 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         if not hasattr(self, '_queryset'):
             place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
             base_queryset = super().get_queryset()
-            self._queryset = base_queryset.filter(place=place)
+            self._queryset = base_queryset.filter(location__place=place)
         return self._queryset
 
     def setup(self, request, *args, **kwargs):
@@ -548,7 +571,7 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         
         message = (
             f"Deleted device <strong>{device_data['name']}</strong> from "
-            f"<i class='bi bi-diagram-3'></i> {location.name if location else 'Unassigned'}<br>"
+            f"<i class='bi bi-diagram-3'></i> {location.name}<br>"
             f"<small class='text-muted'>"
             f"Type: {device_data['device_type']}<br>"
             f"Model: {device_data['model']}<br>"
@@ -586,7 +609,7 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
 
 #     def post(self, request, pk):
 #         # Get the device and validate it exists
-#         device = get_object_or_404(Device, pk=pk)
+#         # device = get_object_or_404(Device, pk=pk)
         
 #         try:
 #             data = json.loads(request.body)

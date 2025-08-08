@@ -3,11 +3,33 @@
 {% block content %}
 <div class="container">
     <h1>Delete InfluxDB Source</h1>
-    <p>Are you sure you want to delete "{{ object.name }}"?</p>
+    <p>Are you sure you want to delete the InfluxDB source "<strong>{{ object.name }}</strong>"?</p>
+    <div class="card mb-3 bg-light">
+        <div class="card-body">
+            <h5 class="card-title mb-3">
+                <i class="bi bi-database text-muted me-2"></i>{{ object.name }}
+            </h5>
+            <dl class="row">
+                <dt class="col-sm-3 text-muted">URL</dt>
+                <dd class="col-sm-9">{{ object.url }}</dd>
+
+                <dt class="col-sm-3 text-muted">Org</dt>
+                <dd class="col-sm-9">{{ object.org }}</dd>
+
+                <dt class="col-sm-3 text-muted">Bucket</dt>
+                <dd class="col-sm-9">{{ object.bucket_name }}</dd>
+            </dl>
+        </div>
+    </div>
+    <p>This action cannot be undone.</p>
     <form method="post">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Confirm Delete</button>
-        <a href="{% url 'sensors:influxsource_detail' object.pk %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash"></i> Confirm Delete
+        </button>
+        <a href="{% url 'sensors:influxsource_detail' place_slug=object.place.slug pk=object.pk %}" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancel
+        </a>
     </form>
 </div>
 {% endblock %} 

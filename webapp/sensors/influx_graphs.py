@@ -5,7 +5,6 @@ def get_lorawan_sensor_data(sensor, time_range='1h'):
     """
     Queries InfluxDB for a given LoRaWAN sensor's data.
     """
-    ic("get_lorawan_sensor_data called for sensor:", sensor)
     influx_source = sensor.influx_source
     if not all([influx_source, influx_source.url, influx_source.token, influx_source.org, influx_source.bucket_name, sensor.influx_measurement]):
         ic("Missing InfluxDB source details for sensor:", sensor)
@@ -23,21 +22,18 @@ def get_lorawan_sensor_data(sensor, time_range='1h'):
         FROM "{sensor.influx_measurement}"
         WHERE time > now() - interval '{time_range}'
         AND "dev_eui" = '{sensor.device.device_id}'
+        ORDER BY time ASC
     """
-    ic("InfluxDB query:", query)
 
     try:
         reader = client.query(query=query, language="sql")
         results = []
         for_pandas = reader.to_pandas().reset_index()
-        ic(f"Pandas DataFrame has {len(for_pandas)} rows.")
-        ic("DataFrame columns:", for_pandas.columns)
+        for_pandas['time'] = for_pandas['time'].dt.tz_localize('UTC')
         for index, row in for_pandas.iterrows():
             results.append((row['time'], row['value']))
         return results
     except Exception as e:
-        ic(f"An exception occurred: {type(e).__name__} - {e}")
-        ic(f"Error querying InfluxDB: {e}")
         print(f"Error querying InfluxDB: {e}")
         return None
 
@@ -66,7 +62,7 @@ def get_lorawan_sensor_stats(sensor):
         FROM "{sensor.influx_measurement}"
         WHERE "dev_eui" = '{sensor.device.device_id}'
     """
-    # ic("InfluxDB stats query:", query)
+    ic("InfluxDB stats query:", query)
 
     try:
         reader = client.query(query=query, language="sql")

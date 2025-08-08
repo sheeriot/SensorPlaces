@@ -16,6 +16,9 @@
             <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-warning me-1" title="Edit Device">
                 <i class="bi bi-pencil"></i>
             </a>
+            <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-sm btn-outline-info me-1" title="Duplicate Device">
+                <i class="bi bi-copy"></i>
+            </a>
             <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-danger" title="Delete Device">
                 <i class="bi bi-trash"></i>
             </a>
@@ -43,6 +46,11 @@
                     <br><small class="text-muted">{{ device.manufacturer }}</small>
                 {% endif %}
             </dd>
+
+            {% if device.device_id %}
+            <dt class="col-sm-4">Device ID</dt>
+            <dd class="col-sm-8">{{ device.device_id }}</dd>
+            {% endif %}
 
             <dt class="col-sm-4">Sensors</dt>
             <dd class="col-sm-8">

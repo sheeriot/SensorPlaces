@@ -1,13 +1,12 @@
 {% extends "sensors/base.html" %}
 {% load static %}
-{% load cache_bust %}
 {% load sensor_filters %}
 
 {% block title %}Sensor Places - Locations{% endblock %}
 
 {% block extra_css %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css'|bust %}">
+    <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -27,6 +26,6 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="{% static 'sensors/js/siteplan-view.js'|bust %}"></script>
-<script src="{% static 'sensors/js/live-counts-updater.js'|bust %}"></script>
+<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+<script src="{% static 'sensors/js/live-counts-updater.js' %}"></script>
 {% endblock %}
