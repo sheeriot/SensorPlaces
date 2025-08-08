@@ -242,25 +242,28 @@ class DeviceForm(forms.ModelForm):
         if location and not location.is_active and cleaned_data.get('is_active', False):
             cleaned_data['is_active'] = False
             self.add_error('is_active', "Device cannot be active when its location is inactive.")
+            
+        # Check for unique device_id within the same place
+        device_id = cleaned_data.get('device_id')
+        if device_id and location:
+            place = location.place
+            query = Device.objects.filter(
+                location__place=place,
+                device_id__iexact=device_id
+            )
+            if self.instance and self.instance.pk:
+                query = query.exclude(pk=self.instance.pk)
+            
+            if query.exists():
+                duplicate = query.first()
+                self.add_error('device_id', (
+                    f"A device with ID '{device_id}' already exists in this place "
+                    f"(in location '{duplicate.location.name}')."
+                ))
         
         return cleaned_data
 
-    def clean_device_id(self):
-        device_id = self.cleaned_data.get('device_id')
-        if not device_id:
-            return device_id
-
-        # Check for uniqueness
-        if self.instance and self.instance.pk:
-            # If updating, exclude self from the check
-            if Device.objects.filter(device_id__iexact=device_id).exclude(pk=self.instance.pk).exists():
-                self.add_warning('device_id', f'Device with ID "{device_id}" already exists.')
-        else:
-            # If creating, check all devices
-            if Device.objects.filter(device_id__iexact=device_id).exists():
-                self.add_warning('device_id', f'Device with ID "{device_id}" already exists.')
-
-        return device_id
+ 
 
     def add_warning(self, field, message):
         if not hasattr(self, '_warnings'):

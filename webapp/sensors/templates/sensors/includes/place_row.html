@@ -17,9 +17,13 @@
             <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-sm btn-warning">
                 <i class="bi bi-pencil"></i>
             </a>
-            <a href="{% url 'sensors:place_delete' place_slug=place.slug %}" class="btn btn-sm btn-danger">
+            <button type="button" class="btn btn-sm btn-danger delete-place"
+                    data-url="{% url 'sensors:place_delete' place_slug=place.slug %}"
+                    data-bs-toggle="modal"
+                    data-bs-target="#deletePlaceModal"
+                    title="Delete">
                 <i class="bi bi-trash"></i>
-            </a>
+            </button>
         </div>
     </td>
 </tr> 

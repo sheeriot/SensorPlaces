@@ -18,7 +18,8 @@ class SensorChart {
                     fill: 'origin',
                     pointRadius: 1,
                     pointHoverRadius: 5,
-                    xAxisID: 'x' // Plot on the primary time axis
+                    xAxisID: 'x', // Plot on the primary time axis
+                    showLine: this.options.graphType === 'LINE'
                 }]
             },
             options: {
@@ -259,6 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const readingsTableUrl = readingsChartContainer.dataset.readingsTableUrl;
     const sensorUnit = readingsChartContainer.dataset.unit || '';
     const sensorName = readingsChartContainer.dataset.name || 'Sensor Readings';
+    const graphType = readingsChartContainer.dataset.graphType || 'SCATTER';
 
     const canvas = readingsChartContainer.querySelector('canvas');
     if (!canvas) return;

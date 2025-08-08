@@ -156,6 +156,7 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Get sensor reading statistics
         if sensor.device.is_lorawan:
             stats_data = get_lorawan_sensor_stats(sensor)
+            ic(stats_data)
             if stats_data:
                 stats = {
                     'reading_count': stats_data.get('reading_count'),
@@ -965,8 +966,8 @@ def lorawan_sensor_data_api(request, place_slug, pk):
     
     time_range = end - start
     time_range_str = f"{int(time_range.total_seconds())}s"
-
     chart_data = get_lorawan_sensor_data(sensor, time_range_str)
+    # ic(chart_data)
     
     if chart_data is None:
         return JsonResponse({'error': 'Could not retrieve data from InfluxDB.'}, status=500)

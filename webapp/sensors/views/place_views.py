@@ -356,77 +356,34 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
 class PlaceDeleteView(LoginRequiredMixin, DeleteView):
     model = Place
     template_name = 'sensors/place_confirm_delete.html'
-    success_url = reverse_lazy('sensors:place_list')
     slug_url_kwarg = 'place_slug'
     slug_field = 'slug'
-    form_class = PlaceDeleteForm
-    
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-    
-    def get_form_kwargs(self):
-        """Return the keyword arguments for instantiating the form."""
-        kwargs = super().get_form_kwargs()
-        return kwargs
-    
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(Place, slug=self.kwargs['place_slug'])
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['model_name'] = 'place'
+        context['place'] = self.object
         return context
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            context = self.get_context_data(object=self.object)
+            html = render_to_string('sensors/place_confirm_delete_modal.html', context, request=request)
+            return JsonResponse({'html': html})
+        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        place = self.object
-        
-        # Get the form with the object instance properly set
-        form_class = self.get_form_class()
-        form = form_class(request.POST, instance=place)
-        
-        if form.is_valid():
-            # Store place data before deletion
-            place_data = {
-                'name': place.name,
-                'latitude': place.latitude,
-                'longitude': place.longitude,
-                'is_active': place.is_active
-            }
-            
-            message = (
-                f"Deleted place <strong>{place_data['name']}</strong> "
-                f"<small class='text-muted'>{place_data['latitude']:.6f}, {place_data['longitude']:.6f}</small>"
-            )
-            
-            # Get count of active locations before deletion
-            active_locations = Location.objects.filter(
-                place=place,
-                is_active=True
-            ).annotate(
-                active_devices=Count('devices', filter=Q(devices__is_active=True))
-            )
-            
-            if active_locations.exists():
-                message += "<br>Affected active locations:<ul class='mb-0'>"
-                for loc in active_locations:
-                    message += f"<li>{loc.name} ({loc.active_devices} active devices)</li>"
-                message += "</ul>"
-            
-            message += "</small>"
-            
-            # Before we delete the place, add a toast notification without place association
-            # Setting the place association for a Place deletion would create a foreign key issue
-            # because the Place would be deleted before the notification could be saved
-            setattr(request, 'toast_message', {
-                'message': message,
-                'type': 'warning'
-            })
-            
-            # Delete the place
-            success_url = self.get_success_url()
-            self.object.delete()
-            
-            return HttpResponseRedirect(success_url)
-        else:
-            return self.form_invalid(form)
+        self.object.delete()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'redirect_url': self.get_success_url()})
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return self.request.POST.get('next', reverse_lazy('sensors:place_list'))
 
 @login_required
 def place_stats(request, place_slug):

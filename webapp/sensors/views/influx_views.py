@@ -6,14 +6,13 @@ from django.views.generic import (
     UpdateView,
     DeleteView,
 )
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.template.loader import render_to_string
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 
 from ..models import InfluxSource, Place
 from .influx_forms import InfluxSourceForm
 
-from icecream import ic
 
 class InfluxSourceListView(ListView):
     model = InfluxSource
@@ -67,28 +66,15 @@ class InfluxSourceCreateView(CreateView):
         return reverse("sensors:influxsource_list", kwargs={'place_slug': self.place.slug})
 
     def form_valid(self, form):
-        ic("Form is valid")
-        self.object = form.save()
-        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            ic("AJAX request detected, returning JSON")
-            return JsonResponse({
-                'success': True,
-                'pk': self.object.pk,
-                'name': self.object.name,
-            })
-        ic("Standard request, redirecting")
+
         return super().form_valid(form)
 
     def form_invalid(self, form):
-        ic("Form is invalid")
-        ic(form.errors)
         if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            ic("AJAX request detected, returning JSON error")
             return JsonResponse({
                 'success': False,
                 'html': render_to_string(self.template_name, {'form': form}, request=self.request),
             })
-        ic("Standard request, re-rendering form")
         return super().form_invalid(form)
 
 
@@ -101,4 +87,32 @@ class InfluxSourceUpdateView(UpdateView):
 class InfluxSourceDeleteView(DeleteView):
     model = InfluxSource
     template_name = "sensors/influxsource_confirm_delete.html"
-    success_url = reverse_lazy("sensors:influxsource_list") 
+    context_object_name = "influxsource"
+
+    def get_object(self, queryset=None):
+        place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+        return get_object_or_404(InfluxSource, pk=self.kwargs['pk'], place=place)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['place'] = self.object.place
+        return context
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            context = self.get_context_data(object=self.object)
+            html = render_to_string("sensors/influxsource_confirm_delete_modal.html", context, request=request)
+            return JsonResponse({'html': html})
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.object.delete()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True})
+        return HttpResponse(status=204, headers={'HX-Redirect': self.get_success_url()})
+    
+    def get_success_url(self):
+        return self.request.POST.get('next', reverse("sensors:influxsource_list", kwargs={'place_slug': self.object.place.slug}))
+ 

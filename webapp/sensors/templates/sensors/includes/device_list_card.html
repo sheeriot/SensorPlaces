@@ -31,23 +31,5 @@
             {% endfor %}
         {% endfor %}
 
-        {# Unassigned Devices #}
-        {% if unassigned_devices %}
-            <div class="list-group-item list-group-item-secondary d-flex justify-content-between align-items-center py-1 location-row">
-                <strong><i class="bi bi-question-circle me-2"></i>Unassigned Devices</strong>
-                {% include "sensors/partials/device_add_button.html" with place=place %}
-            </div>
-            <div class="list-group-item d-none d-md-block bg-light small text-muted py-1">
-                <div class="row g-0">
-                    <div class="col-6">NAME</div>
-                    <div class="col-2">ACTIVE</div>
-                    <div class="col-2 text-center">SENSORS</div>
-                    <div class="col-2 text-end">ACTIONS</div>
-                </div>
-            </div>
-            {% for device in unassigned_devices %}
-                {% include "sensors/partials/unassigned_device_row.html" with device=device hide_inactive=hide_inactive %}
-            {% endfor %}
-        {% endif %}
     </div>
 </div>

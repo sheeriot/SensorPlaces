@@ -3,26 +3,34 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!graphCard) {
         return;
     }
-
     const chartCanvas = document.getElementById('sensorChart');
     if (!chartCanvas) {
         return;
     }
-
     const sensorId = graphCard.dataset.sensorId;
     const placeSlug = graphCard.dataset.placeSlug;
     const apiUrl = graphCard.dataset.apiUrl;
     const sensorType = graphCard.dataset.sensorType;
+    const graphType = graphCard.dataset.graphType;
+    const tempUnitSelect = document.getElementById('temp-unit-select');
     
     let chart;
     let rawData = [];
+    let currentUnit = 'C';
 
+    function convertTemperature(value, toUnit) {
+        if (toUnit === 'F') {
+            return (value * 9/5) + 32;
+        }
+        return (value - 32) * 5/9;
+    }
+    
     function filterOutliers(data) {
-        if (sensorType === 'humidity' && data.length > 0) {
+        if (sensorType === 'HUMIDITY' && data.length > 0) {
             return data.filter(item => item[1] <= 100);
         }
 
-        if (sensorType === 'rainfall_total' || data.length < 4) {
+        if (sensorType === 'RAINFALL_TOTAL' || data.length < 4) {
             return data;
         }
         const values = data.map(item => item[1]).sort((a, b) => a - b);
@@ -40,8 +48,16 @@ document.addEventListener('DOMContentLoaded', function() {
             chart.destroy();
         }
 
-        const labels = data.map(item => new Date(item[0]));
-        const values = data.map(item => item[1]);
+        let processedData = data;
+        if (sensorType === 'TEMPERATURE' && tempUnitSelect && tempUnitSelect.value !== 'C') {
+            processedData = data.map(item => [item[0], convertTemperature(item[1], 'F')]);
+            currentUnit = 'F';
+        } else {
+            currentUnit = 'C';
+        }
+
+        const labels = processedData.map(item => new Date(item[0]));
+        const values = processedData.map(item => item[1]);
         
         const durationDays = (labels.length > 1) ? (labels[labels.length - 1] - labels[0]) / (1000 * 60 * 60 * 24) : 0;
 
@@ -50,16 +66,21 @@ document.addEventListener('DOMContentLoaded', function() {
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Sensor Reading',
+                    label: `Sensor Reading (°${currentUnit})`,
                     data: values,
                     borderColor: 'rgba(75, 192, 192, 1)',
                     borderWidth: 1,
-                    showLine: false,
+                    showLine: graphType === 'LINE',
                     pointRadius: 3,
                     pointBackgroundColor: 'rgba(75, 192, 192, 1)'
                 }]
             },
             options: {
+                plugins: {
+                    legend: {
+                        onClick: null
+                    }
+                },
                 scales: {
                     x: {
                         type: 'time',
@@ -72,7 +93,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     },
                     y: {
-                        beginAtZero: false
+                        beginAtZero: false,
+                        ticks: {
+                            maxTicksLimit: 8,
+                            stepSize: 0.5,
+                            callback: function(value) {
+                                return value.toFixed(1);
+                            }
+                        }
                     }
                 }
             }
@@ -80,11 +108,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const dataPointsContainer = document.getElementById('data-points');
         if (dataPointsContainer) {
-            if (data.length > 0) {
+            if (processedData.length > 0) {
                 let table = '<table class="table table-sm table-striped">';
-                table += '<thead><tr><th>Timestamp</th><th>Value</th></tr></thead><tbody>';
-                data.forEach(item => {
-                    table += `<tr><td>${new Date(item[0]).toLocaleString()}</td><td>${item[1]}</td></tr>`;
+                table += `<thead><tr><th>Timestamp</th><th>Value (°${currentUnit})</th></tr></thead><tbody>`;
+                processedData.slice().reverse().forEach(item => {
+                    table += `<tr><td>${formatTimestamp(item[0])}</td><td>${item[1].toFixed(1)}</td></tr>`;
                 });
                 table += '</tbody></table>';
                 dataPointsContainer.innerHTML = table;
@@ -115,6 +143,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 dataPointsContainer.innerHTML = '<p class="text-danger">Error loading data.</p>';
             }
         }
+    }
+
+    if (tempUnitSelect) {
+        tempUnitSelect.addEventListener('change', () => {
+            const filterSwitch = document.getElementById('filter-outliers-switch');
+            const dataToRender = filterSwitch.checked ? filterOutliers(rawData) : rawData;
+            renderChart(dataToRender);
+        });
     }
 
     const startDatePicker = document.getElementById('start-date-picker');

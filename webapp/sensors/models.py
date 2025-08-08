@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.db.models.functions import Lower
 from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 from django.conf import settings
 from typing import Any, Optional
@@ -103,6 +105,11 @@ class Place(models.Model):
         verbose_name_plural = '1. Places'
         ordering = ['-is_active', Lower('name')]
 
+@receiver(post_save, sender=Place)
+def create_unassigned_location_for_place(sender, instance, created, **kwargs):
+    if created:
+        instance.get_unassigned_location()
+
 class Location(models.Model):
     name: CharField = models.CharField(max_length=100)
     slug: CharField = models.SlugField(max_length=100, blank=True)
@@ -140,6 +147,10 @@ class Location(models.Model):
     def save(self, *args, **kwargs):
         # Run full validation first
         self.full_clean()
+
+        # Enforce that the 'Unassigned Devices' location can never be active
+        if self.slug == 'unassigned-devices' and self.is_active:
+            self.is_active = False
         
         # If parent place is inactive, location must be inactive
         if hasattr(self, 'place') and self.place and not self.place.is_active:
@@ -202,7 +213,7 @@ class Device(models.Model):
     name: CharField = models.CharField(max_length=100)
     model: CharField = models.CharField(max_length=100, null=True, blank=True)
     manufacturer: CharField = models.CharField(max_length=100, null=True, blank=True)
-    device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    device_id: CharField = models.CharField(max_length=100, null=True, blank=True)
     location: ForeignKey = models.ForeignKey(
         Location, 
         on_delete=models.CASCADE, 
@@ -230,6 +241,25 @@ class Device(models.Model):
             raise ValidationError({
                 'is_active': 'Device cannot be active when its location is inactive.'
             })
+
+        # Check for unique device_id within the same place
+        if self.device_id and self.location:
+            place = self.location.place
+            query = Device.objects.filter(
+                location__place=place,
+                device_id__iexact=self.device_id
+            )
+            if self.pk:
+                query = query.exclude(pk=self.pk)
+            
+            if query.exists():
+                duplicate = query.first()
+                raise ValidationError({
+                    'device_id': (
+                        f"A device with ID '{self.device_id}' already exists in this place "
+                        f"(in location '{duplicate.location.name}')."
+                    )
+                })
 
     def save(self, *args, **kwargs):
         if self.device_id:
@@ -311,6 +341,11 @@ class Sensor(models.Model):
     is_active: BooleanField = models.BooleanField(default=True, verbose_name='Active Status')
     sensor_type: CharField = models.CharField(max_length=20, choices=SENSOR_TYPES)
     unit: CharField = models.CharField(max_length=10, choices=UNITS)
+    graph_type: CharField = models.CharField(
+        max_length=20,
+        choices=[('LINE', 'Line Graph'), ('SCATTER', 'Scatter Plot')],
+        default='SCATTER'
+    )
     
     # For data source
     data_type: CharField = models.CharField(max_length=10, choices=DATA_TYPES, default='DIRECT')

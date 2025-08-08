@@ -14,7 +14,7 @@ class SensorForm(forms.ModelForm):
 
     class Meta:
         model = Sensor
-        fields = ['device', 'name', 'is_active', 'sensor_type', 'unit', 'data_type', 'influx_source', 'influx_measurement']
+        fields = ['device', 'name', 'is_active', 'sensor_type', 'unit', 'graph_type', 'data_type', 'influx_source', 'influx_measurement']
         widgets = {
             'device': forms.Select(attrs={'class': 'form-select'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -28,6 +28,7 @@ class SensorForm(forms.ModelForm):
             ),
             'sensor_type': forms.Select(attrs={'class': 'form-select'}),
             'unit': forms.Select(attrs={'class': 'form-select'}),
+            'graph_type': forms.Select(attrs={'class': 'form-select'}),
             'data_type': forms.Select(attrs={'class': 'form-select'}),
             'influx_source': forms.Select(attrs={'class': 'form-select'}),
             'influx_measurement': forms.TextInput(attrs={'class': 'form-control'})
@@ -134,8 +135,9 @@ class SensorForm(forms.ModelForm):
                 css_class='form-row'
             ),
             Row(
-                Column('sensor_type', css_class='form-group col-md-6'),
-                Column('unit', css_class='form-group col-md-6'),
+                Column('sensor_type', css_class='form-group col-md-4'),
+                Column('unit', css_class='form-group col-md-4'),
+                Column('graph_type', css_class='form-group col-md-4'),
                 css_class='form-row'
             ),
             Row(
