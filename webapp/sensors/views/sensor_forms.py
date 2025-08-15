@@ -14,7 +14,15 @@ class SensorForm(forms.ModelForm):
 
     class Meta:
         model = Sensor
-        fields = ['device', 'name', 'is_active', 'sensor_type', 'unit', 'graph_type', 'data_type', 'influx_source', 'influx_measurement']
+        fields = [
+            'device', 'name', 'is_active', 'sensor_type', 
+            'unit', 'unit_override', 
+            'data_type', 'data_type_override',
+            'min_value', 'min_value_override',
+            'max_value', 'max_value_override',
+            'graph_type', 
+            'influx_source', 'influx_measurement'
+        ]
         widgets = {
             'device': forms.Select(attrs={'class': 'form-select'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -28,8 +36,14 @@ class SensorForm(forms.ModelForm):
             ),
             'sensor_type': forms.Select(attrs={'class': 'form-select'}),
             'unit': forms.Select(attrs={'class': 'form-select'}),
+            'unit_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'graph_type': forms.Select(attrs={'class': 'form-select'}),
             'data_type': forms.Select(attrs={'class': 'form-select'}),
+            'data_type_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'min_value': forms.NumberInput(attrs={'class': 'form-control'}),
+            'min_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'max_value': forms.NumberInput(attrs={'class': 'form-control'}),
+            'max_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'influx_source': forms.Select(attrs={'class': 'form-select'}),
             'influx_measurement': forms.TextInput(attrs={'class': 'form-control'})
         }
@@ -38,6 +52,7 @@ class SensorForm(forms.ModelForm):
         # Handle all possible parameters from views/mixins
         self.device = kwargs.pop('device', None)
         self.place = kwargs.pop('place', None)
+        self.cancel_url = kwargs.pop('cancel_url', None)
         # Make sure to pop these parameters even if we don't use them
         inactive_help_text = kwargs.pop('inactive_help_text', None)
         kwargs.pop('locations', None)
@@ -78,6 +93,13 @@ class SensorForm(forms.ModelForm):
         else:
             self.fields['is_active'].label = 'Active'  # Set initial label
             
+        # Set initial label for is_active checkbox
+        self.fields['is_active'].label = 'Inactive' if self.instance and self.instance.pk and not self.instance.is_active else 'Active'
+        
+        # Set the initial value for the unit field from the effective_unit
+        if self.instance and self.instance.pk:
+            self.fields['unit'].initial = self.instance.effective_unit.pk if self.instance.effective_unit else None
+
         # Apply inactive_help_text if provided
         if inactive_help_text:
             self.fields['is_active'].help_text = inactive_help_text
@@ -88,6 +110,46 @@ class SensorForm(forms.ModelForm):
             'id': checkbox_id,
             'data-sensor-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
         })
+
+        # Pre-populate the form with effective values if they are not overridden.
+        # This ensures the form displays the default from the SensorType.
+        if self.instance and self.instance.pk:
+            if not self.instance.unit_override:
+                self.initial['unit'] = self.instance.effective_unit.pk if self.instance.effective_unit else None
+            if not self.instance.data_type_override:
+                self.initial['data_type'] = self.instance.effective_data_type
+
+        # Set labels for the override fields and remove help text for cleaner layout
+        self.fields['unit_override'].label = "Override default unit"
+        self.fields['data_type_override'].label = "Override default data type"
+        self.fields['unit_override'].help_text = None
+        self.fields['data_type_override'].help_text = None
+        self.fields['min_value_override'].label = "Override default min value"
+        self.fields['max_value_override'].label = "Override default max value"
+        self.fields['min_value_override'].help_text = None
+        self.fields['max_value_override'].help_text = None
+
+        # --- New logic for allow_override ---
+        # Get the selected SensorType instance
+        sensor_type = None
+        if self.instance and self.instance.sensor_type:
+            sensor_type = self.instance.sensor_type
+        
+        # If a sensor type is selected, check its allow_override flag
+        if sensor_type and not sensor_type.allow_override:
+            # Disable override fields if not allowed
+            self.fields['unit'].disabled = True
+            self.fields['unit_override'].disabled = True
+            self.fields['data_type'].disabled = True
+            self.fields['data_type_override'].disabled = True
+        else:
+            # If override is allowed, disable the selects until the toggle is checked
+            # This will be handled by JavaScript
+            if not self.initial.get('unit_override', False):
+                 self.fields['unit'].disabled = True
+            if not self.initial.get('data_type_override', False):
+                 self.fields['data_type'].disabled = True
+        # --- End of new logic ---
 
         # If we have data_type, update fields based on it
         if 'data_type' in self.data:
@@ -108,54 +170,72 @@ class SensorForm(forms.ModelForm):
         self.helper.form_tag = True
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
-            # Hidden fields
             'referrer',
             'device',
-            # Main fields
             Row(
-                Column('name', css_class='form-group col-md-6'),
-                Column(
-                    HTML("""
-                        <div class="form-group">
-                            <label for="id_device_name">Device</label>
-                            <div id="id_device_name" class="form-control-plaintext">
-                                <i class="bi bi-hdd-rack me-2"></i>{{ device }}
-                            </div>
-                        </div>
-                    """),
-                    css_class='form-group col-md-6'
-                ),
-                css_class='form-row'
+                Column('name', css_class='form-group col-md-9 mb-0'),
+                Column(Field('is_active', wrapper_class='form-check form-switch mt-4'), css_class='form-group col-md-3 mb-0'),
+                css_class='form-row align-items-center'
             ),
+            Row(
+                Column('sensor_type', css_class='form-group col-md-6 mb-0'),
+                Column('graph_type', css_class='form-group col-md-6 mb-0')
+            ),
+            HTML('<hr class="my-3">'),
             Row(
                 Column(
-                    'is_active',
-                    css_class='form-group col-md-12'
+                    'unit',
+                    Field('unit_override', wrapper_class='form-check form-switch mt-2'),
+                    css_class='form-group col-md-6 mb-0'
                 ),
-                css_class='form-row'
+                Column(
+                    'data_type',
+                    Field('data_type_override', wrapper_class='form-check form-switch mt-2'),
+                    css_class='form-group col-md-6 mb-0'
+                )
             ),
             Row(
-                Column('sensor_type', css_class='form-group col-md-4'),
-                Column('unit', css_class='form-group col-md-4'),
-                Column('graph_type', css_class='form-group col-md-4'),
-                css_class='form-row'
+                Column(
+                    'min_value',
+                    Field('min_value_override', wrapper_class='form-check form-switch mt-2'),
+                    css_class='form-group col-md-6 mb-0'
+                ),
+                Column(
+                    'max_value',
+                    Field('max_value_override', wrapper_class='form-check form-switch mt-2'),
+                    css_class='form-group col-md-6 mb-0'
+                )
             ),
-            Row(
-                Column('data_type', css_class='form-group col-md-12'),
-                css_class='form-row'
+            Div(
+                HTML('<hr class="my-3">'),
+                css_class='w-100'
             ),
             Div(
                 Row(
-                    Column('influx_source', css_class='form-group col-md-6'),
-                    Column('influx_measurement', css_class='form-group col-md-6'),
-                    css_class='form-row'
+                    Column(
+                        HTML("""
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label for="id_influx_source" class="form-label mb-0">Influx Source</label>
+                                {% if self.place %}
+                                <a href="{% url 'sensors:influxsource_create' place_slug=self.place.slug %}"
+                                   class="btn btn-sm btn-outline-primary" 
+                                   id="add-influx-source-btn">
+                                    <i class="bi bi-plus-circle"></i> Source
+                                </a>
+                                {% endif %}
+                            </div>
+                        """),
+                        Field('influx_source'),
+                        css_class="mb-3"
+                    ),
+                    Column('influx_measurement', css_class='form-group col-md-6 mb-0'),
                 ),
-                css_class='influx-fields',
-                style='display:none;' if not self.instance.data_type == 'INFLUX' else ''
+                id='influx-fields'
             ),
+            HTML('<hr class="my-3">'),
             FormActions(
                 Submit('submit', 'Save' if self.instance.pk else 'Create', css_class='btn-primary'),
-                HTML('<a href="{{ referrer|default:cancel_url }}" class="btn btn-secondary">Cancel</a>'),
+                HTML(f'<a href="{self.cancel_url}" class="btn btn-secondary">Cancel</a>'),
             )
         )
 
@@ -168,6 +248,37 @@ class SensorForm(forms.ModelForm):
         device = cleaned_data.get('device') or self.device
         influx_source = cleaned_data.get('influx_source')
         influx_measurement = cleaned_data.get('influx_measurement')
+        unit_override = cleaned_data.get('unit_override')
+        data_type_override = cleaned_data.get('data_type_override')
+
+        # If a sensor type is selected, enforce override logic
+        if self.instance and self.instance.sensor_type:
+            sensor_type = self.instance.sensor_type
+            # If unit override is selected but matches the default, clear it
+            if unit_override and cleaned_data.get('unit') == sensor_type.default_unit:
+                cleaned_data['unit'] = None
+                cleaned_data['unit_override'] = False
+                # Re-run validation on the field if needed, or just accept
+            
+            # If data type override is selected but matches the default, clear it
+            if data_type_override and cleaned_data.get('data_type') == sensor_type.default_data_type:
+                cleaned_data['data_type'] = None
+                cleaned_data['data_type_override'] = False
+
+        # --- New override logic ---
+        if unit_override and not cleaned_data.get('unit'):
+            self.add_error('unit', "Unit must be specified when overriding.")
+        
+        if data_type_override and not cleaned_data.get('data_type'):
+            self.add_error('data_type', "Data type must be specified when overriding.")
+
+        # Clear values if not overriding to fall back to SensorType defaults
+        if not unit_override:
+            cleaned_data['unit'] = None
+            
+        if not data_type_override:
+            cleaned_data['data_type'] = None
+        # --- End of new logic ---
 
         # Ensure device is set
         if not device and self.device:
@@ -211,6 +322,7 @@ class LoRaWANSensorForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         place = kwargs.pop('place', None)
+        cancel_url = kwargs.pop('cancel_url', None)
         super().__init__(*args, **kwargs)
         self.fields['is_active'].label = "Active"
         self.fields['influx_source'].label = False
@@ -238,5 +350,5 @@ class LoRaWANSensorForm(forms.ModelForm):
             'influx_measurement',
             HTML('<hr>'),
             HTML('<button type="submit" class="btn btn-primary">Save</button>'),
-            HTML('<a class="btn btn-secondary" href="{{ request.META.HTTP_REFERER }}">Cancel</a>')
+            HTML(f'<a class="btn btn-secondary" href="{cancel_url}">Cancel</a>')
         )

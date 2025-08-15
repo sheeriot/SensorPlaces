@@ -8,14 +8,13 @@
     <td class="ps-4">
         <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none text-dark d-flex align-items-center">
             <i class="bi bi-hdd-rack me-2"></i>
-            <strong class="text-break">{{ device.name }}</strong>
+            <strong class="text-nowrap">{{ device.name }}</strong>
         </a>
     </td>
-    <td></td>
     <td>
-        <div class="small">{{ device.device_type }}</div>
-        <div class="small text-muted lh-1">({{ device.model }})</div>
+        <div class="small text-muted lh-1">{{ device.device_type }} ({{ device.model }})</div>
     </td>
+    <td></td>
     <td class="text-end">
         {% include "sensors/partials/sensor_add_button.html" %}
     </td>

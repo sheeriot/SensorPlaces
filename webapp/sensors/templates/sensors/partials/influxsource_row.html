@@ -1,0 +1,25 @@
+<div class="list-group-item" id="influx-source-{{ source.pk }}">
+    <div class="row align-items-center">
+        <div class="col-md-2">{{ source.name }}</div>
+        <div class="col-md-4 text-muted small text-truncate">{{ source.url }}</div>
+        <div class="col-md-2 text-truncate">{{ source.org }}</div>
+        <div class="col-md-2">{{ source.bucket_name }}</div>
+        <div class="col-md-2 text-end">
+            <div class="btn-group btn-group-sm" role="group">
+                <a href="{% url 'sensors:influxsource_detail' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-info" title="View">
+                    <i class="bi bi-eye-fill"></i>
+                </a>
+                <a href="{% url 'sensors:influxsource_update' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-warning" title="Edit">
+                    <i class="bi bi-pencil-fill"></i>
+                </a>
+                <button type="button" class="btn btn-outline-danger delete-influx-source" 
+                        data-url="{% url 'sensors:influxsource_delete' place_slug=place.slug pk=source.pk %}"
+                        data-bs-toggle="modal" 
+                        data-bs-target="#deleteInfluxSourceModal"
+                        title="Delete">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

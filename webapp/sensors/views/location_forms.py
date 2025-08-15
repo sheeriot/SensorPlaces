@@ -30,6 +30,7 @@ class LocationForm(forms.ModelForm):
         # Extract parameters that might be passed but aren't used directly by the form
         self.place = kwargs.pop('place', None)
         inactive_help_text = kwargs.pop('inactive_help_text', None)
+        cancel_url = kwargs.pop('cancel_url', None)
         
         # Pop anything that might come from FormDataMixin
         kwargs.pop('locations', None)
@@ -113,8 +114,8 @@ class LocationForm(forms.ModelForm):
             Div(
                 HTML('<hr class="mt-4">'),
                 Div(
-                    HTML("""
-                        <a href="{% if referrer %}{{ referrer }}{% else %}{% url 'sensors:location_list' place_slug=place.slug %}{% endif %}" 
+                    HTML(f"""
+                        <a href="{cancel_url}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>

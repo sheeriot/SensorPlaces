@@ -1,0 +1,11 @@
+{% extends 'sensors/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if object %}Edit Sensor Type{% else %}Create Sensor Type{% endif %}</h2>
+    <hr>
+    {% crispy form %}
+</div>
+{% endblock %}
+

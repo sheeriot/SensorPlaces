@@ -1,19 +1,22 @@
 from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
 # from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
 from django.utils.safestring import mark_safe
+from django.template.loader import render_to_string
 import json
+from django.utils.decorators import method_decorator
 
 from ..models import Place, Location, Device, Sensor
 from .location_forms import LocationForm
 from .mixins import PlaceAnnotationMixin, FormDataMixin
 from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
+from ..decorators import log_execution_time
 
 from icecream import ic
 
@@ -53,6 +56,7 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         
         return context
 
+@method_decorator(log_execution_time, name='dispatch')
 class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Location
     context_object_name = 'location'
@@ -180,7 +184,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
             'place': self._place.pk,  # Use the primary key, not the object
             'referrer': self._referrer
         })
-        
+        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -188,17 +192,19 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         context['model_name'] = 'location'
         
         # Add a fallback cancel URL
+        context['cancel_url'] = self.get_cancel_url()
+        return context
+
+    def get_cancel_url(self):
         if self.object and self.object.pk:
-            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
+            return reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,  # Use cached place
                 'slug': self.object.slug
             })
         else:
-            context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
+            return reverse('sensors:place_detail', kwargs={
                 'place_slug': self._place.slug  # Use cached place
             })
-        
-        return context
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
@@ -397,7 +403,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         kwargs['initial'].update({
             'referrer': self._referrer
         })
-        
+        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -421,17 +427,19 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         )
         
         # Add a fallback cancel URL
+        context['cancel_url'] = self.get_cancel_url()
+        return context
+
+    def get_cancel_url(self):
         if self.object and self.object.pk:
-            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
+            return reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,  # Use cached place
                 'slug': self.object.slug
             })
         else:
-            context['cancel_fallback_url'] = reverse('sensors:place_detail', kwargs={
+            return reverse('sensors:place_detail', kwargs={
                 'place_slug': self._place.slug  # Use cached place
             })
-        
-        return context
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
@@ -495,7 +503,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         return HttpResponseRedirect(success_url)
 
 class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
-    model = Location
+    
     template_name = 'sensors/location_confirm_delete.html'
     slug_url_kwarg = 'slug'
 
@@ -516,8 +524,15 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        context['place'] = self._place
         return context
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            context = self.get_context_data(object=self.object)
+            html = render_to_string('sensors/location_confirm_delete_modal.html', context, request=request)
+            return JsonResponse({'html': html})
+        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -561,6 +576,8 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             'type': 'danger'
         })
         
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'redirect_url': self.get_success_url()})
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):

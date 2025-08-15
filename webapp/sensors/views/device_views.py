@@ -1,19 +1,23 @@
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render, redirect
+from django.template.loader import render_to_string
 from django.urls import reverse
-from django.http import HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect
+import json
+from icecream import ic
 
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet, Prefetch
 from django.utils.safestring import mark_safe
+from django.utils.decorators import method_decorator
 
 from ..models import Place, Location, Device, Sensor
 from .device_forms import DeviceForm
 from .mixins import PlaceAnnotationMixin
 from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
-from icecream import ic
+from ..decorators import log_execution_time
 
 # Device Views
 class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
@@ -63,6 +67,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             
         return context
 
+@method_decorator(log_execution_time, name='dispatch')
 class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Device
     context_object_name = 'device'
@@ -108,9 +113,9 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add live counts to context
         context.update(get_live_counts_context(self._place))
         
-        ic(context['device'].__dict__)
-        ic(context['sensors'])
-        ic(context['locations'])
+        # ic(context['device'].__dict__)
+        # ic(context['sensors'])
+        # ic(context['locations'])
         return context
 
 class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
@@ -144,6 +149,11 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
 
     def get_initial(self):
         initial = super().get_initial()
+        
+        # Set location from URL if available
+        if self._location:
+            initial['location'] = self._location
+
         duplicate_pk = self.request.GET.get('duplicate')
 
         if duplicate_pk:
@@ -175,7 +185,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         initial.update(kwargs.get('initial', {}))
         initial['referrer'] = self.request.GET.get('next', self.request.META.get('HTTP_REFERER', ''))
         kwargs['initial'] = initial
-        
+        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -193,18 +203,20 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             context['location'] = location
 
         # Set a fallback cancel URL
+        context['cancel_url'] = self.get_cancel_url()
+        return context
+
+    def get_cancel_url(self):
         # If location has a slug, go to location_detail, otherwise go to device_list
-        if location and hasattr(location, 'slug') and location.slug:
-            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
+        if self._location and hasattr(self._location, 'slug') and self._location.slug:
+            return reverse('sensors:location_detail', kwargs={
                 'place_slug': self._place.slug,
-                'slug': location.slug
+                'slug': self._location.slug
             })
         else:
-            context['cancel_fallback_url'] = reverse('sensors:device_list', kwargs={
+            return reverse('sensors:device_list', kwargs={
                 'place_slug': self._place.slug
             })
-        
-        return context
 
     def get_success_url(self):
         """
@@ -391,7 +403,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         
         # Pass the referrer from initial data to the form
         kwargs['initial'] = self.get_initial()
-        
+        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -408,27 +420,15 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         if device.location:
             context['location'] = get_annotated_locations(self._place).get(pk=device.location.pk)
         
-        # Add a fallback cancel URL based on whether we have a location_pk
-        location_slug = self.kwargs.get('location_slug', None)
-        if location_slug:
-            # If we have a location_pk, go to location_detail
-            context['cancel_fallback_url'] = reverse('sensors:location_detail', kwargs={
-                'place_slug': self._place.slug,
-                'slug': self._location.slug
-            })
-        else:
-            # If no location_pk, go to device_list
-            context['cancel_fallback_url'] = reverse('sensors:device_list', kwargs={
-                'place_slug': self._place.slug
-            })
-        
         # Add a fallback cancel URL
-        context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
+        context['cancel_url'] = self.get_cancel_url()
+        return context
+
+    def get_cancel_url(self):
+        return reverse('sensors:device_detail', kwargs={
             'place_slug': self._place.slug,
             'pk': self.object.pk
             })
-        
-        return context
 
     def get_success_url(self):
         return reverse('sensors:device_detail', kwargs={
@@ -523,17 +523,16 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Create inactive help text to be used in form and toast messages
         try:
             device = self.get_object()
-            location = device.location
-            
-            if location and not location.is_active:
-                self._inactive_help_text = mark_safe(
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This device is inactive because Location "{location.name}" is inactive.'
-                )
-            else:
-                self._inactive_help_text = None
-        except Exception as e:
+        except Http404:
+            device = None
             # ic(f"Error in DeviceDeleteView.setup: {str(e)}")
+            
+        if device and device.location and not device.location.is_active:
+            self._inactive_help_text = mark_safe(
+                    '<i class="bi bi-exclamation-triangle me-2"></i>'
+                    f'This device is inactive because Location "{device.location.name}" is inactive.'
+                )
+        else:
             self._inactive_help_text = None
 
     def get_context_data(self, **kwargs):
@@ -547,6 +546,14 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             context['location'] = device.location
             
         return context
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            context = self.get_context_data(object=self.object)
+            html = render_to_string('sensors/device_confirm_delete_modal.html', context, request=request)
+            return JsonResponse({'html': html})
+        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -599,6 +606,8 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'redirect_url': success_url})
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):

@@ -41,9 +41,13 @@
                 <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug pk=device.pk %}" class="btn btn-sm btn-outline-warning">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
-                <a href="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}" class="btn btn-sm btn-outline-danger">
+                <button type="button" class="btn btn-sm btn-outline-danger delete-device"
+                        data-url="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteDeviceModal"
+                        title="Delete">
                     <i class="bi bi-trash-fill"></i>
-                </a>
+                </button>
             </div>
         </div>
     </div>

@@ -18,6 +18,13 @@
         {% endif %}
     </div>
 </div>
+
+<div class="modal fade" id="deleteSensorModal" tabindex="-1" aria-labelledby="deleteSensorModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        </div>
+    </div>
+</div>
 {% endblock content %}
 
 {% block extra_js %}
@@ -26,4 +33,5 @@
     {% elif sensor.is_active and sensor.device.is_lorawan %}
         <script src="{% static 'sensors/js/sensor-chart.js' %}" defer></script>
     {% endif %}
+    <script src="{% static 'sensors/js/sensor-detail.js' %}" defer></script>
 {% endblock extra_js %} 

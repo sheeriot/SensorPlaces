@@ -37,9 +37,13 @@ This template expects:
                 <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-warning">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
-                <a href="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}" class="btn btn-sm btn-outline-danger">
+                <button type="button" class="btn btn-sm btn-outline-danger delete-location"
+                        data-url="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteLocationModal"
+                        title="Delete">
                     <i class="bi bi-trash-fill"></i>
-                </a>
+                </button>
             </div>
         </div>
     </div>

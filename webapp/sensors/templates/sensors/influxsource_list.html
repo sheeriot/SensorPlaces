@@ -1,5 +1,3 @@
-{% extends "sensors/base.html" %}
-
 {% block content %}
 <div class="card my-1">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -23,31 +21,7 @@
         </div>
         <!-- Data Rows -->
         {% for source in influxsources %}
-        <div class="list-group-item" id="influx-source-{{ source.pk }}">
-            <div class="row align-items-center">
-                <div class="col-md-2">{{ source.name }}</div>
-                <div class="col-md-4 text-muted small text-truncate">{{ source.url }}</div>
-                <div class="col-md-2 text-truncate">{{ source.org }}</div>
-                <div class="col-md-2">{{ source.bucket_name }}</div>
-                <div class="col-md-2 text-end">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <a href="{% url 'sensors:influxsource_detail' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-info" title="View">
-                            <i class="bi bi-eye-fill"></i>
-                        </a>
-                        <a href="{% url 'sensors:influxsource_update' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-warning" title="Edit">
-                            <i class="bi bi-pencil-fill"></i>
-                        </a>
-                        <button type="button" class="btn btn-outline-danger delete-influx-source" 
-                                data-url="{% url 'sensors:influxsource_delete' place_slug=place.slug pk=source.pk %}"
-                                data-bs-toggle="modal" 
-                                data-bs-target="#deleteInfluxSourceModal"
-                                title="Delete">
-                            <i class="bi bi-trash-fill"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+            {% include "sensors/partials/influxsource_row.html" with source=source place=place %}
         {% empty %}
         <div class="list-group-item text-center text-muted">
             No InfluxDB sources found.
@@ -69,47 +43,42 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const deleteModal = new bootstrap.Modal(document.getElementById('deleteInfluxSourceModal'));
-    const modalContent = document.querySelector('#deleteInfluxSourceModal .modal-content');
+    const deleteModalEl = document.getElementById('deleteInfluxSourceModal');
+    if (deleteModalEl) {
+        deleteModalEl.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const url = button.dataset.url;
+            const modalContent = deleteModalEl.querySelector('.modal-content');
 
-    document.querySelectorAll('.delete-influx-source').forEach(button => {
-        button.addEventListener('click', function (event) {
-            const url = this.dataset.url;
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    modalContent.innerHTML = data.html;
-                    const deleteForm = modalContent.querySelector('#deleteInfluxSourceForm');
-                    
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = 'next';
-                    hiddenInput.value = window.location.pathname;
-                    deleteForm.appendChild(hiddenInput);
-
-                    deleteForm.addEventListener('submit', function (e) {
-                        e.preventDefault();
-                        const formData = new FormData(deleteForm);
-                        fetch(deleteForm.action, {
-                            method: 'POST',
-                            body: formData,
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-                            }
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                const sourceId = deleteForm.action.split('/').slice(-2)[0];
-                                document.getElementById(`influx-source-${sourceId}`).remove();
-                                deleteModal.hide();
-                            }
-                        });
+            fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                modalContent.innerHTML = data.html;
+                const deleteForm = modalContent.querySelector('#deleteInfluxSourceForm');
+                deleteForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    fetch(deleteForm.action, {
+                        method: 'POST',
+                        body: new FormData(deleteForm),
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Redirect to the URL provided by the server
+                            window.location.href = data.redirect_url;
+                        }
                     });
                 });
+            });
         });
-    });
+    }
 });
 </script>
 {% endblock %}

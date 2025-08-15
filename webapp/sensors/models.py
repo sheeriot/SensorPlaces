@@ -2,9 +2,10 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.db.models.functions import Lower
-from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey
+from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey, PositiveIntegerField
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.urls import reverse
 
 from django.conf import settings
 from typing import Any, Optional
@@ -190,6 +191,17 @@ class Location(models.Model):
         ordering = ['-is_active', 'name']
         unique_together = ('place', 'slug')
 
+class Unit(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    symbol = models.CharField(max_length=10)
+    
+    def __str__(self):
+        return f"{self.name} ({self.symbol})"
+
+    class Meta:
+        verbose_name_plural = 'Units'
+        ordering = ['name']
+
 class DeviceType(models.Model):
     name = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True)
@@ -319,7 +331,8 @@ class Sensor(models.Model):
     ]
     DATA_TYPES = [
         ('DIRECT', 'Direct'),
-        ('INFLUX', 'InfluxDB'),
+        ('INFLUX', 'InfluxDB (Gauge)'),
+        ('INFLUX_CUMULATIVE_RESET', 'InfluxDB (Cumulative, Resets)'),
     ]
     UNITS = [
         ('C', '°C'),
@@ -337,22 +350,75 @@ class Sensor(models.Model):
     ]
 
     name: CharField = models.CharField(max_length=100)
-    device: ForeignKey = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='sensors')
+    device: ForeignKey = models.ForeignKey('Device', on_delete=models.CASCADE, related_name='sensors')
     is_active: BooleanField = models.BooleanField(default=True, verbose_name='Active Status')
-    sensor_type: CharField = models.CharField(max_length=20, choices=SENSOR_TYPES)
-    unit: CharField = models.CharField(max_length=10, choices=UNITS)
+    sensor_type = models.ForeignKey('SensorType', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Modified fields to allow fallback to SensorType defaults
+    unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
+    unit_override = models.BooleanField(default=False)
+
+    data_type: CharField = models.CharField(max_length=30, choices=DATA_TYPES, default='DIRECT', null=True, blank=True)
+    data_type_override = models.BooleanField(default=False)
+
     graph_type: CharField = models.CharField(
         max_length=20,
-        choices=[('LINE', 'Line Graph'), ('SCATTER', 'Scatter Plot')],
+        choices=[('LINE', 'Line Graph'), ('SCATTER', 'Scatter Plot'), ('BAR', 'Bar Graph')],
         default='SCATTER'
     )
     
+    # New fields for value overrides
+    min_value = models.FloatField(null=True, blank=True)
+    min_value_override = models.BooleanField(default=False)
+    max_value = models.FloatField(null=True, blank=True)
+    max_value_override = models.BooleanField(default=False)
+
     # For data source
-    data_type: CharField = models.CharField(max_length=10, choices=DATA_TYPES, default='DIRECT')
-    influx_source: ForeignKey = models.ForeignKey(InfluxSource, on_delete=models.SET_NULL, null=True, blank=True, related_name='sensors')
+    influx_source: ForeignKey = models.ForeignKey('InfluxSource', on_delete=models.SET_NULL, null=True, blank=True, related_name='sensors')
     influx_measurement: CharField = models.CharField(max_length=100, null=True, blank=True)
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
+
+    # --- Properties to get effective values ---
+    @property
+    def effective_unit(self):
+        if self.unit_override and self.unit:
+            return self.unit
+        if self.sensor_type and self.sensor_type.default_unit:
+            return self.sensor_type.default_unit
+        return None
+
+    @property
+    def effective_data_type(self):
+        if self.data_type_override and self.data_type:
+            return self.data_type
+        if self.sensor_type and self.sensor_type.default_data_type:
+            return self.sensor_type.default_data_type
+        return 'DIRECT'
+
+    @property
+    def effective_min_value(self):
+        if self.min_value_override and self.min_value is not None:
+            return self.min_value
+        return self.sensor_type.min_value if self.sensor_type else None
+
+    @property
+    def effective_max_value(self):
+        if self.max_value_override and self.max_value is not None:
+            return self.max_value
+        return self.sensor_type.max_value if self.sensor_type else None
+    
+    @property
+    def effective_decimal_places(self):
+        if self.sensor_type and self.sensor_type.decimal_places is not None:
+            return self.sensor_type.decimal_places
+        return None
+
+    @property
+    def get_effective_data_type_display(self):
+        val = self.effective_data_type
+        return dict(self.DATA_TYPES).get(val, val)
+    # --- End of properties ---
 
     def clean(self):
         super().clean()
@@ -383,10 +449,10 @@ class Sensor(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.get_sensor_type_display()})"
+        return f"{self.name} ({self.sensor_type})"
 
     def get_sensor_type_display(self) -> str:
-        return dict(self.SENSOR_TYPES).get(self.sensor_type, 'Unknown')
+        return self.sensor_type.name if self.sensor_type else 'Unknown'
 
     class Meta:
         verbose_name_plural = '5. Sensors'
@@ -397,8 +463,35 @@ class Sensor(models.Model):
             Lower('name')
         ]
 
+class SensorType(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True)
+    
+    # New fields for defaults
+    default_unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
+    default_data_type = models.CharField(
+        max_length=30, 
+        choices=Sensor.DATA_TYPES, 
+        default='DIRECT',
+        blank=True
+    )
+    min_value = models.FloatField(null=True, blank=True)
+    max_value = models.FloatField(null=True, blank=True)
+    allow_override = models.BooleanField(default=False)
+    decimal_places = models.PositiveIntegerField(null=True, blank=True, help_text="Number of decimal places to display for sensor readings.")
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('sensors:sensortype_detail', kwargs={'pk': self.pk})
+
+    class Meta:
+        verbose_name_plural = 'Sensor Types'
+        ordering = ['name']
+
 class SensorReading(models.Model):
-    sensor: ForeignKey = models.ForeignKey(Sensor, on_delete=models.CASCADE, related_name='readings')
+    sensor: ForeignKey = models.ForeignKey('Sensor', on_delete=models.CASCADE, related_name='readings')
     value: FloatField = models.FloatField()
     timestamp: DateTimeField = models.DateTimeField(auto_now_add=True)
     notes: TextField = models.TextField(null=True, blank=True)

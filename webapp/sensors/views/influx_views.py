@@ -49,7 +49,11 @@ class InfluxSourceCreateView(CreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['initial'] = {'place': self.place}
+        initial = kwargs.get('initial', {})
+        initial['place'] = self.place
+        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
+        kwargs['initial'] = initial
+        kwargs['cancel_url'] = self.request.META.get('HTTP_REFERER') or reverse("sensors:place_detail", kwargs={'place_slug': self.place.slug})
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -63,10 +67,16 @@ class InfluxSourceCreateView(CreateView):
         return [self.template_name]
 
     def get_success_url(self):
-        return reverse("sensors:influxsource_list", kwargs={'place_slug': self.place.slug})
+        return self.request.POST.get('referrer') or reverse("sensors:place_detail", kwargs={'place_slug': self.place.slug})
 
     def form_valid(self, form):
-
+        self.object = form.save()
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'pk': self.object.pk,
+                'name': self.object.name,
+            })
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -82,7 +92,9 @@ class InfluxSourceUpdateView(UpdateView):
     model = InfluxSource
     template_name = "sensors/influxsource_form.html"
     fields = ["name", "url", "org", "bucket_name", "token"]
-    success_url = reverse_lazy("sensors:influxsource_list")
+
+    def get_success_url(self):
+        return reverse("sensors:place_detail", kwargs={'place_slug': self.object.place.slug})
 
 class InfluxSourceDeleteView(DeleteView):
     model = InfluxSource
@@ -108,11 +120,12 @@ class InfluxSourceDeleteView(DeleteView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
+        self.place_slug = self.object.place.slug
         self.object.delete()
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': True})
+            return JsonResponse({'success': True, 'redirect_url': self.get_success_url()})
         return HttpResponse(status=204, headers={'HX-Redirect': self.get_success_url()})
     
     def get_success_url(self):
-        return self.request.POST.get('next', reverse("sensors:influxsource_list", kwargs={'place_slug': self.object.place.slug}))
+        return reverse("sensors:place_detail", kwargs={'place_slug': self.place_slug})
  

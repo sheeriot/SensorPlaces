@@ -1,0 +1,34 @@
+<form id="deleteLocationForm" method="post" action="{% url 'sensors:location_delete' place_slug=place.slug slug=object.slug %}">
+    <div class="modal-header">
+        <h5 class="modal-title" id="deleteLocationModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+        <p>Are you sure you want to delete the location <strong><i class="bi bi-geo-alt"></i> {{ object.name }}</strong>?</p>
+        {% if object.devices.exists %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Warning: This location has {{ object.devices.count }} device(s) associated with it.
+            <ul class="mb-0 mt-2">
+            {% for device in object.devices.all %}
+                <li><i class="bi bi-hdd-rack"></i> {{ device.name }}
+                    {% if device.sensors.exists %}
+                    ({{ device.sensors.count }} sensor{{ device.sensors.count|pluralize }})
+                    {% endif %}
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        <p class="text-danger">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            This action cannot be undone. All devices and sensors at this location will also be deleted.
+        </p>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.META.HTTP_REFERER }}">
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-danger">Delete</button>
+    </div>
+</form>

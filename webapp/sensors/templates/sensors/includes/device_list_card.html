@@ -33,3 +33,50 @@
 
     </div>
 </div>
+
+<div class="modal fade" id="deleteDeviceModal" tabindex="-1" aria-labelledby="deleteDeviceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const deleteDeviceModal = document.getElementById('deleteDeviceModal');
+    if (deleteDeviceModal) {
+        deleteDeviceModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const url = button.dataset.url;
+            const modalContent = deleteDeviceModal.querySelector('.modal-content');
+
+            fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                modalContent.innerHTML = data.html;
+                const deleteForm = modalContent.querySelector('#deleteDeviceForm');
+                deleteForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    fetch(deleteForm.action, {
+                        method: 'POST',
+                        body: new FormData(deleteForm),
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.href = data.redirect_url;
+                        }
+                    });
+                });
+            });
+        });
+    }
+});
+</script>

@@ -681,6 +681,17 @@ const toggleActiveManager = {
             toggle._clickHandler = clickHandler;
             toggle.addEventListener('click', clickHandler);
         });
+
+        // Add event listener for when the modal is hidden
+        const modalElement = document.getElementById(`locationToggleModal`);
+        if (modalElement) {
+            modalElement.addEventListener('hidden.bs.modal', function () {
+                // Return focus to the button that opened the modal
+                if (window.lastFocusedButton) {
+                    window.lastFocusedButton.focus();
+                }
+            });
+        }
     },
 
     initializeDeviceToggles() {
@@ -780,6 +791,17 @@ const toggleActiveManager = {
             toggle._clickHandler = clickHandler;
             toggle.addEventListener('click', clickHandler);
         });
+
+        // Add event listener for when the modal is hidden
+        const modalElement = document.getElementById(`deviceToggleModal`);
+        if (modalElement) {
+            modalElement.addEventListener('hidden.bs.modal', function () {
+                // Return focus to the button that opened the modal
+                if (window.lastFocusedButton) {
+                    window.lastFocusedButton.focus();
+                }
+            });
+        }
     },
 
     initializeSensorToggles() {
@@ -848,6 +870,17 @@ const toggleActiveManager = {
             toggle._clickHandler = clickHandler;
             toggle.addEventListener('click', clickHandler);
         });
+
+        // Add event listener for when the modal is hidden
+        const modalElement = document.getElementById(`sensorToggleModal`);
+        if (modalElement) {
+            modalElement.addEventListener('hidden.bs.modal', function () {
+                // Return focus to the button that opened the modal
+                if (window.lastFocusedButton) {
+                    window.lastFocusedButton.focus();
+                }
+            });
+        }
     },
 
     initializeDeviceStatusButtons() {
