@@ -36,12 +36,13 @@ class DeviceForm(forms.ModelForm):
         self.location = kwargs.pop('location', None)
         self.devices_active = kwargs.pop('devices_active', None)
         inactive_help_text = kwargs.pop('inactive_help_text', None)
+        cancel_url = kwargs.pop('cancel_url', None)
         super().__init__(*args, **kwargs)
         
         # Get cancel URL from initial data or fallback
         initial = kwargs.get('initial', {})
         referrer = initial.get('referrer')
-        cancel_url = referrer or initial.get('cancel_fallback_url')
+        cancel_url = referrer or cancel_url
 
         if 'location' in self.fields:
             self.fields['location'].required = False
@@ -205,7 +206,8 @@ class DeviceForm(forms.ModelForm):
         cleaned_data = super().clean()
         # ic(cleaned_data)
         if self.errors:
-            ic(self.errors.as_json())
+            # ic(self.errors.as_json())
+            pass # Commented out ic(self.errors.as_json())
         name = cleaned_data.get('name')
         location = cleaned_data.get('location') or self.location
         
@@ -260,6 +262,7 @@ class DeviceForm(forms.ModelForm):
                     f"A device with ID '{device_id}' already exists in this place "
                     f"(in location '{duplicate.location.name}')."
                 ))
+                # ic(self.errors.as_json()) # Commented out ic(self.errors.as_json())
         
         return cleaned_data
 

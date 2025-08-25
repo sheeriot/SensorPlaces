@@ -7,6 +7,8 @@ from .models import (
     Device,
     DeviceType,
     Sensor,
+    SensorType,
+    Unit,
     SensorReading,
     InfluxSource,
     ToastNotification,
@@ -62,16 +64,44 @@ class DeviceTypeAdmin(admin.ModelAdmin):
     ordering = ('name',)
 
 
+@admin.register(SensorType)
+class SensorTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'default_unit', 'default_data_type', 'allow_override', 'min_value', 'max_value', 'decimal_places')
+    search_fields = ('name', 'description')
+    list_filter = ('allow_override', 'default_data_type')
+    ordering = ('name',)
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description')
+        }),
+        ('Defaults and Overrides', {
+            'fields': ('default_unit', 'default_data_type', 'allow_override')
+        }),
+        ('Value Configuration', {
+            'fields': ('min_value', 'max_value', 'decimal_places')
+        }),
+    )
+
+@admin.register(Unit)
+class UnitAdmin(admin.ModelAdmin):
+    list_display = ('name', 'symbol')
+    search_fields = ('name', 'symbol')
+    ordering = ('name',)
+
 @admin.register(Sensor)
 class SensorAdmin(admin.ModelAdmin):
-    list_display = ('name', 'device', 'sensor_type', 'is_active')
+    list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'effective_data_type_display', 'is_active')
     list_filter = ('sensor_type', 'is_active', 'device__location')
     search_fields = ('name', 'device__name')
     readonly_fields = ('created_at', 'updated_at')
+    autocomplete_fields = ['device', 'sensor_type', 'influx_source']
 
     fieldsets = (
         (None, {
-            'fields': ('name', 'device', 'sensor_type', 'is_active', 'data_type')
+            'fields': ('name', 'device', 'sensor_type', 'is_active')
+        }),
+        ('Display & Data Type Settings', {
+            'fields': ('graph_type', ('unit', 'unit_override'), ('data_type', 'data_type_override'))
         }),
         ('InfluxDB Settings', {
             'fields': ('influx_source', 'influx_measurement'),
@@ -82,6 +112,16 @@ class SensorAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         })
     )
+
+    def effective_unit_display(self, obj):
+        if obj.effective_unit:
+            return obj.effective_unit.symbol
+        return "N/A"
+    effective_unit_display.short_description = 'Unit'
+
+    def effective_data_type_display(self, obj):
+        return obj.get_effective_data_type_display
+    effective_data_type_display.short_description = 'Data Type'
 
     class Meta:
         verbose_name_plural = '4. Sensors'

@@ -1,43 +1,43 @@
-FROM python:3.12-slim-bookworm 
+FROM python:3.12-slim-bookworm
 
-ARG UID=1000 \
-    GID=1000
+ARG UID=1000
+ARG GID=1000
 
-# container ENV settings
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install requirements
-COPY requirements.txt /opt/app/
-RUN pip install -r /opt/app/requirements.txt
-RUN echo "CACHE_VERSION=$(date +%s)" >> /etc/environment
-
-## mount points
-RUN mkdir -p /opt/app/db
-RUN mkdir -p /opt/app/static_files
-RUN mkdir -p /opt/app/media
-
-# App Code directory
-RUN mkdir -p /opt/app/webapp/
-
-# setup files
-COPY docker-entrypoint.sh /opt/app/
-RUN chmod +x /opt/app/docker-entrypoint.sh
-
-# copy the app code
-COPY webapp /opt/app/webapp/
-
-# create user to run the apps
+# Create a non-root user and group
 RUN groupadd -g "${GID}" -r web \
-  && useradd -d '/opt/app' -g web -l -r -u "${UID}" web \
-  && chown web:web -R '/opt/app'
+    && useradd -d '/opt/app' -g web -l -r -u "${UID}" web
 
-# switch to non-root user
+# Create app directories and set permissions
+RUN mkdir -p /opt/app/db \
+    && mkdir -p /opt/app/static_files \
+    && mkdir -p /opt/app/media \
+    && mkdir -p /opt/app/webapp \
+    && chown -R web:web /opt/app
+
+# Switch to the non-root user
 USER web
+WORKDIR /opt/app
 
-# home for the app
+# Set up virtual environment as the web user
+ENV VIRTUAL_ENV=/opt/app/venv
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Install requirements into the venv as the web user
+COPY --chown=web:web requirements.txt .
+RUN pip install -r requirements.txt
+
+# Copy application code as the web user
+COPY --chown=web:web webapp ./webapp
+COPY --chown=web:web docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
+# Set final workdir
 WORKDIR /opt/app/webapp
 
  

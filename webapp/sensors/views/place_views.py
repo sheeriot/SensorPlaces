@@ -13,6 +13,7 @@ from django.utils.safestring import mark_safe
 from django import forms
 from django.db import transaction
 from django.shortcuts import render
+from django.utils.decorators import method_decorator
 # from typing import Dict, Any, Optional, cast
 
 # App stuff
@@ -21,6 +22,7 @@ from .place_forms import PlaceForm, PlaceDeleteForm
 from ..map_fun import place_map_create
 from .mixins import PlaceAnnotationMixin
 from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places, get_live_counts_context
+from ..decorators import log_execution_time
 
 # utility
 import json
@@ -81,6 +83,7 @@ def siteplan_view(request, place_slug):
         'editable': True
     })
 
+@method_decorator(log_execution_time, name='dispatch')
 class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Place
     context_object_name = 'place'
@@ -141,8 +144,13 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
         # Set initial data with referrer
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial']['referrer'] = self._referrer
-        
+        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cancel_url'] = self.get_cancel_url()
+        return context
 
     def form_valid(self, form: PlaceForm):
         # First save the form to get the object
@@ -173,6 +181,9 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
+
+    def get_cancel_url(self):
+        return reverse('sensors:place_list')
 
 class PlaceUpdateView(LoginRequiredMixin, UpdateView):
     model = Place
@@ -254,7 +265,13 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['inactive_help_text'] = self._inactive_help_text
+        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cancel_url'] = self.get_cancel_url()
+        return context
 
     def form_valid(self, form: PlaceForm):
         # Get the object before saving to compare values
@@ -342,6 +359,9 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
+
+    def get_cancel_url(self):
+        return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
 
     def get_success_url(self):
         # Use cleaned_data from the form instead of request.POST

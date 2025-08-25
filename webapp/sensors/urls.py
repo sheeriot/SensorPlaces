@@ -1,22 +1,23 @@
 from django.urls import path
 from .views import (
-    place_views, 
-    location_views, 
-    device_views, 
+    place_views,
+    location_views,
+    device_views,
     sensor_views,
     influx_views,
     webhook_views,
     toggle_active,
+    sensor_type_views,
     timezone_views,
+    toast_views,
 )
 from .views.sensor_views import (
+    SensorCreateView,
+    LoRaWANSensorCreateView,
     SensorListView,
     SensorDetailView,
-    SensorCreateView,
     SensorUpdateView,
     SensorDeleteView,
-    sensor_readings_api,
-    sensor_readings_table_api,
 )
 
 app_name = 'sensors'
@@ -48,24 +49,30 @@ urlpatterns = [
     path('<slug:place_slug>/device/<int:pk>/update/', device_views.DeviceUpdateView.as_view(), name='device_update'),
     path('<slug:place_slug>/device/<int:pk>/delete/', device_views.DeviceDeleteView.as_view(), name='device_delete'),
     
+    # Toast URLs
+    path('api/<slug:place_slug>/toasts/', toast_views.ToastAPIView.as_view(), name='toast_api'),
+    path('<slug:place_slug>/toasts/', toast_views.ToastListView.as_view(), name='toast_list'),
+
     # Sensor URLs - nested under places, locations, and devices
-    path('<slug:place_slug>/sensor/create/<int:device_pk>/', SensorCreateView.as_view(), name='sensor_create'),
-    path('<slug:place_slug>/lorawan_sensor/create/<int:device_pk>/', sensor_views.LoRaWANSensorCreateView.as_view(), name='lorawan_sensor_create'),
+    path('place/<slug:place_slug>/device/<int:device_pk>/sensor/create/', SensorCreateView.as_view(), name='sensor_create'),
+    path('place/<slug:place_slug>/device/<int:device_pk>/lorawan-sensor/create/', LoRaWANSensorCreateView.as_view(), name='lorawan_sensor_create'),
     path('<slug:place_slug>/sensors/', SensorListView.as_view(), name='sensor_list'),
     path('<slug:place_slug>/location/<int:location_pk>/sensors/', SensorListView.as_view(), name='location_sensors'),
     path('<slug:place_slug>/device/<int:device_pk>/sensors/', SensorListView.as_view(), name='device_sensors'),
     path('<slug:place_slug>/sensor/<int:pk>/', SensorDetailView.as_view(), name='sensor_detail'),
+    path('<slug:place_slug>/sensor/<int:pk>/delta/<str:delta>/', SensorDetailView.as_view(), name='sensor_detail_delta'),
+    path('<slug:place_slug>/sensor/<int:pk>/<str:start_date>/<str:end_date>/', SensorDetailView.as_view(), name='sensor_detail_daterange'),
     path('<slug:place_slug>/sensor/<int:pk>/update/', SensorUpdateView.as_view(), name='sensor_update'),
     path('<slug:place_slug>/sensor/<int:pk>/delete/', SensorDeleteView.as_view(), name='sensor_delete'),
     path('<slug:place_slug>/sensor/<int:sensor_pk>/readings/', sensor_views.SensorReadingListView.as_view(), name='sensor_reading_list'),
 
     # API endpoints for sensor readings
-    path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_readings_api, name='sensor_readings_api'),
-    path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_readings_table_api, name='sensor_readings_table_api'),
+    path('api/<slug:place_slug>/sensor/<int:pk>/update-graph-type/', sensor_views.update_graph_type, name='update_graph_type'),
+    path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_views.sensor_readings_api, name='sensor_readings_api'),
+    path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_views.sensor_readings_table_api, name='sensor_readings_table_api'),
     path('api/<slug:place_slug>/sensor/<int:pk>/lorawan_data/', sensor_views.lorawan_sensor_data_api, name='lorawan_sensor_data_api'),
 
     # InfluxSource URLs
-    path('<slug:place_slug>/influx-sources/', influx_views.InfluxSourceListView.as_view(), name='influxsource_list'),
     path('<slug:place_slug>/influx-sources/new/', influx_views.InfluxSourceCreateView.as_view(), name='influxsource_create'),
     path('<slug:place_slug>/influx-sources/<int:pk>/', influx_views.InfluxSourceDetailView.as_view(), name='influxsource_detail'),
     path('<slug:place_slug>/influx-sources/<int:pk>/update/', influx_views.InfluxSourceUpdateView.as_view(), name='influxsource_update'),
@@ -79,4 +86,10 @@ urlpatterns = [
     
     # Timezone
     path('api/set-timezone/', timezone_views.set_user_timezone, name='set_user_timezone'),
+
+    # SensorType URLs
+    path('sensortypes/', sensor_type_views.SensorTypeListView.as_view(), name='sensortype_list'),
+    path('sensortype/create/', sensor_type_views.SensorTypeCreateView.as_view(), name='sensortype_create'),
+    path('sensortype/<int:pk>/', sensor_type_views.SensorTypeDetailView.as_view(), name='sensortype_detail'),
+    path('sensortype/<int:pk>/update/', sensor_type_views.SensorTypeUpdateView.as_view(), name='sensortype_update'),
 ]

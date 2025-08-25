@@ -5,7 +5,7 @@
     data-sensor-id="{{ sensor.pk }}"
     data-sensor-name="{{ sensor.name }}"
     data-sensor-active="{{ sensor.is_active|lower }}">
-    <td class="text-nowrap">
+    <td class="text-nowrap ps-5">
         <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none d-flex align-items-center">
             <i class="bi bi-thermometer me-2"></i>
             <div>
@@ -14,6 +14,7 @@
             </div>
         </a>
     </td>
+    <td></td>
     {% if not narrow_view %}
     <td class="text-end">
         {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug %}

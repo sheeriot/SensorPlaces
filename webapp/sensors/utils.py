@@ -5,15 +5,16 @@ import matplotlib
 from datetime import datetime, timezone as dt_timezone
 from typing import List, Optional
 import numpy as np
+from influxdb_client_3 import InfluxDBClient3
 
 # Use a non-interactive backend for matplotlib
 matplotlib.use('Agg')
 
 
 def get_influxdb_client(influx_source):
-    return InfluxDBClient(
-        host=f"http://{influx_source.server_dns}:{influx_source.server_port}",
-        token=influx_source.read_token,
+    return InfluxDBClient3(
+        host=influx_source.url,
+        token=influx_source.token,
         org=influx_source.org,
         database=influx_source.bucket_name
     )

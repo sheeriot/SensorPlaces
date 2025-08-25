@@ -1,104 +1,143 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const graphCard = document.getElementById('sensor-graph-card');
-    if (!graphCard) {
-        return;
-    }
-    const chartCanvas = document.getElementById('sensorChart');
-    if (!chartCanvas) {
-        return;
-    }
-    const sensorId = graphCard.dataset.sensorId;
-    const placeSlug = graphCard.dataset.placeSlug;
-    const apiUrl = graphCard.dataset.apiUrl;
-    const sensorType = graphCard.dataset.sensorType;
-    const graphType = graphCard.dataset.graphType;
-    const tempUnitSelect = document.getElementById('temp-unit-select');
-    
-    let chart;
-    let rawData = [];
-    let currentUnit = 'C';
-
-    function convertTemperature(value, toUnit) {
-        if (toUnit === 'F') {
-            return (value * 9/5) + 32;
-        }
-        return (value - 32) * 5/9;
-    }
-    
-    function filterOutliers(data) {
-        if (sensorType === 'HUMIDITY' && data.length > 0) {
-            return data.filter(item => item[1] <= 100);
+class SensorChart {
+    constructor(graphCardId) {
+        this.graphCard = document.getElementById(graphCardId);
+        if (!this.graphCard) {
+            console.error('Graph card not found!');
+            return;
         }
 
-        if (sensorType === 'RAINFALL_TOTAL' || data.length < 4) {
-            return data;
-        }
-        const values = data.map(item => item[1]).sort((a, b) => a - b);
-        const q1 = values[Math.floor(values.length * 0.25)];
-        const q3 = values[Math.floor(values.length * 0.75)];
-        const iqr = q3 - q1;
-        const maxValue = q3 + iqr * 1.5;
-        const minValue = q1 - iqr * 1.5;
+        this.sensorChartConfig = { debug: true };
+        this.chart = null;
+        this.originalData = [];
+        this.currentGraphType = this.graphCard.dataset.graphType;
+        this.originalUnit = this.graphCard.dataset.sensorUnit;
+        this.sensorType = this.graphCard.dataset.sensorType;
 
-        return data.filter(item => item[1] >= minValue && item[1] <= maxValue);
+        this.initialize();
     }
 
-    function renderChart(data) {
-        if (chart) {
-            chart.destroy();
-        }
+    // --- Conversion Helpers ---
+    celsiusToFahrenheit(celsius) { return celsius * 9 / 5 + 32; }
+    fahrenheitToCelsius(fahrenheit) { return (fahrenheit - 32) * 5 / 9; }
 
-        let processedData = data;
-        if (sensorType === 'TEMPERATURE' && tempUnitSelect && tempUnitSelect.value !== 'C') {
-            processedData = data.map(item => [item[0], convertTemperature(item[1], 'F')]);
-            currentUnit = 'F';
-        } else {
-            currentUnit = 'C';
-        }
+    // --- UI Helper ---
+    showLoadingState(isLoading) {
+        const chartCanvas = document.getElementById('sensorChart');
+        const sensorId = this.graphCard.dataset.sensorId;
+        const dataPointsBody = document.getElementById(`data-points-body-${sensorId}`);
 
-        const labels = processedData.map(item => new Date(item[0]));
-        const values = processedData.map(item => item[1]);
+        if (isLoading) {
+            if (this.chart) this.chart.destroy();
+            const ctx = chartCanvas.getContext('2d');
+            ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+            ctx.textAlign = "center";
+            ctx.fillText("Loading...", chartCanvas.width / 2, chartCanvas.height / 2);
+
+            if (dataPointsBody) {
+                dataPointsBody.innerHTML = `<tr><td colspan="2" class="text-center py-5"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div><span class="ms-2">Loading data...</span></td></tr>`;
+            }
+        }
+    }
+
+    // --- Data Fetching and Processing ---
+    async fetchData(apiUrl) {
+        this.showLoadingState(true);
+
+        if (!apiUrl) {
+            console.error('API URL is missing.');
+            this.renderChart([], this.currentGraphType);
+            this.showLoadingState(false);
+            return;
+        }
+        try {
+            const response = await window.utils.fetchWithCSRF(apiUrl);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const responseData = await response.json();
+            
+            this.currentGraphType = responseData.sensor.graph_type;
+            this.graphCard.dataset.sensorUnit = responseData.sensor.unit || 'N/A';
+            this.originalUnit = this.graphCard.dataset.sensorUnit;
+
+            this.originalData = responseData.data_points.map(p => [new Date(p[0]), p[1]]);
+            
+            const tempUnitSelect = document.getElementById('temp-unit-select');
+            if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
+                tempUnitSelect.dispatchEvent(new Event('change'));
+            } else {
+                this.renderChart(this.originalData, this.currentGraphType);
+            }
+        } catch (error) {
+            console.error('Error fetching or rendering chart:', error);
+            this.renderChart([], this.currentGraphType);
+        } finally {
+            this.showLoadingState(false);
+        }
+    }
+
+    // --- Chart Rendering ---
+    renderChart(data, type) {
+        const chartCanvas = document.getElementById('sensorChart');
+        if (!chartCanvas) return;
         
-        const durationDays = (labels.length > 1) ? (labels[labels.length - 1] - labels[0]) / (1000 * 60 * 60 * 24) : 0;
+        const displayUnit = this.graphCard.dataset.sensorUnit || '';
+        const minValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
+        const maxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
+        const decimalPlaces = this.graphCard.dataset.decimalPlaces !== '' ? parseInt(this.graphCard.dataset.decimalPlaces) : 2;
+        const sensorName = this.graphCard.dataset.sensorName || 'Sensor';
+        const deviceName = this.graphCard.dataset.deviceName || 'Device';
 
-        chart = new Chart(chartCanvas.getContext('2d'), {
-            type: 'line',
+        if (this.chart) this.chart.destroy();
+
+        const chartData = data.map(item => ({ x: item[0], y: item[1] }));
+        const chartType = type === 'SCATTER' ? 'scatter' : (type === 'BAR' ? 'bar' : 'line');
+        
+        const yAxisOptions = { title: { display: true, text: `Value (${displayUnit})` } };
+        if (minValue !== null) yAxisOptions.min = minValue;
+        if (maxValue !== null) yAxisOptions.max = maxValue;
+        if (this.sensorType && this.sensorType.toLowerCase().includes('humidity')) {
+            yAxisOptions.min = 0;
+            yAxisOptions.max = 100;
+        }
+
+        this.chart = new Chart(chartCanvas.getContext('2d'), {
+            type: chartType,
             data: {
-                labels: labels,
                 datasets: [{
-                    label: `Sensor Reading (°${currentUnit})`,
-                    data: values,
+                    label: `${sensorName} (${deviceName})`,
+                    data: chartData,
                     borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
-                    showLine: graphType === 'LINE',
-                    pointRadius: 3,
-                    pointBackgroundColor: 'rgba(75, 192, 192, 1)'
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: chartType === 'line',
+                    tension: 0.1
                 }]
             },
             options: {
-                plugins: {
-                    legend: {
-                        onClick: null
-                    }
-                },
+                responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     x: {
                         type: 'time',
-                        time: {
-                            unit: durationDays <= 3 ? 'hour' : 'day',
-                            displayFormats: {
-                                hour: 'MMM d, h a',
-                                day: 'MMM d'
-                            }
-                        }
+                        time: { unit: 'day', tooltipFormat: 'MMM D, YYYY, h:mm:ss a' },
+                        title: { display: true, text: 'Timestamp' }
                     },
-                    y: {
-                        beginAtZero: false,
-                        ticks: {
-                            maxTicksLimit: 8,
-                            stepSize: 0.5,
-                            callback: function(value) {
-                                return value.toFixed(1);
+                    y: yAxisOptions
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        align: 'end',
+                        labels: { usePointStyle: true, pointStyle: 'circle', padding: 10 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) {
+                                    label += `${context.parsed.y.toFixed(decimalPlaces)} ${displayUnit}`;
+                                }
+                                return label;
                             }
                         }
                     }
@@ -106,116 +145,124 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        const dataPointsContainer = document.getElementById('data-points');
-        if (dataPointsContainer) {
-            if (processedData.length > 0) {
-                let table = '<table class="table table-sm table-striped">';
-                table += `<thead><tr><th>Timestamp</th><th>Value (°${currentUnit})</th></tr></thead><tbody>`;
-                processedData.slice().reverse().forEach(item => {
-                    table += `<tr><td>${formatTimestamp(item[0])}</td><td>${item[1].toFixed(1)}</td></tr>`;
-                });
-                table += '</tbody></table>';
-                dataPointsContainer.innerHTML = table;
-            } else {
-                dataPointsContainer.innerHTML = '<p class="text-muted">No data available for this time range.</p>';
-            }
-        }
+        this.updateDataPointsTable(chartData, displayUnit, decimalPlaces);
     }
-    
-    async function fetchData(startDate, endDate) {
-        const url = `${apiUrl}?start=${startDate.toISOString()}&end=${endDate.toISOString()}`;
+
+    updateDataPointsTable(chartData, displayUnit, decimalPlaces) {
+        const sensorId = this.graphCard.dataset.sensorId;
+        const dataPointsBody = document.getElementById(`data-points-body-${sensorId}`);
+        const dataPointsHeader = document.querySelector(`#data-points-container th:nth-child(2)`);
+
+        if (dataPointsHeader) dataPointsHeader.textContent = `Value (${displayUnit})`;
         
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            rawData = await response.json();
-            
-            const filterSwitch = document.getElementById('filter-outliers-switch');
-            const dataToRender = filterSwitch.checked ? filterOutliers(rawData) : rawData;
-            renderChart(dataToRender);
-
-        } catch (error) {
-            console.error('Error fetching or rendering chart:', error);
-            const dataPointsContainer = document.getElementById('data-points');
-            if (dataPointsContainer) {
-                dataPointsContainer.innerHTML = '<p class="text-danger">Error loading data.</p>';
+        if (dataPointsBody) {
+            if (chartData.length > 0) {
+                let rows = '';
+                chartData.slice().reverse().forEach(item => {
+                    const valueDisplay = (item.y !== null && typeof item.y !== 'undefined') ? item.y.toFixed(decimalPlaces) : 'N/A';
+                    rows += `<tr><td>${window.utils.formatTimestamp(item.x)}</td><td class="text-end">${valueDisplay}</td></tr>`;
+                });
+                dataPointsBody.innerHTML = rows;
+            } else {
+                dataPointsBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-5">No data available for this time range.</td></tr>';
             }
         }
     }
 
-    if (tempUnitSelect) {
-        tempUnitSelect.addEventListener('change', () => {
-            const filterSwitch = document.getElementById('filter-outliers-switch');
-            const dataToRender = filterSwitch.checked ? filterOutliers(rawData) : rawData;
-            renderChart(dataToRender);
-        });
-    }
+    // --- Event Listeners and Initialization ---
+    initialize() {
+        document.addEventListener('DOMContentLoaded', () => {
+            const initialApiUrl = new URL(this.graphCard.dataset.apiUrl, window.location.origin);
+            const startDate = this.graphCard.dataset.startDate;
+            const endDate = this.graphCard.dataset.endDate;
+            const startDatePicker = document.getElementById('start-date-picker');
+            const endDatePicker = document.getElementById('end-date-picker');
 
-    const startDatePicker = document.getElementById('start-date-picker');
-    const endDatePicker = document.getElementById('end-date-picker');
-    const applyButton = document.getElementById('apply-date-range');
-    const filterSwitch = document.getElementById('filter-outliers-switch');
-    const presetButtons = document.querySelectorAll('.date-range-preset');
-
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 7);
-
-    startDatePicker.value = startDate.toISOString().split('T')[0];
-    endDatePicker.value = endDate.toISOString().split('T')[0];
-
-    if (applyButton) {
-        applyButton.addEventListener('click', () => {
-            const start = new Date(startDatePicker.value);
-            const end = new Date(endDatePicker.value);
-            fetchData(start, end);
-            presetButtons.forEach(btn => btn.classList.remove('active'));
-        });
-    }
-
-    presetButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            presetButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-
-            const range = button.dataset.range;
-            const end = new Date();
-            let start = new Date();
-            
-            if (range.endsWith('h')) {
-                start.setHours(end.getHours() - parseInt(range));
-            } else if (range.endsWith('d')) {
-                start.setDate(end.getDate() - parseInt(range));
-            }
-
-            startDatePicker.value = start.toISOString().split('T')[0];
-            endDatePicker.value = end.toISOString().split('T')[0];
-            fetchData(start, end);
-        });
-    });
-
-    if (filterSwitch) {
-        filterSwitch.addEventListener('change', () => {
-            const originalCount = rawData.length;
-            const dataToRender = filterSwitch.checked ? filterOutliers(rawData) : rawData;
-            const filteredCount = dataToRender.length;
-
-            if (filterSwitch.checked) {
-                const removedCount = originalCount - filteredCount;
-                if (window.toastSystem) {
-                    window.toastSystem.show({ message: `Filter removed ${removedCount} outliers.`, type: 'info' });
-                }
+            if (startDate && endDate) {
+                initialApiUrl.searchParams.set('start', startDate);
+                initialApiUrl.searchParams.set('end', endDate);
+                if (startDatePicker) startDatePicker.value = startDate.split('T')[0];
+                if (endDatePicker) endDatePicker.value = endDate.split('T')[0];
             } else {
-                if (window.toastSystem) {
-                    window.toastSystem.show({ message: 'Outlier filter disabled.', type: 'info' });
-                }
+                initialApiUrl.searchParams.set('delta', '7d');
+                const end = new Date();
+                const start = new Date();
+                start.setDate(end.getDate() - 7);
+                if (startDatePicker) startDatePicker.value = start.toISOString().split('T')[0];
+                if (endDatePicker) endDatePicker.value = end.toISOString().split('T')[0];
             }
+            this.fetchData(initialApiUrl.toString());
 
-            renderChart(dataToRender);
+            this.setupEventListeners();
         });
     }
 
-    fetchData(startDate, endDate);
-}); 
+    setupEventListeners() {
+        this.graphCard.addEventListener('dateRangeApplied', (event) => this.fetchData(event.detail.apiUrl));
+
+        this.graphCard.addEventListener('graphTypeChange', (e) => {
+            if (this.sensorChartConfig.debug) console.log('sensor-chart.js: Received graphTypeChange event with detail:', e.detail);
+            
+            this.currentGraphType = e.detail.newType;
+            const tempUnitSelect = document.getElementById('temp-unit-select');
+            if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
+                 tempUnitSelect.dispatchEvent(new Event('change'));
+            } else {
+                this.renderChart(this.originalData, this.currentGraphType);
+            }
+        });
+        if (this.sensorChartConfig.debug) console.log('sensor-chart.js: Event listener for graphTypeChange added to graphCard.');
+
+        document.querySelectorAll('.date-range-preset').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                const range = button.dataset.range;
+                const apiUrl = new URL(this.graphCard.dataset.apiUrl, window.location.origin);
+                apiUrl.searchParams.delete('start');
+                apiUrl.searchParams.delete('end');
+                apiUrl.searchParams.set('delta', range);
+                this.fetchData(apiUrl.toString());
+
+                const end = new Date();
+                const start = new Date();
+                if (range.includes('h')) start.setHours(start.getHours() - parseInt(range));
+                else if (range.includes('d')) start.setDate(start.getDate() - parseInt(range));
+                
+                document.getElementById('start-date-picker').value = start.toISOString().split('T')[0];
+                document.getElementById('end-date-picker').value = end.toISOString().split('T')[0];
+            });
+        });
+
+        const tempUnitSelect = document.getElementById('temp-unit-select');
+        if (tempUnitSelect) {
+            tempUnitSelect.addEventListener('change', () => {
+                const selectedUnit = tempUnitSelect.value;
+                let dataToRender = [];
+
+                if ((selectedUnit === 'C' && this.originalUnit.includes('C')) || (selectedUnit === 'F' && this.originalUnit.includes('F'))) {
+                    dataToRender = this.originalData;
+                    this.graphCard.dataset.sensorUnit = this.originalUnit;
+                } else {
+                    if (selectedUnit === 'F' && this.originalUnit.includes('C')) {
+                        dataToRender = this.originalData.map(p => [p[0], this.celsiusToFahrenheit(p[1])]);
+                        this.graphCard.dataset.sensorUnit = '°F';
+                    } else if (selectedUnit === 'C' && this.originalUnit.includes('F')) {
+                        dataToRender = this.originalData.map(p => [p[0], this.fahrenheitToCelsius(p[1])]);
+                        this.graphCard.dataset.sensorUnit = '°C';
+                    } else {
+                        dataToRender = this.originalData;
+                        this.graphCard.dataset.sensorUnit = this.originalUnit;
+                    }
+                }
+                this.renderChart(dataToRender, this.currentGraphType);
+            });
+        }
+    }
+}
+
+// Initialize the chart object
+if (document.getElementById('sensor-graph-card')) {
+    new SensorChart('sensor-graph-card');
+} 

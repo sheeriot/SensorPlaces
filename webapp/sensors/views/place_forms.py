@@ -62,6 +62,7 @@ class PlaceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         inactive_help_text = kwargs.pop('inactive_help_text', None)
+        cancel_url = kwargs.pop('cancel_url', None)
         
         # Remove the referrer pop - we'll handle it through initial data instead
         # Pop parameters from FormDataMixin that we don't use
@@ -200,8 +201,8 @@ class PlaceForm(forms.ModelForm):
             Div(
                 HTML('<hr class="mt-4">'),
                 Div(
-                    HTML("""
-                        <a href="{% url 'sensors:place_list' %}" 
+                    HTML(f"""
+                        <a href="{cancel_url}" 
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>

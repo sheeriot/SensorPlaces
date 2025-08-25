@@ -166,8 +166,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             view = LocationUpdateView()
             help_text, _ = view.get_location_inactive_help_text(location)
             # Log if the help text contains a wrapper
-            if help_text and '<div class="form-text' in help_text:
-                ic("Location help text contains wrapper:", help_text)
+            # ic("Location help text contains wrapper:", help_text)
             return help_text
         except Exception as e:
             return None
@@ -179,8 +178,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             view = DeviceUpdateView()
             help_text, _ = view.get_device_inactive_help_text(device)
             # Log if the help text contains a wrapper
-            if help_text and '<div class="form-text' in help_text:
-                ic("Device help text contains wrapper:", help_text)
+            # ic("Device help text contains wrapper:", help_text)
             return help_text
         except Exception as e:
             return None
@@ -192,8 +190,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             view = SensorUpdateView()
             help_text = view.get_sensor_inactive_help_text(sensor)
             # Log if the help text contains a wrapper
-            if help_text and '<div class="form-text' in help_text:
-                ic("Sensor help text contains wrapper:", help_text)
+            # ic("Sensor help text contains wrapper:", help_text)
             return help_text
         except Exception as e:
             return None

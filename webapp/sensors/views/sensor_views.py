@@ -19,12 +19,16 @@ from ..models import Device, Sensor, SensorReading, Place, Location
 from .mixins import PlaceAnnotationMixin
 from .sensor_forms import SensorForm, LoRaWANSensorForm
 from ..utils import get_sensor_readings, generate_sparkline
-from ..influx_graphs import get_lorawan_sensor_data, get_lorawan_sensor_stats
 from .views_fun import get_annotated_locations, get_live_counts_context
+from ..decorators import log_execution_time
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 from icecream import ic
+from django.template.loader import render_to_string
+
+from django.views.decorators.http import require_POST
+import json
 
 class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = Location
@@ -95,6 +99,80 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         
         return context
 
+def parse_date(date_str, is_end_date=False):
+    """Parses a date string from various formats and returns a timezone-aware datetime object."""
+    # Try parsing ISO 8601 format first (e.g., '2025-07-01T04:00:00+00:00')
+    try:
+        # fromisoformat handles timezone info automatically
+        return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+    except (ValueError, TypeError):
+        pass  # If it fails, try the other formats
+
+    # Try parsing custom formats
+    try:
+        if len(date_str) == 8:
+            dt = datetime.strptime(date_str, '%Y%m%d')
+        else:
+            dt = datetime.strptime(date_str, '%Y%m%d%H%M')
+        
+        # Make the datetime timezone-aware in UTC
+        aware_dt = dt.replace(tzinfo=dt_timezone.utc)
+    
+        # If it's an end date with no time specified, set it to the end of the day
+        if is_end_date and len(date_str) == 8:
+            aware_dt += timedelta(days=1, microseconds=-1)
+    
+        return aware_dt
+    except (ValueError, TypeError):
+        # If all parsing fails, raise an error or handle it as needed
+        raise ValueError(f"Unable to parse date string: {date_str}")
+
+
+def get_date_range(delta_str):
+    """
+    Helper to get start and end dates based on a delta string (e.g., '1d', '2h').
+    Returns a tuple (start_date, end_date).
+    """
+    end_date = timezone.now()
+    if delta_str.endswith('d'):
+        days = int(delta_str[:-1])
+        start_date = end_date - timedelta(days=days)
+    elif delta_str.endswith('h'):
+        hours = int(delta_str[:-1])
+        start_date = end_date - timedelta(hours=hours)
+    else:
+        # Default or error case
+        start_date = end_date - timedelta(days=7)
+    return start_date, end_date
+
+
+def _parse_date_range_from_params(params):
+    """
+    Parses date range parameters from a dictionary (e.g., request.GET or view.kwargs)
+    and returns timezone-aware datetime objects and their ISO string representations.
+    """
+    start_date_str = params.get('start') or params.get('start_date')
+    end_date_str = params.get('end') or params.get('end_date')
+    delta_str = params.get('delta')
+
+    start_date, end_date = None, None
+    start_date_iso, end_date_iso = None, None
+
+    if start_date_str and end_date_str:
+        start_date = parse_date(start_date_str)
+        end_date = parse_date(end_date_str, is_end_date=True)
+        start_date_iso = start_date.isoformat()
+        # For display, use the date part of the original string to avoid off-by-one day
+        end_date_iso = parse_date(end_date_str, is_end_date=False).isoformat()
+    elif delta_str:
+        start_date, end_date = get_date_range(delta_str)
+        start_date_iso = start_date.isoformat()
+        end_date_iso = end_date.isoformat()
+
+    return start_date, end_date, start_date_iso, end_date_iso, delta_str
+
+
+@method_decorator(log_execution_time, name='dispatch')
 class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Sensor
     context_object_name = 'sensor'
@@ -148,15 +226,28 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['sensors'] = Sensor.objects.filter(device=device).order_by(Lower('name'))
         context['narrow_view'] = True
         
-        # Get all readings for statistics and sparkline
-        readings = SensorReading.objects.filter(sensor=sensor).order_by('timestamp')
-        
-        context['readings'] = readings
+        # Use the new helper to parse date range from URL kwargs
+        start_date, end_date, start_date_iso, end_date_iso, delta = _parse_date_range_from_params(self.kwargs)
 
-        # Get sensor reading statistics
+        context['start_date_iso'] = start_date_iso
+        context['end_date_iso'] = end_date_iso
+        context['delta'] = delta
+        
+        # The readings for the graph ARE filtered by the date range
+        graph_readings_qs = SensorReading.objects.filter(sensor=sensor)
+        if start_date and end_date:
+            graph_readings_qs = graph_readings_qs.filter(timestamp__gte=start_date, timestamp__lte=end_date)
+        
+        context['readings'] = graph_readings_qs.order_by('timestamp')
+
+        # Overall statistics are NOT filtered by the date range.
+        all_readings_qs = SensorReading.objects.filter(sensor=sensor)
+
         if sensor.device.is_lorawan:
+            # For LoRaWAN, stats come from InfluxDB and should reflect the full history.
+            from ..influx_graphs import get_lorawan_sensor_stats
             stats_data = get_lorawan_sensor_stats(sensor)
-            ic(stats_data)
+            # ic(stats_data)
             if stats_data:
                 stats = {
                     'reading_count': stats_data.get('reading_count'),
@@ -170,16 +261,17 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
                     'last_reading': 'N/A'
                 }
         else:
-            stats = SensorReading.objects.filter(sensor=sensor).aggregate(
+            # For direct readings, aggregate over the entire unfiltered set.
+            stats = all_readings_qs.aggregate(
                 first_reading=Min('timestamp'),
                 last_reading=Max('timestamp'),
                 reading_count=Count('id')
             )
         context['reading_stats'] = stats
 
-        # Generate sparkline
+        # Generate sparkline based on the filtered graph data
         if not sensor.device.is_lorawan:
-            timestamps = [reading.timestamp for reading in readings]
+            timestamps = [reading.timestamp for reading in context['readings']]
             context['sparkline_image'] = generate_sparkline(timestamps)
         
         # Add locations for the place_nav_card
@@ -207,13 +299,6 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         except Exception as e:
             # ic(f"Error getting device: {str(e)}")
             pass
-
-        # Initialize inactive_help_text based on device status
-        self._inactive_help_text = None
-        
-        # Only generate help text if we have a device, but don't create a dummy sensor
-        if hasattr(self, '_device') and self._device:
-            self._inactive_help_text = self.get_sensor_inactive_help_text(None, self._device)
 
     def get_sensor_inactive_help_text(self, sensor, device=None):
         """
@@ -258,7 +343,6 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self._place
         kwargs['device'] = self._device
-        kwargs['inactive_help_text'] = self._inactive_help_text
         
         # Set initial data properly
         kwargs['initial'] = kwargs.get('initial', {})
@@ -271,6 +355,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             'referrer': self.request.GET.get('next', '')
         })
         
+        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -284,20 +369,23 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             context['location'] = self._device.location
         
         # Add a fallback cancel URL
-        context['cancel_url'] = self.request.META.get('HTTP_REFERER')
-        if not context['cancel_url']:
+        context['cancel_url'] = self.get_cancel_url()
+        return context
+
+    def get_cancel_url(self):
+        cancel_url = self.request.META.get('HTTP_REFERER')
+        if not cancel_url:
             if hasattr(self, '_device') and self._device:
-                context['cancel_url'] = reverse('sensors:device_detail', kwargs={
+                cancel_url = reverse('sensors:device_detail', kwargs={
                     'place_slug': self._place.slug,
                     'pk': self._device.pk
                 })
             else:
                 # Fallback to place detail if no device specified
-                context['cancel_url'] = reverse('sensors:place_detail', kwargs={
+                cancel_url = reverse('sensors:place_detail', kwargs={
                     'place_slug': self._place.slug
                 })
-        
-        return context
+        return cancel_url
 
     def form_valid(self, form):
         
@@ -323,15 +411,17 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             f"<i class='bi bi-geo-alt'></i> {self._device.location.name} > "
             f"<i class='bi bi-hdd-rack'></i> {self._device.name}<br>"
             f"<small class='text-muted'>"
-            f"Type: {sensor.get_sensor_type_display()}<br>"
-            f"Unit: {sensor.unit}<br>"
+            f"Type: {sensor.sensor_type.name if sensor.sensor_type else 'N/A'}<br>"
+            f"Unit: {sensor.effective_unit}<br>"
+            f"Data Type: {sensor.get_effective_data_type_display}<br>"
             f"Status: {'Active' if sensor.is_active else 'inactive'}"
             f"</small>"
         )
         
         # Add inactive warning to message if sensor is inactive
-        if not sensor.is_active and self._inactive_help_text:
-            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
+        inactive_help_text = self.get_sensor_inactive_help_text(sensor, self._device)
+        if not sensor.is_active and inactive_help_text:
+            message += f"<br><small class='text-warning'>{inactive_help_text}</small>"
         
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
@@ -362,6 +452,7 @@ class LoRaWANSensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.place
+        kwargs['cancel_url'] = reverse('sensors:device_detail', kwargs={'place_slug': self.place.slug, 'pk': self.device.pk})
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -469,7 +560,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self._place
         kwargs['device'] = self._device
-        kwargs['inactive_help_text'] = self._inactive_help_text
+        kwargs['cancel_url'] = self.get_cancel_url()
         
         return kwargs
 
@@ -489,14 +580,17 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         context['location'] = device.location
         
         # Add a fallback cancel URL
-        context['cancel_url'] = self.request.META.get('HTTP_REFERER')
-        if not context['cancel_url']:
-            context['cancel_url'] = reverse('sensors:device_detail', kwargs={
-                'place_slug': self._place.slug,
-                'pk': device.pk
-            })
-        
+        context['cancel_url'] = self.get_cancel_url()
         return context
+
+    def get_cancel_url(self):
+        cancel_url = self.request.META.get('HTTP_REFERER')
+        if not cancel_url:
+            cancel_url = reverse('sensors:device_detail', kwargs={
+                'place_slug': self._place.slug,
+                'pk': self.object.device.pk
+            })
+        return cancel_url
 
     def form_valid(self, form):
 
@@ -527,18 +621,22 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         changes = []
         
         if hasattr(self, '_original_values'):
-            if self._original_values['name'] != form.cleaned_data['name']:
-                changes.append(f"name: {self._original_values['name']} → {form.cleaned_data['name']}")
-            if self._original_values['is_active'] != form.cleaned_data['is_active']:
-                changes.append(f"active: {self._original_values['is_active']} → {form.cleaned_data['is_active']}")
-            if self._original_values['device'] != form.cleaned_data['device']:
-                changes.append(f"device: {self._original_values['device'].name} → {form.cleaned_data['device'].name}")
-            if self._original_values['sensor_type'] != form.cleaned_data['sensor_type']:
-                changes.append(f"type: {self._original_values['sensor_type']} → {form.cleaned_data['sensor_type']}")
-            if self._original_values['data_type'] != form.cleaned_data['data_type']:
-                changes.append(f"data source: {self._original_values['data_type']} → {form.cleaned_data['data_type']}")
-            if self._original_values['unit'] != form.cleaned_data['unit']:
-                changes.append(f"unit: {self._original_values['unit']} → {form.cleaned_data['unit']}")
+            if self._original_values['name'] != sensor.name:
+                changes.append(f"name: {self._original_values['name']} → {sensor.name}")
+            if self._original_values['is_active'] != sensor.is_active:
+                changes.append(f"active: {self._original_values['is_active']} → {sensor.is_active}")
+            if self._original_values['device'] != sensor.device:
+                changes.append(f"device: {self._original_values['device'].name} → {sensor.device.name}")
+            if self._original_values['sensor_type'] != sensor.sensor_type:
+                changes.append(f"type: {self._original_values['sensor_type']} → {sensor.sensor_type}")
+            if 'data_type' in self._original_values and self._original_values['data_type'] != sensor.effective_data_type:
+                changes.append(f"data type: {self._original_values['data_type']} → {sensor.get_effective_data_type_display}")
+            if 'unit' in self._original_values and self._original_values['unit'] != sensor.effective_unit:
+                # Need to import Unit at the top
+                from ..models import Unit
+                original_unit_pk = self._original_values['unit']
+                original_unit = Unit.objects.get(pk=original_unit_pk) if original_unit_pk else "None"
+                changes.append(f"unit: {original_unit} → {sensor.effective_unit}")
 
         message = (
             f"Updated sensor <strong>{sensor.name}</strong> in "
@@ -628,6 +726,14 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         
         return context
 
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            context = self.get_context_data(object=self.object)
+            html = render_to_string('sensors/sensor_confirm_delete_modal.html', context, request=request)
+            return JsonResponse({'html': html})
+        return super().get(request, *args, **kwargs)
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         sensor = self.object
@@ -640,8 +746,8 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             'name': sensor.name,
             'is_active': sensor.is_active,
             'sensor_type': sensor.sensor_type or '',
-            'data_type': sensor.data_type or '',
-            'unit': sensor.unit or ''
+            'data_type': sensor.get_effective_data_type_display,
+            'unit': sensor.effective_unit or ''
         }
         
         message = (
@@ -667,6 +773,8 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'redirect_url': success_url})
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):
@@ -824,7 +932,7 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
             f"<i class='bi bi-hdd-rack'></i> {device.name} > "
             f"<i class='bi bi-thermometer'></i> {sensor.name}<br>"
             f"<small class='text-muted'>"
-            f"Value: {reading.value} {sensor.unit or '-'}<br>"
+            f"Value: {reading.value} {sensor.effective_unit or '-'}<br>"
             f"Timestamp: {reading.timestamp}"
             f"</small>"
         )
@@ -903,6 +1011,7 @@ def test_sensor_readings(request, place_slug, sensor_pk):
         }, status=500)
 
 @login_required
+@log_execution_time
 def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonResponse:
     """
     API endpoint to get sensor readings for a given sensor.
@@ -914,23 +1023,13 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
             device__location__place__slug=place_slug
         )
         
-        # Get start and end dates from query parameters
-        start_str = request.GET.get('start')
-        end_str = request.GET.get('end')
-        
+        # Use the new helper to parse date range from GET parameters
+        start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
+
         queryset = SensorReading.objects.filter(sensor=sensor)
 
-        if start_str and end_str:
-            try:
-                # Assuming ISO 8601 format from JavaScript (e.g., "2024-07-16T10:00:00.000Z")
-                # The 'Z' is for UTC, fromisoformat handles it correctly in Python 3.11+
-                # For older versions, it might need replacement with +00:00
-                start_date = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
-                end_date = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
-                
-                queryset = queryset.filter(timestamp__gte=start_date, timestamp__lte=end_date)
-            except ValueError:
-                return JsonResponse({'error': 'Invalid date format. Use ISO 8601 format.'}, status=400)
+        if start_date and end_date:
+            queryset = queryset.filter(timestamp__gte=start_date, timestamp__lte=end_date)
         else:
             # Default to the last 24 hours if no range is provided
             time_threshold = timezone.now() - timedelta(hours=24)
@@ -938,47 +1037,82 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
 
         readings = queryset.order_by('timestamp').values('timestamp', 'value')
         
-        return JsonResponse(list(readings), safe=False)
+        # Format data into the new structure
+        data_points = [{'x': r['timestamp'].isoformat(), 'y': r['value']} for r in readings]
+
+        response_data = {
+            'sensor': {
+                'name': sensor.name,
+                'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
+                'data_type': sensor.effective_data_type,
+                'graph_type': sensor.graph_type,
+                'min_value': sensor.effective_min_value,
+                'max_value': sensor.effective_max_value
+            },
+            'query_range': {
+                'start_date': start_date_iso if start_date else None,
+                'end_date': end_date_iso if end_date else None
+            },
+            'data_points': data_points
+        }
+        
+        return JsonResponse(response_data)
 
     except Exception as e:
-        ic(f"Error fetching sensor readings: {e}")
+        # ic(f"Error fetching sensor readings: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
+@log_execution_time
 def lorawan_sensor_data_api(request, place_slug, pk):
     """
     API endpoint to get sensor readings from InfluxDB for a given LoRaWAN sensor.
     """
-    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
-    start_str = request.GET.get('start')
-    end_str = request.GET.get('end')
+    try:
+        sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
+    except Sensor.DoesNotExist:
+        return JsonResponse({"error": "Sensor not found"}, status=404)
 
-    if not start_str or not end_str:
-        return JsonResponse({'error': 'Start and end date parameters are required.'}, status=400)
+    # Use the new helper to parse date range from GET parameters
+    start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
 
-    if not sensor.device.is_lorawan:
-        return JsonResponse({'error': 'Sensor is not a LoRaWAN sensor.'}, status=400)
+    try:
+        from ..influx_graphs import get_lorawan_sensor_data
+        data_points = get_lorawan_sensor_data(sensor, start_date, end_date)
 
-    # Convert start and end strings to datetime objects
-    from datetime import datetime
-    start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
-    end = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
-    
-    time_range = end - start
-    time_range_str = f"{int(time_range.total_seconds())}s"
-    chart_data = get_lorawan_sensor_data(sensor, time_range_str)
-    # ic(chart_data)
-    
-    if chart_data is None:
-        return JsonResponse({'error': 'Could not retrieve data from InfluxDB.'}, status=500)
+        # Manually convert Decimal to float for safe JSON serialization.
+        # Also, convert datetime to ISO format string.
+        serializable_data_points = []
+        if data_points:
+            for ts, val in data_points:
+                # Ensure value is float for Chart.js, or None if it's null
+                serializable_val = float(val) if val is not None else None
+                serializable_data_points.append((ts.isoformat(), serializable_val))
 
-    # Convert timestamp objects to ISO 8601 strings
-    chart_data = [(ts.isoformat(), value) for ts, value in chart_data]
+        response_data = {
+            'sensor': {
+                'name': sensor.name,
+                'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
+                'data_type': sensor.effective_data_type,
+                'graph_type': sensor.graph_type,
+                'min_value': sensor.effective_min_value,
+                'max_value': sensor.effective_max_value,
+            },
+            'query_range': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+            },
+            'data_points': serializable_data_points,
+        }
+        return JsonResponse(response_data)
 
-    return JsonResponse(chart_data, safe=False)
+    except Exception as e:
+        # ic(f"Error fetching LoRaWAN sensor data: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
+@log_execution_time
 def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: int) -> JsonResponse:
     """
     API endpoint to get a rendered table of sensor readings for a given sensor.
@@ -1017,5 +1151,35 @@ def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: 
         return JsonResponse({'html': html})
 
     except Exception as e:
-        ic(f"Error fetching sensor readings table: {e}")
+        # ic(f"Error fetching sensor readings table: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_POST
+@login_required
+def update_graph_type(request, place_slug, pk):
+    """
+    Update the graph type for a sensor.
+    """
+    try:
+        data = json.loads(request.body)
+        new_graph_type = data.get('graph_type')
+
+        # Basic validation
+        if new_graph_type not in ['LINE', 'SCATTER', 'BAR']:
+            return JsonResponse({'success': False, 'error': 'Invalid graph type.'}, status=400)
+
+        # Get the place and sensor
+        place = get_object_or_404(Place, slug=place_slug)
+        sensor = get_object_or_404(Sensor, pk=pk, device__location__place=place)
+
+        # Update the sensor
+        sensor.graph_type = new_graph_type
+        sensor.save(update_fields=['graph_type'])
+
+        return JsonResponse({'success': True, 'new_graph_type': new_graph_type})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
