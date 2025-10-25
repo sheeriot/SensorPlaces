@@ -22,8 +22,8 @@
         </div>
         <!-- Active Toggle -->
         <div class="col-1">
-            {% if not device.location or device.location.is_active %}
-                {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=device.location.place.slug %}
+            {% if device.location and device.location.is_active and device.location.place.is_active %}
+                {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=device.location.place.slug object_name=device.name %}
             {% else %}
                 <span class="badge bg-secondary">inactive</span>
             {% endif %}
@@ -38,7 +38,7 @@
         <!-- Actions -->
         <div class="col-2 text-end">
             <div class="btn-group btn-group-sm">
-                <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug pk=device.pk %}" class="btn btn-sm btn-outline-warning">
+                <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug pk=device.pk %}?next={{ absolute_url|urlencode }}" class="btn btn-sm btn-outline-warning">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-device"

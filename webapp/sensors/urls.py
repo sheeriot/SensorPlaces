@@ -30,17 +30,17 @@ urlpatterns = [
     path('<slug:place_slug>/update/', place_views.PlaceUpdateView.as_view(), name='place_update'),
     path('<slug:place_slug>/delete/', place_views.PlaceDeleteView.as_view(), name='place_delete'),
     path('<slug:place_slug>/siteplan/', place_views.siteplan_view, name='siteplan'),
-    path('<slug:place_slug>/siteplan/update', place_views.siteplan_update, name='siteplan_update'),
+    path('<slug:place_slug>/siteplan/update/', place_views.siteplan_update, name='siteplan_update'),
     path('api/<slug:place_slug>/stats/', place_views.place_stats, name='place_stats_api'),
     # path('<slug:place_slug>/stats/', place_views.place_stats, name='place_stats'),
-    
+
     # Location URLs
     path('<slug:place_slug>/location/', location_views.LocationListView.as_view(), name='location_list'),
     path('<slug:place_slug>/location/new/', location_views.LocationCreateView.as_view(), name='location_create'),
     path('<slug:place_slug>/location/<slug:slug>/', location_views.LocationDetailView.as_view(), name='location_detail'),
     path('<slug:place_slug>/location/<slug:slug>/update/', location_views.LocationUpdateView.as_view(), name='location_update'),
     path('<slug:place_slug>/location/<slug:slug>/delete/', location_views.LocationDeleteView.as_view(), name='location_delete'),
-    
+
     # Device URLs
     path('<slug:place_slug>/devices/', device_views.DeviceListView.as_view(), name='device_list'),
     path('<slug:place_slug>/device/create/', device_views.DeviceCreateView.as_view(), name='device_create'),
@@ -48,14 +48,17 @@ urlpatterns = [
     path('<slug:place_slug>/device/<int:pk>/', device_views.DeviceDetailView.as_view(), name='device_detail'),
     path('<slug:place_slug>/device/<int:pk>/update/', device_views.DeviceUpdateView.as_view(), name='device_update'),
     path('<slug:place_slug>/device/<int:pk>/delete/', device_views.DeviceDeleteView.as_view(), name='device_delete'),
-    
+    path('<slug:place_slug>/device/<int:pk>/fetch-reading/', device_views.fetch_switchbot_reading, name='fetch_switchbot_reading'),
+    path('<slug:place_slug>/device/<int:pk>/inspect/', device_views.device_inspect_view, name='device_inspect'),
+    path('<slug:place_slug>/device/<int:pk>/add-sensor/', device_views.add_switchbot_sensor, name='add_switchbot_sensor'),
+
     # Toast URLs
     path('api/<slug:place_slug>/toasts/', toast_views.ToastAPIView.as_view(), name='toast_api'),
     path('<slug:place_slug>/toasts/', toast_views.ToastListView.as_view(), name='toast_list'),
 
     # Sensor URLs - nested under places, locations, and devices
-    path('place/<slug:place_slug>/device/<int:device_pk>/sensor/create/', SensorCreateView.as_view(), name='sensor_create'),
-    path('place/<slug:place_slug>/device/<int:device_pk>/lorawan-sensor/create/', LoRaWANSensorCreateView.as_view(), name='lorawan_sensor_create'),
+    path('<slug:place_slug>/device/<int:device_pk>/sensor/create/', SensorCreateView.as_view(), name='sensor_create'),
+    path('<slug:place_slug>/device/<int:device_pk>/lorawan-sensor/create/', LoRaWANSensorCreateView.as_view(), name='lorawan_sensor_create'),
     path('<slug:place_slug>/sensors/', SensorListView.as_view(), name='sensor_list'),
     path('<slug:place_slug>/location/<int:location_pk>/sensors/', SensorListView.as_view(), name='location_sensors'),
     path('<slug:place_slug>/device/<int:device_pk>/sensors/', SensorListView.as_view(), name='device_sensors'),
@@ -79,11 +82,13 @@ urlpatterns = [
     path('<slug:place_slug>/influx-sources/<int:pk>/delete/', influx_views.InfluxSourceDeleteView.as_view(), name='influxsource_delete'),
 
     # Webhook URLs
-    path('webhook/<uuid:uuid>/', webhook_views.WebhookReceiverView.as_view(), name='webhook_receiver'),
+    # THIS IS NEXT
+    path('webhook/switchbot/<slug:place_slug>/', webhook_views.SwitchBotWebhookReceiverView.as_view(), name='switchbot_webhook_receiver'),
+    path('webhook/<slug:place_slug>/<uuid:uuid>/', webhook_views.WebhookReceiverView.as_view(), name='webhook_receiver'),
 
     # Toggle Active State
     path('api/<slug:place_slug>/toggle-active/', toggle_active.ToggleActiveView.as_view(), name='toggle_active'),
-    
+
     # Timezone
     path('api/set-timezone/', timezone_views.set_user_timezone, name='set_user_timezone'),
 

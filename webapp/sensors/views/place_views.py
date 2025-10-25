@@ -20,13 +20,14 @@ from django.utils.decorators import method_decorator
 from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxSource
 from .place_forms import PlaceForm, PlaceDeleteForm
 from ..map_fun import place_map_create
-from .mixins import PlaceAnnotationMixin
+from .mixins import PlaceAnnotationMixin, ReferrerMixin
 from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places, get_live_counts_context
 from ..decorators import log_execution_time
 
 # utility
 import json
 from decimal import Decimal
+from icecream import ic
 
 # Place Views
 class PlaceListView(LoginRequiredMixin, ListView):
@@ -58,7 +59,7 @@ def siteplan_view(request, place_slug):
     locations = Location.objects.filter(place=place).annotate(
         devices_active_count=Count('device', filter=Q(device__is_active=True)),
         devices_inactive_count=Count('device', filter=Q(device__is_active=False))
-    )
+    ).exclude(slug='unassigned-devices')
     
     locations_json = json.dumps(
         [
@@ -97,6 +98,7 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'place'
+        context['absolute_url'] = self.request.build_absolute_uri()
         
         # Add place data from get_place_data function.
         # This adds the correctly annotated 'locations' queryset, 'locations_json',
@@ -121,7 +123,7 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         
         return context
 
-class PlaceCreateView(LoginRequiredMixin, CreateView):
+class PlaceCreateView(LoginRequiredMixin, ReferrerMixin, CreateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
@@ -134,22 +136,13 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
             'This place is inactive. All locations and devices within it will not collect data.'
         )
         
-        # Cache the referrer for later use
-        self._referrer = request.META.get('HTTP_REFERER', '')
-    
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['inactive_help_text'] = self._inactive_help_text
-        
-        # Set initial data with referrer
-        kwargs['initial'] = kwargs.get('initial', {})
-        kwargs['initial']['referrer'] = self._referrer
-        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['cancel_url'] = self.get_cancel_url()
         return context
 
     def form_valid(self, form: PlaceForm):
@@ -179,13 +172,11 @@ class PlaceCreateView(LoginRequiredMixin, CreateView):
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
 
-    def get_success_url(self):
+    def get_default_success_url(self):
         return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
 
-    def get_cancel_url(self):
-        return reverse('sensors:place_list')
 
-class PlaceUpdateView(LoginRequiredMixin, UpdateView):
+class PlaceUpdateView(LoginRequiredMixin, ReferrerMixin, UpdateView):
     model = Place
     form_class = PlaceForm
     template_name = 'sensors/place_form.html'
@@ -199,9 +190,6 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
         # Generate detailed inactive help text 
         self._inactive_help_text = self.get_place_inactive_help_text(self._place)
         
-        # Cache the referrer for later use
-        self._referrer = request.META.get('HTTP_REFERER', '')
-
     def get_place_inactive_help_text(self, place):
         """
         Generate help text for place inactive status.
@@ -256,21 +244,13 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
             
         return help_text
 
-    def get_initial(self):
-        initial = super().get_initial()
-        # Set the referrer in initial data
-        initial['referrer'] = self._referrer
-        return initial
-    
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['inactive_help_text'] = self._inactive_help_text
-        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['cancel_url'] = self.get_cancel_url()
         return context
 
     def form_valid(self, form: PlaceForm):
@@ -360,18 +340,9 @@ class PlaceUpdateView(LoginRequiredMixin, UpdateView):
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
 
-    def get_cancel_url(self):
+    def get_default_success_url(self):
         return reverse('sensors:place_detail', kwargs={'place_slug': self.object.slug})
 
-    def get_success_url(self):
-        # Use cleaned_data from the form instead of request.POST
-        if self.object and hasattr(self.object, 'referrer') and self.object.referrer:
-            return self.object.referrer
-        # Or check form's cleaned_data
-        elif hasattr(self, 'form') and 'referrer' in self.form.cleaned_data and self.form.cleaned_data['referrer']:
-            return self.form.cleaned_data['referrer']
-        # Fallback to default URL
-        return reverse('sensors:place_list')
 
 class PlaceDeleteView(LoginRequiredMixin, DeleteView):
     model = Place
@@ -442,11 +413,14 @@ def siteplan_update(request, place_slug):
     """
     Handles AJAX requests to update the x, y positions of locations on a site plan.
     """
+    ic("Entering siteplan_update", request.method, place_slug)
+
     if request.method != 'POST':
         return JsonResponse({'type': 'error', 'message': 'Invalid request method.'}, status=405)
 
     try:
         data = json.loads(request.body)
+        ic("Request body data:", data)
         locations_data = data.get('locations', [])
         place = get_object_or_404(Place, slug=place_slug)
         
@@ -454,8 +428,10 @@ def siteplan_update(request, place_slug):
         
         with transaction.atomic():
             for loc_data in locations_data:
+                ic("Processing location data:", loc_data)
                 form = LocationPositionForm(loc_data)
                 if form.is_valid():
+                    ic("Form is valid for slug:", form.cleaned_data['slug'])
                     slug = form.cleaned_data['slug']
                     x_pos = form.cleaned_data['x_pos']
                     y_pos = form.cleaned_data['y_pos']
@@ -473,8 +449,8 @@ def siteplan_update(request, place_slug):
                             'slug': location.slug,
                             'name': location.name,
                             'original_position': {
-                                'x_pos': float(original_position['x_pos']),
-                                'y_pos': float(original_position['y_pos'])
+                                'x_pos': float(original_position['x_pos']) if original_position['x_pos'] is not None else None,
+                                'y_pos': float(original_position['y_pos']) if original_position['y_pos'] is not None else None
                             },
                             'new_position': {
                                 'x_pos': float(location.x_pos),
@@ -483,18 +459,20 @@ def siteplan_update(request, place_slug):
                         })
                         
                     except Location.DoesNotExist:
-                        # This case is logged on the client-side, so just continue
+                        ic("Location not found for slug:", slug)
                         continue
                 else:
-                    # Also logged on the client-side
+                    ic("Form is invalid:", form.errors, "Data:", loc_data)
                     continue
 
         if not updated_locations_info:
+            ic("No locations were updated.")
             return JsonResponse({
                 'type': 'info',
                 'message': 'No locations were updated.'
             })
             
+        ic("Successfully updated locations:", updated_locations_info)
         # Build a more detailed message
         changes_list = ''.join([
             f"<li>{info['name']}: position: ({info['original_position']['x_pos']}, {info['original_position']['y_pos']}) → ({info['new_position']['x_pos']}, {info['new_position']['y_pos']})</li>"
@@ -507,7 +485,15 @@ def siteplan_update(request, place_slug):
         )
         
         # Add device/sensor counts for context
-        counts = get_place_counts(place)
+        locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
+        counts = {
+            'locations_active': locations_active,
+            'locations_inactive': locations_inactive,
+            'devices_active': devices_active,
+            'devices_inactive': devices_inactive,
+            'sensors_active': sensors_active,
+            'sensors_inactive': sensors_inactive
+        }
         
         return JsonResponse({
             'message': message,
@@ -516,7 +502,9 @@ def siteplan_update(request, place_slug):
             **counts
         })
 
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        ic("JSON Decode Error:", e)
         return JsonResponse({'type': 'error', 'message': 'Invalid JSON data.'}, status=400)
     except Exception as e:
+        ic("Unexpected error in siteplan_update:", e)
         return JsonResponse({'type': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)

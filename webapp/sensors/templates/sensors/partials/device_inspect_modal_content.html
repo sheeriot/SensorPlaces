@@ -1,0 +1,60 @@
+<div class="modal-header">
+    <h5 class="modal-title">
+        <i class="bi bi-terminal me-2"></i>
+        Inspect: {{ device.name }}
+        <small class="text-body-secondary ms-2">
+            <i class="bi bi-chevron-right"></i>
+            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=device.location.slug %}" class="link-dark">
+                <i class="bi bi-geo-alt"></i>
+                {{ device.location.name }}
+            </a> 
+            <i class="bi bi-chevron-right"></i>
+            <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="link-dark">
+                <i class="bi bi-house-gear"></i>
+                {{ place.name }}
+            </a> 
+        </small>
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% else %}
+        {% if missing_sensors %}
+        <div class="mb-3">
+            <p>The following sensors are available in the cloud but not yet added to this device:</p>
+            <ul class="list-group">
+                {% for sensor in missing_sensors %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ sensor.name }}</strong>
+                            <span class="text-muted ms-2">{{ sensor.value }}</span>
+                        </div>
+                        <form id="add-sensor-form-{{ sensor.name }}"
+                              hx-post="{% url 'sensors:add_switchbot_sensor' place_slug=place_slug pk=device.pk %}"
+                              hx-swap="none">
+                            {% csrf_token %}
+                            <input type="hidden" name="sensor_type" value="{{ sensor.name }}">
+                            {% if sensor.value is not None %}
+                            <input type="hidden" name="value" value="{{ sensor.value }}">
+                            {% endif %}
+                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-plus-circle"></i> Add {{ sensor.name }}
+                            </button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <p class="mt-4">Raw JSON response from SwitchBot Cloud for <strong>{{ device.name }}</strong> ({{ device.device_id }}):</p>
+        <pre class="bg-dark text-white p-2 rounded" style="border: 1px solid #444;"><code>{{ inspect_data }}</code></pre>
+    {% endif %}
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+        <i class="bi bi-door-closed me-1"></i>Close
+    </button>
+</div>

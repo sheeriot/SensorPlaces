@@ -2,6 +2,9 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from ..models import SensorType
 from ..forms.sensor_type_forms import SensorTypeForm
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from icecream import ic
 
 class SensorTypeListView(ListView):
     model = SensorType

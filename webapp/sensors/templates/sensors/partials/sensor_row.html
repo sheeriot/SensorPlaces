@@ -1,68 +1,91 @@
 {% load widget_tweaks %}
 
-<tr id="sensor-row-{{ sensor.pk }}" 
-    class="sensor-row {% if not sensor.is_active %}opacity-50{% endif %} {% if sensor.pk == object.pk %}table-info{% endif %}"
-    data-sensor-id="{{ sensor.pk }}"
-    data-sensor-name="{{ sensor.name }}"
-    data-sensor-active="{{ sensor.is_active|lower }}">
-    <td class="text-nowrap ps-5">
-        <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none d-flex align-items-center">
-            <i class="bi bi-thermometer me-2"></i>
-            <div>
-                <strong>{{ sensor.name }}</strong>
-                <div class="small text-muted">{{ sensor.get_sensor_type_display }}</div>
-            </div>
-        </a>
-    </td>
-    <td></td>
-    {% if not narrow_view %}
-    <td class="text-end">
-        {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug %}
-    </td>
-    <td class="text-end">
-        <div class="btn-group btn-group-sm">
-            <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="btn btn-info" title="View Sensor">
-                <i class="bi bi-eye"></i>
-            </a>
-            <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-warning" title="Edit Sensor">
-                <i class="bi bi-pencil"></i>
-            </a>
+<div id="sensor-row-{{ sensor.pk }}"
+     class="list-group-item list-group-item-action d-flex align-items-center py-2 px-3 {% if not sensor.is_active or not sensor.device.is_active %}opacity-50{% endif %} {% if model_name == 'sensor' and sensor.pk == object.pk %}active{% endif %}"
+     data-sensor-id="{{ sensor.pk }}"
+     data-sensor-name="{{ sensor.name }}"
+     data-sensor-active="{{ sensor.is_active|lower }}">
+
+    <!-- Name column -->
+    <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none text-body flex-grow-1 d-flex align-items-center" style="min-width: 0;">
+        <i class="bi bi-thermometer me-2"></i>
+        <div>
+            <strong>{{ sensor.name }}</strong>
+            <div class="small text-muted">{{ sensor.get_sensor_type_display }}</div>
         </div>
-    </td>
+    </a>
+
+    {% if not narrow_view %}
+        <!-- Current Value -->
+        <div style="width: 100px;" class="text-start">
+            {% if sensor.live_value is not None %}
+                <span class="badge bg-success-subtle text-success-emphasis rounded-1">
+                    {{ sensor.live_value|floatformat:sensor.effective_decimal_places }}{{ sensor.effective_unit.symbol }}
+                </span>
+            {% else %}
+                &nbsp;
+            {% endif %}
+        </div>
+
+        <!-- Active toggle -->
+        <div style="width: 90px;" class="text-start">
+            {% if sensor.device.is_active and sensor.device.location.is_active and sensor.device.location.place.is_active %}
+                {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug object_name=sensor.name %}
+            {% else %}
+                <span class="badge bg-secondary">inactive</span>
+            {% endif %}
+        </div>
+
+        <!-- Actions buttons -->
+        <div style="width: 120px;" class="text-end">
+            <div class="btn-group btn-group-sm">
+                <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="btn btn-info" title="View Sensor">
+                    <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-warning" title="Edit Sensor">
+                    <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+                   class="btn btn-danger"
+                   title="Delete Sensor"
+                   hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+                   hx-target="#modal-content">
+                    <i class="bi bi-trash"></i>
+                </a>
+            </div>
+        </div>
     {% endif %}
-</tr>
+</div>
 
 {% if sensor.is_active and device_is_active and parent_is_active %}
-<tr id="readings-results-{{ sensor.pk }}" class="readings-results d-none sensor-row" data-device-id="{{ device.pk }}">
-    <td colspan="5">
-        <div class="alert mb-3" role="alert"></div>
-        <div class="readings-summary d-none">
-            <h6>Summary</h6>
-            <dl class="row mb-3">
-                <dt class="col-sm-3">Count</dt>
-                <dd class="col-sm-9 count">-</dd>
-                <dt class="col-sm-3">Range</dt>
-                <dd class="col-sm-9">
-                    <span class="min">-</span> to <span class="max">-</span>
-                </dd>
-                <dt class="col-sm-3">Average</dt>
-                <dd class="col-sm-9 avg">-</dd>
-                <dt class="col-sm-3">Time Range</dt>
-                <dd class="col-sm-9 timerange">-</dd>
-            </dl>
-        </div>
-        <div class="recent-readings d-none">
-            <h6>Recent Readings</h6>
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </td>
-</tr>
+<div id="readings-results-{{ sensor.pk }}" class="readings-results d-none sensor-row p-3 border-bottom" data-device-id="{{ device.pk }}">
+    <div class="alert mb-3" role="alert"></div>
+    <div class="readings-summary d-none">
+        <h6>Summary</h6>
+        <dl class="row mb-3">
+            <dt class="col-sm-3">Count</dt>
+            <dd class="col-sm-9 count">-</dd>
+            <dt class="col-sm-3">Range</dt>
+            <dd class="col-sm-9">
+                <span class="min">-</span> to <span class="max">-</span>
+            </dd>
+            <dt class="col-sm-3">Average</dt>
+            <dd class="col-sm-9 avg">-</dd>
+            <dt class="col-sm-3">Time Range</dt>
+            <dd class="col-sm-9 timerange">-</dd>
+        </dl>
+    </div>
+    <div class="recent-readings d-none">
+        <h6>Recent Readings</h6>
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
 {% endif %} 

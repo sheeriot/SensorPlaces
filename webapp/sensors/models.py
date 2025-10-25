@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.db.models.functions import Lower
@@ -41,7 +41,24 @@ class Place(models.Model):
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
             self.slug = slugify(self.name)
-        return super().save(*args, **kwargs)
+
+        is_being_deactivated = False
+        if self.pk:
+            try:
+                original_is_active = Place.objects.values_list('is_active', flat=True).get(pk=self.pk)
+                if original_is_active and not self.is_active:
+                    is_being_deactivated = True
+            except Place.DoesNotExist:
+                pass  # This is a new object, so no need to do anything.
+
+        super().save(*args, **kwargs)
+
+        if is_being_deactivated:
+            # On deactivation, deactivate all devices within this place.
+            # Use on_commit to ensure this only runs if the place save is successful.
+            def deactivate_devices():
+                Device.objects.filter(location__place=self).update(is_active=False)
+            transaction.on_commit(deactivate_devices)
 
     @property
     def display_name(self) -> str:
@@ -218,14 +235,15 @@ class DeviceType(models.Model):
         return self.name
 
     class Meta:
-        verbose_name_plural = '3. Device Types'
+        verbose_name_plural = '6. Device Types'
         ordering = ['name']
 
 class Device(models.Model):
     name: CharField = models.CharField(max_length=100)
     model: CharField = models.CharField(max_length=100, null=True, blank=True)
     manufacturer: CharField = models.CharField(max_length=100, null=True, blank=True)
-    device_id: CharField = models.CharField(max_length=100, null=True, blank=True)
+    device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    notes: TextField = models.TextField(blank=True, null=True, help_text="Internal notes for this device.")
     location: ForeignKey = models.ForeignKey(
         Location, 
         on_delete=models.CASCADE, 
@@ -239,6 +257,8 @@ class Device(models.Model):
         related_name='devices',
     )
     is_lorawan: BooleanField = models.BooleanField(default=False, verbose_name="LoRaWAN Device")
+    is_switchbot: BooleanField = models.BooleanField(default=False, help_text="Is this a SwitchBot device?")
+    switchbot_hub_device_id: CharField = models.CharField(max_length=100, null=True, blank=True)
     is_active: BooleanField = models.BooleanField(
         default=True,
         help_text="inactive devices will be hidden by default"
@@ -254,29 +274,7 @@ class Device(models.Model):
                 'is_active': 'Device cannot be active when its location is inactive.'
             })
 
-        # Check for unique device_id within the same place
-        if self.device_id and self.location:
-            place = self.location.place
-            query = Device.objects.filter(
-                location__place=place,
-                device_id__iexact=self.device_id
-            )
-            if self.pk:
-                query = query.exclude(pk=self.pk)
-            
-            if query.exists():
-                duplicate = query.first()
-                raise ValidationError({
-                    'device_id': (
-                        f"A device with ID '{self.device_id}' already exists in this place "
-                        f"(in location '{duplicate.location.name}')."
-                    )
-                })
-
     def save(self, *args, **kwargs):
-        if self.device_id:
-            self.device_id = self.device_id.lower()
-
         # Run full validation first
         self.full_clean()
         
@@ -291,11 +289,15 @@ class Device(models.Model):
             
         super().save(*args, **kwargs)
 
+    def get_absolute_url(self):
+        """Returns the URL to the device's detail page."""
+        return reverse('sensors:device_detail', kwargs={'place_slug': self.location.place.slug, 'pk': self.pk})
+
     def __str__(self) -> str:
         return f"{self.name} ({self.model})"
 
     class Meta:
-        verbose_name_plural = '4. Devices'
+        verbose_name_plural = '3. Devices'
         ordering = ['location__place', 'location', '-is_active', Lower('name')]
 
 class InfluxSource(models.Model):
@@ -376,6 +378,16 @@ class Sensor(models.Model):
     # For data source
     influx_source: ForeignKey = models.ForeignKey('InfluxSource', on_delete=models.SET_NULL, null=True, blank=True, related_name='sensors')
     influx_measurement: CharField = models.CharField(max_length=100, null=True, blank=True)
+
+    # Cached reading to reduce API calls
+    current_reading_value = models.FloatField(null=True, blank=True)
+    current_reading_timestamp = models.DateTimeField(null=True, blank=True)
+    stale_threshold_override_seconds = models.PositiveIntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Override the default stale time from the sensor type, in seconds."
+    )
+
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -412,7 +424,16 @@ class Sensor(models.Model):
     def effective_decimal_places(self):
         if self.sensor_type and self.sensor_type.decimal_places is not None:
             return self.sensor_type.decimal_places
-        return None
+        return 1
+
+    @property
+    def effective_stale_threshold(self):
+        """Get the stale threshold in seconds, using override if available."""
+        if self.stale_threshold_override_seconds is not None:
+            return self.stale_threshold_override_seconds
+        if self.sensor_type and self.sensor_type.default_stale_threshold_seconds is not None:
+            return self.sensor_type.default_stale_threshold_seconds
+        return 300  # Fallback to 5 minutes
 
     @property
     def get_effective_data_type_display(self):
@@ -454,8 +475,15 @@ class Sensor(models.Model):
     def get_sensor_type_display(self) -> str:
         return self.sensor_type.name if self.sensor_type else 'Unknown'
 
+    def get_absolute_url(self):
+        """Returns the URL to the sensor's detail page."""
+        return reverse('sensors:sensor_detail', kwargs={
+            'place_slug': self.device.location.place.slug,
+            'pk': self.pk
+        })
+
     class Meta:
-        verbose_name_plural = '5. Sensors'
+        verbose_name_plural = '4. Sensors'
         ordering = [
             Lower('device__location__name'),
             Lower('device__name'),
@@ -479,6 +507,12 @@ class SensorType(models.Model):
     max_value = models.FloatField(null=True, blank=True)
     allow_override = models.BooleanField(default=False)
     decimal_places = models.PositiveIntegerField(null=True, blank=True, help_text="Number of decimal places to display for sensor readings.")
+    default_stale_threshold_seconds = models.PositiveIntegerField(
+        default=300,
+        null=True, 
+        blank=True, 
+        help_text="Default stale time for this sensor type, in seconds. Default is 5 minutes."
+    )
 
     def __str__(self):
         return self.name
@@ -487,7 +521,7 @@ class SensorType(models.Model):
         return reverse('sensors:sensortype_detail', kwargs={'pk': self.pk})
 
     class Meta:
-        verbose_name_plural = 'Sensor Types'
+        verbose_name_plural = '7. Sensor Types'
         ordering = ['name']
 
 class SensorReading(models.Model):

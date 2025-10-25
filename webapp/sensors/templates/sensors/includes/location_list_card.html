@@ -37,7 +37,7 @@ This template expects the following context variables:
         {% empty %}
             <div class="text-center p-3 text-muted border-top">
                 <p class="mb-1">No locations found.</p>
-                <a href="{% url 'sensors:location_create' place_slug=place.slug %}" class="btn btn-sm btn-primary">
+                <a href="{% url 'sensors:location_create' place_slug=place.slug %}?next={{ absolute_url|urlencode }}" class="btn btn-sm btn-primary">
                     <i class="bi bi-plus-circle me-1"></i> Add Location
                 </a>
             </div>

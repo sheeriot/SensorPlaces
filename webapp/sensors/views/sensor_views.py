@@ -10,13 +10,13 @@ from django.db.models.functions import Lower
 
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponseRedirect, HttpRequest
+from django.http import JsonResponse, HttpResponseRedirect, HttpRequest, HttpResponse
 
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
 from ..models import Device, Sensor, SensorReading, Place, Location
-from .mixins import PlaceAnnotationMixin
+from .mixins import PlaceAnnotationMixin, ReferrerMixin
 from .sensor_forms import SensorForm, LoRaWANSensorForm
 from ..utils import get_sensor_readings, generate_sparkline
 from .views_fun import get_annotated_locations, get_live_counts_context
@@ -209,6 +209,7 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
+        context['absolute_url'] = self.request.build_absolute_uri()
         
         # Add device and location to context
         sensor = self.get_object()
@@ -279,7 +280,8 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         
         return context
 
-class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
+
+class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, CreateView):
     model = Sensor
     form_class = SensorForm
     template_name = 'sensors/sensor_form.html'
@@ -344,18 +346,10 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         kwargs['place'] = self._place
         kwargs['device'] = self._device
         
-        # Set initial data properly
-        kwargs['initial'] = kwargs.get('initial', {})
-        
         # Set is_active based on device status
         if self._device:
-            kwargs['initial']['is_active'] = self._device.is_active
+            kwargs.setdefault('initial', {})['is_active'] = self._device.is_active
         
-        kwargs['initial'].update({
-            'referrer': self.request.GET.get('next', '')
-        })
-        
-        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -368,24 +362,26 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
             context['device'] = self._device
             context['location'] = self._device.location
         
-        # Add a fallback cancel URL
-        context['cancel_url'] = self.get_cancel_url()
         return context
 
+    def get_default_success_url(self):
+        # Fallback if no referrer is available
+        if hasattr(self, '_device') and self._device:
+            return reverse('sensors:device_detail', kwargs={
+                'place_slug': self._place.slug,
+                'pk': self._device.pk
+            })
+        else:
+            return reverse('sensors:place_detail', kwargs={
+                'place_slug': self._place.slug
+            })
+
     def get_cancel_url(self):
-        cancel_url = self.request.META.get('HTTP_REFERER')
-        if not cancel_url:
-            if hasattr(self, '_device') and self._device:
-                cancel_url = reverse('sensors:device_detail', kwargs={
-                    'place_slug': self._place.slug,
-                    'pk': self._device.pk
-                })
-            else:
-                # Fallback to place detail if no device specified
-                cancel_url = reverse('sensors:place_detail', kwargs={
-                    'place_slug': self._place.slug
-                })
-        return cancel_url
+        """Returns the URL to the device's detail page."""
+        return reverse('sensors:device_detail', kwargs={
+            'place_slug': self._place.slug,
+            'pk': self._device.pk
+        })
 
     def form_valid(self, form):
         
@@ -433,13 +429,8 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
 
-    def get_success_url(self):
-        return reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self._place.slug,
-            'pk': self.object.pk
-        })
 
-class LoRaWANSensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
+class LoRaWANSensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, CreateView):
     model = Sensor
     form_class = LoRaWANSensorForm
     template_name = 'sensors/lorawan_sensor_form.html'
@@ -452,7 +443,6 @@ class LoRaWANSensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self.place
-        kwargs['cancel_url'] = reverse('sensors:device_detail', kwargs={'place_slug': self.place.slug, 'pk': self.device.pk})
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -467,15 +457,27 @@ class LoRaWANSensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
         self.object.save()
         return super().form_valid(form)
 
-    def get_success_url(self):
+    def get_default_success_url(self):
         return reverse('sensors:device_detail', kwargs={'place_slug': self.place.slug, 'pk': self.device.pk})
 
 
-class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
+class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, UpdateView):
     model = Sensor
     form_class = SensorForm
     template_name = 'sensors/sensor_form.html'
     object: Sensor
+
+    def get_queryset(self):
+        """
+        Optimize the queryset to pre-fetch related objects and avoid N+1 queries.
+        """
+        return super().get_queryset().select_related(
+            'device',
+            'device__location',
+            'sensor_type',
+            'sensor_type__default_unit',
+            'unit'
+        )
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
@@ -550,24 +552,17 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         
         return inactive_help_text
 
-    def get_initial(self):
-        initial = super().get_initial()
-        # Set the referrer in initial data
-        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
-        return initial
-
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['place'] = self._place
-        kwargs['device'] = self._device
-        kwargs['cancel_url'] = self.get_cancel_url()
-        
+        kwargs.update({
+            'place': self._place,
+            'device': self._device,
+        })
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        # Place is already in context from PlaceAnnotationMixin
         
         sensor = self.get_object()
         device_pk = sensor.device.pk
@@ -579,18 +574,17 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         context['device'] = device
         context['location'] = device.location
         
-        # Add a fallback cancel URL
-        context['cancel_url'] = self.get_cancel_url()
         return context
 
-    def get_cancel_url(self):
-        cancel_url = self.request.META.get('HTTP_REFERER')
-        if not cancel_url:
-            cancel_url = reverse('sensors:device_detail', kwargs={
-                'place_slug': self._place.slug,
-                'pk': self.object.device.pk
-            })
-        return cancel_url
+    def get_default_success_url(self):
+        """
+        Redirect to the referrer URL from the form's cleaned data if it exists,
+        otherwise fall back to the sensor's detail page.
+        """
+        return reverse('sensors:sensor_detail', kwargs={
+            'place_slug': self._place.slug,
+            'pk': self.object.pk
+        })
 
     def form_valid(self, form):
 
@@ -603,7 +597,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             'device': sensor.device,
             'sensor_type': sensor.sensor_type,
             'data_type': sensor.data_type,
-            'unit': sensor.unit
+            'unit_id': sensor.unit_id
         }
         
         # Ensure is_active is set correctly based on device status
@@ -631,10 +625,10 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
                 changes.append(f"type: {self._original_values['sensor_type']} → {sensor.sensor_type}")
             if 'data_type' in self._original_values and self._original_values['data_type'] != sensor.effective_data_type:
                 changes.append(f"data type: {self._original_values['data_type']} → {sensor.get_effective_data_type_display}")
-            if 'unit' in self._original_values and self._original_values['unit'] != sensor.effective_unit:
+            if 'unit_id' in self._original_values and self._original_values['unit_id'] != (sensor.effective_unit.id if sensor.effective_unit else None):
                 # Need to import Unit at the top
                 from ..models import Unit
-                original_unit_pk = self._original_values['unit']
+                original_unit_pk = self._original_values['unit_id']
                 original_unit = Unit.objects.get(pk=original_unit_pk) if original_unit_pk else "None"
                 changes.append(f"unit: {original_unit} → {sensor.effective_unit}")
 
@@ -662,19 +656,6 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
-
-    def get_success_url(self):
-        # Use cleaned_data from the form instead of request.POST
-        if hasattr(self, 'object') and hasattr(self.object, 'referrer') and self.object.referrer:
-            return self.object.referrer
-        # Or check form's cleaned_data
-        elif hasattr(self, 'form') and 'referrer' in self.form.cleaned_data and self.form.cleaned_data['referrer']:
-            return self.form.cleaned_data['referrer']
-        # Fallback to default URL
-        return reverse('sensors:sensor_detail', kwargs={
-            'place_slug': self._place.slug,
-            'pk': self.object.pk
-        })
 
 class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Sensor
@@ -709,6 +690,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Add device and location to context
         context['device'] = device
         context['location'] = device.location
+        context['place'] = device.location.place # Pass the place object for breadcrumbs
         # Place is already in context from PlaceAnnotationMixin
         context['model_name'] = 'sensor'
         
@@ -727,11 +709,14 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         return context
 
     def get(self, request, *args, **kwargs):
+        """Handle GET requests, checking for HTMX."""
         self.object = self.get_object()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        # If it's an HTMX request, render the modal partial
+        if 'HX-Request' in request.headers:
             context = self.get_context_data(object=self.object)
-            html = render_to_string('sensors/sensor_confirm_delete_modal.html', context, request=request)
-            return JsonResponse({'html': html})
+            return render(request, 'sensors/partials/sensor_confirm_delete_modal.html', context)
+        
+        # Otherwise, render the full page
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -741,43 +726,41 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         location = device.location
         place = location.place
         
-        # Before deleting the sensor, store its data
-        sensor_data = {
-            'name': sensor.name,
-            'is_active': sensor.is_active,
-            'sensor_type': sensor.sensor_type or '',
-            'data_type': sensor.get_effective_data_type_display,
-            'unit': sensor.effective_unit or ''
-        }
-        
-        message = (
-            f"Deleted sensor <strong>{sensor_data['name']}</strong> from "
-            f"<i class='bi bi-hdd-rack'></i> {device.name}<br>"
-            f"<small class='text-muted'>"
-            f"Type: {sensor_data['sensor_type']}<br>"
-            f"Data type: {sensor_data['data_type']}<br>"
-            f"Unit: {sensor_data['unit']}<br>"
-            f"Status: {'Active' if sensor_data['is_active'] else 'inactive'}"
-        )
-        
-        message += "</small>"
-        
-        # Create toast message
-        request.toast_message = {
-            'message': message,
-            'type': 'warning'
-        }
-        
+        # Store the IDs BEFORE deleting the object
+        sensor_id = sensor.pk
+        device_id = device.pk
+        sensor_name = sensor.name
+
         # Delete the sensor
         sensor.delete()
         
-        # Get the success URL and return HttpResponseRedirect
+        # Create toast message
+        message = f"Deleted sensor <strong>{sensor_name}</strong> from {device.name}."
+        
+        # Set toast message directly on request for middleware
+        setattr(request, 'toast_message', {
+            'message': message,
+            'type': 'warning',
+            'place_id': place.pk
+        })
+        
+        # For HTMX requests from the modal, send back an event trigger
+        if 'HX-Request' in request.headers:
+            response = HttpResponse(status=204) # No Content
+            response['HX-Trigger'] = json.dumps({
+                'sensorDeleted': {
+                    'sensorId': sensor_id,
+                    'deviceId': device_id
+                }
+            })
+            return response
+            
+        # Standard response for non-HTMX requests (fallback)
         success_url = self.get_success_url()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': True, 'redirect_url': success_url})
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):
+        # Fallback success URL
         device = self.object.device
         return reverse('sensors:device_detail', kwargs={
             'place_slug': self._place.slug,

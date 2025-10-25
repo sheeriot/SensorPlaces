@@ -1,16 +1,16 @@
 {% load widget_tweaks %}
 {% load timezone_filters %}
 
-<div class="card my-1 {% if not sensor.is_active %}opacity-50 text-muted{% endif %}" id="sensor-card-{{ sensor.pk }}" data-sensor-id="{{ sensor.pk }}">
+<div class="card my-1 {% if not sensor.is_active or not sensor.device.is_active %}opacity-50 text-muted{% endif %}" id="sensor-card-{{ sensor.pk }}" data-sensor-id="{{ sensor.pk }}">
 
     <div class="card-header d-flex justify-content-between align-items-center py-1">
         <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
             <i class="bi bi-thermometer me-2"></i>
-            Sensor Details
+            {{ sensor.name }}
         </h5>
         <div class="btn-group">
             {% if model_name == 'sensor' %}
-                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" 
+                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}?next={{ request.build_absolute_uri|urlencode }}" 
                    class="btn btn-warning btn-sm">
                     <i class="bi bi-pencil"></i>
                 </a>
@@ -25,6 +25,21 @@
         </div>
     </div>
     <div class="card-body p-2">
+        <div class="d-flex align-items-center text-muted mb-2">
+            <div class="me-3">
+                <i class="bi bi-hdd-rack me-1"></i>
+                <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
+                    {{ device.name }}
+                </a>
+            </div>
+            <div>
+                <i class="bi bi-geo-alt me-1"></i>
+                <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-decoration-none">
+                    {{ location.name }}
+                </a>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-md-6">
                 <div class="mb-2">

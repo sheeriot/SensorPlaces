@@ -14,7 +14,7 @@ from django.utils.decorators import method_decorator
 
 from ..models import Place, Location, Device, Sensor
 from .location_forms import LocationForm
-from .mixins import PlaceAnnotationMixin, FormDataMixin
+from .mixins import PlaceAnnotationMixin, FormDataMixin, ReferrerMixin
 from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
 from ..decorators import log_execution_time
 
@@ -72,6 +72,7 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
+        context['absolute_url'] = self.request.build_absolute_uri()
         
         # Check for hide_inactive cookie
         hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
@@ -117,7 +118,7 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         
         return context
 
-class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin, CreateView):
+class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, FormDataMixin, CreateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
@@ -133,16 +134,11 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         if self._place and not self._place.is_active:
             self._inactive_help_text = self.get_location_inactive_help_text(None, self._place)[0]
         
-        # Get the referrer URL
-        self._referrer = request.META.get('HTTP_REFERER', '')
-
-    def get_success_url(self):
-        """Return the URL to redirect to after processing a valid form."""
-        if self.object:
-            return reverse('sensors:location_detail', kwargs={
-                'place_slug': self.kwargs['place_slug'],
-                'slug': self.object.slug
-            })
+    def get_default_success_url(self):
+        """
+        Return the default URL to redirect to. For create views, this should
+        always be a safe URL that doesn't depend on the object, like the list view.
+        """
         return reverse('sensors:location_list', kwargs={
             'place_slug': self.kwargs['place_slug']
         })
@@ -178,33 +174,16 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         kwargs = super().get_form_kwargs()
         
         # Set initial data properly - everything else comes from FormDataMixin
-        kwargs['initial'] = kwargs.get('initial', {})
-        kwargs['initial'].update({
+        kwargs.setdefault('initial', {}).update({
             'is_active': self._place.is_active,
             'place': self._place.pk,  # Use the primary key, not the object
-            'referrer': self._referrer
         })
-        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        
-        # Add a fallback cancel URL
-        context['cancel_url'] = self.get_cancel_url()
         return context
-
-    def get_cancel_url(self):
-        if self.object and self.object.pk:
-            return reverse('sensors:location_detail', kwargs={
-                'place_slug': self._place.slug,  # Use cached place
-                'slug': self.object.slug
-            })
-        else:
-            return reverse('sensors:place_detail', kwargs={
-                'place_slug': self._place.slug  # Use cached place
-            })
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
@@ -230,8 +209,11 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
         
-        # Get the success URL and return HttpResponseRedirect
-        success_url = self.get_success_url()
+        # On success, redirect to the detail view of the newly created object.
+        success_url = reverse('sensors:location_detail', kwargs={
+            'place_slug': self.kwargs['place_slug'],
+            'slug': self.object.slug
+        })
         return HttpResponseRedirect(success_url)
 
     def post(self, request, *args, **kwargs):
@@ -242,6 +224,10 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
             # ic("Form is valid, calling form_valid")
             return self.form_valid(form)
         else:
+            # Re-add cancel_url to context if form is invalid
+            self.extra_context = {
+                'cancel_url': form.cleaned_data.get('referrer') or self.get_default_success_url()
+            }
             # ic("Form is invalid, errors:", form.errors)
             # ic("Form data:", form.data)
             # ic("Form instance:", vars(form.instance))
@@ -272,7 +258,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         
         return toast_data
 
-class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin, UpdateView):
+class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, FormDataMixin, UpdateView):
     model = Location
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
@@ -285,9 +271,6 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         self._place = self.get_place()
         self._inactive_help_text = None
         self._devices_active = []
-        
-        # Get the referrer URL
-        self._referrer = request.META.get('HTTP_REFERER', '')
         
         try:
             # Try to get the location if we're updating
@@ -303,7 +286,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
                 'This location is inactive. All devices within it will not collect data.'
             )
 
-    def get_success_url(self):
+    def get_default_success_url(self):
         """Return the URL to redirect to after processing a valid form."""
         if self.object:
             return reverse('sensors:location_detail', kwargs={
@@ -389,21 +372,8 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
         
         return inactive_help_text, devices_active
 
-    def get_initial(self):
-        initial = super().get_initial()
-        # Set the referrer in initial data
-        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
-        return initial
-
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        
-        # Set initial data properly - everything else comes from FormDataMixin
-        kwargs['initial'] = kwargs.get('initial', {})
-        kwargs['initial'].update({
-            'referrer': self._referrer
-        })
-        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -497,7 +467,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, FormDataMixin
             # ic("⚠️ Also set pending_toast in session")
         
         # Get the success URL and return HttpResponseRedirect
-        success_url = self.get_success_url()
+        success_url = self.get_default_success_url()
         # ic("⚠️ Redirecting to:", success_url)
         
         return HttpResponseRedirect(success_url)

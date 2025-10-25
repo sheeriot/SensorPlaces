@@ -1,17 +1,19 @@
-django >= 5.1.6
-django-widget-tweaks >= 1.5.0
-folium >= 0.19.4
+django
+django-widget-tweaks
+folium
 influxdb3-python
-pillow >= 11.1
+pillow
 icecream
 django-crispy-forms
 crispy-bootstrap5
 geopy
-django-allauth >= 65.4
+django-allauth
 jwt
 pylint-django
 django-cors-headers
 matplotlib
 pandas
 gunicorn
+# psycopg2-binary
+# pyotp
 

@@ -3,19 +3,6 @@
 
 {% block title %}Places{% endblock %}
 
-{% block extra_css %}
-<style>
-#placesTable {
-    table-layout: fixed;
-}
-#placesTable th:nth-child(1) { width: 200px; }  /* Name */
-#placesTable th:nth-child(2) { width: 250px; }  /* Address */
-#placesTable th:nth-child(3) { width: 180px; }  /* Coordinates */
-#placesTable th:nth-child(4) { width: 120px; }  /* Status */
-#placesTable th:nth-child(5) { width: 150px; }  /* Actions */
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="m-0">Places List</h2>

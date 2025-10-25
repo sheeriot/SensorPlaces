@@ -1,5 +1,6 @@
 import json
 from uuid import UUID
+import logging
 from django.http import HttpResponse, HttpRequest, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views import View
@@ -7,149 +8,123 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from icecream import ic
 
-from sensors.models import Place, Device, Sensor, SensorReading, Location
+from sensors.models import Place, Device, Sensor, SensorReading, Location, InfluxSource, SensorType
+from ..influx_client import write_to_influx
+
+logger = logging.getLogger(__name__)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class WebhookReceiverView(View):
     """
-    Handles incoming webhooks from devices.
+    Handles incoming webhooks from generic devices and writes to InfluxDB.
     """
-    IGNORED_KEYS = ['report_url']
-
-    def get(self, request: HttpRequest, place_slug: str, uuid: UUID) -> HttpResponse:
-        device_id = request.GET.get('device_id', None)
-        query_params = request.GET.dict()
-        
-        # ic("Webhook GET request received")
-        # ic(f"place_slug: {place_slug}")
-        # ic(f"device_id: {device_id}")
-        
-        if not device_id:
-            # ic("No device_id provided in GET request.")
-            return HttpResponse("No device_id provided", status=400)
-        
-        # ic("GET Query Parameters:", query_params)
-        
-        try:
-            device = Device.objects.get(device_id__iexact=device_id, location__place__slug=place_slug)
-            # ic(f"Device found: {device}")
-        except Device.DoesNotExist:
-            # ic(f"Device with id '{device_id}' in place '{place_slug}' not found.")
-            return HttpResponse(f"Device with id '{device_id}' not found.", status=404)
-        
-        # ic(request.headers)
-        
-        for sensor_name, value in query_params.items():
-            if sensor_name in ['device_id']:
-                # ic(f"Ignoring GET parameter: '{sensor_name}' with value '{value}'")
-                continue
-                
-            # ic(f"Processing GET parameter: sensor='{sensor_name}', value='{value}'")
-            
-            try:
-                # Get or create the sensor
-                sensor, created = Sensor.objects.get_or_create(
-                    device=device,
-                    name=sensor_name,
-                )
-                
-                if created:
-                    # ic("CREATED new sensor", sensor)
-                    pass
-                
-                # Store the new reading
-                reading = SensorReading.objects.create(sensor=sensor, value=float(value))
-                # ic("Stored new reading", reading)
-                
-            except Exception as e:
-                # ic(f"ERROR processing sensor '{sensor_name}': {e}")
-                return HttpResponse(f"Error processing sensor '{sensor_name}': {e}", status=400)
-
-        return HttpResponse("GET request processed successfully")
 
     def post(self, request: HttpRequest, place_slug: str, uuid: UUID) -> HttpResponse:
-        # ic("Webhook POST request received")
-        # ic(f"place_slug: {place_slug}")
+        try:
+            place = Place.objects.get(slug=place_slug)
+            influx_source = InfluxSource.objects.filter(place=place).first()
+            if not influx_source:
+                logger.error(f"No InfluxSource found for place '{place_slug}'")
+                return HttpResponse("InfluxDB source not configured for this place.", status=500)
+        except Place.DoesNotExist:
+            return HttpResponse(f"Place '{place_slug}' not found.", status=404)
+        except Exception as e:
+            logger.error(f"Error getting InfluxSource for place '{place_slug}': {e}")
+            return HttpResponse("Server configuration error.", status=500)
 
-        device = None
-        device_id = None
-        data = None
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return HttpResponse("Invalid JSON", status=400)
 
-        # Check content type and decode body
-        if 'application/json' in request.content_type:
-            try:
-                data = json.loads(request.body)
-                # ic("JSON Payload:", data)
-            except json.JSONDecodeError:
-                # ic("Failed to decode JSON body")
-                # ic(request.body.decode('utf-8', errors='ignore'))
-                return HttpResponse("Invalid JSON", status=400)
-        else:
-            # ic("Request content-type is not application/json. Raw body:", request.body.decode('utf-8', errors='ignore'))
-            return HttpResponse("Content-Type must be application/json", status=400)
+        device_id = data.get('device_id')
+        if not device_id:
+            return HttpResponse("No device_id provided in payload.", status=400)
         
-        # Determine device_id from URL parameter or JSON payload
-        url_device_id = request.GET.get('device_id', None)
-        payload_device_id = data.get('device_id', None) if isinstance(data, dict) else None
-        
-        if url_device_id:
-            device_id = url_device_id
-        elif payload_device_id:
-            # ic(f"Found device_id in payload: {payload_device_id}")
-            device_id = payload_device_id
-        
-        # ic(f"device_id confirmed: {device_id}")
-        
-        if device_id:
-            try:
-                device = Device.objects.get(
-                    device_id__iexact=device_id,
-                    location__place__slug=place_slug
-                )
-                # ic("device found", device)
-            except Device.DoesNotExist:
-                # ic("device not_found")
-                # Create a new device in the 'Unassigned' location for the place.
+        try:
+            device = Device.objects.get(device_id__iexact=device_id, location__place=place)
+        except Device.DoesNotExist:
+            # Optionally create a new device if it doesn't exist
+            # For now, we will just return an error
+            logger.warning(f"Device with ID '{device_id}' not found in place '{place_slug}'.")
+            return HttpResponse(f"Device '{device_id}' not found.", status=404)
+
+        if 'sensors' in data and isinstance(data['sensors'], dict):
+            for measurement, value in data['sensors'].items():
                 try:
-                    place = Place.objects.get(slug=place_slug)
-                    unassigned_location = place.get_unassigned_location()
-                    device = Device.objects.create(
-                        name=f"New Device - {device_id}",
-                        device_id=device_id,
-                        location=unassigned_location,
-                        is_active=True
-                    )
-                    # ic("Created new device", device)
+                    # LoRaWAN devices often send float values directly
+                    fields = {'value': float(value)}
+                    tags = {'device_id': device.device_id}
+                    write_to_influx(influx_source, measurement, fields, tags)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Could not process value '{value}' for measurement '{measurement}': {e}")
                 except Exception as e:
-                    # ic(f"Error creating new device or 'Unassigned' location: {e}")
-                    return HttpResponse(f"Could not find or create device '{device_id}'.", status=400)
-        else:
-            # ic("No device_id in URL or payload. Logging payload and exiting.")
-            # Log the payload for debugging purposes
-            # logger.warning(f"Webhook received POST without device_id for place '{place_slug}': {data}")
-            return HttpResponse("No device_id provided.", status=400)
+                    logger.error(f"Failed to write to InfluxDB for device '{device_id}': {e}")
 
-        if isinstance(data, dict) and 'sensors' in data and isinstance(data['sensors'], dict):
-            # ic(f"Processing sensor values for device '{device.name}': {data}")
-            for sensor_name, value in data['sensors'].items():
+        return HttpResponse("POST request processed successfully")
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SwitchBotWebhookReceiverView(View):
+    """
+    Handles incoming webhooks from SwitchBot and writes to InfluxDB.
+    """
+    def post(self, request: HttpRequest, place_slug: str) -> HttpResponse:
+        try:
+            place = Place.objects.get(slug=place_slug)
+            influx_source = InfluxSource.objects.filter(place=place).first()
+            if not influx_source:
+                logger.error(f"No InfluxSource found for place '{place_slug}'")
+                return JsonResponse({'status': 'error', 'message': 'InfluxDB not configured for this place.'}, status=500)
+        except Place.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': f"Place '{place_slug}' not found."}, status=404)
+
+        try:
+            data = json.loads(request.body)
+            # Log the full webhook body for debugging
+            logger.debug(f"SwitchBot webhook received for '{place.name}': {json.dumps(data)}")
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON in request body.'}, status=400)
+
+        event_type = data.get('eventType')
+        context = data.get('context', {})
+        device_id = context.get('deviceMac')
+
+        if event_type != 'changeReport' or not device_id:
+            return JsonResponse({'status': 'ignored', 'message': 'Not a change report or no device MAC.'})
+
+        try:
+            device = Device.objects.get(device_id__iexact=device_id, location__place=place)
+        except Device.DoesNotExist:
+            logger.warning(f"Received SwitchBot webhook for unknown device_id '{device_id}' in place '{place.name}'")
+            return JsonResponse({'status': 'error', 'message': f"Device with ID '{device_id}' not found."}, status=404)
+
+        # Mapping of SwitchBot context keys to our measurements/fields
+        status_map = {
+            'temperature': 'temperature',
+            'humidity': 'humidity',
+            'battery': 'battery'
+        }
+
+        fields_to_write = {}
+        for key, measurement in status_map.items():
+            if key in context:
                 try:
-                    sensor, created = Sensor.objects.get_or_create(
-                        device=device,
-                        name=sensor_name
-                    )
-
-                    if created:
-                        # ic("CREATED new sensor", sensor)
-                        pass
-
-                    try:
-                        reading = SensorReading.objects.create(sensor=sensor, value=float(value))
-                        # ic("Stored new reading", reading)
-                    except (ValueError, TypeError) as e:
-                        # ic(f"ERROR: Could not convert value '{value}' to float for sensor '{sensor_name}': {e}")
-                        pass
-                except Exception as e:
-                    # ic(f"ERROR processing sensor '{sensor_name}': {e}")
-                    pass
+                    value = float(context[key])
+                    fields_to_write[measurement] = value
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not convert value '{context[key]}' for '{key}' to float.")
         
-        return HttpResponse("POST request processed successfully") 
+        if fields_to_write:
+            try:
+                # For SwitchBot, we can use a generic measurement name like 'sensor_reading'
+                # and put the specific type in a field.
+                # Or, we can create separate measurements. Let's write them as separate fields in one measurement.
+                tags = {'device_id': device.device_id, 'device_name': device.name}
+                write_to_influx(influx_source, "switchbot_reading", fields_to_write, tags)
+                
+            except Exception as e:
+                logger.error(f"Failed to write SwitchBot data to InfluxDB for device '{device_id}': {e}")
+                return JsonResponse({'status': 'error', 'message': 'Failed to write to database.'}, status=500)
+
+        return JsonResponse({'status': 'success'}) 

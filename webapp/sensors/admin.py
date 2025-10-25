@@ -38,10 +38,10 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'place_name', 'location', 'device_type', 'is_active', 'model', 'manufacturer', 'device_id')
-    list_filter = ('is_active', 'location__place', 'location', 'device_type', 'manufacturer')
+    list_display = ('name', 'place_name', 'location', 'device_type', 'is_active', 'model', 'manufacturer', 'device_id', 'is_switchbot')
+    list_filter = ('is_active', 'is_switchbot', 'location__place', 'location', 'device_type', 'manufacturer')
     search_fields = ('name', 'device_id', 'location__place__name', 'location__name')
-    list_editable = ('is_active',)
+    list_editable = ('is_active', 'is_switchbot',)
     autocomplete_fields = ('location', 'device_type')
     ordering = ('name',)
 
