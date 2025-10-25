@@ -4,14 +4,14 @@
             <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-house-gear"></i>
                 <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="text-decoration-none">
-                    {{ place.name }}
+                    {{ place.name }} ({{ place.slug }})
                 </a>
             </div>
             {% include "sensors/partials/status_active_badge.html" with object=place %}
         </div>
     </td>
     <td class="text-wrap text-break d-none d-md-table-cell">{{ place.address|default:"&nbsp;" }}</td>
-    <td class="d-none d-lg-table-cell text-nowrap">{{ place.latitude }},{{ place.longitude }}</td>
+    <td class="d-none d-lg-table-cell text-nowrap">{{ place.latitude|floatformat:5 }},{{ place.longitude|floatformat:5 }}</td>
     <td class="text-end">
         <div class="btn-group">
             <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-sm btn-warning">

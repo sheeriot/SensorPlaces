@@ -23,7 +23,7 @@
                 </thead>
                 <tbody>
                     {% for device in unassigned_devices %}
-                        {% include "sensors/includes/device_row.html" with place=place device=device %}
+                        {% include "sensors/partials/device_row.html" with place=place device=device %}
                     {% endfor %}
                 </tbody>
             </table>

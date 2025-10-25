@@ -13,7 +13,7 @@
         </div>
         <!-- Active Toggle -->
         <div class="col-2">
-            {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug %}
+            {% include "sensors/partials/toggle_active_button.html" with type="device" id=device.pk is_active=device.is_active place_slug=place.slug object_name=device.name %}
         </div>
         <!-- Sensor Counts -->
         <div class="col-2 text-center">

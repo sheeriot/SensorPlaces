@@ -3,71 +3,129 @@
 <div id="device-detail-card" class="card my-1 {% if not device.is_active %}opacity-50{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center py-1">
         <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
-            <div class="text-nowrap">
+            <a href="{{ device.get_absolute_url }}" class="text-body text-decoration-none d-flex align-items-center">
                 <i class="bi bi-hdd-rack me-2"></i>
                 {{ device.name }}
+            </a>
+            <div class="text-nowrap ms-2">
+                {% if not device.is_active %}
+                    <span class="badge bg-secondary ms-2">inactive</span>
+                {% endif %}
                 {% include "sensors/partials/lorawan_badge.html" with device=device %}
             </div>
         </h5>
         <div class="d-flex align-items-center">
-            <span id="device-inactive-badge" class="badge bg-secondary me-2 {% if device.is_active %}d-none{% endif %}">
-                inactive
-            </span>
-            <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-warning me-1" title="Edit Device">
-                <i class="bi bi-pencil"></i>
-            </a>
-            <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-sm btn-outline-info me-1" title="Duplicate Device">
-                <i class="bi bi-copy"></i>
-            </a>
-            <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-danger" title="Delete Device">
-                <i class="bi bi-trash"></i>
-            </a>
+            <!-- Full buttons for medium screens and up -->
+            <div class="btn-group btn-group-sm d-none d-md-flex">
+                {% if device.is_switchbot and device.device_id %}
+                <a href="{% url 'sensors:fetch_switchbot_reading' place_slug=place.slug pk=device.pk %}" class="btn btn-outline-primary" title="Fetch Latest Reading">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </a>
+                <button type="button" class="btn btn-outline-secondary" title="Inspect Cloud Data"
+                        hx-get="{% url 'sensors:device_inspect' place_slug=place.slug pk=device.pk %}"
+                        hx-target="#modal-content">
+                    <i class="bi bi-terminal"></i>
+                </button>
+                {% endif %}
+                <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-outline-warning" title="Edit Device">
+                    <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-outline-info" title="Duplicate Device">
+                    <i class="bi bi-copy"></i>
+                </a>
+                <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" class="btn btn-outline-danger" title="Delete Device">
+                    <i class="bi bi-trash"></i>
+                </a>
+            </div>
+            <!-- Dropdown for small screens -->
+            <div class="btn-group d-md-none">
+                {% if device.is_switchbot and device.device_id %}
+                <a href="{% url 'sensors:fetch_switchbot_reading' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-primary" title="Fetch Latest Reading">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </a>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    {% if device.is_switchbot and device.device_id %}
+                    <li>
+                        <button class="dropdown-item" type="button" title="Inspect Cloud Data"
+                                hx-get="{% url 'sensors:device_inspect' place_slug=place.slug pk=device.pk %}"
+                                hx-target="#modal-content">
+                            <i class="bi bi-terminal me-2"></i>Inspect
+                        </button>
+                    </li>
+                    {% endif %}
+                    <li><a class="dropdown-item" href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                    <li><a class="dropdown-item" href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}"><i class="bi bi-copy me-2"></i>Duplicate</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                </ul>
+            </div>
         </div>
     </div>
     <div class="card-body p-2">
-        <dl class="row mb-0">
-            <dt class="col-sm-4">Location</dt>
-            <dd class="col-sm-8">
-                <i class="bi bi-geo-alt me-2"></i>{{ device.location.name }}
-            </dd>
-            
-            <dt class="col-sm-4">Type</dt>
-            <dd class="col-sm-8">{{ device.device_type.name }}</dd>
-
-            {% if device.is_lorawan %}
-            <dt class="col-sm-4">Network</dt>
-            <dd class="col-sm-8">LoRaWAN</dd>
-            {% endif %}
-
-            <dt class="col-sm-4">Model</dt>
-            <dd class="col-sm-8">
-                {{ device.model }}
-                {% if device.manufacturer %}
-                    <br><small class="text-muted">{{ device.manufacturer }}</small>
-                {% endif %}
-            </dd>
-
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="text-muted small">Location</div>
+                <div><i class="bi bi-geo-alt me-2"></i>{{ device.location.name }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-muted small">Sensors</div>
+                <div id="sensor-count-{{ device.pk }}">
+                    {{ device.active_sensors_count }}
+                    {% if device.inactive_sensors_count > 0 %}
+                        <span class="text-muted">({{ device.inactive_sensors_count }})</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-muted small">Type</div>
+                <div>
+                    {{ device.device_type.name }}
+                    {% if device.is_switchbot %}
+                        <span class="badge bg-info text-dark ms-2">SwitchBot</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-muted small">Device Status</div>
+                <div>
+                    {% if device.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-muted small">Model</div>
+                <div>
+                    {{ device.model }}
+                    {% if device.manufacturer %}
+                        <br><small class="text-muted">{{ device.manufacturer }}</small>
+                    {% endif %}
+                </div>
+            </div>
             {% if device.device_id %}
-            <dt class="col-sm-4">Device ID</dt>
-            <dd class="col-sm-8">{{ device.device_id }}</dd>
+            <div class="col-md-6">
+                <div class="text-muted small">Device ID</div>
+                <div>{{ device.device_id }}</div>
+            </div>
             {% endif %}
-
-            <dt class="col-sm-4">Sensors</dt>
-            <dd class="col-sm-8">
-                {{ device.active_sensors_count }}
-                {% if device.inactive_sensors_count > 0 %}
-                    <span class="text-muted">({{ device.inactive_sensors_count }})</span>
-                {% endif %}
-            </dd>
-
-            <dt class="col-sm-4">Status</dt>
-            <dd class="col-sm-8">
-                {% if device.is_active %}
-                    <span class="badge bg-success">Active</span>
-                {% else %}
-                    {% include "sensors/partials/status_active_badge.html" with object=device %}
-                {% endif %}
-            </dd>
-        </dl>
+            {% if device.is_lorawan %}
+            <div class="col-md-6">
+                <div class="text-muted small">Network</div>
+                <div>LoRaWAN</div>
+            </div>
+            {% endif %}
+            {% if device.notes %}
+            <div class="col-12">
+                <div class="text-muted small">Notes</div>
+                <div>{{ device.notes|linebreaksbr }}</div>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div> 

@@ -14,7 +14,7 @@
 
 // System Configuration
 const toggleActiveConfig = {
-    debug: false,
+    debug: true,
     logMarkerChanges: true,
     logMapEvents: true,
     logStatusChanges: true
@@ -118,7 +118,7 @@ function reportCardStatus() {
         // 2. Header Toggles Report
         if (cardHeader) {
             console.group('Header Toggles');
-            const headerToggles = ['location', 'device', 'sensor'].map(type => ({
+            const headerToggles = ['device', 'sensor'].map(type => ({
                 type,
                 elements: Array.from(cardHeader.querySelectorAll(`.toggle-${type}-active`))
             })).filter(t => t.elements.length > 0);
@@ -140,7 +140,7 @@ function reportCardStatus() {
 
         // 3. Body Toggles Report
         console.group('Body Toggles');
-        const bodyToggles = ['location', 'device', 'sensor'].map(type => ({
+        const bodyToggles = ['device', 'sensor'].map(type => ({
             type,
             elements: Array.from(cardBody.querySelectorAll(`.toggle-${type}-active`))
         })).filter(t => t.elements.length > 0);
@@ -180,7 +180,8 @@ const toggleActiveManager = {
         return switchEl?.checked || false;
     },
 
-    async toggleStatus(modelType, id, placeSlug) {
+    async toggleStatus(modelType, id) {
+        const placeSlug = document.body.dataset.placeSlug;
         if (toggleActiveConfig.debug) {
             console.group('Toggle Status Request');
             console.debug('Parameters:', { modelType, id, placeSlug });
@@ -197,12 +198,18 @@ const toggleActiveManager = {
                     })
                 }
             );
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
             
             if (toggleActiveConfig.debug) {
-                console.debug('Server Response:', response);
+                console.debug('Server Response:', data);
             }
             
-            if (response.success || response.status === 'success') {
+            if (data.success) {
                 // Find all elements that match this model type and ID
                 const wrappers = document.querySelectorAll(`.toggle-button-wrapper[data-${modelType}-id="${id}"]`);
                 const rows = document.querySelectorAll(`[data-${modelType}-id="${id}"]`);
@@ -211,32 +218,21 @@ const toggleActiveManager = {
                 const hideInactiveState = this.getHideInactiveState(modelType);
                 
                 // Update all toggle buttons
-                const toggleButtons = document.querySelectorAll(`.toggle-${modelType}-active[data-${modelType}-id="${id}"]`);
+                const toggleButtons = document.querySelectorAll(`.toggle-active-button[data-${modelType}-id="${id}"]`);
                 toggleButtons.forEach(button => {
                     // Update button state
-                    button.setAttribute('data-current-status', response.is_active.toString());
-                    button.setAttribute('aria-pressed', response.is_active.toString());
-                    if (response.is_active) {
-                        button.classList.add('active');
-                    } else {
-                        button.classList.remove('active');
-                    }
-                    
-                    // Update status label
-                    const statusLabel = button.querySelector('.status-label');
-                    if (statusLabel) {
-                        statusLabel.textContent = response.is_active ? 'Active' : 'Inactive';
-                        statusLabel.classList.toggle('text-success', response.is_active);
-                        statusLabel.classList.toggle('text-danger', !response.is_active);
+                    const newStatus = data.new_state;
+                    button.setAttribute('data-current-status', newStatus);
+                    button.checked = newStatus;
+
+                    // Update parent wrapper's data attribute as well
+                    const wrapper = button.closest('.toggle-button-wrapper');
+                    if (wrapper) {
+                        wrapper.setAttribute(`data-${modelType}-active`, newStatus);
                     }
                 });
-                
-                // Update wrapper attributes
-                wrappers.forEach(wrapper => {
-                    wrapper.setAttribute(`data-${modelType}-active`, response.is_active.toString());
-                });
-                
-                // Update other elements with the same data attribute
+
+                // Update row styles
                 rows.forEach(row => {
                     if (toggleActiveConfig.debug) {
                         console.group('Updating row');
@@ -249,10 +245,10 @@ const toggleActiveManager = {
                     }
 
                     // Update row attributes to match server state
-                    row.setAttribute(`data-${modelType}-active`, response.is_active.toString());
+                    row.setAttribute(`data-${modelType}-active`, data.new_state.toString());
                     
                     // Update classes based on active state
-                    if (response.is_active) {
+                    if (data.new_state) {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
                         // Also remove from cells for consistency
                         Array.from(row.children).forEach(cell => {
@@ -288,9 +284,9 @@ const toggleActiveManager = {
                     const statusLabels = row.querySelectorAll('.status-label');
                     statusLabels.forEach(label => {
                         if (!label.closest('.toggle-active-button')) { // Skip labels inside toggle buttons
-                            label.textContent = response.is_active ? 'Active' : 'Inactive';
-                            label.classList.toggle('text-success', response.is_active);
-                            label.classList.toggle('text-danger', !response.is_active);
+                            label.textContent = data.new_state ? 'Active' : 'Inactive';
+                            label.classList.toggle('text-success', data.new_state);
+                            label.classList.toggle('text-danger', !data.new_state);
                         }
                     });
 
@@ -300,7 +296,7 @@ const toggleActiveManager = {
                         const sensorsCard = document.getElementById('sensors-card');
                         
                         if (deviceDetailCard && sensorsCard) {
-                            if (response.is_active) {
+                            if (data.new_state) {
                                 // If device is now active, remove opacity and show the switch
                                 deviceDetailCard.classList.remove('opacity-50');
                                 sensorsCard.classList.remove('opacity-50');
@@ -345,7 +341,7 @@ const toggleActiveManager = {
                 // Handle card-level updates
                 const card = document.querySelector(`.card[data-${modelType}-id="${id}"]`);
                 if (card) {
-                    if (response.is_active) {
+                    if (data.new_state) {
                         card.classList.remove('opacity-50', 'text-muted');
                     } else {
                         card.classList.add('opacity-50', 'text-muted');
@@ -357,8 +353,8 @@ const toggleActiveManager = {
                 if (toggleContainer) {
                     const label = toggleContainer.querySelector('label');
                     if (label) {
-                        label.textContent = response.is_active ? 'Active' : 'inactive';
-                        if (response.is_active) {
+                        label.textContent = data.new_state ? 'Active' : 'inactive';
+                        if (data.new_state) {
                             label.classList.remove('text-danger');
                         } else {
                             label.classList.add('text-danger');
@@ -367,33 +363,31 @@ const toggleActiveManager = {
                 }
 
                 // Handle child toggles based on parent type
-                if (modelType === 'location') {
-                    this.updateChildTogglesForLocation(id, response.is_active);
-                } else if (modelType === 'device') {
-                    this.updateChildTogglesForDevice(id, response.is_active);
+                if (modelType === 'device') {
+                    this.updateChildTogglesForDevice(id, data.new_state);
                 }
 
                 // Handle map markers if this is a place toggle
                 if (modelType === 'place') {
-                    this.updateMapMarkers(id, response.is_active, hideInactiveState);
+                    this.updateMapMarkers(id, data.new_state, hideInactiveState);
                 }
 
-                return response;
-            } else if (response.status === 'warning') {
+                return data;
+            } else if (data.status === 'warning') {
                 // Handle warning status
                 if (toggleActiveConfig.debug) {
-                    console.warn('Toggle Status Warning:', response.message);
+                    console.warn('Toggle Status Warning:', data.message);
                 }
                 
                 this.showToast({
-                    message: response.message,
+                    message: data.message,
                     type: 'warning',
                     addToHistory: true
                 });
                 
-                return response;
+                return data;
             } else {
-                throw new Error(response.message || `Failed to update ${modelType} status`);
+                throw new Error(data.message || `Failed to update ${modelType} status`);
             }
         } catch (error) {
             if (toggleActiveConfig.debug) {
@@ -471,455 +465,6 @@ const toggleActiveManager = {
         }
     },
 
-    async updateDeviceStatus(deviceId, isActive, placeSlug) {
-        if (toggleActiveConfig.debug) {
-            console.debug('Action:', { type: 'device', action: 'update', deviceId, isActive });
-        }
-
-        try {
-            const response = await utils.fetchWithCSRF(
-                `/api/${placeSlug}/device/${deviceId}/toggle_active/`,
-                {
-                    method: 'POST',
-                    body: JSON.stringify({ is_active: isActive })
-                }
-            );
-            
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-            
-            if (data.status === 'success') {
-                const device = data.device;
-                const row = document.querySelector(`tr[data-device-id="${device.id}"]`);
-                
-                // Update row styling
-                if (!device.is_active) {
-                    row.classList.add('text-muted', 'opacity-50');
-                } else {
-                    row.classList.remove('text-muted', 'opacity-50', 'd-none');
-                }
-
-                // Update toggle switch and status label
-                const toggle = row.querySelector('.toggle-device-active');
-                if (toggle) {
-                    toggle.checked = device.is_active;
-                    toggle.dataset.currentStatus = device.is_active.toString();
-                }
-
-                const statusLabel = row.querySelector('.status-label');
-                if (statusLabel) {
-                    statusLabel.textContent = device.is_active ? 'Active' : 'Inactive';
-                    statusLabel.classList.toggle('text-success', device.is_active);
-                    statusLabel.classList.toggle('text-danger', !device.is_active);
-                }
-
-                // Show toast with affected sensors if any
-                let message = data.message;
-                if (device.affected_sensors && device.affected_sensors.length > 0) {
-                    message += '<br><br>Affected sensors:<ul class="mb-0">';
-                    device.affected_sensors.forEach(sensor => {
-                        message += `<li>${sensor}</li>`;
-                    });
-                    message += '</ul>';
-                }
-                
-                this.showToast(message, 'success', true);
-                return data;
-            } else {
-                throw new Error(data.message || 'Failed to update device status');
-            }
-        } catch (error) {
-            if (toggleActiveConfig.debug) {
-                console.debug('Error:', { type: 'device', error: error.message });
-            }
-            this.showToast(error.message, 'danger', true);
-            return null;
-        }
-    },
-
-    createToggleModal(type) {
-        const modalId = `${type}ToggleModal`;
-        if (!document.getElementById(modalId)) {
-            const modalHTML = `
-                <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true" data-bs-backdrop="static">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="${modalId}Label">Confirm Status Change</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p id="${type}ToggleMessage"></p>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="button" class="btn btn-primary" id="confirm${type.charAt(0).toUpperCase() + type.slice(1)}Toggle">
-                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                                    Confirm
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-        }
-
-        const modalElement = document.getElementById(modalId);
-        let modal = bootstrap.Modal.getInstance(modalElement);
-        if (!modal) {
-            modal = new bootstrap.Modal(modalElement, {
-                backdrop: 'static',
-                keyboard: false
-            });
-        }
-
-        return {
-            modal: modal,
-            element: modalElement,
-            messageEl: document.getElementById(`${type}ToggleMessage`),
-            confirmBtn: document.getElementById(`confirm${type.charAt(0).toUpperCase() + type.slice(1)}Toggle`),
-            spinner: document.getElementById(`confirm${type.charAt(0).toUpperCase() + type.slice(1)}Toggle`).querySelector('.spinner-border')
-        };
-    },
-
-    initializeLocationToggles() {
-        const modalComponents = this.createToggleModal('location');
-        
-        document.querySelectorAll('.toggle-location-active').forEach(toggle => {
-            // Clean up any old handlers
-            toggle.removeEventListener('click', toggle._clickHandler);
-            
-            // Create new click handler
-            const clickHandler = async function(e) {
-                e.preventDefault();
-                
-                const locationId = this.dataset.locationId;
-                const placeSlug = this.dataset.placeSlug;
-                const currentStatus = this.getAttribute('aria-pressed') === 'true' || 
-                                     this.dataset.currentStatus === 'true';
-                const newStatus = !currentStatus;
-                
-                // Find the location name
-                const wrapper = this.closest('.toggle-button-wrapper');
-                let locationName = 'this location';
-                
-                // Try to find location name in parent row or from label
-                const row = this.closest('tr, [data-location-name]');
-                if (row && row.dataset.locationName) {
-                    locationName = row.dataset.locationName;
-                } else {
-                    // Try to find from a nearby element with location-name class
-                    const nameEl = document.querySelector(`.location-name[data-location-id="${locationId}"]`);
-                    if (nameEl) {
-                        locationName = nameEl.textContent.trim();
-                    }
-                }
-                
-                let message = newStatus ? 
-                    `Are you sure you want to Activate <i class='bi bi-geo-alt'></i> ${locationName}?` : 
-                    `Are you sure you want to Deactivate <i class='bi bi-geo-alt'></i> ${locationName}?`;
-
-                // For deactivation, add info about active devices that will be deactivated
-                if (!newStatus) {
-                    // Find all active devices for this location
-                    const activeDevices = Array.from(document.querySelectorAll(`.toggle-device-active[data-location-id="${locationId}"]`))
-                        .filter(deviceToggle => {
-                            return deviceToggle.classList.contains('active') || 
-                                   deviceToggle.getAttribute('aria-pressed') === 'true' ||
-                                   deviceToggle.dataset.currentStatus === 'true';
-                        })
-                        .map(deviceToggle => {
-                            // Try to find device name
-                            const deviceRow = deviceToggle.closest('tr, [data-device-name]');
-                            if (deviceRow && deviceRow.dataset.deviceName) {
-                                return deviceRow.dataset.deviceName;
-                            }
-                            
-                            const deviceNameEl = deviceToggle.querySelector('.device-name') || 
-                                                document.querySelector(`.device-name[data-device-id="${deviceToggle.dataset.deviceId}"]`);
-                            return deviceNameEl ? deviceNameEl.textContent.trim() : null;
-                        })
-                        .filter(name => name); // Remove any null/undefined entries
-
-                    if (activeDevices.length > 0) {
-                        message += '<br><br>The following active devices will be deactivated:<ul class="mb-0">';
-                        activeDevices.forEach(deviceName => {
-                            message += `<li>${deviceName}</li>`;
-                        });
-                        message += '</ul>';
-                        message += '<br><small class="text-muted">All sensors in these devices will also be deactivated.</small>';
-                    }
-                }
-                
-                modalComponents.messageEl.innerHTML = message;
-                modalComponents.confirmBtn.disabled = false;
-                modalComponents.spinner.classList.add('d-none');
-                
-                modalComponents.modal.show();
-
-                const handleConfirm = async () => {
-                    modalComponents.confirmBtn.disabled = true;
-                    modalComponents.spinner.classList.remove('d-none');
-
-                    try {
-                        const result = await toggleActiveManager.toggleStatus('location', locationId, placeSlug);
-                        if (result) {
-                            modalComponents.modal.hide();
-                            // Use the handleToggleResponse to process the response
-                            toggleActiveManager.handleToggleResponse(result);
-                        }
-                    } finally {
-                        modalComponents.confirmBtn.disabled = false;
-                        modalComponents.spinner.classList.add('d-none');
-                    }
-                };
-
-                modalComponents.confirmBtn.removeEventListener('click', handleConfirm);
-                modalComponents.confirmBtn.addEventListener('click', handleConfirm, { once: true });
-            };
-
-            toggle._clickHandler = clickHandler;
-            toggle.addEventListener('click', clickHandler);
-        });
-
-        // Add event listener for when the modal is hidden
-        const modalElement = document.getElementById(`locationToggleModal`);
-        if (modalElement) {
-            modalElement.addEventListener('hidden.bs.modal', function () {
-                // Return focus to the button that opened the modal
-                if (window.lastFocusedButton) {
-                    window.lastFocusedButton.focus();
-                }
-            });
-        }
-    },
-
-    initializeDeviceToggles() {
-        const modalComponents = this.createToggleModal('device');
-        
-        document.querySelectorAll('.toggle-device-active').forEach(toggle => {
-            // Clean up any old handlers
-            toggle.removeEventListener('click', toggle._clickHandler);
-            
-            // Create new click handler
-            const clickHandler = async function(e) {
-                e.preventDefault();
-                
-                const deviceId = this.dataset.deviceId;
-                const placeSlug = this.dataset.placeSlug;
-                const currentStatus = this.getAttribute('aria-pressed') === 'true' || 
-                                     this.dataset.currentStatus === 'true';
-                const newStatus = !currentStatus;
-                
-                // Find the device name
-                let deviceName = 'this device';
-                
-                // Try to find device name in parent row or from label
-                const row = this.closest('tr, [data-device-name]');
-                if (row && row.dataset.deviceName) {
-                    deviceName = row.dataset.deviceName;
-                } else {
-                    // Try to find from a nearby element with device-name class
-                    const nameEl = this.querySelector('.device-name') || 
-                                  document.querySelector(`.device-name[data-device-id="${deviceId}"]`);
-                    if (nameEl) {
-                        deviceName = nameEl.textContent.trim();
-                    }
-                }
-                
-                let message = '';
-                if (newStatus) {
-                    message = `Are you sure you want to activate <i class='bi bi-hdd-rack'></i> ${deviceName}?<br><small class="text-muted">This will allow its sensors to be activated.</small>`;
-                } else {
-                    // Find all active sensors for this device
-                    const activeSensors = Array.from(document.querySelectorAll(`.toggle-sensor-active[data-device-id="${deviceId}"]`))
-                        .filter(sensorToggle => {
-                            return sensorToggle.classList.contains('active') || 
-                                   sensorToggle.getAttribute('aria-pressed') === 'true' ||
-                                   sensorToggle.dataset.currentStatus === 'true';
-                        })
-                        .map(sensorToggle => {
-                            // Try to find sensor name
-                            const sensorRow = sensorToggle.closest('tr, [data-sensor-name]');
-                            if (sensorRow && sensorRow.dataset.sensorName) {
-                                return sensorRow.dataset.sensorName;
-                            }
-                            
-                            const sensorNameEl = sensorToggle.querySelector('.sensor-name') || 
-                                               document.querySelector(`.sensor-name[data-sensor-id="${sensorToggle.dataset.sensorId}"]`);
-                            return sensorNameEl ? sensorNameEl.textContent.trim() : null;
-                        })
-                        .filter(name => name); // Remove any null/undefined entries
-
-                    message = `Are you sure you want to deactivate <i class='bi bi-hdd-rack'></i> ${deviceName}?`;
-                    
-                    if (activeSensors.length > 0) {
-                        message += '<br><br>The following active sensors will be deactivated:<ul class="mb-0">';
-                        activeSensors.forEach(sensorName => {
-                            message += `<li>${sensorName}</li>`;
-                        });
-                        message += '</ul>';
-                    }
-                }
-                
-                modalComponents.messageEl.innerHTML = message;
-                modalComponents.confirmBtn.disabled = false;
-                modalComponents.spinner.classList.add('d-none');
-                modalComponents.modal.show();
-
-                const handleConfirm = async () => {
-                    modalComponents.confirmBtn.disabled = true;
-                    modalComponents.spinner.classList.remove('d-none');
-
-                    try {
-                        const result = await toggleActiveManager.toggleStatus('device', deviceId, placeSlug);
-                        if (result) {
-                            modalComponents.modal.hide();
-                            // Use the handleToggleResponse to process the response
-                            toggleActiveManager.handleToggleResponse(result);
-                        }
-                    } finally {
-                        modalComponents.confirmBtn.disabled = false;
-                        modalComponents.spinner.classList.add('d-none');
-                    }
-                };
-
-                modalComponents.confirmBtn.removeEventListener('click', handleConfirm);
-                modalComponents.confirmBtn.addEventListener('click', handleConfirm, { once: true });
-            };
-
-            toggle._clickHandler = clickHandler;
-            toggle.addEventListener('click', clickHandler);
-        });
-
-        // Add event listener for when the modal is hidden
-        const modalElement = document.getElementById(`deviceToggleModal`);
-        if (modalElement) {
-            modalElement.addEventListener('hidden.bs.modal', function () {
-                // Return focus to the button that opened the modal
-                if (window.lastFocusedButton) {
-                    window.lastFocusedButton.focus();
-                }
-            });
-        }
-    },
-
-    initializeSensorToggles() {
-        const modalComponents = this.createToggleModal('sensor');
-        
-        document.querySelectorAll('.toggle-sensor-active').forEach(toggle => {
-            // Clean up any old handlers
-            toggle.removeEventListener('click', toggle._clickHandler);
-            
-            // Create new click handler
-            const clickHandler = async function(e) {
-                e.preventDefault();
-                
-                const sensorId = this.dataset.sensorId;
-                const placeSlug = this.dataset.placeSlug;
-                const currentStatus = this.getAttribute('aria-pressed') === 'true' || 
-                                     this.dataset.currentStatus === 'true';
-                const newStatus = !currentStatus;
-                
-                // Find the sensor name
-                let sensorName = 'this sensor';
-                
-                // Try to find sensor name in parent row or from label
-                const row = this.closest('tr, [data-sensor-name]');
-                if (row && row.dataset.sensorName) {
-                    sensorName = row.dataset.sensorName;
-                } else {
-                    // Try to find from a nearby element with sensor-name class
-                    const nameEl = this.querySelector('.sensor-name') || 
-                                  document.querySelector(`.sensor-name[data-sensor-id="${sensorId}"]`);
-                    if (nameEl) {
-                        sensorName = nameEl.textContent.trim();
-                    }
-                }
-                
-                modalComponents.messageEl.innerHTML = newStatus ? 
-                    `Are you sure you want to activate <i class='bi bi-thermometer'></i> ${sensorName}?` : 
-                    `Are you sure you want to deactivate <i class='bi bi-thermometer'></i> ${sensorName}?`;
-
-                modalComponents.confirmBtn.disabled = false;
-                modalComponents.spinner.classList.add('d-none');
-                
-                modalComponents.modal.show();
-
-                const handleConfirm = async () => {
-                    modalComponents.confirmBtn.disabled = true;
-                    modalComponents.spinner.classList.remove('d-none');
-
-                    try {
-                        const result = await toggleActiveManager.toggleStatus('sensor', sensorId, placeSlug);
-                        if (result) {
-                            modalComponents.modal.hide();
-                            // Use the handleToggleResponse to process the response
-                            toggleActiveManager.handleToggleResponse(result);
-                        }
-                    } finally {
-                        modalComponents.confirmBtn.disabled = false;
-                        modalComponents.spinner.classList.add('d-none');
-                    }
-                };
-
-                modalComponents.confirmBtn.removeEventListener('click', handleConfirm);
-                modalComponents.confirmBtn.addEventListener('click', handleConfirm, { once: true });
-            };
-
-            toggle._clickHandler = clickHandler;
-            toggle.addEventListener('click', clickHandler);
-        });
-
-        // Add event listener for when the modal is hidden
-        const modalElement = document.getElementById(`sensorToggleModal`);
-        if (modalElement) {
-            modalElement.addEventListener('hidden.bs.modal', function () {
-                // Return focus to the button that opened the modal
-                if (window.lastFocusedButton) {
-                    window.lastFocusedButton.focus();
-                }
-            });
-        }
-    },
-
-    initializeDeviceStatusButtons() {
-        document.querySelectorAll('.toggle-device-active').forEach(button => {
-            if (button.tagName.toLowerCase() !== 'button') return; // Only handle buttons
-            
-            button.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const deviceId = button.dataset.deviceId;
-                const placeSlug = button.dataset.placeSlug;
-                const currentStatus = button.dataset.currentStatus === 'true';
-                const newStatus = !currentStatus;
-                
-                const modalComponents = this.createToggleModal('device');
-                modalComponents.messageEl.textContent = newStatus ? 
-                    'Are you sure you want to activate this device? This will allow its sensors to be activated.' : 
-                    'Are you sure you want to deactivate this device? This will disable all its sensors.';
-                
-                const handleConfirm = async () => {
-                    modalComponents.confirmBtn.disabled = true;
-                    modalComponents.spinner.classList.remove('d-none');
-                    
-                    try {
-                        await this.updateDeviceStatus(deviceId, newStatus, placeSlug);
-                        modalComponents.modal.hide();
-                    } finally {
-                        modalComponents.confirmBtn.disabled = false;
-                        modalComponents.spinner.classList.add('d-none');
-                    }
-                };
-
-                modalComponents.confirmBtn.removeEventListener('click', handleConfirm);
-                modalComponents.confirmBtn.addEventListener('click', handleConfirm, { once: true });
-                
-                modalComponents.modal.show();
-            });
-        });
-    },
-
     // Update showToast method to ensure proper handling
     showToast(messageOrObject, type = 'info', addToHistory = true) {
         if (toggleActiveConfig.debug) {
@@ -946,103 +491,7 @@ const toggleActiveManager = {
         }
     },
 
-    handleToggleResponse(response) {
-        if (toggleActiveConfig.debug) {
-            console.group('Handling Toggle Response');
-            console.debug('Response:', response);
-        }
-        
-        if (!response) {
-            if (toggleActiveConfig.debug) {
-                console.debug('No response to handle');
-                console.groupEnd();
-            }
-            return;
-        }
-
-        try {
-            // Note: Toast handling is now done in utils.fetchWithCSRF
-            
-            // Handle any dependencies that were affected
-            if (response.dependencies && response.dependencies.length > 0) {
-                // We might want to update UI for the affected dependencies
-                if (toggleActiveConfig.debug) {
-                    console.debug('Dependencies affected:', response.dependencies);
-                }
-                
-                // Update UI for each dependency
-                response.dependencies.forEach(dep => {
-                    // Find any toggles for this dependency
-                    const depToggles = document.querySelectorAll(
-                        `.toggle-${dep.type}-active[data-${dep.type}-id="${dep.id}"]`
-                    );
-                    
-                    // Update each toggle to match the new state (always false for dependencies)
-                    depToggles.forEach(toggle => {
-                        if (toggle.tagName.toLowerCase() === 'input') {
-                            toggle.checked = false;
-                        }
-                    });
-                    
-                    // Find related rows and update their classes
-                    const depRows = document.querySelectorAll(`[data-${dep.type}-id="${dep.id}"]`);
-                    depRows.forEach(row => {
-                        row.setAttribute(`data-${dep.type}-active`, "false");
-                        row.classList.add('opacity-50', 'text-muted');
-                        
-                        // If we're hiding inactive items, hide this row
-                        const hideInactive = this.getHideInactiveState(dep.type);
-                        if (hideInactive) {
-                            row.classList.add('d-none');
-                        }
-                    });
-                });
-            }
-        } catch (error) {
-            console.error('Error handling toggle response:', error);
-            // Show error toast using event system
-            document.dispatchEvent(new CustomEvent('sensors:toast:show', {
-                detail: {
-                    message: 'Error handling toggle response: ' + error.message,
-                    type: 'danger',
-                    addToHistory: true
-                }
-            }));
-        } finally {
-            if (toggleActiveConfig.debug) {
-                console.groupEnd();
-            }
-        }
-    },
-
     // Add helper methods to update child toggles
-    updateChildTogglesForLocation(locationId, isActive) {
-        // Find all device toggles within this location
-        const deviceToggles = document.querySelectorAll(`.toggle-device-active[data-location-id="${locationId}"]`);
-        deviceToggles.forEach(toggle => {
-            const toggleWrapper = toggle.closest('.toggle-button-wrapper');
-            if (toggleWrapper) {
-                if (isActive) {
-                    toggleWrapper.classList.remove('d-none');
-                    toggle.disabled = false;
-                } else {
-                    toggleWrapper.classList.add('d-none');
-                    toggle.disabled = true;
-                }
-            }
-        });
-
-        // Update status badges visibility
-        const statusBadges = document.querySelectorAll(`[data-location-id="${locationId}"] .isactive-badge .badge`);
-        statusBadges.forEach(badge => {
-            if (isActive) {
-                badge.classList.add('d-none');
-            } else {
-                badge.classList.remove('d-none');
-            }
-        });
-    },
-
     updateChildTogglesForDevice(deviceId, isActive) {
         // Find all sensor toggles within this device
         const sensorToggles = document.querySelectorAll(`.toggle-sensor-active[data-device-id="${deviceId}"]`);
@@ -1072,13 +521,115 @@ const toggleActiveManager = {
 };
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    toggleActiveManager.initializeLocationToggles();
-    toggleActiveManager.initializeDeviceToggles();
-    toggleActiveManager.initializeSensorToggles();
-    
-    // Report initial card status
-    reportCardStatus();
+document.addEventListener('DOMContentLoaded', () => {
+    document.body.addEventListener('change', function(event) {
+        if (event.target.matches('.toggle-active-button')) {
+            if (toggleActiveConfig.debug) {
+                console.group('Toggle Active Button Change Event');
+                console.debug('Target:', event.target);
+            }
+
+            const button = event.target;
+            const modelType = button.dataset.modelType;
+            const id = button.dataset[`${modelType}Id`];
+            const wasChecked = button.checked;
+            const objectName = button.dataset.objectName || modelType;
+
+            if (toggleActiveConfig.debug) {
+                console.debug('Model Type:', modelType);
+                console.debug('ID:', id);
+                console.debug('wasChecked:', wasChecked);
+                console.debug('Object Name:', objectName);
+            }
+
+            // Prevent default and immediately revert the visual state
+            event.preventDefault();
+            button.checked = !wasChecked;
+            if (toggleActiveConfig.debug) console.debug('Reverted checkbox state to:', button.checked);
+
+
+            // If a popover already exists for this button, do nothing
+            if (bootstrap.Popover.getInstance(button)) {
+                if (toggleActiveConfig.debug) {
+                    console.debug('Popover already exists, exiting.');
+                    console.groupEnd();
+                }
+                return;
+            }
+
+            if (toggleActiveConfig.debug) console.debug('Creating popover...');
+
+            const popoverContent = () => {
+                const container = document.createElement('div');
+                const newStatus = wasChecked ? 'active' : 'inactive';
+                container.innerHTML = `
+                    <p class="mb-2">Set <strong>${objectName}</strong> to ${newStatus}?</p>
+                    <div class="d-flex justify-content-end">
+                        <button class="btn btn-sm btn-secondary me-2 popover-cancel">Cancel</button>
+                        <button class="btn btn-sm btn-primary popover-confirm">Confirm</button>
+                    </div>
+                `;
+                return container;
+            };
+
+            const popover = new bootstrap.Popover(button, {
+                content: popoverContent,
+                html: true,
+                placement: 'top',
+                trigger: 'manual',
+                customClass: 'shadow'
+            });
+
+            popover.show();
+            if (toggleActiveConfig.debug) console.debug('Popover shown.');
+
+            const popoverEl = document.getElementById(button.getAttribute('aria-describedby'));
+
+            const disposePopover = () => {
+                // Remove the event listener to avoid memory leaks
+                document.removeEventListener('click', outsideClickHandler, true);
+                if (bootstrap.Popover.getInstance(button)) {
+                    if (toggleActiveConfig.debug) console.debug('Disposing popover.');
+                    popover.dispose();
+                }
+                if (toggleActiveConfig.debug) console.groupEnd();
+            };
+
+            const outsideClickHandler = (e) => {
+                // If the click is outside the popover and the button, dispose of the popover.
+                if (popoverEl && !popoverEl.contains(e.target) && e.target !== button) {
+                    if (toggleActiveConfig.debug) console.debug('Clicked outside, disposing popover.');
+                    disposePopover();
+                }
+            };
+
+            // Use capture phase to ensure this runs before other click events
+            document.addEventListener('click', outsideClickHandler, true);
+
+            popoverEl.addEventListener('click', function(e) {
+                if (e.target.matches('.popover-confirm')) {
+                    if (toggleActiveConfig.debug) console.debug('Confirm button clicked.');
+                    toggleActiveManager.toggleStatus(modelType, id)
+                        .then(result => {
+                            if (toggleActiveConfig.debug) {
+                                console.debug('toggleStatus finished successfully.', result);
+                            }
+                        })
+                        .catch(error => {
+                            if (toggleActiveConfig.debug) {
+                                console.error('toggleStatus failed.', error);
+                            }
+                        })
+                        .finally(() => {
+                            disposePopover();
+                        });
+                } else if (e.target.matches('.popover-cancel')) {
+                     if (toggleActiveConfig.debug) console.debug('Cancel button clicked.');
+                     disposePopover();
+                }
+            });
+        }
+    });
 });
 
 // Export for use in other modules

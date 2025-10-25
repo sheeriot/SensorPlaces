@@ -1,0 +1,35 @@
+{% load crispy_forms_tags %}
+
+<form id="deleteSensorForm" method="post" action="{% url 'sensors:sensor_delete' place_slug=place.slug pk=object.pk %}"
+      hx-post="{% url 'sensors:sensor_delete' place_slug=place.slug pk=object.pk %}"
+      hx-swap="none">
+    {% csrf_token %}
+    <div class="modal-header">
+        <h5 class="modal-title">
+            <i class="bi bi-trash text-danger me-2"></i>
+            Delete Sensor
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+        <div class="mb-3">
+            <small class="text-body-secondary text-nowrap">
+                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" class="link-dark"><i class="bi bi-house-gear me-1"></i>{{ place.name }}</a>
+                <i class="bi bi-chevron-right"></i>
+                <a href="{{ device.location.get_absolute_url }}" class="link-dark"><i class="bi bi-geo-alt me-1"></i>{{ device.location.name }}</a>
+                <i class="bi bi-chevron-right"></i>
+                <a href="{{ device.get_absolute_url }}" class="link-dark"><i class="bi bi-hdd-rack me-1"></i>{{ device.name }}</a>
+            </small>
+        </div>
+        <p>Are you sure you want to delete the sensor: <strong>{{ object.name }}</strong>?</p>
+        <p class="text-muted small">This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-1"></i>Cancel
+        </button>
+        <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash-fill me-1"></i>Delete Sensor
+        </button>
+    </div>
+</form>

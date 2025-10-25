@@ -18,7 +18,7 @@ services:
       - sensors-db:/opt/app/db
       - sensors-static:/opt/app/static_files
       - sensors-media:/opt/app/media
-      # - ./webapp:/opt/app/webapp
+      - ./webapp:/opt/app/webapp
 volumes:
   sensors-db:
   sensors-static:

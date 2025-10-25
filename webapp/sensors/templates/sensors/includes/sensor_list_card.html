@@ -11,47 +11,42 @@
         {% endif %}
     </div>
     <div class="card-body p-0">
-        <table id="sensor-list-table" class="table table-hover mb-0">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th></th>
-                    {% if not narrow_view %}
-                    <th class="text-end">Active</th>
-                    <th class="text-end text-nowrap" style="width: 15%;">Actions</th>
-                    {% endif %}
-                </tr>
-            </thead>
-            <tbody>
+        <!-- Custom List Header -->
+        <div class="d-flex align-items-center text-muted fw-bold px-3 py-2 border-bottom bg-light">
+            <div class="flex-grow-1 ps-3" style="min-width: 0;">Name</div>
+            {% if not narrow_view %}
+            <div style="width: 100px;" class="text-start">Current</div>
+            <div style="width: 90px;" class="text-start">Active</div>
+            <div style="width: 120px;" class="text-end">Actions</div>
+            {% endif %}
+        </div>
+        
+        <div id="sensor-list-{{ device.pk }}" class="list-group list-group-flush">
             {# Renders sensors for a single device #}
             {% if device %}
                 {% for sensor in sensors %}
                     {% include 'sensors/partials/sensor_row.html' with sensor=sensor device=device hide_inactive=hide_inactive %}
                 {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center text-muted p-3">
-                            <i class="bi bi-info-circle me-1"></i>
-                            This device has no sensors.
-                            {% if not readonly %}
-                                {% include 'sensors/partials/sensor_add_button.html' %}
-                            {% endif %}
-                        </td>
-                    </tr>
+                    <div id="no-sensors-message-{{ device.pk }}" class="text-center text-muted p-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        This device has no sensors.
+                        {% if not readonly %}
+                            {% include 'sensors/partials/sensor_add_button.html' %}
+                        {% endif %}
+                    </div>
                 {% endfor %}
             {# Renders a list of devices and their sensors for a single location #}
             {% elif location %}
                 {% for device in location.devices_sorted %}
                     {% include 'sensors/includes/sensor_list_device_row.html' with device=device %}
                 {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center text-muted p-3">
-                            <i class="bi bi-info-circle me-1"></i>
-                            This location has no devices.
-                            <a href="{% url 'sensors:device_create_in_location' place_slug=place.slug location_slug=location.slug %}" class="btn btn-sm btn-outline-primary ms-2">
-                                <i class="bi bi-plus-lg me-1"></i>Add Device
-                            </a>
-                        </td>
-                    </tr>
+                    <div class="text-center text-muted p-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        This location has no devices.
+                        <a href="{% url 'sensors:device_create_in_location' place_slug=place.slug location_slug=location.slug %}" class="btn btn-sm btn-outline-primary ms-2">
+                            <i class="bi bi-plus-lg me-1"></i>Add Device
+                        </a>
+                    </div>
                 {% endfor %}
             {# Renders a list of locations with their devices and sensors #}
             {% elif locations %}
@@ -62,7 +57,6 @@
                     {% endfor %}
                 {% endfor %}
             {% endif %}
-            </tbody>
-        </table>
+        </div>
     </div>
 </div>

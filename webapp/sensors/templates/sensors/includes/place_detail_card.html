@@ -1,14 +1,17 @@
 {% load widget_tweaks %}
 
 <div id="place-detail-card"
-     class="card my-1 {% if not place.is_active %}opacity-50 text-muted{% endif %}">
+     class="card my-1 %}">
     <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
+        <h5 class="card-title mb-0 d-flex align-items-center">
             <i class="bi bi-house-gear me-2"></i>
             {{ place.name }}
+            {% if not place.is_active %}
+                <span class="badge bg-secondary ms-2">inactive</span>
+            {% endif %}
         </h5>
         <div class="btn-group btn-group-sm">
-            <a href="{% url 'sensors:place_update' place.slug %}" class="btn btn-warning">
+            <a href="{% url 'sensors:place_update' place.slug %}?next={{ absolute_url|urlencode }}" class="btn btn-warning">
                 <i class="bi bi-pencil"></i>
             </a>
             <a href="{% url 'sensors:place_delete' place.slug %}" class="btn btn-danger">
@@ -18,13 +21,6 @@
     </div>
     <div class="card-body px-2 pb-1 pt-2">
         <dl class="row g-0">
-            <dt class="text-secondary small mb-1">Status</dt>
-            <dd class="mb-2">
-                <div class="d-flex align-items-center gap-2">
-                    {% include "sensors/partials/status_active_badge.html" with object=place show_active=True %}
-                </div>
-            </dd>
-            
             <dt class="text-secondary small mb-1">Address</dt>
             <dd class="mb-2 fw-medium">{{ place.address }}</dd>
             

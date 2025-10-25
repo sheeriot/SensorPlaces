@@ -159,3 +159,36 @@
 .leaflet-top.leaflet-left .leaflet-control {
     margin: 5px;
 } 
+
+.site-plan-container {
+    position: relative;
+    max-width: 100%;
+    margin: auto;
+}
+
+.site-plan-image {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.overlay-box {
+    position: absolute;
+    border: 2px solid rgba(255, 0, 0, 0.7);
+    background-color: rgba(255, 0, 0, 0.2);
+    cursor: move;
+    resize: both;
+    overflow: hidden;
+    color: white;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-shadow: 1px 1px 2px black;
+}
+
+/* Make the resize handle more visible */
+.overlay-box::-webkit-resizer {
+    border: 2px solid red;
+    background: white;
+} 

@@ -1,15 +1,10 @@
 /**
  * Common JavaScript functionality for the sensors application
  * 
- * Configuration:
- * -------------
- * To enable debugging, set debug: true in commonConfig below
- */
-
+*/ 
 // System Configuration
-const commonConfig = {
-    debug: false  // Set to false in production
-};
+var commonConfig = {};
+commonConfig.debug = true;
 
 // Global state - expanded with body data attributes
 window.sensorPlaces = {

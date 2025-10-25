@@ -13,13 +13,14 @@ def debug_context(context):
     
     # Filter out complex objects that can't be JSON serialized
     filtered_context = {}
-    for k, v in context.items():
-        try:
-            if k not in ['view', 'request'] and not k.startswith('_'):
-                json.dumps({k: str(v)})  # Test if serializable
-                filtered_context[k] = str(v)
-        except:
-            filtered_context[k] = f"<{type(v).__name__}>"
+    for d in context.dicts:
+        for k, v in d.items():
+            try:
+                if k not in ['view', 'request'] and not k.startswith('_'):
+                    json.dumps({k: str(v)})  # Test if serializable
+                    filtered_context[k] = str(v)
+            except:
+                filtered_context[k] = f"<{type(v).__name__}>"
     
     debug_html = f"""
     <div class="debug-context" style="margin-top: 20px; padding: 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">

@@ -18,10 +18,14 @@ window.utils = {
         const csrfToken = this.getCookie('csrftoken') || document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         
         const defaultHeaders = {
-            'Content-Type': 'application/json',
             'X-CSRFToken': csrfToken,
             'X-Requested-With': 'XMLHttpRequest'
         };
+
+        // Only set Content-Type for non-FormData requests, as the browser handles it for FormData
+        if (!(options.body instanceof FormData)) {
+            defaultHeaders['Content-Type'] = 'application/json';
+        }
 
         options.headers = { ...defaultHeaders, ...options.headers };
 

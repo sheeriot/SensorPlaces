@@ -3,21 +3,167 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect, HttpResponse, Http404
 import json
 from icecream import ic
+# import logging # No longer needed
 
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet, Prefetch
 from django.utils.safestring import mark_safe
 from django.utils.decorators import method_decorator
+from django.views.decorators.http import require_POST
+from django.utils import timezone
+from datetime import timedelta
 
-from ..models import Place, Location, Device, Sensor
+from ..models import Place, Location, Device, Sensor, SensorReading, SensorType, Unit
 from .device_forms import DeviceForm
-from .mixins import PlaceAnnotationMixin
+from .mixins import PlaceAnnotationMixin, ReferrerMixin
 from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
+from .sensor_forms import SensorForm, LoRaWANSensorForm
+from ..utils import get_sensor_readings, generate_sparkline
 from ..decorators import log_execution_time
+from ..switchbot_client import get_status
+
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+
+# Maps SwitchBot API keys to a user-friendly name and a default Unit.
+# Format: 'api_key': ('Friendly Name', 'Unit Name', 'Unit Symbol')
+# This allows us to handle various sensor types from the API.
+SWITCHBOT_KEY_MAP = {
+    'temperature': ('Temperature', 'Celsius', '°C'),
+    'humidity': ('Humidity', 'Relative Humidity', '%RH'),
+    'battery': ('Battery', 'Percent', '%'),
+    'leakState': ('Water Leak', 'Binary', ''),
+    'status': ('Status', 'Binary', ''),
+    'moveDetected': ('Motion', 'Binary', ''),
+    'brightness': ('Light', 'Level', ''),
+}
+
+# logger = logging.getLogger(__name__) # No longer needed
+
+@login_required
+def device_inspect_view(request, place_slug, pk):
+    device = get_object_or_404(
+        Device.objects.select_related('location', 'location__place'), 
+        pk=pk, 
+        location__place__slug=place_slug
+    )
+    context = {'device': device, 'place': device.location.place, 'place_slug': place_slug}
+
+    if not device.is_switchbot or not device.device_id:
+        context['error'] = "This is not a SwitchBot device with a valid device ID."
+    else:
+        try:
+            status_data = get_status(device.device_id)
+            context['inspect_data'] = json.dumps(status_data, indent=2)
+
+            if status_data.get('statusCode') == 100:
+                body = status_data.get('body', {})
+                
+                # Get existing sensor type names for this device, case-insensitive
+                existing_sensor_types = set(
+                    s.lower() for s in device.sensors.select_related('sensor_type')
+                                  .filter(sensor_type__name__isnull=False)
+                                  .values_list('sensor_type__name', flat=True)
+                )
+
+                # Exclude non-sensor keys from the API response
+                excluded_keys = {'version', 'deviceid', 'devicetype', 'hubdeviceid'}
+
+                # Find keys in the API body that are not yet sensors on this device
+                missing_sensors = []
+                for key, value in body.items():
+                    if key.lower() not in existing_sensor_types and key.lower() not in excluded_keys:
+                        missing_sensors.append({
+                            'name': key,
+                            'value': value,
+                        })
+                
+                context['missing_sensors'] = missing_sensors
+
+        except Exception as e:
+            context['error'] = f"Failed to get SwitchBot status: {e}"
+
+    return render(request, 'sensors/partials/device_inspect_modal_content.html', context)
+
+
+@require_POST
+@login_required
+def add_switchbot_sensor(request, place_slug, pk):
+    device = get_object_or_404(Device, pk=pk, location__place__slug=place_slug)
+    sensor_to_add_raw = request.POST.get('sensor_type')
+    value_to_add = request.POST.get('value')
+
+    if not sensor_to_add_raw:
+        return HttpResponse("Sensor type not provided.", status=400)
+
+    try:
+        sensor_type_name = sensor_to_add_raw.capitalize()
+        unit = None
+        if sensor_type_name == 'Temperature':
+            unit, _ = Unit.objects.get_or_create(name="Celsius", defaults={'symbol': '°C'})
+        elif sensor_type_name == 'Humidity':
+            unit, _ = Unit.objects.get_or_create(name="Relative Humidity", defaults={'symbol': '%RH'})
+        elif sensor_type_name == 'Battery':
+            unit, _ = Unit.objects.get_or_create(name="Percent", defaults={'symbol': '%'})
+
+        sensor_type, _ = SensorType.objects.get_or_create(
+            name__iexact=sensor_type_name,
+            defaults={'name': sensor_type_name, 'default_unit': unit}
+        )
+
+        sensor, created = Sensor.objects.get_or_create(
+            device=device,
+            sensor_type=sensor_type,
+            defaults={'name': f'{device.name} {sensor_type.name}'}
+        )
+
+        if created and value_to_add is not None:
+            try:
+                sensor.current_reading_value = float(value_to_add)
+                sensor.current_reading_timestamp = timezone.now()
+                sensor.save(update_fields=['current_reading_value', 'current_reading_timestamp'])
+            except (ValueError, TypeError):
+                ic(f"Could not parse value '{value_to_add}' for new sensor {sensor.name}")
+
+        if created:
+            sensor.live_value = sensor.current_reading_value
+            sensor_row_html = render_to_string(
+                'sensors/partials/sensor_row.html',
+                {
+                    'sensor': sensor, 
+                    'place': device.location.place, 
+                    'device': device,
+                    'device_is_active': device.is_active,
+                    'parent_is_active': device.location.is_active,
+                    'narrow_view': False,
+                    'object_name': sensor.name
+                }
+            )
+            
+            ic("Generated sensor row HTML for trigger:", sensor_row_html)
+
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                'sensorAdded': {
+                    'sensorType': sensor_to_add_raw, # Use the raw name for the JS selector
+                    'sensorHTML': sensor_row_html,
+                    'deviceId': device.pk
+                }
+            })
+            return response
+        else:
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({'sensorAlreadyExists': {'sensorType': sensor_to_add_raw}})
+            return response
+
+    except Exception as e:
+        ic(f"Error adding SwitchBot sensor: {e}", exc_info=True)
+        return HttpResponse(f'<div class="badge bg-danger">Error</div>', status=500)
+
 
 # Device Views
 class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
@@ -85,7 +231,8 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
                 ).prefetch_related(
                     Prefetch(
                         'sensors',
-                        queryset=Sensor.objects.order_by('-is_active', Lower('name')),
+                        queryset=Sensor.objects.select_related('sensor_type', 'sensor_type__default_unit')
+                                              .order_by('-is_active', Lower('name')),
                         to_attr='sensors_sorted'
                     ))
         return self._queryset
@@ -101,6 +248,50 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['location'] = location
         context['sensors'] = device.sensors_sorted
         context['locations'] = get_annotated_locations(self._place)
+        context['absolute_url'] = self.request.build_absolute_uri()
+
+        # --- Smart SwitchBot Status Fetching ---
+        if device.is_switchbot and device.device_id:
+            fetch_needed = False
+            # Determine if we need to fetch fresh data
+            for sensor in context['sensors']:
+                if sensor.sensor_type and sensor.sensor_type.name.lower() in ['temperature', 'humidity', 'battery', 'status', 'leakstate']:
+                    if sensor.current_reading_timestamp is None:
+                        fetch_needed = True
+                        break
+                    
+                    stale_time = timezone.now() - timedelta(seconds=sensor.effective_stale_threshold)
+                    if sensor.current_reading_timestamp < stale_time:
+                        fetch_needed = True
+                        break
+            
+            if fetch_needed:
+                try:
+                    status_data = get_status(device.device_id)
+                    if status_data.get('statusCode') == 100:
+                        live_body = status_data.get('body', {})
+                        
+                        # Simple mapping of lowercase API key to the value
+                        live_values = {k.lower(): v for k, v in live_body.items()}
+
+                        # Update sensor instances with new data and save
+                        for sensor in context['sensors']:
+                            if sensor.sensor_type and sensor.sensor_type.name.lower() in live_values:
+                                live_value = live_values[sensor.sensor_type.name.lower()]
+                                if live_value is not None:
+                                    sensor.current_reading_value = live_value
+                                    sensor.current_reading_timestamp = timezone.now()
+                                    sensor.save(update_fields=['current_reading_value', 'current_reading_timestamp'])
+                    else:
+                        ic(f"SwitchBot API error for device {device.device_id}: {status_data.get('message')}")
+
+                except Exception as e:
+                    ic(f"Failed to get SwitchBot status for device {device.device_id}: {e}")
+
+        # Attach the (potentially updated) cached value to live_value for the template
+        for sensor in context['sensors']:
+            sensor.live_value = sensor.current_reading_value
+        # --- End of Smart Fetching ---
 
         # Add hide_inactive state from GET param or cookie
         hide_inactive_param = self.request.GET.get('hide_inactive')
@@ -118,7 +309,7 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # ic(context['locations'])
         return context
 
-class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
+class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, CreateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
@@ -132,21 +323,12 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         
         # Initialize location and inactive_help_text
         self._location = None
-        self._inactive_help_text = None
         
         # Get location if specified in URL
         location_slug = self.kwargs.get('location_slug', None)
         if location_slug:
             self._location = get_object_or_404(Location, slug=location_slug, place=self._place)
             
-            # If location is inactive, create help text about that
-            if self._location and not self._location.is_active:
-                self._inactive_help_text = mark_safe(
-                    '<div class="form-text text-warning-emphasis mt-2">'
-                    '<i class="bi bi-exclamation-triangle me-2"></i>This device will be inactive because Location "{self._location.name}" is inactive.'
-                    '</div>'
-                )
-
     def get_initial(self):
         initial = super().get_initial()
         
@@ -163,6 +345,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
                 initial['name'] = f"{device_to_duplicate.name}_Dup"
                 initial['is_active'] = device_to_duplicate.is_active
                 initial['is_lorawan'] = device_to_duplicate.is_lorawan
+                initial['is_switchbot'] = device_to_duplicate.is_switchbot
                 initial['location'] = device_to_duplicate.location
                 initial['device_type'] = device_to_duplicate.device_type
                 initial['manufacturer'] = device_to_duplicate.manufacturer
@@ -178,14 +361,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self._place
         kwargs['locations'] = self._locations
-        kwargs['inactive_help_text'] = self._inactive_help_text
-        
-        # Set initial data properly
-        initial = self.get_initial()
-        initial.update(kwargs.get('initial', {}))
-        initial['referrer'] = self.request.GET.get('next', self.request.META.get('HTTP_REFERER', ''))
-        kwargs['initial'] = initial
-        kwargs['cancel_url'] = self.get_cancel_url()
+        kwargs['location'] = self._location # Pass location to form
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -221,13 +397,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
     def get_success_url(self):
         """
         Determine the URL to redirect to on successful form submission.
-        - First, try the 'referrer' from the form's POST data.
-        - Fallback to the detail view of the created device.
         """
-        referrer_url = self.request.POST.get('referrer')
-        if referrer_url:
-            return referrer_url
-        
         return reverse('sensors:device_detail', kwargs={
             'place_slug': self.object.location.place.slug, 
             'pk': self.object.pk
@@ -264,8 +434,8 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         )
         
         # Add inactive warning to message if device is inactive
-        if not device.is_active and self._inactive_help_text:
-            message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
+        # if not device.is_active and self._inactive_help_text:
+        #     message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
         
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
@@ -281,7 +451,7 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
         return super().form_invalid(form)
 
 
-class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
+class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, UpdateView):
     model = Device
     form_class = DeviceForm
     template_name = 'sensors/device_form.html'
@@ -318,7 +488,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
             # Get help text based on device active state and its location
             self._inactive_help_text = self.get_device_inactive_help_text(device, location)
             
-        except Exception as e:
+        except Http404:
             # If we can't get the object yet (e.g., in a GET request before the object exists)
             pass
 
@@ -333,77 +503,13 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         Returns:
             str: help_text HTML string with warning message or None
         """
-        inactive_help_text = None
-        sensors_active = []
-        
-        if not device:
-            return None
-            
-        if not location:
-            location = device.location
-            
-        # If location is inactive, create help text about that
-        if location and not location.is_active:
-            # Check if device is active when it shouldn't be
-            if device and device.is_active:
-                # Get the list of affected sensors before fixing
-                # Convert queryset to list to ensure it's iterable
-                sensors_active = list(device.sensors.filter(is_active=True).annotate(
-                    reading_count=Count('readings')
-                ))
-                
-                # Fix the inconsistency - set device to inactive
-                device.is_active = False
-                device.save()
-            
-            # Standard message for inactive location
-            inactive_help_text = mark_safe(
-                '<i class="bi bi-exclamation-triangle me-2"></i>'
-                f'This device will be inactive because Location "{location.name}" is inactive.'
-            )
-        # If device is being set to inactive or viewing an inactive device, check for active sensors
-        elif device:
-            # Get active sensors with reading counts - convert queryset to list
-            sensors_active = list(device.sensors.filter(is_active=True).annotate(
-                reading_count=Count('readings')
-            ))
-            
-            active_sensor_count = len(sensors_active)
-            
-            if active_sensor_count > 0:
-                # Generate the list of active sensors with their reading counts
-                active_sensors_list = ''.join([
-                    f'<li><i class="bi bi-thermometer text-muted me-1"></i>{sensor.name} '
-                    f'<small class="text-muted">({sensor.reading_count} readings)</small></li>'
-                    for sensor in sensors_active
-                ])
-                
-                inactive_help_text = mark_safe(
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This device has {active_sensor_count} active sensor{"s" if active_sensor_count > 1 else ""}:'
-                    f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_sensors_list}</ul>'
-                )
-        
-        # Store the active sensors list for later use - make sure it's a list
-        self._sensors_active = sensors_active if isinstance(sensors_active, list) else list(sensors_active)
-        
-        return inactive_help_text
-
-    def get_initial(self):
-        initial = super().get_initial()
-        # Set the referrer in initial data
-        initial['referrer'] = self.request.META.get('HTTP_REFERER', '')
-        return initial
+        return None
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self._place
         kwargs['locations'] = self._locations
         kwargs['inactive_help_text'] = self._inactive_help_text
-        
-        # Pass the referrer from initial data to the form
-        kwargs['initial'] = self.get_initial()
-        kwargs['cancel_url'] = self.get_cancel_url()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -420,21 +526,7 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, UpdateView):
         if device.location:
             context['location'] = get_annotated_locations(self._place).get(pk=device.location.pk)
         
-        # Add a fallback cancel URL
-        context['cancel_url'] = self.get_cancel_url()
         return context
-
-    def get_cancel_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self._place.slug,
-            'pk': self.object.pk
-            })
-
-    def get_success_url(self):
-        return reverse('sensors:device_detail', kwargs={
-            'place_slug': self.object.location.place.slug,
-            'pk': self.object.pk
-        })
 
     def form_valid(self, form):
         # Store original values before save
@@ -613,6 +705,57 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     def get_success_url(self):
         return reverse('sensors:place_detail', 
                       kwargs={'place_slug': self._place.slug})
+
+@login_required
+def fetch_switchbot_reading(request, place_slug, pk):
+    """
+    View to fetch the latest reading for a SwitchBot device.
+    """
+    device = get_object_or_404(Device, pk=pk, location__place__slug=place_slug)
+
+    if not device.is_switchbot or not device.device_id:
+        messages.error(request, f"Device '{device.name}' is not a configured SwitchBot device.")
+        return redirect(device.get_absolute_url())
+
+    try:
+        status_response = get_status(device.device_id)
+        if status_response.get('statusCode') != 100:
+            raise Exception(f"API error: {status_response.get('message', 'Unknown error')}")
+
+        body = status_response.get('body', {})
+        readings_found = 0
+
+        # Mapping from API key to SensorType name and the value
+        reading_map = {
+            'temperature': ('Temperature', body.get('temperature')),
+            'humidity': ('Humidity', body.get('humidity')),
+            'battery': ('Battery', body.get('battery')),
+        }
+
+        for api_key, (sensor_type_name, value) in reading_map.items():
+            if value is not None:
+                try:
+                    sensor = device.sensors.get(sensor_type__name=sensor_type_name)
+                    # Create a historical reading
+                    SensorReading.objects.create(sensor=sensor, value=value)
+                    # Update the cached current reading on the sensor
+                    sensor.current_reading_value = value
+                    sensor.current_reading_timestamp = timezone.now()
+                    sensor.save(update_fields=['current_reading_value', 'current_reading_timestamp'])
+                    readings_found += 1
+                except Sensor.DoesNotExist:
+                    # This sensor type is not set up for this device, so we skip it.
+                    pass
+        
+        if readings_found > 0:
+            messages.success(request, f"Successfully fetched {readings_found} new reading(s) for {device.name}.")
+        else:
+            messages.info(request, f"No new readings were available from the API for {device.name}.")
+
+    except Exception as e:
+        messages.error(request, f"Failed to fetch readings for {device.name}: {e}")
+
+    return redirect(device.get_absolute_url())
 
 # class DeviceMoveLocationView(LoginRequiredMixin, View):
 

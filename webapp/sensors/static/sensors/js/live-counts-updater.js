@@ -39,7 +39,7 @@ const liveCountsUpdater = {
             console.log('LiveCountsUpdater: Fetching counts...');
         }
         try {
-            const response = await fetch(`/api/${this.placeSlug}/stats/`);
+            const response = await window.utils.fetchWithCSRF(`/api/${this.placeSlug}/stats/`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }

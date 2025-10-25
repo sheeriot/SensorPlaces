@@ -32,7 +32,6 @@ class ToggleActiveView(LoginRequiredMixin, View):
 
             # Map model types to actual models
             model_map = {
-                'location': Location,
                 'device': Device,
                 'sensor': Sensor
             }
@@ -55,10 +54,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             obj = get_object_or_404(model_class, pk=object_id)
 
             # Get the place based on model type
-            if model_type == 'location':
-                place = obj.place
-                dependencies = self._get_location_dependencies(obj)
-            elif model_type == 'device':
+            if model_type == 'device':
                 place = obj.location.place
                 dependencies = self._get_device_dependencies(obj)
             else:  # sensor
@@ -88,9 +84,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
 
             # Get the appropriate help text based on model type
             help_text = None
-            if model_type == 'location':
-                help_text = self._get_location_help_text(obj)
-            elif model_type == 'device':
+            if model_type == 'device':
                 help_text = self._get_device_help_text(obj)
             elif model_type == 'sensor':
                 help_text = self._get_sensor_help_text(obj)
@@ -104,7 +98,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             # Ensure the JSON response includes the toast data
             response_data = {
                 'success': True,
-                'is_active': obj.is_active,
+                'new_state': obj.is_active,
                 'dependencies': deactivated_items,
                 'toast': toast_message
             }
@@ -125,9 +119,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
     def _build_toast_message(self, model_type, obj, place, was_active, deactivated_items, help_text=None):
         """Build a standard toast message for toggle operations"""
         # Build basic path info based on model type
-        if model_type == 'location':
-            name_path = f"{place.name} > {obj.name}"
-        elif model_type == 'device':
+        if model_type == 'device':
             name_path = f"{place.name} > {obj.location.name} > {obj.name}"
         else:  # sensor
             name_path = f"{place.name} > {obj.device.location.name} > {obj.device.name} > {obj.name}"
@@ -159,18 +151,6 @@ class ToggleActiveView(LoginRequiredMixin, View):
             'type': 'success' if obj.is_active else 'warning'
         }
     
-    def _get_location_help_text(self, location):
-        """Get help text for location inactivation from LocationUpdateView"""
-        try:
-            # Create a dummy instance to get the help text
-            view = LocationUpdateView()
-            help_text, _ = view.get_location_inactive_help_text(location)
-            # Log if the help text contains a wrapper
-            # ic("Location help text contains wrapper:", help_text)
-            return help_text
-        except Exception as e:
-            return None
-            
     def _get_device_help_text(self, device):
         """Get help text for device inactivation from DeviceUpdateView"""
         try:
@@ -199,35 +179,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
         """Deactivate dependent items and return information about them"""
         deactivated = []
         
-        if model_type == 'location':
-            # Deactivate all devices in this location
-            devices = Device.objects.filter(location=obj, is_active=True)
-            for device in devices:
-                # Get the sensors before deactivating the device
-                sensors = list(Sensor.objects.filter(device=device, is_active=True).values('id', 'name'))
-                
-                # Deactivate the device
-                device.is_active = False
-                device.save()
-                
-                # Add device to the deactivated list
-                deactivated.append({
-                    'id': device.id,
-                    'name': device.name,
-                    'type': 'device'
-                })
-                
-                # Deactivate all sensors in this device
-                for sensor in Sensor.objects.filter(device=device, is_active=True):
-                    sensor.is_active = False
-                    sensor.save()
-                    deactivated.append({
-                        'id': sensor.id,
-                        'name': sensor.name,
-                        'type': 'sensor'
-                    })
-                
-        elif model_type == 'device':
+        if model_type == 'device':
             # Deactivate all sensors in this device
             sensors = Sensor.objects.filter(device=obj, is_active=True)
             for sensor in sensors:
@@ -240,25 +192,6 @@ class ToggleActiveView(LoginRequiredMixin, View):
                 })
         
         return deactivated
-    
-    def _get_location_dependencies(self, location):
-        """Get active devices and sensors that will be affected by location toggle"""
-        active_devices = Device.objects.filter(
-            location=location,
-            is_active=True
-        ).annotate(
-            sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
-        ).values('id', 'name', 'sensor_count')
-        
-        dependencies = []
-        for device in active_devices:
-            dependencies.append({
-                'id': device['id'],
-                'name': f"{device['name']} ({device['sensor_count']} active sensors)",
-                'type': 'device'
-            })
-        
-        return dependencies
     
     def _get_device_dependencies(self, device):
         """Get active sensors that will be affected by device toggle"""

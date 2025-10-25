@@ -75,10 +75,10 @@ const sitePlanSystem = {
                 this.fitMapPerfectly();
             }
         });
-        // Use hide.bs.modal to move focus BEFORE it's hidden, preventing ARIA error
+        // Use hide.bs.modal to blur focus BEFORE it's hidden, preventing ARIA error
         modal.addEventListener('hide.bs.modal', () => {
-            if (this.editButton) {
-                this.editButton.focus();
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
             }
         });
         modal.addEventListener('hidden.bs.modal', () => this.cleanupEditor());
@@ -238,10 +238,11 @@ const sitePlanSystem = {
         try {
             // Instead of reading from the stale dataset, get the most up-to-date
             // locations directly from the sitePlanView's state.
-            const locations = Array.from(window.sitePlanView.state.locations.values());
+            const locations = Array.from(window.sitePlanView.state.locations.values())
+                .filter(loc => loc.slug !== 'unassigned-devices');
 
             if (!locations || locations.length === 0) {
-                this.logDebug('warning', 'No locations found in sitePlanView state.');
+                this.logDebug('warning', 'No locations found in sitePlanView state after filtering.');
                 return;
             }
 
@@ -374,7 +375,11 @@ const sitePlanSystem = {
 
     // Save changes
     async saveChanges() {
-        if (!this.state.isDirty) return;
+        this.logDebug('saves', 'saveChanges triggered.');
+        if (!this.state.isDirty) {
+            this.logDebug('saves', 'No changes detected (isDirty is false). Aborting save.');
+            return;
+        }
 
         // Get only changed markers
         const changedLocations = Array.from(this.state.markers.entries())
@@ -393,33 +398,45 @@ const sitePlanSystem = {
             .filter(loc => loc !== null);
 
         if (changedLocations.length === 0) {
-            this.logDebug('saves', 'No location changes detected');
+            this.logDebug('saves', 'No actual location changes detected after diff. Aborting save.');
             return;
         }
 
-        const updates = {
-            locations: changedLocations
-        };
-
         try {
-            this.logDebug('saves', 'Saving location updates:', updates);
-            const response = await fetch(
-                `/api/${document.body.dataset.placeSlug}/siteplan_update/`,
+            this.logDebug('saves', 'Saving location updates to backend:', { locations: changedLocations });
+            this.showToast('Saving changes...', 'info');
+
+            const response = await window.utils.fetchWithCSRF(
+                `/${document.body.dataset.placeSlug}/siteplan/update/`,
                 {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    },
-                    body: JSON.stringify(updates)
+                    body: JSON.stringify({ locations: changedLocations })
                 }
             );
+
+            this.logDebug('network', 'Received response from server:', { status: response.status, ok: response.ok });
+
+            if (!response.ok) {
+                let errorMessage = `Failed to save changes. Server responded with status ${response.status}.`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                    this.logDebug('error', 'Server error response body:', errorData);
+                } catch (e) {
+                    this.logDebug('error', 'Could not parse error response body.');
+                    errorMessage = `Error ${response.status}: ${response.statusText}`;
+                }
+                this.showToast(errorMessage, 'danger');
+                this.logDebug('error', 'Save failed with non-OK response:', response);
+                return;
+            }
             
             const data = await response.json();
-            
-            if (!response.ok || data.type === 'error' || data.type === 'danger') {
-                this.showToast(data.message || 'Failed to save changes', data.type || 'danger');
-                this.logDebug('error', 'Save failed:', data);
+            this.logDebug('network', 'Parsed response data:', data);
+
+            if (data.type === 'error' || data.type === 'danger') {
+                this.showToast(data.message || 'An unknown error occurred during save.', 'danger');
+                this.logDebug('error', 'Save failed with application error:', data);
                 return;
             }
 
@@ -465,8 +482,8 @@ const sitePlanSystem = {
             this.logDebug('success', 'Changes saved successfully:', data);
             
         } catch (error) {
-            this.logDebug('error', 'Save failed:', error);
-            this.showToast('Network error while saving changes', 'danger');
+            this.logDebug('error', 'Save failed due to network or unexpected error:', error);
+            this.showToast('A network error occurred while saving. Please check your connection.', 'danger');
         }
     },
 

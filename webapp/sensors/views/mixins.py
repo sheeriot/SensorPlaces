@@ -7,12 +7,77 @@ from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest
 from decimal import Decimal
 
-from ..models import Place, Location
+from django.urls import reverse
 from .views_fun import get_annotated_locations, get_place_data
+
+from ..models import Place, Location
 
 from typing import Any, Dict, Optional
 
 from icecream import ic
+
+
+class ReferrerMixin:
+    """
+    A mixin to handle the 'next' URL for successful form submissions and 'Cancel' button links.
+    - It provides a standardized get_success_url that redirects to the object's detail view.
+    - It provides a get_cancel_url that can be defined on the view.
+    """
+    request: HttpRequest
+
+    def get_form_kwargs(self) -> Dict[str, Any]:
+        """
+        Pass the correct cancel_url to the form.
+        """
+        kwargs = super().get_form_kwargs()
+        kwargs['cancel_url'] = self.get_cancel_url()
+        return kwargs
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Ensure the cancel_url is in the context for the template.
+        """
+        context = super().get_context_data(**kwargs)
+        context['cancel_url'] = self.get_cancel_url()
+        return context
+
+    def get_success_url(self) -> str:
+        """
+        Return the object's detail view URL.
+        This provides a consistent redirect after a successful form submission.
+        """
+        if not hasattr(self.object, 'get_absolute_url'):
+            raise ImproperlyConfigured(
+                f"Object {self.object.__class__.__name__} does not have a get_absolute_url method."
+            )
+        return self.object.get_absolute_url()
+
+    def get_cancel_url(self) -> str:
+        """
+        Placeholder for the cancel URL. This can be overridden by any
+        view that inherits from this mixin to provide a logical fallback.
+        """
+        ic("ReferrerMixin.get_cancel_url called")
+        # For update views, try to get the object and return its detail page URL.
+        ic(f"hasattr(self, 'get_object'): {hasattr(self, 'get_object')}")
+        if hasattr(self, 'get_object'):
+            try:
+                ic("Attempting to call self.get_object()")
+                obj = self.get_object()
+                ic(f"self.get_object() returned: {obj}")
+                if obj and hasattr(obj, 'get_absolute_url'):
+                    ic("Object has get_absolute_url, returning it.")
+                    return obj.get_absolute_url()
+                ic("Object is None or does not have get_absolute_url")
+            except Exception as e:
+                # This will fail on a CreateView, which is expected.
+                ic(f"Exception in get_cancel_url's try block: {e}")
+                pass
+        
+        ic("Raising NotImplementedError because conditions not met.")
+        raise NotImplementedError(
+            "ReferrerMixin requires a 'get_cancel_url' method to be defined on the view for create forms."
+        )
 
 
 class PlaceAnnotationMixin:

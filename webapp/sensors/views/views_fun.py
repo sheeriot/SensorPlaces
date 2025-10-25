@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Prefetch
 from django.db.models.functions import Lower
 from decimal import Decimal
 from typing import Dict, Any
@@ -57,17 +57,34 @@ def get_place_counts(place):
     - sensors_active_count
     - sensors_inactive_count
     """
-    locations_active_count = Location.objects.filter(place=place, is_active=True).count()
-    locations_inactive_count = Location.objects.filter(place=place, is_active=False).count()
+    locations_active_count = Location.objects.filter(place=place, is_active=True).exclude(name="Unassigned Devices").count()
+    locations_inactive_count = Location.objects.filter(place=place, is_active=False).exclude(name="Unassigned Devices").count()
     
-    # This query ensures we count all devices linked to the place, either directly
-    # or through their location, avoiding double counts.
-    devices_active_count = Device.objects.filter(location__place=place, is_active=True).count()
-    devices_inactive_count = Device.objects.filter(location__place=place, is_active=False).count()
+    # Correctly count active devices by checking the entire hierarchy.
+    # An active device requires its location and place to also be active.
+    devices_active_count = Device.objects.filter(
+        location__place=place, 
+        is_active=True, 
+        location__is_active=True,
+        location__place__is_active=True
+    ).count()
+
+    # Inactive devices are any devices that do not meet the "active" criteria.
+    total_devices = Device.objects.filter(location__place=place).count()
+    devices_inactive_count = total_devices - devices_active_count
     
-    # Sensor counts should also be robust
-    sensors_active_count = Sensor.objects.filter(device__location__place=place, is_active=True).count()
-    sensors_inactive_count = Sensor.objects.filter(device__location__place=place, is_active=False).count()
+    # Correctly count active sensors, also checking the full hierarchy.
+    sensors_active_count = Sensor.objects.filter(
+        device__location__place=place, 
+        is_active=True,
+        device__is_active=True,
+        device__location__is_active=True,
+        device__location__place__is_active=True
+    ).count()
+
+    # Inactive sensors are any sensors that do not meet the "active" criteria.
+    total_sensors = Sensor.objects.filter(device__location__place=place).count()
+    sensors_inactive_count = total_sensors - sensors_active_count
     
     return locations_active_count, locations_inactive_count, devices_active_count, devices_inactive_count, sensors_active_count, sensors_inactive_count
 
@@ -79,10 +96,23 @@ def get_place_data(place, request=None, include_json=True):
     import json
     
     # Get annotated locations
-    locations = get_annotated_locations(place).order_by('-is_active', Lower('name'))
-    
-    # Build result dictionary with proper type annotations
     result = {}
+
+    # Prefetch devices and their sensors to avoid N+1 queries in the template.
+    # This is the key to making the device list card work correctly.
+    devices_prefetch = Prefetch(
+        'devices',
+        queryset=Device.objects.select_related('device_type').annotate(
+            sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True), distinct=True),
+            sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False), distinct=True)
+        ).prefetch_related(
+            Prefetch('sensors', queryset=Sensor.objects.order_by('-is_active', Lower('name')), to_attr='sensors_sorted')
+        ).order_by('-is_active', Lower('name')),
+        to_attr='devices_sorted'
+    )
+    
+    locations = get_annotated_locations(place).prefetch_related(devices_prefetch).order_by('-is_active', Lower('name'))
+
     result['locations'] = locations
     
     # Add hide_inactive state from request if available

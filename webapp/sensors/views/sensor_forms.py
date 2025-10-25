@@ -4,9 +4,40 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, HTML, Div, Submit, Field
 from crispy_forms.bootstrap import FormActions
 
-from ..models import Sensor
+from ..models import Sensor, SensorType
 
 from icecream import ic
+
+
+class SensorTypeSelect(forms.Select):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Defer the queryset until the form is rendering
+        self.sensor_types_cache = None
+
+    def _load_cache(self):
+        if self.sensor_types_cache is None:
+            try:
+                self.sensor_types_cache = {
+                    st.pk: st for st in SensorType.objects.select_related('default_unit').all()
+                }
+            except Exception:
+                # If the database isn't ready (e.g., during migrations), fail gracefully
+                self.sensor_types_cache = {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        # Load cache just in time
+        if self.sensor_types_cache is None:
+            self._load_cache()
+            
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if value and self.sensor_types_cache and value in self.sensor_types_cache:
+            sensor_type = self.sensor_types_cache[value]
+            option['attrs']['data-default-unit-id'] = sensor_type.default_unit.id if sensor_type.default_unit else ''
+            option['attrs']['data-default-data-type'] = sensor_type.default_data_type or ''
+            option['attrs']['data-min-value'] = str(sensor_type.min_value) if sensor_type.min_value is not None else ''
+            option['attrs']['data-max-value'] = str(sensor_type.max_value) if sensor_type.max_value is not None else ''
+        return option
 
 
 class SensorForm(forms.ModelForm):
@@ -34,7 +65,7 @@ class SensorForm(forms.ModelForm):
                     'style': 'margin-top: 0.1rem;'
                 }
             ),
-            'sensor_type': forms.Select(attrs={'class': 'form-select'}),
+            'sensor_type': SensorTypeSelect(attrs={'class': 'form-select'}),
             'unit': forms.Select(attrs={'class': 'form-select'}),
             'unit_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'graph_type': forms.Select(attrs={'class': 'form-select'}),
@@ -143,12 +174,9 @@ class SensorForm(forms.ModelForm):
             self.fields['data_type'].disabled = True
             self.fields['data_type_override'].disabled = True
         else:
-            # If override is allowed, disable the selects until the toggle is checked
-            # This will be handled by JavaScript
-            if not self.initial.get('unit_override', False):
-                 self.fields['unit'].disabled = True
-            if not self.initial.get('data_type_override', False):
-                 self.fields['data_type'].disabled = True
+            # If override is allowed, JavaScript will handle disabling the fields
+            # until the toggle is checked. We don't need to do it here.
+            pass
         # --- End of new logic ---
 
         # If we have data_type, update fields based on it
@@ -233,14 +261,21 @@ class SensorForm(forms.ModelForm):
                 id='influx-fields'
             ),
             HTML('<hr class="my-3">'),
-            FormActions(
-                Submit('submit', 'Save' if self.instance.pk else 'Create', css_class='btn-primary'),
-                HTML(f'<a href="{self.cancel_url}" class="btn btn-secondary">Cancel</a>'),
+            Div(
+                FormActions(
+                    HTML(f'<a role="button" href="{self.cancel_url}" class="btn btn-secondary me-2"><i class="bi bi-x-circle"></i> Cancel</a>'),
+                    HTML(f'<button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> {"Save" if self.instance.pk else "Create"}</button>')
+                ),
+                css_class='d-flex justify-content-end'
             )
         )
 
         if not self.instance.pk:
-            self.helper.layout[-1][0].field_classes += ' bi bi-thermometer-plus'
+            # Note: This might need adjustment if the layout changes significantly
+            try:
+                self.helper.layout.fields[-1].fields[1].html = f'<button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Create</button>'
+            except (AttributeError, IndexError):
+                pass # Fail silently if layout is not as expected
 
     def clean(self):
         cleaned_data = super().clean()
@@ -250,20 +285,31 @@ class SensorForm(forms.ModelForm):
         influx_measurement = cleaned_data.get('influx_measurement')
         unit_override = cleaned_data.get('unit_override')
         data_type_override = cleaned_data.get('data_type_override')
+        min_value_override = cleaned_data.get('min_value_override')
+        max_value_override = cleaned_data.get('max_value_override')
 
         # If a sensor type is selected, enforce override logic
-        if self.instance and self.instance.sensor_type:
-            sensor_type = self.instance.sensor_type
+        sensor_type = cleaned_data.get('sensor_type')
+        if sensor_type:
             # If unit override is selected but matches the default, clear it
             if unit_override and cleaned_data.get('unit') == sensor_type.default_unit:
                 cleaned_data['unit'] = None
                 cleaned_data['unit_override'] = False
-                # Re-run validation on the field if needed, or just accept
             
             # If data type override is selected but matches the default, clear it
             if data_type_override and cleaned_data.get('data_type') == sensor_type.default_data_type:
                 cleaned_data['data_type'] = None
                 cleaned_data['data_type_override'] = False
+            
+            # If min value override is selected but matches the default, clear it
+            if min_value_override and cleaned_data.get('min_value') == sensor_type.min_value:
+                cleaned_data['min_value'] = None
+                cleaned_data['min_value_override'] = False
+
+            # If max value override is selected but matches the default, clear it
+            if max_value_override and cleaned_data.get('max_value') == sensor_type.max_value:
+                cleaned_data['max_value'] = None
+                cleaned_data['max_value_override'] = False
 
         # --- New override logic ---
         if unit_override and not cleaned_data.get('unit'):
@@ -278,6 +324,10 @@ class SensorForm(forms.ModelForm):
             
         if not data_type_override:
             cleaned_data['data_type'] = None
+        if not min_value_override:
+            cleaned_data['min_value'] = None
+        if not max_value_override:
+            cleaned_data['max_value'] = None
         # --- End of new logic ---
 
         # Ensure device is set
