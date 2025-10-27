@@ -14,7 +14,7 @@ This template expects:
         <div class="col-6 text-truncate">
             <div class="d-flex align-items-center">
                 <i class="bi bi-circle-fill me-2 small {{ location.is_active|yesno:'text-success,text-secondary' }}"></i>
-            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="fw-bold text-decoration-none text-dark">{{ location.name }}</a>
+            <a href="{% if location.slug == 'unassigned-devices' %}{% url 'sensors:unassigned_device_list' place_slug=place.slug %}{% else %}{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}{% endif %}" class="fw-bold text-decoration-none text-dark">{{ location.name }}</a>
             </div>
         </div>
 

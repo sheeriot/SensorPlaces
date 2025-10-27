@@ -574,4 +574,16 @@
     transition: background-color 0.5s ease;
 }
 
+/* Override Bootstrap's muted and opacity styles specifically for the unassigned devices card */
+.unassigned-devices .opacity-50 {
+    opacity: 1 !important;
+}
 
+.unassigned-devices .text-muted {
+    --bs-text-opacity: 1 !important;
+    color: var(--bs-body-color) !important;
+}
+
+.unassigned-devices .list-group-item-light {
+    background-color: transparent !important;
+}

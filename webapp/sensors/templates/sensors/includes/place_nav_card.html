@@ -16,8 +16,8 @@
             <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2
                       {% if location.slug == active_location_slug %}current-location{% endif %}
                       {% if not location.is_active %}opacity-50 text-muted{% endif %}"
-               data-location-active="{{ location.is_active|lower }}"
-               data-location-id="{{ location.pk }}">
+               data-location-id="{{ location.pk }}"
+               data-location-active="{{ location.is_active|lower }}">
                 <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-dark text-decoration-none d-flex align-items-center">
                     <strong class="fw-bold">{{ location.name }}</strong>
                     {% if not location.is_active %}

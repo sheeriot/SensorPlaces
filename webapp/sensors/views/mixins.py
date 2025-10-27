@@ -8,6 +8,7 @@ from django.http import HttpRequest
 from decimal import Decimal
 
 from django.urls import reverse
+from django.views.generic.edit import CreateView
 from .views_fun import get_annotated_locations, get_place_data
 
 from ..models import Place, Location
@@ -54,30 +55,40 @@ class ReferrerMixin:
 
     def get_cancel_url(self) -> str:
         """
-        Placeholder for the cancel URL. This can be overridden by any
-        view that inherits from this mixin to provide a logical fallback.
+        Provide a cancel URL. For create views, it's the list view.
+        For update views, it's the object's detail view.
         """
-        ic("ReferrerMixin.get_cancel_url called")
+        # ic("ReferrerMixin.get_cancel_url called")
+
+        # For create views, return the list view
+        if isinstance(self, CreateView):
+            # Assumes the list view is named '<model_name>-list'
+            # E.g., for a 'Place' model, it would be 'place-list'
+            # But we can do better by looking at the model
+            if hasattr(self, 'model') and self.model:
+                app_label = self.model._meta.app_label
+                model_name = self.model._meta.model_name
+                return reverse(f'{app_label}:{model_name}_list')
+            ic("CreateView without a model, falling back.")
+
         # For update views, try to get the object and return its detail page URL.
         ic(f"hasattr(self, 'get_object'): {hasattr(self, 'get_object')}")
         if hasattr(self, 'get_object'):
             try:
-                ic("Attempting to call self.get_object()")
+                # ic("Attempting to call self.get_object()")
                 obj = self.get_object()
-                ic(f"self.get_object() returned: {obj}")
+                # ic(f"self.get_object() returned: {obj}")
                 if obj and hasattr(obj, 'get_absolute_url'):
                     ic("Object has get_absolute_url, returning it.")
                     return obj.get_absolute_url()
-                ic("Object is None or does not have get_absolute_url")
+                # ic("Object is None or does not have get_absolute_url")
             except Exception as e:
                 # This will fail on a CreateView, which is expected.
-                ic(f"Exception in get_cancel_url's try block: {e}")
+                # ic(f"Exception in get_cancel_url's try block: {e}")
                 pass
         
-        ic("Raising NotImplementedError because conditions not met.")
-        raise NotImplementedError(
-            "ReferrerMixin requires a 'get_cancel_url' method to be defined on the view for create forms."
-        )
+        # ic("No cancel URL found, returning to root.")
+        return reverse('sensors:place_list')
 
 
 class PlaceAnnotationMixin:

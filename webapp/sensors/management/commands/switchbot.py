@@ -192,12 +192,11 @@ class Command(BaseCommand):
         existing_devices = Device.objects.filter(is_switchbot=True).select_related('location__place')
         existing_device_ids = {d.device_id: d for d in existing_devices if d.device_id}
 
-        self.stdout.write("\n--- SwitchBot Cloud Device Summary ---")
-        header = f"{'Device Name':<25} {'Type':<15} {'Device ID':<20} {'Status':<30}"
-        self.stdout.write(self.style.SUCCESS(header))
-        self.stdout.write("-" * len(header))
-
+        all_devices_with_status = []
         new_devices_to_import = []
+        importable_idx = 1
+
+        # Process all devices from the API
         for device in all_api_devices:
             device_id = device['deviceId']
             device_name = device['deviceName']
@@ -205,21 +204,51 @@ class Command(BaseCommand):
 
             if device_id in existing_device_ids:
                 existing_device = existing_device_ids[device_id]
-                status = f"Synced to '{existing_device.location.place.name}'"
-                self.stdout.write(f"{device_name:<25} {device_type:<15} {device_id:<20} {status:<30}")
+                status = f"Existing in '{existing_device.location.place.name}'"
+                all_devices_with_status.append({
+                    'name': device_name,
+                    'type': device_type,
+                    'id': device_id,
+                    'status': status,
+                    'is_new': False,
+                    'import_idx': ''
+                })
             else:
                 new_devices_to_import.append(device)
                 status = "New"
-                self.stdout.write(f"{device_name:<25} {device_type:<15} {device_id:<20} {self.style.WARNING(status):<30}")
+                all_devices_with_status.append({
+                    'name': device_name,
+                    'type': device_type,
+                    'id': device_id,
+                    'status': status,
+                    'is_new': True,
+                    'import_idx': f"[{importable_idx}]"
+                })
+                importable_idx += 1
+
+        # Sort devices to show existing ones first
+        all_devices_with_status.sort(key=lambda x: x['is_new'])
+
+        self.stdout.write("\n--- SwitchBot Cloud Device Summary ---")
+        header = f"{'[#]':<4} {'Device Name':<25} {'Type':<20} {'Device ID':<20} {'Status'}"
+        self.stdout.write(self.style.SUCCESS(header))
+        self.stdout.write("-" * (len(header) + 5)) # A bit of padding
+
+        for dev_info in all_devices_with_status:
+            idx_str = dev_info['import_idx']
+            status_str = dev_info['status']
+            
+            if dev_info['is_new']:
+                status_str = self.style.WARNING(status_str)
+
+            self.stdout.write(
+                f"{idx_str:<4} {dev_info['name']:<25} {dev_info['type']:<20} {dev_info['id']:<20} {status_str}"
+            )
 
         if not new_devices_to_import:
             self.stdout.write(self.style.SUCCESS("\nAll devices are in sync. Nothing to import."))
             return
-
-        self.stdout.write("\nThe following new devices are available to import:")
-        for i, device in enumerate(new_devices_to_import):
-            self.stdout.write(f"  [{i+1}] {device['deviceName']} ({device.get('deviceType', 'Infrared Remote')})")
-
+        
         self.stdout.write("\n  [0] Quit")
         choice_str = input(f"Enter number(s) to import into '{place.name}' (e.g. '1 3' or 'all'), or 0 to quit: ").lower().strip()
 

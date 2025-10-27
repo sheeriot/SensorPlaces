@@ -82,7 +82,6 @@ class DeviceForm(forms.ModelForm):
                 
                 # If location is inactive, device must be inactive
                 if not self.instance.location.is_active:
-                    self.fields['is_active'].initial = False
                     self.fields['is_active'].widget.attrs['disabled'] = True
                     self.fields['is_active'].label = 'inactive'
 
@@ -97,7 +96,6 @@ class DeviceForm(forms.ModelForm):
             # Handle location-based activation constraints
             if not location_initial.is_active:
                 ic(f"Initial location '{location_initial.name}' is inactive, disabling 'is_active' field.")
-                self.fields['is_active'].initial = False
                 self.fields['is_active'].widget.attrs['disabled'] = True
                 self.fields['is_active'].label = 'inactive'
                     

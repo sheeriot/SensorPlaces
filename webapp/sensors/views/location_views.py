@@ -185,6 +185,12 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         context['model_name'] = 'location'
         return context
 
+    def get_cancel_url(self):
+        """
+        Return the cancel URL. For create view, it's the location list view for the current place.
+        """
+        return reverse('sensors:location_list', kwargs={'place_slug': self.kwargs['place_slug']})
+
     def form_valid(self, form):
         # Explicitly set the place on the form instance
         form.instance.place = self._place

@@ -1,14 +1,26 @@
-<tr class="table-primary location-row {% if not location.is_active %}text-muted opacity-50{% endif %} {% if not location.is_active and hide_inactive %}d-none{% endif %}" data-location-id="{{ location.pk }}" data-location-active="{{ location.is_active|lower }}">
-    <td colspan="2">
-        <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-decoration-none text-dark d-flex align-items-center">
-            <i class="bi bi-geo-alt me-2"></i>
-            <strong class="text-break">{{ location.name }}</strong>
-        </a>
-    </td>
-    <td colspan="2" class="text-end">
-        <small class="text-nowrap">
-            <i class="bi bi-hdd-rack me-1"></i> {{ location.devices_active_count }} ({{ location.devices_inactive_count }})
-            <i class="bi bi-thermometer me-1 ms-2"></i> {{ location.sensors_active_count }} ({{ location.sensors_inactive_count }})
-        </small>
-    </td>
-</tr> 
+<!-- Location Header Row -->
+<div class="list-group-item list-group-item-primary location-row {% if not location.is_active %}text-muted opacity-50{% endif %} {% if not location.is_active and hide_inactive %}d-none{% endif %}"
+     data-location-id="{{ location.pk }}"
+     data-location-active="{{ location.is_active|lower }}">
+    <div class="d-flex w-100 align-items-center">
+        <div class="flex-grow-1 ps-3" style="min-width: 0;">
+            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="text-decoration-none text-dark d-flex align-items-center">
+                <i class="bi bi-geo-alt me-2"></i>
+                <strong class="text-break">{{ location.name }}</strong>
+            </a>
+        </div>
+        <div style="width: 100px;" class="text-end">
+            <small class="text-nowrap" title="Active (inactive) devices">
+                <i class="bi bi-hdd-rack me-1"></i> {{ location.devices_active_count }} ({{ location.devices_inactive_count }})
+            </small>
+        </div>
+        <div style="width: 90px;" class="text-end">
+            <small class="text-nowrap" title="Active (inactive) sensors">
+                <i class="bi bi-thermometer me-1"></i> {{ location.sensors_active_count }} ({{ location.sensors_inactive_count }})
+            </small>
+        </div>
+        <div style="width: 120px;" class="text-end">
+            <!-- Placeholder for actions if needed in the future -->
+        </div>
+    </div>
+</div> 

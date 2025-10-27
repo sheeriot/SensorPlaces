@@ -38,6 +38,10 @@ class Place(models.Model):
         """Return the name of the place."""
         return self.name
 
+    def get_absolute_url(self):
+        """Returns the URL to the place's detail page."""
+        return reverse('sensors:place_detail', kwargs={'place_slug': self.slug})
+
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
             self.slug = slugify(self.name)

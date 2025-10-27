@@ -16,6 +16,14 @@ const liveCountsUpdater = {
     },
 
     init(placeSlug) {
+        // Only initialize if the live counts card is present
+        if (!document.getElementById('live-counts-card')) {
+            if (this.config.debug) {
+                console.log('LiveCountsUpdater: Live counts card not found. Aborting initialization.');
+            }
+            return;
+        }
+
         if (!placeSlug) {
             if (this.config.debug) {
                 console.error('LiveCountsUpdater: placeSlug is not defined.');

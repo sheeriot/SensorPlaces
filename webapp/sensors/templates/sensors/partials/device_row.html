@@ -1,4 +1,5 @@
 <div class="list-group-item device-row py-2 {% if not device.is_active and hide_inactive %}d-none{% elif not device.is_active %}list-group-item-light text-muted opacity-50{% endif %}"
+    draggable="{% if device.location.slug == 'unassigned-devices' %}true{% else %}false{% endif %}"
     data-device-active="{{ device.is_active|lower }}"
     data-device-id="{{ device.pk }}"
     data-location-active="{% if device.location %}{{ device.location.is_active|lower }}{% else %}true{% endif %}"

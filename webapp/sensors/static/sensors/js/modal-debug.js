@@ -1,6 +1,6 @@
 // To enable debugging, define `modalConfig = { debug: true }` before this script.
 var modalConfig = {};
-modalConfig.debug = true;
+modalConfig.debug = false;
 
 
 if (modalConfig.debug) {

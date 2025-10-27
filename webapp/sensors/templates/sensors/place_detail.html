@@ -19,7 +19,7 @@
         {% include 'sensors/includes/place_nav_card.html' %}
 
         {% if place.is_active %}
-            {% include 'sensors/includes/place_nav_card.html' %}
+            {% include 'sensors/includes/live_counts_card.html' %}
         {% endif %}
 
     </div>
@@ -27,7 +27,7 @@
     <!-- Right Column: Locations and Site Plan/Map -->
     <div class="col-md-8 {% if not place.is_active %}opacity-50{% endif %}">
         <!-- Device List Card -->
-        {% include "sensors/includes/device_list_card.html" with object_list=locations %}
+        {% include "sensors/includes/location_list_card.html" with object_list=locations %}
 
         <!-- Site Plan Card -->
         {% if place.siteplan_image %}
@@ -43,6 +43,9 @@
                 </div>
             </div>
         {% endif %}
+
+        <!-- Device List Card -->
+        {% include "sensors/includes/device_list_card.html" with object_list=locations %}
     
         <!-- InfluxDB Sources Card -->
         {% include "sensors/influxsource_list.html" %}

@@ -6,57 +6,39 @@
             <i class="bi bi-thermometer me-2"></i>
             Sensors
         </h5>
-        {% if device and device.is_active %}
-            {% include 'sensors/partials/sensor_add_button.html' %}
-        {% endif %}
+        <div class="d-flex align-items-center">
+            {% include "sensors/partials/hide_inactive_switch.html" with model="sensor" hide_inactive=hide_inactive %}
+            {% if device and device.is_active %}
+                {% include 'sensors/partials/sensor_add_button.html' %}
+            {% endif %}
+        </div>
     </div>
     <div class="card-body p-0">
         <!-- Custom List Header -->
         <div class="d-flex align-items-center text-muted fw-bold px-3 py-2 border-bottom bg-light">
             <div class="flex-grow-1 ps-3" style="min-width: 0;">Name</div>
             {% if not narrow_view %}
-            <div style="width: 100px;" class="text-start">Current</div>
-            <div style="width: 90px;" class="text-start">Active</div>
+            <div style="width: 100px;" class="text-end">Current</div>
+            <div style="width: 90px;" class="text-end">Active</div>
             <div style="width: 120px;" class="text-end">Actions</div>
             {% endif %}
         </div>
         
         <div id="sensor-list-{{ device.pk }}" class="list-group list-group-flush">
-            {# Renders sensors for a single device #}
-            {% if device %}
-                {% for sensor in sensors %}
-                    {% include 'sensors/partials/sensor_row.html' with sensor=sensor device=device hide_inactive=hide_inactive %}
-                {% empty %}
-                    <div id="no-sensors-message-{{ device.pk }}" class="text-center text-muted p-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        This device has no sensors.
-                        {% if not readonly %}
-                            {% include 'sensors/partials/sensor_add_button.html' %}
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            {# Renders a list of devices and their sensors for a single location #}
-            {% elif location %}
+            
+            {% for location in locations %}
+                {% include 'sensors/includes/sensor_list_location_row.html' with location=location hide_inactive=hide_inactive %}
+
                 {% for device in location.devices_sorted %}
-                    {% include 'sensors/includes/sensor_list_device_row.html' with device=device %}
-                {% empty %}
-                    <div class="text-center text-muted p-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        This location has no devices.
-                        <a href="{% url 'sensors:device_create_in_location' place_slug=place.slug location_slug=location.slug %}" class="btn btn-sm btn-outline-primary ms-2">
-                            <i class="bi bi-plus-lg me-1"></i>Add Device
-                        </a>
-                    </div>
+                    {% include 'sensors/includes/sensor_list_device_row.html' with device=device parent_is_active=location.is_active hide_inactive=hide_inactive %}
                 {% endfor %}
-            {# Renders a list of locations with their devices and sensors #}
-            {% elif locations %}
-                {% for location in locations %}
-                    {% include 'sensors/includes/sensor_list_location_row.html' with location=location hide_inactive=hide_inactive %}
-                    {% for device in location.devices_sorted %}
-                        {% include 'sensors/includes/sensor_list_device_row.html' with device=device parent_is_active=location.is_active hide_inactive=hide_inactive %}
-                    {% endfor %}
-                {% endfor %}
-            {% endif %}
+            {% empty %}
+                <div class.list-group-item text-center text-muted p-5">
+                    <i class="bi bi-inbox fs-4"></i>
+                    <p class="mb-0 mt-2">No sensors found for this place.</p>
+                </div>
+            {% endfor %}
+
         </div>
     </div>
 </div>

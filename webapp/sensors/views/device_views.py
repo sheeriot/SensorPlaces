@@ -1,4 +1,4 @@
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
@@ -183,6 +183,7 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         )
 
         qs = get_annotated_locations(self._place).prefetch_related(devices_prefetch)
+        qs = qs.exclude(slug='unassigned-devices')
         return qs
 
     def get_context_data(self, **kwargs):
@@ -210,7 +211,35 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         location_pk = self.request.GET.get('location', None)
         if location_pk:
             context['location'] = get_object_or_404(Location, pk=location_pk, place=place)
+
+        # If this is the unassigned-devices location view, force hide_inactive to be off.
+        context['lock_hide_inactive'] = False
+        if context.get('location') and context['location'].slug == 'unassigned-devices':
+            context['hide_inactive'] = False
+            context['lock_hide_inactive'] = True
             
+        return context
+
+class UnassignedDeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
+    model = Device
+    context_object_name = 'unassigned_devices'
+    template_name = 'sensors/unassigned_devices_list.html'
+
+    def get_queryset(self):
+        place = self.get_place()
+        return Device.objects.filter(location__place=place, location__slug='unassigned-devices').order_by('-is_active', 'name')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        place = self.get_place()
+        context['place'] = place
+        context['model_name'] = 'device'
+        context.update(get_live_counts_context(place))
+        
+        # Lock the hide_inactive switch to off for this view
+        context['hide_inactive'] = False
+        context['lock_hide_inactive'] = True
+        
         return context
 
 @method_decorator(log_execution_time, name='dispatch')
@@ -595,6 +624,71 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             'type': 'success'
         }
 
+class DeviceMoveLocationView(LoginRequiredMixin, View):
+    """
+    API View to move a device to a new location.
+    """
+    def post(self, request, place_slug, pk):
+        ic("DeviceMoveLocationView: POST request received.")
+        try:
+            ic(f"Moving device_id {pk} in place {place_slug}")
+            device = get_object_or_404(Device, pk=pk, location__place__slug=place_slug)
+            ic(device)
+            
+            # HTMX with hx-vals sends data as form-encoded, in request.POST
+            ic("Request POST data:", request.POST)
+            new_location_id = request.POST.get('location_id')
+            make_active = request.POST.get('make_active')
+            
+            ic(f"New Location ID from POST: {new_location_id}")
+            ic(f"Make active flag: {make_active}")
+
+            if not new_location_id:
+                ic("Error: Location ID not found in POST data.")
+                return JsonResponse({'error': 'Location ID is required.'}, status=400)
+
+            new_location = get_object_or_404(Location, pk=new_location_id, place__slug=place_slug)
+            ic(new_location)
+            
+            old_location = device.location
+            ic(old_location)
+            
+            device.location = new_location
+            device.save(update_fields=['location']) # Save location change first
+            ic("Device location updated.")
+
+            # If the 'make_active' checkbox was checked, update the active status
+            if make_active:
+                device.is_active = True
+                device.save(update_fields=['is_active'])
+                ic(f"Set device '{device.name}' to active.")
+
+            place = get_object_or_404(Place, slug=place_slug)
+            place_counts = get_place_counts(place)
+            ic(place_counts)
+
+            # Recalculate counts AFTER all changes are saved
+            old_location_active_count = old_location.devices.filter(is_active=True).count()
+            new_location_active_count = new_location.devices.filter(is_active=True).count()
+            ic(f"Old location active count: {old_location_active_count}")
+            ic(f"New location active count: {new_location_active_count}")
+
+            response_data = {
+                'success': True,
+                'message': f"Moved '{device.name}' to '{new_location.name}'.",
+                'old_location_id': old_location.id,
+                'new_location_id': new_location.id,
+                'old_location_active_count': old_location_active_count,
+                'new_location_active_count': new_location_active_count,
+                'place_counts': place_counts
+            }
+            ic(response_data)
+            
+            return JsonResponse(response_data)
+        except Exception as e:
+            ic(f"Error in DeviceMoveLocationView: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+
 class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     model = Device
     template_name = 'sensors/device_confirm_delete.html'
@@ -756,60 +850,3 @@ def fetch_switchbot_reading(request, place_slug, pk):
         messages.error(request, f"Failed to fetch readings for {device.name}: {e}")
 
     return redirect(device.get_absolute_url())
-
-# class DeviceMoveLocationView(LoginRequiredMixin, View):
-
-#     def post(self, request, pk):
-#         # Get the device and validate it exists
-#         # device = get_object_or_404(Device, pk=pk)
-        
-#         try:
-#             data = json.loads(request.body)
-#             new_location_id = data.get('new_location_id')
-#             # 'new_location_id', new_location_id)
-#             if not new_location_id:
-#                 return JsonResponse({'error': 'new_location_id is required'}, status=400)
-            
-#             # Get the new location and validate it exists
-#             new_location = get_object_or_404(Location, pk=new_location_id)
-#             # 'new_location', new_location)
-#             # Store old location for counter updates
-#             old_location = device.location
-            
-#             # Validate that the new location is active
-#             if not new_location.is_active:
-#                 return JsonResponse(
-#                     {'error': 'Cannot move device to inactive location'}, 
-#                     status=400
-#                 )
-            
-#             # Validate that the new location belongs to the same place
-#             if new_location.place != device.location.place:
-#                 return JsonResponse(
-#                     {'error': 'Cannot move device to a different place'}, 
-#                     status=400
-#                 )
-            
-#             # Update the device's location
-#             device.location = new_location
-#             device.save()
-#             # 'saved device.location', device.location)
-#             # Get updated counts
-#             old_location_count = old_location.devices.filter(is_active=True).count()
-#             new_location_count = new_location.devices.filter(is_active=True).count()
-#             results = JsonResponse({
-#                 'success': True,
-#                 'new_location_name': new_location.name,
-#                 'old_location_count': old_location_count,
-#                 'new_location_count': new_location_count,
-#                 'devices_active_count': Device.objects.filter(
-#                     location__place=device.location.place,
-#                     is_active=True
-#                 ).count()
-#             })
-#             return results
-            
-#         except json.JSONDecodeError:
-#             return JsonResponse({'error': 'Invalid JSON'}, status=400)
-#         except Exception as e:
-#             return JsonResponse({'error': str(e)}, status=500)

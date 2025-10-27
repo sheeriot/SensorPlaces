@@ -4,7 +4,7 @@
 */ 
 // System Configuration
 var commonConfig = {};
-commonConfig.debug = true;
+commonConfig.debug = false;
 
 // Global state - expanded with body data attributes
 window.sensorPlaces = {
@@ -93,6 +93,23 @@ document.addEventListener('DOMContentLoaded', () => {
     var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
     var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
         return new bootstrap.Popover(popoverTriggerEl);
+    });
+
+    // Initialize all tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Handle accessibility for modals: blur focus before hiding
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.addEventListener('hide.bs.modal', function () {
+            const focusedElement = document.activeElement;
+            if (modal.contains(focusedElement)) {
+                focusedElement.blur();
+            }
+        });
     });
 });
 
