@@ -18,6 +18,8 @@ from .views.sensor_views import (
     SensorDetailView,
     SensorUpdateView,
     SensorDeleteView,
+    SensorGraphCardView,
+    SensorLiveValueView,
 )
 
 app_name = 'sensors'
@@ -51,10 +53,12 @@ urlpatterns = [
     path('api/<slug:place_slug>/stats/', place_views.place_stats, name='place_stats_api'),
     path('api/<slug:place_slug>/toggle-active/', toggle_active.ToggleActiveView.as_view(), name='toggle_active'),
     path('api/<slug:place_slug>/toasts/', toast_views.ToastAPIView.as_view(), name='toast_api'),
+    path('api/<slug:place_slug>/sensors/live-values/', sensor_views.sensor_live_values_api, name='sensor_live_values_api'),
     
     # Location URLs
     path('<slug:place_slug>/location/', location_views.LocationListView.as_view(), name='location_list'),
     path('<slug:place_slug>/location/new/', location_views.LocationCreateView.as_view(), name='location_create'),
+    path('<slug:place_slug>/location/create-modal/', location_views.LocationCreateModalView.as_view(), name='location_create_modal'),
     path('<slug:place_slug>/location/<slug:slug>/', location_views.LocationDetailView.as_view(), name='location_detail'),
     path('<slug:place_slug>/location/<slug:slug>/update/', location_views.LocationUpdateView.as_view(), name='location_update'),
     path('<slug:place_slug>/location/<slug:slug>/delete/', location_views.LocationDeleteView.as_view(), name='location_delete'),
@@ -86,6 +90,8 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:pk>/', SensorDetailView.as_view(), name='sensor_detail'),
     path('<slug:place_slug>/sensor/<int:pk>/delta/<str:delta>/', SensorDetailView.as_view(), name='sensor_detail_delta'),
     path('<slug:place_slug>/sensor/<int:pk>/<str:start_date>/<str:end_date>/', SensorDetailView.as_view(), name='sensor_detail_daterange'),
+    path('<slug:place_slug>/sensor/<int:pk>/graph-card/', SensorGraphCardView.as_view(), name='sensor_graph_card'),
+    path('<slug:place_slug>/sensor/<int:pk>/live-value/', SensorLiveValueView.as_view(), name='sensor_live_value'),
     path('<slug:place_slug>/sensor/<int:pk>/update/', SensorUpdateView.as_view(), name='sensor_update'),
     path('<slug:place_slug>/sensor/<int:pk>/delete/', SensorDeleteView.as_view(), name='sensor_delete'),
     path('<slug:place_slug>/sensor/<int:sensor_pk>/readings/', sensor_views.SensorReadingListView.as_view(), name='sensor_reading_list'),

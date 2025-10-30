@@ -32,7 +32,27 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
-    <!-- device_form.html -->
-    <script src="{% static 'sensors/js/device-form.js' %}"></script>
+{% block page_js %}
+<script>
+    console.log('Attaching locationCreated event listener.');
+    document.addEventListener('locationCreated', function(event) {
+        console.log('Received locationCreated event:', event.detail);
+        const newLocation = event.detail;
+        const locationSelect = document.querySelector('#id_location');
+
+        if (locationSelect) {
+            console.log('Found location select. Updating options.');
+            // Create a new option and select it
+            const option = new Option(`${newLocation.name} (new)`, newLocation.id, true, true);
+            locationSelect.add(option);
+
+            // Show a toast message to confirm
+            if (window.showToast) {
+                window.showToast(`New location "${newLocation.name}" has been created and selected.`, 'success');
+            }
+        } else {
+            console.warn('Could not find #id_location select element.');
+        }
+    });
+</script>
 {% endblock %}

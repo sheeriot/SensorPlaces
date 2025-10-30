@@ -15,14 +15,13 @@ window.utils = {
     },
 
     fetchWithCSRF: async function(url, options = {}) {
-        const csrfToken = this.getCookie('csrftoken') || document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const csrfToken = this.getCookie('csrftoken');
         
         const defaultHeaders = {
             'X-CSRFToken': csrfToken,
             'X-Requested-With': 'XMLHttpRequest'
         };
 
-        // Only set Content-Type for non-FormData requests, as the browser handles it for FormData
         if (!(options.body instanceof FormData)) {
             defaultHeaders['Content-Type'] = 'application/json';
         }
@@ -30,12 +29,10 @@ window.utils = {
         options.headers = { ...defaultHeaders, ...options.headers };
 
         try {
-            // Return the raw response object for the caller to handle
             const response = await fetch(url, options);
             return response;
         } catch (error) {
             console.error('Fetch error:', error);
-            // Re-throw the error so the calling function can handle it
             throw error;
         }
     },
@@ -68,5 +65,31 @@ window.utils = {
         const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
         
         return `${dateStr} ${timeStr} ${offsetString} (${shortTZ})`;
+    },
+
+    getNaturalTime: function(date) {
+        if (!date) return '';
+
+        const now = new Date();
+        const seconds = Math.round((now - date) / 1000);
+
+        if (seconds < 5) {
+            return "just now";
+        } else if (seconds < 60) {
+            return `${seconds} seconds ago`;
+        }
+
+        const minutes = Math.round(seconds / 60);
+        if (minutes < 60) {
+            return minutes === 1 ? "a minute ago" : `${minutes} minutes ago`;
+        }
+
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) {
+            return hours === 1 ? "an hour ago" : `${hours} hours ago`;
+        }
+
+        const days = Math.round(hours / 24);
+        return days === 1 ? "yesterday" : `${days} days ago`;
     }
 };

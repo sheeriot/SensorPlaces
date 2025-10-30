@@ -1,34 +1,56 @@
 <form id="deleteLocationForm" method="post" action="{% url 'sensors:location_delete' place_slug=place.slug slug=object.slug %}">
-    <div class="modal-header">
-        <h5 class="modal-title" id="deleteLocationModalLabel">Confirm Delete</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    {% csrf_token %}
+    <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteLocationModalLabel">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Deletion
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
     <div class="modal-body">
-        <p>Are you sure you want to delete the location <strong><i class="bi bi-geo-alt"></i> {{ object.name }}</strong>?</p>
-        {% if object.devices.exists %}
-        <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle me-2"></i>
-            Warning: This location has {{ object.devices.count }} device(s) associated with it.
-            <ul class="mb-0 mt-2">
-            {% for device in object.devices.all %}
-                <li><i class="bi bi-hdd-rack"></i> {{ device.name }}
-                    {% if device.sensors.exists %}
-                    ({{ device.sensors.count }} sensor{{ device.sensors.count|pluralize }})
-                    {% endif %}
-                </li>
-            {% endfor %}
-            </ul>
-        </div>
+        {% if device_count > 0 %}
+            <p>You are about to delete the location <strong>{{ object.name }}</strong>, which contains <strong>{{ device_count }}</strong> device(s).</p>
+            <div class="alert alert-warning">
+                <p class="fw-bold">This action will also permanently delete the following devices and all their sensors:</p>
+                <ul class="list-group">
+                    {% for device in devices %}
+                        <li class="list-group-item py-1">{{ device.name }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="mb-3">
+                <label for="delete-confirm-input" class="form-label">To proceed, please type the number of devices that will be deleted (<strong>{{ device_count }}</strong>) and click Delete.</label>
+                <input type="text" class="form-control" id="delete-confirm-input" autocomplete="off">
+            </div>
+        {% else %}
+            <p>Are you sure you want to permanently delete the location <strong><i class="bi bi-geo-alt"></i> {{ object.name }}</strong>?</p>
+            <p class="text-danger mb-0">This action cannot be undone.</p>
         {% endif %}
-        <p class="text-danger">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            This action cannot be undone. All devices and sensors at this location will also be deleted.
-        </p>
-        {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.META.HTTP_REFERER }}">
     </div>
     <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-danger">Delete</button>
+        <button type="submit" id="confirm-delete-button" class="btn btn-danger" {% if device_count > 0 %}disabled{% endif %}>
+            <i class="bi bi-trash"></i> Delete
+        </button>
     </div>
 </form>
+
+{% if device_count > 0 %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmInput = document.getElementById('delete-confirm-input');
+    const deleteButton = document.getElementById('confirm-delete-button');
+    const expectedCount = '{{ device_count }}';
+
+    if (confirmInput && deleteButton) {
+        confirmInput.addEventListener('input', function() {
+            if (confirmInput.value === expectedCount) {
+                deleteButton.disabled = false;
+            } else {
+                deleteButton.disabled = true;
+            }
+        });
+    }
+});
+</script>
+{% endif %}

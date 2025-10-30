@@ -1,12 +1,13 @@
 from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
 # from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet
+from django.shortcuts import render
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
 import json
@@ -34,6 +35,12 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         place = context['place']
+
+        # Loop through locations to attach the full device list for the 'unassigned' one
+        for loc in context['locations']:
+            if loc.slug == 'unassigned-devices':
+                loc.device_list = list(loc.devices.all().order_by('name'))
+                break  # Found it, no need to continue looping
 
         # Add hide_inactive state from GET param or cookie
         hide_inactive_param = self.request.GET.get('hide_inactive')
@@ -185,11 +192,13 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         context['model_name'] = 'location'
         return context
 
-    def get_cancel_url(self):
-        """
-        Return the cancel URL. For create view, it's the location list view for the current place.
-        """
-        return reverse('sensors:location_list', kwargs={'place_slug': self.kwargs['place_slug']})
+    def get(self, request, *args, **kwargs):
+        """Handle GET requests, checking for HTMX to render a modal."""
+        if request.htmx:
+            self.object = None
+            form = self.get_form()
+            return render(request, 'sensors/location_form_modal.html', {'form': form})
+        return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
         # Explicitly set the place on the form instance
@@ -197,6 +206,16 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         # Save the form to get the object
         self.object = form.save()
         
+        if self.request.htmx:
+            response = HttpResponse(status=204) # No Content is best for "do nothing"
+            response['HX-Trigger'] = json.dumps({
+                "locationCreated": {
+                    "id": self.object.id,
+                    "name": self.object.name,
+                }
+            })
+            return response
+
         message = (
             f"Created location <strong>{self.object.name}</strong> in "
             f"<i class='bi bi-house-gear'></i> {self._place.name}<br>"
@@ -479,7 +498,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         return HttpResponseRedirect(success_url)
 
 class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
-    
+    model = Location
     template_name = 'sensors/location_confirm_delete.html'
     slug_url_kwarg = 'slug'
 
@@ -500,6 +519,13 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
+        
+        # Get devices to show the user which devices will be deleted
+        location = self.get_object()
+        devices = location.devices.all().order_by(Lower('name'))
+        context['devices'] = devices
+        context['device_count'] = devices.count()
+        
         return context
 
     def get(self, request, *args, **kwargs):
@@ -560,3 +586,44 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Use stored place_slug for redirect
         return reverse('sensors:place_detail', 
                       kwargs={'place_slug': self.place_slug})
+
+
+class LocationCreateModalView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
+    """A view to handle creating a location from a modal form."""
+    model = Location
+    form_class = LocationForm
+    template_name = 'sensors/location_form_modal.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['place'] = self.get_place()
+        kwargs['cancel_url'] = '#' # Modal has its own close button
+        kwargs['form_action'] = reverse('sensors:location_create_modal', kwargs={'place_slug': self.kwargs['place_slug']})
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.place = self.get_place()
+        self.object = form.save()
+        
+        location_data = {
+            "id": self.object.id,
+            "name": self.object.name,
+        }
+        
+        script = f"""
+        <script>
+            htmx.trigger("body", "locationCreated", {json.dumps(location_data)});
+            htmx.trigger("body", "closeModal", {{ "value": "#modal-container" }});
+            
+            (function() {{
+                var self = document.currentScript;
+                self.parentElement.removeChild(self);
+            }})();
+        </script>
+        """
+        return HttpResponse(script)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['modal_title'] = "Create New Location"
+        return context

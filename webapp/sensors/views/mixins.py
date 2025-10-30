@@ -72,14 +72,14 @@ class ReferrerMixin:
             ic("CreateView without a model, falling back.")
 
         # For update views, try to get the object and return its detail page URL.
-        ic(f"hasattr(self, 'get_object'): {hasattr(self, 'get_object')}")
+        # ic(f"hasattr(self, 'get_object'): {hasattr(self, 'get_object')}")
         if hasattr(self, 'get_object'):
             try:
                 # ic("Attempting to call self.get_object()")
                 obj = self.get_object()
                 # ic(f"self.get_object() returned: {obj}")
                 if obj and hasattr(obj, 'get_absolute_url'):
-                    ic("Object has get_absolute_url, returning it.")
+                    # ic("Object has get_absolute_url, returning it.")
                     return obj.get_absolute_url()
                 # ic("Object is None or does not have get_absolute_url")
             except Exception as e:

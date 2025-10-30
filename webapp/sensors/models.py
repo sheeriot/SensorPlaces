@@ -384,8 +384,9 @@ class Sensor(models.Model):
     influx_measurement: CharField = models.CharField(max_length=100, null=True, blank=True)
 
     # Cached reading to reduce API calls
-    current_reading_value = models.FloatField(null=True, blank=True)
-    current_reading_timestamp = models.DateTimeField(null=True, blank=True)
+    cached_reading_value = models.FloatField(null=True, blank=True)
+    cached_reading_timestamp = models.DateTimeField(null=True, blank=True)
+    last_checked_timestamp = models.DateTimeField(null=True, blank=True, help_text="The last time the application checked for a new value from the source.")
     stale_threshold_override_seconds = models.PositiveIntegerField(
         null=True, 
         blank=True, 

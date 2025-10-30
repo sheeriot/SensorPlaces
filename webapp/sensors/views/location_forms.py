@@ -31,16 +31,25 @@ class LocationForm(forms.ModelForm):
         self.place = kwargs.pop('place', None)
         inactive_help_text = kwargs.pop('inactive_help_text', None)
         cancel_url = kwargs.pop('cancel_url', None)
+        form_action = kwargs.pop('form_action', None)
         
         # Pop anything that might come from FormDataMixin
         kwargs.pop('locations', None)
         kwargs.pop('devices_active', None)
         super().__init__(*args, **kwargs)
         
+        self.fields['name'].label = 'Location Name'
+        
         # Setup crispy form helper
         self.helper = FormHelper()
         self.helper.form_id = 'location-form'
         self.helper.form_class = 'model-form'
+        if form_action:
+            self.helper.form_action = form_action
+            self.helper.attrs = {
+                'hx-post': form_action,
+                'hx-swap': 'outerHTML',
+            }
         
         # Setup Active field with proper ID and label
         checkbox_id = f"location-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
@@ -98,31 +107,28 @@ class LocationForm(forms.ModelForm):
             Field('place', type='hidden'),
             Row(
                 Column('name', css_class='col-md-8'),
-                Column('slug', css_class='col-md-4'),
-                css_class='mb-3'
-            ),
-            Field('description', css_class='mb-3'),
-            Row(
-                Field(
-                    'is_active',
-                    template='sensors/partials/active_status_checkbox.html',
-                    model_name='location',
-                    instance_pk=self.instance.pk if self.instance and self.instance.pk else 'new',
+                Column(
+                    Div(
+                        Field('is_active'),
+                        css_class='form-check mt-4 pt-2'
+                    ),
+                    css_class='col-md-4'
                 ),
                 css_class='mb-3'
             ),
+            Field('description', css_class='mb-3'),
             Div(
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML(f"""
                         <a href="{cancel_url}" 
-                           class="btn btn-outline-secondary">
+                           class="btn btn-outline-secondary" data-bs-dismiss="modal">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),
                     HTML("""
                         <button type="submit" class="btn btn-success">
-                            <i class="bi bi-pin-map me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
+                            <i class="bi bi-geo-alt me-1"></i>Create
                         </button>
                     """),
                     css_class='d-flex justify-content-between align-items-center'
@@ -139,6 +145,15 @@ class LocationForm(forms.ModelForm):
         if not place and self.place:
             cleaned_data['place'] = self.place
             self.instance.place = self.place
+            place = self.place
+
+        name = cleaned_data.get('name')
+        if place and name:
+            query = Location.objects.filter(place=place, name__iexact=name)
+            if self.instance.pk:
+                query = query.exclude(pk=self.instance.pk)
+            if query.exists():
+                self.add_error('name', 'A location with this name already exists in this place.')
         
         # Enforce that location must be inactive if place is inactive
         if place and not place.is_active and cleaned_data.get('is_active', False):

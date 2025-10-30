@@ -1,29 +1,28 @@
 {% load crispy_forms_tags %}
 <div class="card my-1" id="device-form-card">
-    <div class="card-header d-flex justify-content-between align-items-center py-1">
-        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
-            <i class="bi bi-hdd-rack"></i>
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <h5 class="card-title mb-0 fs-5">
             {% if object %}
                 Edit Device: 
-                <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}">
-                    {{ device.name }}
+                <a href="{{ object.get_absolute_url }}" class="text-body text-decoration-none">
+                    <i class="bi bi-hdd-rack"></i>
+                    {{ object.name }}
                 </a>
             {% else %}
-                New Device
+                <i class="bi bi-hdd-rack me-2"></i> New Device
             {% endif %}
-            <small class="text-body-secondary ms-2">
-                <i class="bi bi-chevron-right"></i>
-                <a id="breadcrumb-location" href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" class="link-dark">
-                    <i class="bi bi-geo-alt"></i>
-                    {{ location.name }}
-                </a> 
-                <i class="bi bi-chevron-right"></i>
-                <a href="{% url 'sensors:place_detail' place.slug %}">
-                    <i class="bi bi-house-gear"></i>
-                    {{ place.name }}
-                </a> 
-            </small>
         </h5>
+        <div class="d-flex align-items-center">
+            <a id="breadcrumb-location" href="{% if location %}{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}{% else %}#{% endif %}" class="link-dark d-flex align-items-center">
+                <i class="bi bi-geo-alt me-1"></i>
+                <span id="breadcrumb-location-name">{{ location.name|default:"No Location" }}</span>
+            </a> 
+            <i class="bi bi-chevron-right mx-2"></i>
+            <a href="{% url 'sensors:place_detail' place.slug %}" class="d-flex align-items-center">
+                <i class="bi bi-house-gear me-1"></i>
+                {{ place.name }}
+            </a> 
+        </div>
     </div>
     <div class="card-body p-2" id="device-form-card-body">
         {% crispy form %}

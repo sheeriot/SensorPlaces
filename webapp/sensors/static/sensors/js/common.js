@@ -3,8 +3,9 @@
  * 
 */ 
 // System Configuration
-var commonConfig = {};
-commonConfig.debug = false;
+const commonConfig = {
+    debug: false,
+};
 
 // Global state - expanded with body data attributes
 window.sensorPlaces = {
@@ -112,6 +113,118 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+class LiveValueFetcher {
+    constructor(placeSlug, interval = 30000) {
+        this.placeSlug = placeSlug;
+        this.interval = interval;
+        this.timer = null;
+        this.containers = [];
+    }
+
+    start() {
+        this.fetch(); // Initial fetch
+        if (this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => this.fetch(), this.interval);
+    }
+
+    stop() {
+        if (this.timer) clearInterval(this.timer);
+    }
+
+    forceRefresh() {
+        if(commonConfig.debug) console.log('[LiveValueFetcher] Forcing refresh for all live values.');
+        this.fetch(true);
+    }
+
+    async fetch(force = false) {
+        this.containers = document.querySelectorAll('.live-value-container');
+        const allPksOnPage = [...new Set([...this.containers].map(c => c.dataset.sensorPk).filter(Boolean))];
+
+        if (allPksOnPage.length === 0) return;
+
+        const pksToFetch = new Set();
+        const now = new Date().getTime();
+
+        allPksOnPage.forEach(pk => {
+            const lastCheck = sessionStorage.getItem(`sensor-${pk}-lastcheck`);
+            if (force || !lastCheck || (now - parseInt(lastCheck) > this.interval)) {
+                pksToFetch.add(pk);
+            }
+        });
+
+        this.updateAllContainersFromCache();
+
+        if (pksToFetch.size === 0) {
+            if(commonConfig.debug) console.log('[LiveValueFetcher] All values fresh in cache. Nothing to fetch.');
+            return;
+        }
+
+        if(commonConfig.debug) console.log('[LiveValueFetcher] Fetching stale/forced values for pks:', [...pksToFetch]);
+
+        try {
+            const url = `/api/${this.placeSlug}/sensors/live-values/?pks=${[...pksToFetch].join(',')}`;
+            const response = await window.utils.fetchWithCSRF(url);
+            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+            
+            const data = await response.json();
+            if (data.status !== 'success') throw new Error(data.message || 'API returned an error');
+
+            Object.entries(data.payload).forEach(([pk, sensorData]) => {
+                sessionStorage.setItem(`sensor-${pk}-lastcheck`, now.toString());
+                sessionStorage.setItem(`sensor-${pk}-data`, JSON.stringify(sensorData));
+            });
+
+            this.updateAllContainersFromCache();
+
+        } catch (error) {
+            console.error('[LiveValueFetcher] Error fetching data:', error);
+            this.containers.forEach(container => {
+                if (pksToFetch.has(container.dataset.sensorPk)) {
+                    this.renderErrorForContainer(container, error.message);
+                }
+            });
+        }
+    }
+
+    updateAllContainersFromCache() {
+        this.containers.forEach(container => {
+            const pk = container.dataset.sensorPk;
+            const cachedDataStr = sessionStorage.getItem(`sensor-${pk}-data`);
+            if (cachedDataStr) {
+                const sensorData = JSON.parse(cachedDataStr);
+                this.updateSingleContainer(container, sensorData);
+            }
+        });
+    }
+
+    updateSingleContainer(container, sensorData) {
+        let html = '';
+        if (sensorData && sensorData.status === 'success') {
+            const value = parseFloat(sensorData.value).toFixed(sensorData.decimal_places || 2);
+            const unit = sensorData.unit_symbol || '';
+            const timestamp = sensorData.timestamp ? new Date(sensorData.timestamp) : null;
+            const naturalTime = timestamp && window.utils ? window.utils.getNaturalTime(timestamp) : '';
+            html = `
+                <span class="badge bg-success-subtle text-success-emphasis rounded-1">${value}${unit}</span>
+                ${naturalTime ? `<small class="text-muted">(${naturalTime})</small>` : ''}
+            `;
+        } else if (sensorData && sensorData.status === 'no_reading') {
+            html = `<span class="badge bg-secondary-subtle text-secondary-emphasis rounded-1">No reading</span>`;
+        } else {
+            const errorMessage = sensorData ? sensorData.message : 'Data not found';
+            html = `<span class="badge bg-danger-subtle text-danger-emphasis rounded-1" title="${errorMessage}">Error</span>`;
+        }
+        container.innerHTML = html;
+    }
+
+    renderErrorForContainer(container, errorMessage) {
+        container.innerHTML = `<span class="badge bg-danger-subtle text-danger-emphasis rounded-1" title="${errorMessage}">Error</span>`;
+    }
+}
+
+// Explicitly attach to window for other scripts
+window.LiveValueFetcher = LiveValueFetcher;
 
 // Export initialization status checker
 window.sensorPlaces.isInitialized = function(module) {
