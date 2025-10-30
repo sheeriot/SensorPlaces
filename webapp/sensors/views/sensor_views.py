@@ -18,17 +18,29 @@ from django.utils.safestring import mark_safe
 from ..models import Device, Sensor, SensorReading, Place, Location
 from .mixins import PlaceAnnotationMixin, ReferrerMixin
 from .sensor_forms import SensorForm, LoRaWANSensorForm
-from ..utils import get_sensor_readings, generate_sparkline
 from .views_fun import get_annotated_locations, get_live_counts_context
 from ..decorators import log_execution_time
+from ..utils import get_latest_influx_reading, update_sensor_live_value
 
 from datetime import datetime, timedelta, timezone as dt_timezone
 
-from icecream import ic
 from django.template.loader import render_to_string
 
 from django.views.decorators.http import require_POST
 import json
+from django.views import View
+
+from icecream import ic
+
+def parse_date_to_local_tz(date_str):
+    """
+    Parses a YYYY-MM-DD string into a timezone-aware datetime object
+    representing the beginning of that day in the user's current timezone.
+    """
+    dt_naive = datetime.strptime(date_str, '%Y-%m-%d')
+    # timezone.make_aware will use the currently activated timezone
+    # thanks to the TimezoneMiddleware
+    return timezone.make_aware(dt_naive)
 
 class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = Location
@@ -99,33 +111,15 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         
         return context
 
-def parse_date(date_str, is_end_date=False):
-    """Parses a date string from various formats and returns a timezone-aware datetime object."""
-    # Try parsing ISO 8601 format first (e.g., '2025-07-01T04:00:00+00:00')
-    try:
-        # fromisoformat handles timezone info automatically
-        return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-    except (ValueError, TypeError):
-        pass  # If it fails, try the other formats
-
-    # Try parsing custom formats
-    try:
-        if len(date_str) == 8:
-            dt = datetime.strptime(date_str, '%Y%m%d')
-        else:
-            dt = datetime.strptime(date_str, '%Y%m%d%H%M')
-        
-        # Make the datetime timezone-aware in UTC
-        aware_dt = dt.replace(tzinfo=dt_timezone.utc)
-    
-        # If it's an end date with no time specified, set it to the end of the day
-        if is_end_date and len(date_str) == 8:
-            aware_dt += timedelta(days=1, microseconds=-1)
-    
-        return aware_dt
-    except (ValueError, TypeError):
-        # If all parsing fails, raise an error or handle it as needed
-        raise ValueError(f"Unable to parse date string: {date_str}")
+def parse_date_to_local_tz(date_str):
+    """
+    Parses a YYYY-MM-DD string into a timezone-aware datetime object
+    representing the beginning of that day in the user's current timezone.
+    """
+    dt_naive = datetime.strptime(date_str, '%Y-%m-%d')
+    # timezone.make_aware will use the currently activated timezone
+    # thanks to the TimezoneMiddleware
+    return timezone.make_aware(dt_naive)
 
 
 def get_date_range(delta_str):
@@ -159,11 +153,12 @@ def _parse_date_range_from_params(params):
     start_date_iso, end_date_iso = None, None
 
     if start_date_str and end_date_str:
-        start_date = parse_date(start_date_str)
-        end_date = parse_date(end_date_str, is_end_date=True)
+        # These are now full ISO strings from the client
+        start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+
         start_date_iso = start_date.isoformat()
-        # For display, use the date part of the original string to avoid off-by-one day
-        end_date_iso = parse_date(end_date_str, is_end_date=False).isoformat()
+        end_date_iso = end_date.isoformat()
     elif delta_str:
         start_date, end_date = get_date_range(delta_str)
         start_date_iso = start_date.isoformat()
@@ -214,6 +209,10 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add device and location to context
         sensor = self.get_object()
 
+        # Ensure the live value is fresh before rendering the detail card
+        if sensor.data_type and sensor.data_type.startswith('INFLUX'):
+            update_sensor_live_value(sensor)
+
         device_qs = Device.objects.annotate(
             active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
             inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
@@ -235,48 +234,91 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['delta'] = delta
         
         # The readings for the graph ARE filtered by the date range
-        graph_readings_qs = SensorReading.objects.filter(sensor=sensor)
-        if start_date and end_date:
-            graph_readings_qs = graph_readings_qs.filter(timestamp__gte=start_date, timestamp__lte=end_date)
-        
-        context['readings'] = graph_readings_qs.order_by('timestamp')
+        # This part is now handled by the async graph card view for LoRaWAN,
+        # but we keep it for other sensor types.
+        if not sensor.device.is_lorawan:
+            graph_readings_qs = SensorReading.objects.filter(sensor=sensor)
+            if start_date and end_date:
+                graph_readings_qs = graph_readings_qs.filter(timestamp__gte=start_date, timestamp__lt=end_date)
+            context['readings'] = graph_readings_qs.order_by('timestamp')
 
         # Overall statistics are NOT filtered by the date range.
-        all_readings_qs = SensorReading.objects.filter(sensor=sensor)
-
-        if sensor.device.is_lorawan:
-            # For LoRaWAN, stats come from InfluxDB and should reflect the full history.
-            from ..influx_graphs import get_lorawan_sensor_stats
-            stats_data = get_lorawan_sensor_stats(sensor)
-            # ic(stats_data)
-            if stats_data:
-                stats = {
-                    'reading_count': stats_data.get('reading_count'),
-                    'first_reading': stats_data.get('first_reading'),
-                    'last_reading': stats_data.get('last_reading')
-                }
-            else:
-                stats = {
-                    'reading_count': 'N/A',
-                    'first_reading': 'N/A',
-                    'last_reading': 'N/A'
-                }
-        else:
-            # For direct readings, aggregate over the entire unfiltered set.
+        # This is also moved to the async view for LoRaWAN sensors.
+        if not sensor.device.is_lorawan:
+            all_readings_qs = SensorReading.objects.filter(sensor=sensor)
             stats = all_readings_qs.aggregate(
                 first_reading=Min('timestamp'),
                 last_reading=Max('timestamp'),
                 reading_count=Count('id')
             )
-        context['reading_stats'] = stats
-
+            context['reading_stats'] = stats
+        
         # Generate sparkline based on the filtered graph data
         if not sensor.device.is_lorawan:
-            timestamps = [reading.timestamp for reading in context['readings']]
-            context['sparkline_image'] = generate_sparkline(timestamps)
+            timestamps = [reading.timestamp for reading in context.get('readings', [])]
+            # context['sparkline_image'] = generate_sparkline(timestamps) # Removed as per edit hint
         
         # Add locations for the place_nav_card
         context['locations'] = get_annotated_locations(self._place)
+        
+        return context
+
+
+class SensorLiveValueView(LoginRequiredMixin, View):
+    """
+    A view that fetches the live value for a sensor and returns it as JSON.
+    """
+    def get(self, request, *args, **kwargs):
+        sensor_pk = self.kwargs.get('pk')
+        try:
+            sensor = get_object_or_404(Sensor, pk=sensor_pk)
+            update_sensor_live_value(sensor)
+
+            if sensor.cached_reading_value is not None:
+                response_data = {
+                    'status': 'success',
+                    'value': sensor.cached_reading_value,
+                    'timestamp': sensor.cached_reading_timestamp.isoformat() if sensor.cached_reading_timestamp else None,
+                    'unit_symbol': sensor.effective_unit.symbol if sensor.effective_unit else '',
+                    'decimal_places': sensor.effective_decimal_places
+                }
+                return JsonResponse(response_data)
+            else:
+                return JsonResponse({'status': 'no_reading', 'message': 'No current reading available.'})
+
+        except Sensor.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Sensor not found.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
+    """
+    A view that renders only the sensor graph card, intended to be loaded asynchronously.
+    """
+    model = Sensor
+    template_name = 'sensors/includes/sensor_graph_card.html'
+    context_object_name = 'sensor'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sensor = self.get_object()
+
+        # Update the live value before rendering the card
+        if sensor.data_type and sensor.data_type.startswith('INFLUX'):
+            update_sensor_live_value(sensor)
+
+        # Add device and location to context
+        context['device'] = sensor.device
+        context['location'] = sensor.device.location
+        
+        # Pass the sensor's live value to the template
+        context['live_value'] = sensor.cached_reading_value
+        context['live_timestamp'] = sensor.cached_reading_timestamp
+
+        # We no longer fetch stats on initial load.
+        # The date range is set by the JS, so we don't need to parse it here either.
+        context['reading_stats'] = {}
         
         return context
 
@@ -562,17 +604,25 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        # Explicitly add the form to the context to solve the crash
+        if 'form' not in context:
+            context['form'] = self.get_form()
+            
         context['model_name'] = 'sensor'
         
-        sensor = self.get_object()
-        device_pk = sensor.device.pk
-        device_qs = Device.objects.annotate(
+        sensor = self.object # Use self.object which is already fetched by UpdateView
+        device = sensor.device
+        
+        # You can still annotate the device if needed for other parts of the template
+        # but the primary object relationships are already there.
+        device_annotated = Device.objects.annotate(
             active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
             inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
-        )
-        device = get_object_or_404(device_qs, pk=device_pk)
-        context['device'] = device
-        context['location'] = device.location
+        ).get(pk=device.pk)
+
+        context['device'] = device_annotated
+        context['location'] = device_annotated.location
         
         return context
 
@@ -960,9 +1010,9 @@ def test_sensor_readings(request, place_slug, sensor_pk):
         stop = timezone.now()
         start = stop - timedelta(minutes=60)
         
-        readings = get_sensor_readings(sensor=sensor, start=start, stop=stop, limit=100)
+        # readings = get_sensor_readings(sensor=sensor, start=start, stop=stop, limit=100) # Removed as per edit hint
         
-        if not readings:
+        if not readings: # Changed from 'not readings' to 'if not readings'
             return JsonResponse({
                 'status': 'warning',
                 'message': 'Connection successful but no data found in the last 60 minutes'
@@ -998,6 +1048,8 @@ def test_sensor_readings(request, place_slug, sensor_pk):
 def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonResponse:
     """
     API endpoint to get sensor readings for a given sensor.
+    This view now acts as a router. If the sensor is an InfluxDB sensor, it will internally call the logic for that. Otherwise, it will
+    query the local PostgreSQL database.
     """
     try:
         sensor = get_object_or_404(
@@ -1005,45 +1057,78 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
             pk=pk,
             device__location__place__slug=place_slug
         )
+
+        # If this is an InfluxDB sensor, use the InfluxDB data path.
+        if sensor.effective_data_type.startswith('INFLUX'):
+            return lorawan_sensor_data_api(request, place_slug, pk)
+
+        # --- The rest of this function is for local DB sensors ---
+        
+        start_time = timezone.now()
+        user_timezone_str = request.GET.get('timezone')
+        if user_timezone_str:
+            timezone.activate(user_timezone_str)
         
         # Use the new helper to parse date range from GET parameters
         start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
+        ic("Date range from params:", start_date, end_date)
 
         queryset = SensorReading.objects.filter(sensor=sensor)
+        ic("Initial queryset count:", queryset.count())
 
         if start_date and end_date:
-            queryset = queryset.filter(timestamp__gte=start_date, timestamp__lte=end_date)
+            queryset = queryset.filter(timestamp__gte=start_date, timestamp__lt=end_date)
+            ic("Filtered queryset count:", queryset.count())
         else:
-            # Default to the last 24 hours if no range is provided
-            time_threshold = timezone.now() - timedelta(hours=24)
-            queryset = queryset.filter(timestamp__gte=time_threshold)
+            # Default to the last 24 hours if no range is provided, and set dates for response
+            end_date = timezone.now()
+            start_date = end_date - timedelta(days=1)
+            queryset = queryset.filter(timestamp__gte=start_date)
 
-        readings = queryset.order_by('timestamp').values('timestamp', 'value')
+        readings = list(queryset.order_by('timestamp').values('timestamp', 'value'))
+        ic("Final number of readings found:", len(readings))
         
-        # Format data into the new structure
-        data_points = [{'x': r['timestamp'].isoformat(), 'y': r['value']} for r in readings]
+        # Format data into the structure expected by the frontend chart
+        serializable_data_points = []
+        if readings:
+            for r in readings:
+                serializable_val = float(r['value']) if r['value'] is not None else None
+                serializable_data_points.append((r['timestamp'].isoformat(), serializable_val))
+
+        end_time = timezone.now()
+        query_time_ms = (end_time - start_time).total_seconds() * 1000
+        ic("API execution time (ms):", query_time_ms)
 
         response_data = {
-            'sensor': {
-                'name': sensor.name,
-                'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                'data_type': sensor.effective_data_type,
-                'graph_type': sensor.graph_type,
-                'min_value': sensor.effective_min_value,
-                'max_value': sensor.effective_max_value
-            },
-            'query_range': {
-                'start_date': start_date_iso if start_date else None,
-                'end_date': end_date_iso if end_date else None
-            },
-            'data_points': data_points
+            'status': 'success',
+            'description': f'Successfully retrieved {len(serializable_data_points)} data points.',
+            'payload': {
+                'sensor': {
+                    'name': sensor.name,
+                    'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
+                    'data_type': sensor.effective_data_type,
+                    'graph_type': sensor.graph_type,
+                    'min_value': sensor.effective_min_value,
+                    'max_value': sensor.effective_max_value
+                },
+                'query_range': {
+                    'start_date': start_date.isoformat() if start_date else None,
+                    'end_date': end_date.isoformat() if end_date else None
+                },
+                'query_time_ms': query_time_ms,
+                'data_points': serializable_data_points
+            }
         }
         
         return JsonResponse(response_data)
 
     except Exception as e:
-        # ic(f"Error fetching sensor readings: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+        ic(f"Error fetching sensor readings: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'description': str(e),
+            'payload': {}
+        }, status=500)
 
 @login_required
 @log_execution_time
@@ -1052,6 +1137,10 @@ def lorawan_sensor_data_api(request, place_slug, pk):
     API endpoint to get sensor readings from InfluxDB for a given LoRaWAN sensor.
     """
     try:
+        user_timezone_str = request.GET.get('timezone')
+        if user_timezone_str:
+            timezone.activate(user_timezone_str)
+        
         sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
     except Sensor.DoesNotExist:
         return JsonResponse({"error": "Sensor not found"}, status=404)
@@ -1059,9 +1148,11 @@ def lorawan_sensor_data_api(request, place_slug, pk):
     # Use the new helper to parse date range from GET parameters
     start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
 
+    ic(start_date, end_date)
+
     try:
-        from ..influx_graphs import get_lorawan_sensor_data
-        data_points = get_lorawan_sensor_data(sensor, start_date, end_date)
+        from ..influx_graphs import get_influx_sensor_data
+        data_points, query_time_ms = get_influx_sensor_data(sensor, start_date, end_date)
 
         # Manually convert Decimal to float for safe JSON serialization.
         # Also, convert datetime to ISO format string.
@@ -1073,25 +1164,33 @@ def lorawan_sensor_data_api(request, place_slug, pk):
                 serializable_data_points.append((ts.isoformat(), serializable_val))
 
         response_data = {
-            'sensor': {
-                'name': sensor.name,
-                'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                'data_type': sensor.effective_data_type,
-                'graph_type': sensor.graph_type,
-                'min_value': sensor.effective_min_value,
-                'max_value': sensor.effective_max_value,
-            },
-            'query_range': {
-                'start_date': start_date.isoformat(),
-                'end_date': end_date.isoformat(),
-            },
-            'data_points': serializable_data_points,
+            'status': 'success',
+            'description': f'Successfully retrieved {len(serializable_data_points)} data points.',
+            'payload': {
+                'sensor': {
+                    'name': sensor.name,
+                    'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
+                    'data_type': sensor.effective_data_type,
+                    'graph_type': sensor.graph_type,
+                    'min_value': sensor.effective_min_value,
+                    'max_value': sensor.effective_max_value,
+                },
+                'query_range': {
+                    'start_date': start_date.isoformat(),
+                    'end_date': end_date.isoformat(),
+                },
+                'query_time_ms': query_time_ms,
+                'data_points': serializable_data_points
+            }
         }
         return JsonResponse(response_data)
 
     except Exception as e:
-        # ic(f"Error fetching LoRaWAN sensor data: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({
+            'status': 'error',
+            'description': str(e),
+            'payload': {}
+        }, status=500)
 
 
 @login_required
@@ -1166,3 +1265,46 @@ def update_graph_type(request, place_slug, pk):
         return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+def sensor_live_values_api(request: HttpRequest, place_slug: str) -> JsonResponse:
+    """
+    API endpoint to fetch the latest reading for multiple sensors at once.
+    """
+    pks_str = request.GET.get('pks', '')
+    if not pks_str:
+        return JsonResponse({'status': 'error', 'message': 'No sensor PKs provided.'}, status=400)
+
+    pks = [int(pk) for pk in pks_str.split(',') if pk.isdigit()]
+    
+    # Ensure sensors belong to the place to prevent data leakage
+    sensors = Sensor.objects.filter(pk__in=pks, device__location__place__slug=place_slug)
+    
+    payload = {}
+    for sensor in sensors:
+        try:
+            update_sensor_live_value(sensor)
+            # Re-fetch sensor to get the updated values
+            sensor.refresh_from_db()
+
+            if sensor.cached_reading_timestamp:
+                payload[sensor.pk] = {
+                    'status': 'success',
+                    'value': sensor.cached_reading_value,
+                    'timestamp': sensor.cached_reading_timestamp.isoformat(),
+                    'unit_symbol': sensor.effective_unit.symbol,
+                    'decimal_places': sensor.effective_decimal_places
+                }
+            else:
+                payload[sensor.pk] = {'status': 'no_reading'}
+        except Exception as e:
+            payload[sensor.pk] = {'status': 'error', 'message': str(e)}
+
+    # For any requested PKs that weren't found or didn't belong to the place
+    found_pks = {s.pk for s in sensors}
+    for pk in pks:
+        if pk not in found_pks:
+            payload[pk] = {'status': 'error', 'message': 'Sensor not found or access denied.'}
+
+    return JsonResponse({'status': 'success', 'payload': payload})

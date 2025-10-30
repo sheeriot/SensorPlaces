@@ -13,6 +13,7 @@ from .models import (
     InfluxSource,
     ToastNotification,
 )
+from .utils import update_sensor_live_value
 
 
 @admin.register(Place)
@@ -93,12 +94,15 @@ class SensorAdmin(admin.ModelAdmin):
     list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'effective_data_type_display', 'is_active')
     list_filter = ('sensor_type', 'is_active', 'device__location')
     search_fields = ('name', 'device__name')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_override_seconds')
     autocomplete_fields = ['device', 'sensor_type', 'influx_source']
 
     fieldsets = (
         (None, {
             'fields': ('name', 'device', 'sensor_type', 'is_active')
+        }),
+        ('Live Data', {
+            'fields': ('cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_override_seconds')
         }),
         ('Display & Data Type Settings', {
             'fields': ('graph_type', ('unit', 'unit_override'), ('data_type', 'data_type_override'))
@@ -108,10 +112,29 @@ class SensorAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Metadata', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': (('created_at', 'updated_at'),),
             'classes': ('collapse',)
         })
     )
+
+    def get_queryset(self, request):
+        """
+        Override to update live sensor values before displaying them.
+        """
+        queryset = super().get_queryset()
+        for sensor in queryset:
+            if sensor.data_type and sensor.data_type.startswith('INFLUX'):
+                update_sensor_live_value(sensor)
+        return queryset
+
+    def get_object(self, request, object_id, from_field=None):
+        """
+        Override to update the live value for a single sensor when viewing its detail page.
+        """
+        obj = super().get_object(request, object_id, from_field)
+        if obj and obj.data_type and obj.data_type.startswith('INFLUX'):
+            update_sensor_live_value(obj)
+        return obj
 
     def effective_unit_display(self, obj):
         if obj.effective_unit:

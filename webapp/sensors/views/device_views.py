@@ -22,7 +22,7 @@ from .device_forms import DeviceForm
 from .mixins import PlaceAnnotationMixin, ReferrerMixin
 from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
 from .sensor_forms import SensorForm, LoRaWANSensorForm
-from ..utils import get_sensor_readings, generate_sparkline
+from ..utils import get_sensor_readings, generate_sparkline, get_latest_influx_reading, update_sensor_live_value
 from ..decorators import log_execution_time
 from ..switchbot_client import get_status
 
@@ -123,14 +123,14 @@ def add_switchbot_sensor(request, place_slug, pk):
 
         if created and value_to_add is not None:
             try:
-                sensor.current_reading_value = float(value_to_add)
-                sensor.current_reading_timestamp = timezone.now()
-                sensor.save(update_fields=['current_reading_value', 'current_reading_timestamp'])
+                sensor.cached_reading_value = float(value_to_add)
+                sensor.cached_reading_timestamp = timezone.now()
+                sensor.save(update_fields=['cached_reading_value', 'cached_reading_timestamp'])
             except (ValueError, TypeError):
                 ic(f"Could not parse value '{value_to_add}' for new sensor {sensor.name}")
 
         if created:
-            sensor.live_value = sensor.current_reading_value
+            sensor.live_value = sensor.cached_reading_value
             sensor_row_html = render_to_string(
                 'sensors/partials/sensor_row.html',
                 {
@@ -279,48 +279,8 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['locations'] = get_annotated_locations(self._place)
         context['absolute_url'] = self.request.build_absolute_uri()
 
-        # --- Smart SwitchBot Status Fetching ---
-        if device.is_switchbot and device.device_id:
-            fetch_needed = False
-            # Determine if we need to fetch fresh data
-            for sensor in context['sensors']:
-                if sensor.sensor_type and sensor.sensor_type.name.lower() in ['temperature', 'humidity', 'battery', 'status', 'leakstate']:
-                    if sensor.current_reading_timestamp is None:
-                        fetch_needed = True
-                        break
-                    
-                    stale_time = timezone.now() - timedelta(seconds=sensor.effective_stale_threshold)
-                    if sensor.current_reading_timestamp < stale_time:
-                        fetch_needed = True
-                        break
-            
-            if fetch_needed:
-                try:
-                    status_data = get_status(device.device_id)
-                    if status_data.get('statusCode') == 100:
-                        live_body = status_data.get('body', {})
-                        
-                        # Simple mapping of lowercase API key to the value
-                        live_values = {k.lower(): v for k, v in live_body.items()}
-
-                        # Update sensor instances with new data and save
-                        for sensor in context['sensors']:
-                            if sensor.sensor_type and sensor.sensor_type.name.lower() in live_values:
-                                live_value = live_values[sensor.sensor_type.name.lower()]
-                                if live_value is not None:
-                                    sensor.current_reading_value = live_value
-                                    sensor.current_reading_timestamp = timezone.now()
-                                    sensor.save(update_fields=['current_reading_value', 'current_reading_timestamp'])
-                    else:
-                        ic(f"SwitchBot API error for device {device.device_id}: {status_data.get('message')}")
-
-                except Exception as e:
-                    ic(f"Failed to get SwitchBot status for device {device.device_id}: {e}")
-
-        # Attach the (potentially updated) cached value to live_value for the template
-        for sensor in context['sensors']:
-            sensor.live_value = sensor.current_reading_value
-        # --- End of Smart Fetching ---
+        # --- Smart Data Fetching for Sensors ---
+        self.fetch_live_data_for_sensors(context['sensors'])
 
         # Add hide_inactive state from GET param or cookie
         hide_inactive_param = self.request.GET.get('hide_inactive')
@@ -337,6 +297,21 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # ic(context['sensors'])
         # ic(context['locations'])
         return context
+
+    def fetch_live_data_for_sensors(self, sensors):
+        """
+        Iterate through sensors and fetch live data if it's stale.
+        This is now a simple wrapper around the utility function.
+        """
+        # The logic to group SwitchBot calls is now handled inside the util,
+        # or accepted as a trade-off for simplicity in the live-value-per-sensor context.
+        # For a full device page refresh, this is still efficient enough.
+        for sensor in sensors:
+            update_sensor_live_value(sensor)
+
+        # Attach the (potentially updated) cached value to live_value for the template
+        for sensor in sensors:
+            sensor.live_value = sensor.cached_reading_value
 
 class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, CreateView):
     model = Device
@@ -833,9 +808,9 @@ def fetch_switchbot_reading(request, place_slug, pk):
                     # Create a historical reading
                     SensorReading.objects.create(sensor=sensor, value=value)
                     # Update the cached current reading on the sensor
-                    sensor.current_reading_value = value
-                    sensor.current_reading_timestamp = timezone.now()
-                    sensor.save(update_fields=['current_reading_value', 'current_reading_timestamp'])
+                    sensor.cached_reading_value = value
+                    sensor.cached_reading_timestamp = timezone.now()
+                    sensor.save(update_fields=['cached_reading_value', 'cached_reading_timestamp'])
                     readings_found += 1
                 except Sensor.DoesNotExist:
                     # This sensor type is not set up for this device, so we skip it.

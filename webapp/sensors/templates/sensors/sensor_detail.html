@@ -2,36 +2,54 @@
 {% load static %}
 {% load i18n %}
 
-{% block head_title %}{{ sensor.name }}{% endblock %}
+{% block title %}{{ sensor.name }} | {{ sensor.device.name }} | Sensor Detail{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'sensors/css/sensor-detail.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="row gx-2 mx-1">
-    <div class="col-md-4">
-        {% include "sensors/includes/place_nav_card.html" %}
-        {% include "sensors/includes/device_detail_card.html" %}
-        {% include "sensors/includes/sensor_list_card.html" %}
-    </div>
-    <div class="col-md-8">
-        {% include "sensors/includes/sensor_detail_card.html" %}
-        {% if device.is_active and sensor.is_active %}
-            {% include "sensors/includes/sensor_graph_card.html" %}
-        {% endif %}
-    </div>
-</div>
+<div class="container-fluid" data-sensor-pk="{{ sensor.pk }}">
+    <div class="row">
+        <div class="col-md-4">
+            {% include "sensors/includes/place_nav_card.html" %}
+            <div id="device-info-card-container">
+                 {% include 'sensors/includes/device_info_card.html' %}
+            </div>
+            <div id="sensor-list-card-container" class="mt-3">
+                {% include 'sensors/includes/sensor_list_card.html' %}
+            </div>
+        </div>
 
-<div class="modal fade" id="deleteSensorModal" tabindex="-1" aria-labelledby="deleteSensorModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="col-md-8">
+            <div id="sensor-detail-card-container">
+                {% include 'sensors/includes/sensor_detail_card.html' %}
+            </div>
+            <div id="sensor-graph-card"
+                 hx-get="{% url 'sensors:sensor_graph_card' place_slug=place.slug pk=sensor.pk %}"
+                 hx-trigger="load"
+                 hx-swap="outerHTML">
+                <div class="card mb-3">
+                    <div class="card-body text-center p-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading Graph...</span>
+                        </div>
+                        <p class="mt-2">Loading graph component...</p>
+                    </div>
+                </div>
+            </div>
+            <div id="sensor-readings-table-container">
+                 {% include 'sensors/includes/sensor_readings_table.html' %}
+            </div>
         </div>
     </div>
 </div>
-{% endblock content %}
 
-{% block extra_js %}
-    {% if sensor.is_active and not sensor.device.is_lorawan %}
-        <script src="{% static 'sensors/js/charts.js' %}" defer></script>
-    {% elif sensor.is_active and sensor.device.is_lorawan %}
-        <script src="{% static 'sensors/js/sensor-chart.js' %}" defer></script>
-    {% endif %}
-    <script src="{% static 'sensors/js/sensor-detail.js' %}" defer></script>
-{% endblock extra_js %} 
+<!-- Modals should be loaded dynamically, not included directly -->
+
+{% endblock %}
+
+{% block page_js %}
+    <script src="{% static 'sensors/js/sensor-chart.js' %}?v={{ APP_VERSION }}"></script>
+    <script src="{% static 'sensors/js/sensor-detail.js' %}?v={{ APP_VERSION }}"></script>
+{% endblock %} 

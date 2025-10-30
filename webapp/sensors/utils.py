@@ -6,9 +6,15 @@ from datetime import datetime, timezone as dt_timezone
 from typing import List, Optional
 import numpy as np
 from influxdb_client_3 import InfluxDBClient3
+from icecream import ic
+import pandas as pd
 
 # Use a non-interactive backend for matplotlib
 matplotlib.use('Agg')
+
+# --- DEBUG FLAG ---
+# Set to True to bypass the stale check and always query for live values.
+# DISABLE_STALE_CHECK = True
 
 
 def get_influxdb_client(influx_source):
@@ -48,6 +54,139 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
         return []
     finally:
         client.close()
+
+
+def get_latest_influx_reading(sensor):
+    """
+    Fetches the single most recent reading for a sensor from InfluxDB.
+    """
+    if not sensor.influx_source or not sensor.influx_measurement:
+        return None
+
+    client = get_influxdb_client(sensor.influx_source)
+    
+    # Determine the correct filter field. If 'frmpayload' is in the measurement name,
+    # it's very likely LoRaWAN data and should use 'dev_eui'.
+    if 'frmpayload' in sensor.influx_measurement:
+        filter_field = "dev_eui"
+    else:
+        # Fallback to the original logic for other measurement types
+        filter_field = "dev_eui" if sensor.device.is_lorawan else "device_id"
+    
+    device_id_val = sensor.device.device_id
+
+    query = f'''
+    SELECT *
+    FROM "{sensor.influx_measurement}"
+    WHERE "{filter_field}" = '{device_id_val}'
+    ORDER BY time DESC
+    LIMIT 1
+    '''
+    
+    # ic(f"Querying InfluxDB for latest reading for sensor '{sensor.name}' (pk={sensor.pk}) with query: {query}")
+    
+    try:
+        reader = client.query(query, language="sql")
+        df = reader.to_pandas()
+        # ic("Raw response from InfluxDB:", df)
+        
+        # This is the robust way to check for an empty DataFrame.
+        if df.empty:
+            # ic("InfluxDB query returned no data.")
+            return None
+        
+        latest = df.iloc[0]
+        # ic("Latest row from DataFrame:", latest)
+        
+        # Check for pandas NaT (Not a Time) and NaN (Not a Number)
+        if pd.notna(latest['time']) and pd.notna(latest['value']):
+            # Convert to Python native types before returning
+            py_time = latest['time'].to_pydatetime()
+            
+            # Ensure the datetime is timezone-aware (assume UTC).
+            if py_time.tzinfo is None:
+                py_time = py_time.replace(tzinfo=dt_timezone.utc)
+
+            return {
+                'time': py_time,
+                'value': float(latest['value'])
+            }
+        else:
+            # ic("InfluxDB returned a row with null time or value.")
+            return None
+            
+    except Exception as e:
+        ic(f"Error during InfluxDB latest reading query for sensor '{sensor.name}': {e}")
+        return None
+    finally:
+        client.close()
+
+
+def update_sensor_live_value(sensor):
+    """
+    Fetches and updates the live value for a single sensor if it's time to check.
+    This function now uses `last_checked_timestamp` to determine if a check is needed,
+    preventing excessive queries for sensors that update infrequently.
+    Returns True if a new value was fetched and saved, False otherwise.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # Decide if it's time to check based on the stale threshold.
+    if 'DISABLE_STALE_CHECK' in globals() and globals()['DISABLE_STALE_CHECK']:
+        pass # Skip the check if the debug flag is set
+    elif sensor.last_checked_timestamp:
+        time_since_last_check = timezone.now() - sensor.last_checked_timestamp
+        if time_since_last_check < timedelta(seconds=sensor.effective_stale_threshold):
+            return False  # Not time to check yet.
+
+    # Proceed with the check.
+    from .switchbot_client import get_status
+    
+    new_value = None
+    new_timestamp = None
+    
+    if sensor.effective_data_type and sensor.effective_data_type.startswith('INFLUX'):
+        try:
+            latest_reading = get_latest_influx_reading(sensor)
+            if latest_reading and latest_reading.get('value') is not None:
+                new_value = latest_reading['value']
+                new_timestamp = latest_reading['time']
+        except Exception:
+            pass  # Errors are logged in get_latest_influx_reading
+    
+    elif sensor.device.is_switchbot:
+        try:
+            status_data = get_status(sensor.device.device_id)
+            if status_data.get('statusCode') == 100:
+                live_body = status_data.get('body', {})
+                live_values = {k.lower(): v for k, v in live_body.items()}
+                
+                if sensor.sensor_type and sensor.sensor_type.name.lower() in live_values:
+                    live_value = live_values[sensor.sensor_type.name.lower()]
+                    if live_value is not None:
+                        new_value = live_value
+                        new_timestamp = timezone.now()
+        except Exception:
+            pass
+
+    # --- Update the sensor object ---
+    
+    # Always update the last_checked time
+    sensor.last_checked_timestamp = timezone.now()
+    update_fields = ['last_checked_timestamp']
+    
+    value_was_updated = False
+    # Only update the cached value if the new reading is actually newer
+    if new_timestamp and (sensor.cached_reading_timestamp is None or new_timestamp > sensor.cached_reading_timestamp):
+        sensor.cached_reading_value = new_value
+        sensor.cached_reading_timestamp = new_timestamp
+        update_fields.extend(['cached_reading_value', 'cached_reading_timestamp'])
+        value_was_updated = True
+
+    sensor.save(update_fields=update_fields)
+    
+    return value_was_updated
 
 
 # def calculate_zoom(distance=0):

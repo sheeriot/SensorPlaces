@@ -29,10 +29,14 @@ This template expects the following context variables:
     </div>
     <div class="overflow-auto">
         {% for location in locations %}
-            {% if place.is_active %}
-                {% include "sensors/partials/location_row.html" with place=place location=location hide_inactive=hide_inactive %}
+            {% if location.slug == 'unassigned-devices' %}
+                {% include "sensors/partials/unassigned_devices_row.html" with place=place location=location %}
             {% else %}
-                {% include "sensors/partials/location_row.html" with place=place location=location show_inactive=True %}
+                {% if place.is_active %}
+                    {% include "sensors/partials/location_row.html" with place=place location=location hide_inactive=hide_inactive %}
+                {% else %}
+                    {% include "sensors/partials/location_row.html" with place=place location=location show_inactive=True %}
+                {% endif %}
             {% endif %}
         {% empty %}
             <div class="text-center p-3 text-muted border-top">

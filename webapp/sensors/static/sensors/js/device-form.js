@@ -41,88 +41,157 @@ const deviceFormManager = {
         this.handleLocationChange(locationSelect, deviceForm);
     },
 
-    handleLocationChange(select, form) {
-        if (this.config.debug) console.groupCollapsed('[DeviceForm] handleLocationChange');
-
-        const locationId = select.value;
-
-        // --- FIX: Read data from the parent <select> dataset, not the <option> ---
-        const locationIsActive = select.dataset[`isactive-${locationId}`] === 'true';
-        const locationName = select.dataset[`locationname-${locationId}`];
-        const locationSlug = select.dataset[`locationslug-${locationId}`];
-
+    handleLocationCreated(event) {
         if (this.config.debug) {
-            console.groupCollapsed(`[DeviceForm] Location Change Details (ID: ${locationId})`);
-            console.log("Select Element:", select);
-            console.log("Dataset:", select.dataset);
-            console.log(`Reading key 'isactive-${locationId}':`, select.dataset[`isactive-${locationId}`]);
-            console.log(`Is Location Active: ${locationIsActive}`);
-            console.log(`Reading key 'locationname-${locationId}':`, select.dataset[`locationname-${locationId}`]);
-            console.log(`Location Name: ${locationName}`);
-            console.log(`Reading key 'locationslug-${locationId}':`, select.dataset[`locationslug-${locationId}`]);
-            console.log(`Location Slug: ${locationSlug}`);
-            console.groupEnd();
+            console.log('[DeviceForm] handleLocationCreated triggered.');
+            console.table(event.detail);
         }
+        
+        const { id, name } = event.detail;
+        const locationSelect = document.getElementById('id_location');
 
-        const activeCheckbox = form.querySelector('.active-status-checkbox');
-        const activeCheckboxLabel = form.querySelector(`label[for="${activeCheckbox.id}"]`);
-        const helpTextContainer = form.querySelector('[data-help-text-container]');
-        const container = form.querySelector('.is-active-container');
-
-        if (this.config.debug && !activeCheckboxLabel) {
-            console.warn(`[DeviceForm] Could not find label for checkbox #${activeCheckbox.id}`);
-        }
-
-        // --- UI Updates ---
-        if (locationIsActive) {
-            if (this.config.debug) console.log('[DeviceForm] UI UPDATE: Location is ACTIVE. Enabling checkbox.');
-            activeCheckbox.disabled = false;
-            activeCheckbox.checked = true;
-            if (activeCheckboxLabel) activeCheckboxLabel.textContent = 'Active';
-            container.classList.remove('opacity-50');
-            helpTextContainer.classList.add('d-none');
-            helpTextContainer.innerHTML = '';
-        } else {
-            if (this.config.debug) console.log('[DeviceForm] UI UPDATE: Location is INACTIVE. Disabling checkbox.');
-            activeCheckbox.disabled = true;
-            activeCheckbox.checked = false;
-            if (activeCheckboxLabel) activeCheckboxLabel.textContent = 'inactive';
-            container.classList.add('opacity-50');
-            const reason = `<div class="form-text text-warning-emphasis"><i class="bi bi-exclamation-triangle me-2"></i>This device will be inactive because Location "${locationName}" is inactive.</div>`;
-            helpTextContainer.innerHTML = reason;
-            helpTextContainer.classList.remove('d-none');
-        }
-
-        // Update Breadcrumb
-        const breadcrumb = document.getElementById('breadcrumb-location');
-        if (breadcrumb) {
-            if (this.config.debug) console.log(`[DeviceForm] Updating breadcrumb to "${locationName}"`);
+        if (locationSelect) {
+            if (this.config.debug) console.log('[DeviceForm] Found location select. Updating options and disabling field.');
             
-            // Update text
-            breadcrumb.textContent = locationName;
-
-            // Update URL using global place slug
-            const placeSlug = document.body.dataset.placeSlug;
-            if (placeSlug && placeSlug !== 'none') {
-                breadcrumb.href = `/sensors/${placeSlug}/location/${locationSlug}/`;
-                if (this.config.debug) console.log(`[DeviceForm] New breadcrumb URL: ${breadcrumb.href}`);
-            } else {
-                if (this.config.debug) console.warn('[DeviceForm] Could not find place slug on body tag.');
+            // Clear existing options
+            while (locationSelect.firstChild) {
+                locationSelect.removeChild(locationSelect.firstChild);
             }
 
-        } else {
-            if (this.config.debug) console.warn('[DeviceForm] Could not find breadcrumb element #breadcrumb-location');
-        }
+            // Add the new option and assume it's active
+            locationSelect.dataset[`isactive-${id}`] = 'true';
+            locationSelect.dataset[`locationname-${id}`] = name;
+            
+            const newOption = new Option(name, id, true, true);
+            locationSelect.add(newOption, null);
 
-        if (this.config.debug) {
-            console.log(`[DeviceForm] Final Checkbox State:`, {
-                checked: activeCheckbox.checked,
-                disabled: activeCheckbox.disabled,
-                label: activeCheckboxLabel ? activeCheckboxLabel.textContent : 'N/A'
-            });
-            console.log('[DeviceForm] Help Text Visible:', !helpTextContainer.classList.contains('d-none'));
+            // Disable the select field to "lock in" the new location
+            locationSelect.disabled = true;
+
+            // Manually trigger the change event to update UI state
+            if (this.config.debug) console.log('[DeviceForm] Dispatching change event on location select.');
+            locationSelect.dispatchEvent(new Event('change'));
+        } else {
+            if (this.config.debug) console.error('[DeviceForm] Could not find location select to update.');
+        }
+    },
+
+    handleLocationChange(select, form) {
+        try {
+            if (this.config.debug) console.log('[DeviceForm] handleLocationChange triggered.');
+
+            const locationId = select.value;
+
+            const locationIsActive = select.dataset[`isactive-${locationId}`] === 'true';
+            const locationName = select.dataset[`locationname-${locationId}`];
+            const locationSlug = select.dataset[`locationslug-${locationId}`];
+
+            if (this.config.debug) {
+                console.log(`[DeviceForm] Location Change Details (ID: ${locationId})`);
+                console.table({
+                    "Is Active": locationIsActive,
+                    "Name": locationName,
+                    "Slug": locationSlug
+                });
+            }
+
+            const activeCheckbox = form.querySelector('.active-status-checkbox');
+            const activeCheckboxLabel = form.querySelector(`label[for="${activeCheckbox.id}"]`);
+            const helpTextContainer = form.querySelector('[data-help-text-container]');
+            const container = form.querySelector('.is-active-container');
+
+            if (this.config.debug && !activeCheckboxLabel) {
+                console.warn(`[DeviceForm] Could not find label for checkbox #${activeCheckbox.id}`);
+            }
+
+            // --- UI Updates ---
+            if (locationIsActive) {
+                if (this.config.debug) console.log('[DeviceForm] UI UPDATE: Location is ACTIVE. Enabling checkbox.');
+                activeCheckbox.disabled = false;
+                activeCheckbox.checked = true;
+                if (activeCheckboxLabel) activeCheckboxLabel.textContent = 'Active';
+                container.classList.remove('opacity-50');
+                helpTextContainer.classList.add('d-none');
+                helpTextContainer.innerHTML = '';
+            } else {
+                if (this.config.debug) console.log('[DeviceForm] UI UPDATE: Location is INACTIVE. Disabling checkbox.');
+                activeCheckbox.disabled = true;
+                activeCheckbox.checked = false;
+                if (activeCheckboxLabel) activeCheckboxLabel.textContent = 'inactive';
+                container.classList.add('opacity-50');
+                const reason = `<div class="form-text text-warning-emphasis"><i class="bi bi-exclamation-triangle me-2"></i>This device will be inactive because Location "${locationName}" is inactive.</div>`;
+                helpTextContainer.innerHTML = reason;
+                helpTextContainer.classList.remove('d-none');
+            }
+
+            // Update Breadcrumb
+            const breadcrumb = document.getElementById('breadcrumb-location');
+            if (breadcrumb) {
+                if (this.config.debug) console.log(`[DeviceForm] Updating breadcrumb to "${locationName}"`);
+                
+                breadcrumb.textContent = locationName;
+
+                const placeSlug = document.body.dataset.placeSlug;
+                if (placeSlug && placeSlug !== 'none') {
+                    breadcrumb.href = `/sensors/${placeSlug}/location/${locationSlug}/`;
+                    if (this.config.debug) console.log(`[DeviceForm] New breadcrumb URL: ${breadcrumb.href}`);
+                } else {
+                    if (this.config.debug) console.warn('[DeviceForm] Could not find place slug on body tag.');
+                }
+
+            } else {
+                if (this.config.debug) console.warn('[DeviceForm] Could not find breadcrumb element #breadcrumb-location');
+            }
+
+            if (this.config.debug) {
+                console.log(`[DeviceForm] Final Checkbox State:`);
+                console.table({
+                    "Checked": activeCheckbox.checked,
+                    "Disabled": activeCheckbox.disabled,
+                    "Label": activeCheckboxLabel ? activeCheckboxLabel.textContent : 'N/A'
+                });
+            }
+        } catch (error) {
+            console.error('[DeviceForm] Error in handleLocationChange:', error);
         }
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => deviceFormManager.init()); 
+document.addEventListener('DOMContentLoaded', () => {
+    deviceFormManager.init();
+
+    document.body.addEventListener('htmx:beforeSwap', function(evt) {
+        if (deviceFormManager.config.debug) {
+            console.log('[DeviceForm] htmx:beforeSwap event triggered.');
+            console.log('Event detail:', evt.detail);
+        }
+
+        const triggerHeader = evt.detail.xhr.getResponseHeader('HX-Trigger');
+        if (triggerHeader) {
+            if (deviceFormManager.config.debug) console.log(`[DeviceForm] Found HX-Trigger: ${triggerHeader}`);
+            try {
+                const data = JSON.parse(triggerHeader);
+                if (data.locationCreated) {
+                    if (deviceFormManager.config.debug) console.log('[DeviceForm] locationCreated trigger found. Handling event.');
+                    deviceFormManager.handleLocationCreated({ detail: data.locationCreated });
+                    
+                    const modalElement = document.getElementById('modal-container');
+                    if (modalElement) {
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) {
+                            if (deviceFormManager.config.debug) console.log('[DeviceForm] Closing modal.');
+                            modal.hide();
+                        } else {
+                            if (deviceFormManager.config.debug) console.log('[DeviceForm] Modal instance not found, cannot close.');
+                        }
+                    }
+                    
+                    // We've handled this response, so we don't want HTMX to swap anything.
+                    evt.detail.shouldSwap = false;
+                }
+            } catch (e) {
+                console.error("Error parsing HX-Trigger header", e);
+            }
+        }
+    });
+}); 

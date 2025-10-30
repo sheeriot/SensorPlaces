@@ -124,9 +124,15 @@ class SensorForm(forms.ModelForm):
         else:
             self.fields['is_active'].label = 'Active'  # Set initial label
             
-        # Set initial label for is_active checkbox
-        self.fields['is_active'].label = 'Inactive' if self.instance and self.instance.pk and not self.instance.is_active else 'Active'
-        
+        self.fields['name'].label = "Sensor Name"
+        self.fields['sensor_type'].label = "Sensor Type"
+        self.fields['graph_type'].label = "Graph Type"
+
+        self.fields['unit'].label = False
+        self.fields['data_type'].label = False
+        self.fields['min_value'].label = False
+        self.fields['max_value'].label = False
+
         # Set the initial value for the unit field from the effective_unit
         if self.instance and self.instance.pk:
             self.fields['unit'].initial = self.instance.effective_unit.pk if self.instance.effective_unit else None
@@ -151,12 +157,12 @@ class SensorForm(forms.ModelForm):
                 self.initial['data_type'] = self.instance.effective_data_type
 
         # Set labels for the override fields and remove help text for cleaner layout
-        self.fields['unit_override'].label = "Override default unit"
-        self.fields['data_type_override'].label = "Override default data type"
+        self.fields['unit_override'].label = "Override"
+        self.fields['data_type_override'].label = "Override"
         self.fields['unit_override'].help_text = None
         self.fields['data_type_override'].help_text = None
-        self.fields['min_value_override'].label = "Override default min value"
-        self.fields['max_value_override'].label = "Override default max value"
+        self.fields['min_value_override'].label = "Override"
+        self.fields['max_value_override'].label = "Override"
         self.fields['min_value_override'].help_text = None
         self.fields['max_value_override'].help_text = None
 
@@ -206,32 +212,46 @@ class SensorForm(forms.ModelForm):
                 css_class='form-row align-items-center'
             ),
             Row(
-                Column('sensor_type', css_class='form-group col-md-6 mb-0'),
-                Column('graph_type', css_class='form-group col-md-6 mb-0')
+                Column('sensor_type', css_class='form-group col-md-auto mb-0'),
+                Column('graph_type', css_class='form-group col-md-auto mb-0')
             ),
             HTML('<hr class="my-3">'),
             Row(
                 Column(
-                    'unit',
-                    Field('unit_override', wrapper_class='form-check form-switch mt-2'),
-                    css_class='form-group col-md-6 mb-0'
+                    Div(
+                        HTML('<label for="id_unit" class="form-label mb-0">Unit</label>'),
+                        Field('unit_override', wrapper_class='form-check form-switch'),
+                        css_class='d-flex justify-content-between align-items-baseline'
+                    ),
+                    Div(Field('unit', id="id_unit"), css_class="mb-1"),
+                    css_class='form-group col-md-auto mb-0'
                 ),
                 Column(
-                    'data_type',
-                    Field('data_type_override', wrapper_class='form-check form-switch mt-2'),
-                    css_class='form-group col-md-6 mb-0'
-                )
-            ),
-            Row(
-                Column(
-                    'min_value',
-                    Field('min_value_override', wrapper_class='form-check form-switch mt-2'),
-                    css_class='form-group col-md-6 mb-0'
+                    Div(
+                        HTML('<label for="id_data_type" class="form-label mb-0">Data Type</label>'),
+                        Field('data_type_override', wrapper_class='form-check form-switch'),
+                        css_class='d-flex justify-content-between align-items-baseline'
+                    ),
+                    Div(Field('data_type', id="id_data_type"), css_class="mb-1"),
+                    css_class='form-group col-md-auto mb-0'
                 ),
                 Column(
-                    'max_value',
-                    Field('max_value_override', wrapper_class='form-check form-switch mt-2'),
-                    css_class='form-group col-md-6 mb-0'
+                    Div(
+                        HTML('<label for="id_min_value" class="form-label mb-0">Min Value</label>'),
+                        Field('min_value_override', wrapper_class='form-check form-switch'),
+                        css_class='d-flex justify-content-between align-items-baseline'
+                    ),
+                    Div(Field('min_value', id="id_min_value"), css_class="mb-1"),
+                    css_class='form-group col-md-auto mb-0'
+                ),
+                Column(
+                    Div(
+                        HTML('<label for="id_max_value" class="form-label mb-0">Max Value</label>'),
+                        Field('max_value_override', wrapper_class='form-check form-switch'),
+                        css_class='d-flex justify-content-between align-items-baseline'
+                    ),
+                    Div(Field('max_value', id="id_max_value"), css_class="mb-1"),
+                    css_class='form-group col-md-auto mb-0'
                 )
             ),
             Div(
@@ -241,20 +261,8 @@ class SensorForm(forms.ModelForm):
             Div(
                 Row(
                     Column(
-                        HTML("""
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <label for="id_influx_source" class="form-label mb-0">Influx Source</label>
-                                {% if self.place %}
-                                <a href="{% url 'sensors:influxsource_create' place_slug=self.place.slug %}"
-                                   class="btn btn-sm btn-outline-primary" 
-                                   id="add-influx-source-btn">
-                                    <i class="bi bi-plus-circle"></i> Source
-                                </a>
-                                {% endif %}
-                            </div>
-                        """),
                         Field('influx_source'),
-                        css_class="mb-3"
+                        css_class="form-group col-md-6 mb-0"
                     ),
                     Column('influx_measurement', css_class='form-group col-md-6 mb-0'),
                 ),

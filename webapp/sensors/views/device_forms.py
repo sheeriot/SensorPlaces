@@ -4,17 +4,18 @@ from django.utils.safestring import mark_safe
 from ..models import Device
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div
+from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
 
 
 from icecream import ic
 
 
 class DeviceForm(forms.ModelForm):
+    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     class Meta:
         model = Device
-        fields = ['name', 'is_active', 'is_lorawan', 'is_switchbot', 'location', 'device_type', 'manufacturer', 'model', 'device_id', 'notes']
+        fields = ['name', 'is_active', 'is_lorawan', 'location', 'device_type', 'manufacturer', 'model', 'device_id', 'notes']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter device name'}),
             'manufacturer': forms.TextInput(attrs={'placeholder': 'Enter manufacturer'}),
@@ -52,9 +53,10 @@ class DeviceForm(forms.ModelForm):
         
         # Configure crispy form helper
         self.helper = FormHelper()
+        self.helper.form_class = 'model-form'
+        
         self.helper.form_tag = True
         self.helper.form_method = 'post'
-        self.helper.form_class = 'mb-0 model-form'
         self.helper.form_id = 'device-form'
         self.helper.form_show_errors = True
         self.helper.error_text_inline = True
@@ -73,6 +75,10 @@ class DeviceForm(forms.ModelForm):
             self.fields['is_active'].label = 'Inactive'
         else:
             self.fields['is_active'].label = 'Active'
+            
+        self.fields['name'].label = mark_safe('<i class="bi bi-hdd-rack me-1"></i> Device Name')
+        self.fields['location'].label = False
+        self.fields['device_id'].label = 'Device ID'
             
         # Store original state for JavaScript
         if self.instance and self.instance.pk:
@@ -127,80 +133,64 @@ class DeviceForm(forms.ModelForm):
             )
 
         self.helper.layout = Layout(
-            'name',
+            Field('referrer', type='hidden'),
             Row(
-                Column(Field('location', id='id_location'), css_class='col-7'),
+                Column('name', css_class='col-md-8'),
                 Column(
                     Div(
                         Field('is_active'),
-                        css_class='is-active-container form-check'
-                    ), 
-                    css_class='col-5 d-flex align-items-center pt-3' # pt-3 to align with dropdown
-                ),
-                css_class='mb-2'
-            ),
-            Row(
-                Column(
-                    # This is the dedicated container for our JS-managed help text
-                    HTML('<div class="form-text text-warning-emphasis" data-help-text-container></div>'), 
-                    css_class='col-12'
-                ),
-                css_class='mb-3'
-            ),
-            Row(
-                Column('device_type', css_class='col-7'),
-                Column(
-                    # Re-wrap is_lorawan to ensure proper alignment
-                    Div(
-                        Field('is_lorawan'), 
-                        css_class='form-check mt-4'
+                        css_class='is-active-container form-check form-switch pt-4'
                     ),
-                    css_class='col-5 d-flex align-items-center'
+                    css_class='col-md-4 d-flex align-items-center'
                 ),
                 css_class='mb-3'
             ),
             Row(
                 Column(
-                    # is_switchbot field
                     Div(
-                        Field('is_switchbot'), 
-                        css_class='form-check'
+                        HTML("""
+                            <label for="id_location" class="form-label d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-geo-alt me-1"></i> Location</span>
+                                <button type="button" hx-get="{% url 'sensors:location_create_modal' place_slug=place.slug %}"
+                                        hx-target="#modal-container"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modal-container"
+                                        class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-plus-circle me-1"></i> Add
+                                </button>
+                            </label>
+                        """),
+                        Field('location', id='id_location'),
                     ),
-                    css_class='col-12 d-flex align-items-center'
+                    css_class='col-md-6'
                 ),
                 css_class='mb-3'
             ),
             Row(
-                Column('manufacturer', css_class='col-auto'),
-                Column('model', css_class='col-auto'),
-                css_class='mb-1'
+                Column('manufacturer', css_class='col-md-6'),
+                Column('model', css_class='col-md-6'),
+                css_class='mb-3'
             ),
             Row(
-                Column('device_id', css_class='col-auto'),
-                css_class='mb-2'
+                Column('device_type', css_class='col-md-6'),
+                Column('device_id', css_class='col-md-6'),
+                css_class='mb-3'
             ),
-            Row(
-                Column('notes', css_class='col-12'),
-                css_class='mb-2'
-            ),
+            'notes',
+            HTML('<hr>'),
             Div(
-                HTML('<hr class="mt-1">'),
-                Div(
-                    HTML(f"""
-                        <a href="{cancel_url}" 
-                           class="btn btn-outline-secondary">
-                            <i class="bi bi-x-lg me-1"></i>Cancel
-                        </a>
-                    """),
-                    HTML("""
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-hdd-rack me-1"></i>{% if not object %}Create{% else %}Save{% endif %}
-                        </button>
-                    """),
-                    css_class='d-flex justify-content-between align-items-center'
-                ),
-                css_class='mt-3'
-            ),
+                HTML(f"""
+                    <a href="{cancel_url}" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Cancel
+                    </a>
+                """),
+                HTML("""
+                    <button type="submit" name="submit" class="btn btn-success">
+                        <i class="bi bi-hdd-rack me-1"></i> Save
+                    </button>
+                """),
+                css_class='d-flex justify-content-between align-items-center'
+            )
         )
 
     def clean(self):
@@ -244,7 +234,7 @@ class DeviceForm(forms.ModelForm):
         # Enforce that device must be inactive if location is inactive
         if location and not location.is_active and cleaned_data.get('is_active', False):
             cleaned_data['is_active'] = False
-            self.add_error('is_active', "Device cannot be active when its location is inactive.")
+            self.add_error(None, "A device cannot be active if its location is inactive.")
             
         # Check for unique device_id within the same place
         device_id = cleaned_data.get('device_id')

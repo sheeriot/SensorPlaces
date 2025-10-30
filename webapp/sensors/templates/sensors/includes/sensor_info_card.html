@@ -1,0 +1,30 @@
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-thermometer-half me-2"></i>Sensor Details
+        </h5>
+        <div class="btn-group">
+            <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil-fill"></i> Edit
+            </a>
+            <button class="btn btn-sm btn-outline-danger"
+                    hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+                    hx-target="#modal-container"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal-container">
+                <i class="bi bi-trash-fill"></i> Delete
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">{{ sensor.name }}</h6>
+        <p class="card-text">
+            <strong>Type:</strong> {{ sensor.get_sensor_type_display }}<br>
+            <strong>Unit:</strong> {{ sensor.effective_unit.symbol|default:"N/A" }}<br>
+            <strong>Data Type:</strong> {{ sensor.get_effective_data_type_display }}
+        </p>
+        <p class="card-text">
+            <small class="text-muted">Last updated: {{ sensor.updated_at|date:"Y-m-d H:i" }}</small>
+        </p>
+    </div>
+</div>

@@ -1,3 +1,4 @@
+{% load humanize %}
 <div class="card my-2" id="sensor-graph-card" 
     data-sensor-id="{{ sensor.pk }}" 
     data-place-slug="{{ place.slug }}"
@@ -12,88 +13,49 @@
     data-start-date="{{ start_date_iso|default:'' }}"
     data-end-date="{{ end_date_iso|default:'' }}"
     data-api-url="{% if sensor.device.is_lorawan %}{% url 'sensors:lorawan_sensor_data_api' place_slug=place.slug pk=sensor.pk %}{% else %}{% url 'sensors:sensor_readings_api' place_slug=place.slug pk=sensor.pk %}{% endif %}">
-    <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="card-title mb-0 d-flex align-items-center">
-                <i class="bi bi-graph-up-arrow me-2"></i>
-                <span class="me-2">{% if sensor.device.is_lorawan %}InfluxDB Graph{% else %}Recent Readings{% endif %}</span>
-            </h5>
-            <div class="d-flex align-items-center">
-                {% if 'temperature' in sensor.sensor_type.name|lower %}
-                <div class="me-2">
-                    <select id="temp-unit-select" class="form-select form-select-sm">
-                        <option value="C" {% if sensor.unit.symbol == 'C' %}selected{% endif %}>Celsius (°C)</option>
-                        <option value="F" {% if sensor.unit.symbol == 'F' %}selected{% endif %}>Fahrenheit (°F)</option>
-                    </select>
-                </div>
-                {% endif %}
-                <div class="form-check form-switch me-3 d-none">
-                    <input class="form-check-input" type="checkbox" id="filter-outliers-switch" checked>
-                    <label class="form-check-label" for="filter-outliers-switch">Filter outliers</label>
-                </div>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGraph" aria-expanded="true" aria-controls="collapseGraph">
-                    <i class="bi bi-arrows-angle-expand"></i>
-                </button>
-            </div>
+    <div class="card-header d-flex align-items-center">
+        <h5 class="card-title mb-0 d-flex align-items-center">
+            <i class="bi bi-graph-up me-2"></i> InfluxDB Graph
+            {% include 'sensors/partials/sensor_live_value_htmx.html' with component_id_suffix="header" sensor_pk=sensor.pk place_slug=place.slug %}
+        </h5>
+        <div class="ms-auto d-flex align-items-center">
+            {% if sensor.sensor_type.name == 'Temperature' %}
+            <select id="temp-unit-select" class="form-select form-select-sm" style="width: auto;">
+                <option value="C" {% if 'C' in sensor.effective_unit.symbol %}selected{% endif %}>Celsius (°C)</option>
+                <option value="F" {% if 'F' in sensor.effective_unit.symbol %}selected{% endif %}>Fahrenheit (°F)</option>
+            </select>
+            {% endif %}
         </div>
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div class="btn-group btn-group-sm" role="group">
+    </div>
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-2 flex-wrap">
+            <div class="btn-group btn-group-sm me-3 mb-2" role="group">
                 <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="6h">6h</button>
                 <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="24h">24h</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="3d">3d</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset {% if not start_date_iso and not end_date_iso %}active{% endif %}" data-range="7d">7d</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset active" data-range="3d">3d</button>
+                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="7d">7d</button>
                 <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="14d">14d</button>
                 <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="30d">30d</button>
                 <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="60d">60d</button>
             </div>
-            <div class="d-flex align-items-center">
-                <div class="input-group input-group-sm w-auto">
-                    <input type="date" id="start-date-picker" class="form-control" value="{{ start_date_iso|date:'Y-m-d' }}">
-                    <span class="input-group-text">to</span>
-                    <input type="date" id="end-date-picker" class="form-control" value="{{ end_date_iso|date:'Y-m-d' }}">
-                    <button id="apply-date-range" class="btn btn-primary">Apply</button>
-                </div>
-                <div class="ms-2 d-flex align-items-center">
-                    {% if not start_date_iso and not end_date_iso %}
-                    <a href="#" id="copy-relative-url-btn" title="Copy relative time URL" class="text-secondary me-2">
-                        <i class="bi bi-clock-history"></i>
-                    </a>
-                    {% endif %}
-                    <a href="#" id="copy-absolute-url-btn" title="Copy absolute time URL" class="text-secondary">
-                        <i class="bi bi-clock"></i>
-                    </a>
-                </div>
+            <div class="d-flex align-items-center mb-2">
+                <input type="text" id="start-date-picker" class="form-control form-control-sm" placeholder="Start Date">
+                <span class="mx-2">to</span>
+                <input type="text" id="end-date-picker" class="form-control form-control-sm" placeholder="End Date">
+                <button id="apply-date-range" class="btn btn-primary btn-sm ms-2">Graph</button>
             </div>
+        </div>
+        <div id="graph-content-{{ sensor.pk }}" class="d-none" style="position: relative; height:400px;">
+            <canvas id="sensorChart"></canvas>
         </div>
     </div>
-    <div class="collapse show" id="collapseGraph">
-        <div class="card-body">
-            <div class="chart-container" style="height:40vh;">
-                <canvas id="sensorChart"></canvas>
-            </div>
-        </div>
-        <div class="card-footer">
-            <div id="data-points-container" class="mt-3">
-                <h5 class="px-3">Data Points</h5>
-                <div class="table-responsive" style="max-height: 300px;">
-                    <table class="table table-sm table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>Timestamp</th>
-                                <th class="text-end">
-                                    Value 
-                                    {% if sensor.effective_unit.symbol %}
-                                        ({{ sensor.effective_unit.symbol }})
-                                    {% endif %}
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody id="data-points-body-{{ sensor.pk }}">
-                            <!-- Data rows will be injected by JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+    <div class="card-footer d-flex justify-content-between text-muted small">
+        <span><i class="bi bi-info-circle me-1"></i> Data from InfluxDB</span>
+        <div class="d-flex">
+            <span id="first-reading-time" class="me-3"></span>
+            <span id="last-reading-time" class="me-3"></span>
+            <span id="datapoint-count" class="me-3"></span>
+            <span id="graph-query-time"></span>
         </div>
     </div>
 </div> 
