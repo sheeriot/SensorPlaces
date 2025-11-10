@@ -3,11 +3,11 @@ set -e
 
 # Wait for the database to be ready
 # Note: This is a simple loop. For production, a more robust solution like wait-for-it.sh is recommended.
-echo "Waiting for database..."
-while ! nc -z db 5432; do
-  sleep 1
-done
-echo "Database is ready."
+# echo "Waiting for database..."
+# while ! nc -z db 5432; do
+#   sleep 1
+# done
+# echo "Database is ready."
 
 # Apply database migrations
 echo "Apply database migrations"
@@ -23,6 +23,6 @@ if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ] &&
   python manage.py createsuperuser --noinput
 fi
 
-# Start the Django development server
-echo "Running python manage.py runserver 0.0.0.0:8010"
-exec python manage.py runserver 0.0.0.0:8010 
+# Execute the command passed to the script
+echo "Executing command: $@"
+exec "$@" 
