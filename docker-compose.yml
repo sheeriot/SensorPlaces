@@ -18,6 +18,19 @@ services:
       - sensors-static:/opt/app/static_files
       - sensors-media:/opt/app/media
       - ./webapp:/opt/app/webapp
+
+  test:
+    build:
+      context: .
+    env_file:
+      - env/django-test.env
+    entrypoint: /opt/app/docker-entrypoint.sh
+    # This service is for running tests. It has no volumes and is fully isolated.
+    # Arguments passed to 'docker compose run' are appended to the 'python manage.py test' command.
+    command: python manage.py test
+    profiles:
+      - test
+
 volumes:
   sensors-db:
   sensors-static:
