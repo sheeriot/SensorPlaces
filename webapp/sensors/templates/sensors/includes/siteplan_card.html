@@ -8,15 +8,16 @@
             <i class="bi bi-map me-2"></i>
             Site Plan
         </h5>
-        {% if editable %}
-        <button id="siteplan-edit" class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-grid"></i> Edit Layout
-        </button>
-        {% else %}
-        <a href="#" class="btn btn-sm btn-outline-secondary p-1" data-bs-toggle="modal" data-bs-target="#siteplan-view-modal">
-            <i class="bi bi-arrows-fullscreen"></i>
-        </a>
-        {% endif %}
+        <div class="ms-auto d-flex align-items-center">
+            {% if editable %}
+            <button id="siteplan-edit" class="btn btn-sm btn-outline-primary me-2">
+                <i class="bi bi-grid"></i> Edit
+            </button>
+            {% endif %}
+            <a href="#" class="btn btn-sm btn-outline-secondary p-1" data-bs-toggle="modal" data-bs-target="#siteplan-view-modal" title="View Fullscreen">
+                <i class="bi bi-arrows-fullscreen"></i>
+            </a>
+        </div>
     </div>
     {% if place.siteplan_image %}
     <div class="card-body p-0">

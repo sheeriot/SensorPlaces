@@ -39,7 +39,8 @@ This template expects:
                     <i class="bi bi-pencil-fill"></i>
                 </a>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-location"
-                        data-url="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}"
+                        hx-get="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}"
+                        hx-target="#deleteLocationModal .modal-content"
                         data-bs-toggle="modal"
                         data-bs-target="#deleteLocationModal"
                         title="Delete Location">

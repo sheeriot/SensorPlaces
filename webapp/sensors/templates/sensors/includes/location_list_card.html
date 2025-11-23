@@ -49,50 +49,14 @@ This template expects the following context variables:
     </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteLocationModal" tabindex="-1" aria-labelledby="deleteLocationModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <!-- Content will be loaded here dynamically -->
+        </div>
     </div>
-  </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const deleteLocationModal = document.getElementById('deleteLocationModal');
-    if (deleteLocationModal) {
-        deleteLocationModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const url = button.dataset.url;
-            const modalContent = deleteLocationModal.querySelector('.modal-content');
-
-            fetch(url, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                modalContent.innerHTML = data.html;
-                const deleteForm = modalContent.querySelector('#deleteLocationForm');
-                deleteForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    fetch(deleteForm.action, {
-                        method: 'POST',
-                        body: new FormData(deleteForm),
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            window.location.href = data.redirect_url;
-                        }
-                    });
-                });
-            });
-        });
-    }
-});
-</script>
+<!-- Drag and Drop column placeholder -->
+<div id="drag-drop-column" class="drag-drop-column list-group-item d-none"></div>

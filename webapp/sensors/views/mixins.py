@@ -16,6 +16,7 @@ from ..models import Place, Location
 from typing import Any, Dict, Optional
 
 from icecream import ic
+from django.urls import NoReverseMatch
 
 
 class ReferrerMixin:
@@ -68,7 +69,20 @@ class ReferrerMixin:
             if hasattr(self, 'model') and self.model:
                 app_label = self.model._meta.app_label
                 model_name = self.model._meta.model_name
-                return reverse(f'{app_label}:{model_name}_list')
+                
+                url_name = f'{app_label}:{model_name}_list'
+                url_kwargs = {}
+                
+                # If 'place_slug' is in the view's kwargs, add it to the reverse call
+                if 'place_slug' in self.kwargs:
+                    url_kwargs['place_slug'] = self.kwargs['place_slug']
+                
+                try:
+                    return reverse(url_name, kwargs=url_kwargs)
+                except NoReverseMatch:
+                    # Fallback for cases where the URL structure is unexpected
+                    pass
+
             ic("CreateView without a model, falling back.")
 
         # For update views, try to get the object and return its detail page URL.

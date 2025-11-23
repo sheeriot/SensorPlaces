@@ -16,7 +16,7 @@ from django.utils.decorators import method_decorator
 from ..models import Place, Location, Device, Sensor
 from .location_forms import LocationForm
 from .mixins import PlaceAnnotationMixin, FormDataMixin, ReferrerMixin
-from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
+from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context, get_place_data
 from ..decorators import log_execution_time
 
 from icecream import ic
@@ -29,37 +29,37 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
 
     def get_queryset(self) -> QuerySet[Location]:
         """Get locations with device and sensor counts."""
+        # self._place should be set by PlaceAnnotationMixin.setup()
+        if not hasattr(self, '_place') or not self._place:
+            # Fallback in case setup wasn't called as expected
+            self._place = self.get_place()
         return get_annotated_locations(self._place).order_by('-is_active', Lower('name'))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        place = context['place']
+        
+        # Ensure place is in context, retrieving it from the mixin's cache
+        place = getattr(self, '_place', None)
+        if not place:
+            place = self.get_place() # Should not be necessary but good for robustness
+        context['place'] = place
+
+        # Use the centralized get_place_data function to populate the context
+        place_data = get_place_data(place, request=self.request, include_json=True)
+        context.update(place_data)
 
         # Loop through locations to attach the full device list for the 'unassigned' one
+        # Note: 'locations' is now in the context from get_place_data
         for loc in context['locations']:
             if loc.slug == 'unassigned-devices':
                 loc.device_list = list(loc.devices.all().order_by('name'))
                 break  # Found it, no need to continue looping
 
-        # Add hide_inactive state from GET param or cookie
-        hide_inactive_param = self.request.GET.get('hide_inactive')
-        if hide_inactive_param is not None:
-            context['hide_inactive'] = hide_inactive_param.lower() == 'true'
-        else:
-            hide_inactive_cookie = self.request.COOKIES.get('hideInactive_location', 'false')
-            context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
-
-        # Add live counts to context
-        context.update(get_live_counts_context(place))
-        
-        # Add locations_json for siteplan
-        from .views_fun import get_location_data
-        import json
-        
-        locations = context['locations']
-        locations_data = [get_location_data(loc) for loc in locations]
-        context['locations_json'] = json.dumps(locations_data)
+        # The rest of the logic is now handled by get_place_data, so we can remove it.
+        # # Add hide_inactive state from GET param or cookie...
+        # # Add live counts to context...
+        # # Add locations_json for siteplan...
         
         return context
 
@@ -530,10 +530,13 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        
+        # HTMX requests get a partial response
+        if request.htmx:
             context = self.get_context_data(object=self.object)
-            html = render_to_string('sensors/location_confirm_delete_modal.html', context, request=request)
-            return JsonResponse({'html': html})
+            return render(request, 'sensors/location_confirm_delete_modal.html', context)
+
+        # Standard full-page GET request
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -578,8 +581,13 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             'type': 'danger'
         })
         
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': True, 'redirect_url': self.get_success_url()})
+        # For HTMX requests, redirect with a special header
+        if request.htmx:
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = self.get_success_url()
+            return response
+            
+        # For standard form submissions, do a regular redirect
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
