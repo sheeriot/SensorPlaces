@@ -19,7 +19,7 @@ Create a file `resources/nginx/conf.d/sensorplaces.conf` in your webhost reposit
 server {
     listen 80;
     server_name sensorplaces.yourdomain.com;
-    
+
     location / {
         proxy_pass http://sensorplaces:8000;
         proxy_set_header Host $host;
@@ -27,11 +27,11 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    
+
     location /static/ {
         alias /static/;
     }
-    
+
     location /media/ {
         alias /media/;
     }
@@ -61,10 +61,10 @@ For HTTPS, your NGINX configuration should include:
 server {
     listen 443 ssl;
     server_name sensorplaces.yourdomain.com;
-    
+
     ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-    
+
     location / {
         proxy_pass http://sensorplaces:8000;
         proxy_set_header Host $host;
@@ -72,11 +72,11 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    
+
     location /static/ {
         alias /static/;
     }
-    
+
     location /media/ {
         alias /media/;
     }
@@ -98,4 +98,4 @@ After making these changes, restart the webhost services:
 cd /path/to/webhost
 docker-compose down
 docker-compose up -d
-``` 
+```

@@ -30,7 +30,7 @@ urlpatterns = [
     # Legacy URL for /places/
     path('places/', place_views.PlaceListView.as_view(), name='place_list_legacy'),
     path('new/', place_views.PlaceCreateView.as_view(), name='place_create'),
-    
+
     # API, sensortype, and other specific patterns before the generic <place_slug>
     path('api/set-timezone/', timezone_views.set_user_timezone, name='set_user_timezone'),
     path('sensortypes/', sensor_type_views.SensorTypeListView.as_view(), name='sensortype_list'),
@@ -54,7 +54,7 @@ urlpatterns = [
     path('api/<slug:place_slug>/toggle-active/', toggle_active.ToggleActiveView.as_view(), name='toggle_active'),
     path('api/<slug:place_slug>/toasts/', toast_views.ToastAPIView.as_view(), name='toast_api'),
     path('api/<slug:place_slug>/sensors/live-values/', sensor_views.sensor_live_values_api, name='sensor_live_values_api'),
-    
+
     # Location URLs
     path('<slug:place_slug>/location/', location_views.LocationListView.as_view(), name='location_list'),
     path('<slug:place_slug>/location/new/', location_views.LocationCreateView.as_view(), name='location_create'),
@@ -72,7 +72,7 @@ urlpatterns = [
     path('<slug:place_slug>/device/<int:pk>/update/', device_views.DeviceUpdateView.as_view(), name='device_update'),
     path('<slug:place_slug>/device/<int:pk>/delete/', device_views.DeviceDeleteView.as_view(), name='device_delete'),
     path('<slug:place_slug>/device/<int:pk>/fetch-reading/', device_views.fetch_switchbot_reading, name='fetch_switchbot_reading'),
-    
+
     # API endpoints for devices
     path('api/<slug:place_slug>/device/<int:pk>/inspect/', device_views.device_inspect_view, name='device_inspect'),
     path('api/<slug:place_slug>/device/<int:pk>/move/', device_views.DeviceMoveLocationView.as_view(), name='device_move_location'),

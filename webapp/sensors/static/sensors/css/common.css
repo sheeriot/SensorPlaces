@@ -395,7 +395,7 @@
 
 .grouped-list-header.opacity-50:hover {
     background-color: rgba(108, 117, 125, 0.1) !important;  /* Slightly darker gray on hover when inactive */
-} 
+}
 
 /* Replace the complex alert handling with this simple rule */
 /* lets see if there are still alerts in the code */

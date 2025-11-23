@@ -38,7 +38,7 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        
+
         # Ensure place is in context, retrieving it from the mixin's cache
         place = getattr(self, '_place', None)
         if not place:
@@ -60,7 +60,7 @@ class LocationListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         # # Add hide_inactive state from GET param or cookie...
         # # Add live counts to context...
         # # Add locations_json for siteplan...
-        
+
         return context
 
 @method_decorator(log_execution_time, name='dispatch')
@@ -80,11 +80,11 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         context['absolute_url'] = self.request.build_absolute_uri()
-        
+
         # Check for hide_inactive cookie
         hide_inactive_cookie = self.request.COOKIES.get('hideInactive_device', 'false')
         context['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
-        
+
         # Get the specific location for the detail view
         detailed_location = get_annotated_locations(self._place).get(slug=self.object.slug)
         context['location'] = detailed_location
@@ -100,10 +100,10 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
             sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True), distinct=True),
             sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False), distinct=True)
         ).order_by(
-            '-is_active', 
+            '-is_active',
             Lower('name')
         )
-        
+
         context['object_list'] = [detailed_location]
         context['unassigned_devices'] = [] # No unassigned devices in this context
 
@@ -122,7 +122,7 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
                 for loc in all_locations
             ]
         )
-        
+
         return context
 
 class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, FormDataMixin, CreateView):
@@ -130,17 +130,17 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
     form_class = LocationForm
     template_name = 'sensors/location_form.html'
     object: Location
-    
+
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Get and cache place 
+        # Get and cache place
         self._place = self.get_place()
         self._inactive_help_text = None
-        
+
         # Generate help text if place is inactive
         if self._place and not self._place.is_active:
             self._inactive_help_text = self.get_location_inactive_help_text(None, self._place)[0]
-        
+
     def get_default_success_url(self):
         """
         Return the default URL to redirect to. For create views, this should
@@ -153,18 +153,18 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
     def get_location_inactive_help_text(self, location, place=None):
         """
         Generate help text for location inactive status when creating.
-        
+
         Args:
             location: The location object (None for create view)
             place: The location's place
-            
+
         Returns:
             tuple: (help_text, active_devices)
                 - help_text: HTML string with warning message or None
                 - active_devices: empty list for create view
         """
         inactive_help_text = None
-        
+
         # For create view, we only care about place being inactive
         if place and not place.is_active:
             inactive_help_text = mark_safe(
@@ -174,12 +174,12 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
                 f'All devices within it will not collect data.'
                 '</div>'
             )
-        
+
         return inactive_help_text, []
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        
+
         # Set initial data properly - everything else comes from FormDataMixin
         kwargs.setdefault('initial', {}).update({
             'is_active': self._place.is_active,
@@ -205,7 +205,7 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         form.instance.place = self._place
         # Save the form to get the object
         self.object = form.save()
-        
+
         if self.request.htmx:
             response = HttpResponse(status=204) # No Content is best for "do nothing"
             response['HX-Trigger'] = json.dumps({
@@ -223,17 +223,17 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
             f"Status: {'Active' if self.object.is_active else 'inactive'}"
             f"</small>"
         )
-        
+
         # Add inactive warning to message if location is inactive
         if not self.object.is_active and self._inactive_help_text:
             message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
-        
+
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         })
-        
+
         # On success, redirect to the detail view of the newly created object.
         success_url = reverse('sensors:location_detail', kwargs={
             'place_slug': self.kwargs['place_slug'],
@@ -263,24 +263,24 @@ class LocationCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         """Add a toast message to the request."""
         # Get the place from self.get_place() (set in PlaceAnnotationMixin.setup)
         place = self.get_place()
-        
+
         # Create toast data dict
         toast_data = {
             'message': message,
             'type': type
         }
-        
+
         # Initialize toast_message list if it doesn't exist
         if not hasattr(self.request, 'toast_message'):
             self.request.toast_message = []
-        
+
         # If it's a single message (not a list), convert to list
         elif not isinstance(self.request.toast_message, list):
             self.request.toast_message = [self.request.toast_message]
-        
+
         # Add the new toast message
         self.request.toast_message.append(toast_data)
-        
+
         return toast_data
 
 class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, FormDataMixin, UpdateView):
@@ -289,18 +289,18 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
     template_name = 'sensors/location_form.html'
     context_object_name = 'location'
     slug_url_kwarg = 'slug'
-    
+
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         # Get and cache place
         self._place = self.get_place()
         self._inactive_help_text = None
         self._devices_active = []
-        
+
         try:
             # Try to get the location if we're updating
             location = self.get_object()
-            
+
             # Use the helper method to get the appropriate help text
             self._inactive_help_text, self._devices_active = self.get_location_inactive_help_text(location, self._place)
         except Exception as e:
@@ -325,11 +325,11 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
     def get_location_inactive_help_text(self, location, place=None):
         """
         Generate help text for location inactive status.
-        
+
         Args:
             location: The location object
             place: The location's place (optional)
-            
+
         Returns:
             tuple: (help_text, active_devices)
                 - help_text: HTML string with warning message or None
@@ -337,13 +337,13 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         """
         inactive_help_text = None
         devices_active = []
-        
+
         if not location:
             return None, []
-            
+
         if not place:
             place = location.place
-            
+
         # If place is inactive, create help text about that
         if place and not place.is_active:
             # Check if location is active when it shouldn't be
@@ -352,16 +352,16 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
                 devices_active = list(location.devices.filter(is_active=True).annotate(
                     sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
                 ).prefetch_related('sensors'))
-                
+
                 # Fix the inconsistency - set location to inactive
                 location.is_active = False
                 location.save()
-                
+
                 # Just log the inconsistency with ic
                 # ic(f"Fixed inconsistency: Location {location.id} ({location.name}) was active "
                 #    f"but its Place {place.id} ({place.name}) is inactive.")
                 # ic(f"Affected devices: {len(devices_active)}")
-            
+
             # Standard message for inactive place
             inactive_help_text = mark_safe(
                 '<div class="form-text text-warning-emphasis mt-2">'
@@ -376,9 +376,9 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
             devices_active = list(location.devices.filter(is_active=True).annotate(
                 sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
             ).prefetch_related('sensors'))
-            
+
             active_device_count = len(devices_active)
-            
+
             if active_device_count > 0:
                 # Generate the list of active devices with their sensor counts
                 active_devices_list = ''.join([
@@ -386,7 +386,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
                     f'<small class="text-muted">({device.sensor_count} active sensors)</small></li>'
                     for device in devices_active
                 ])
-                
+
                 inactive_help_text = mark_safe(
                     '<div class="form-text text-warning-emphasis mt-2">'
                     f'<i class="bi bi-exclamation-triangle me-2"></i>'
@@ -394,7 +394,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
                     f'<ul class="list-unstyled mb-0 mt-1 ms-4">{active_devices_list}</ul>'
                     '</div>'
                 )
-        
+
         return inactive_help_text, devices_active
 
     def get_form_kwargs(self):
@@ -405,7 +405,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
         location = self.get_object()
-         
+
         # Add all devices to context with annotations
         context['devices'] = Device.objects.filter(
             location=location
@@ -417,10 +417,10 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
             sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True), distinct=True),
             sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False), distinct=True)
         ).order_by(
-            '-is_active', 
+            '-is_active',
             Lower('name')
         )
-        
+
         # Add a fallback cancel URL
         context['cancel_url'] = self.get_cancel_url()
         return context
@@ -439,7 +439,7 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
     def form_valid(self, form):
         # Explicitly set the place on the form instance
         form.instance.place = self._place
-        
+
         # Get the object before saving to compare values
         location = self.get_object()
         original_values = {
@@ -447,10 +447,10 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
             'is_active': location.is_active,
             'slug': location.slug,
         }
-        
+
         # Save the form
         self.object = form.save()
-        
+
         # Build changes list
         changes = []
         if original_values['name'] != form.cleaned_data['name']:
@@ -468,33 +468,33 @@ class LocationUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin
             f"Changes: {', '.join(changes) if changes else 'No changes'}"
             f"</small>"
         )
-        
+
         # Add inactive warning to message if location is inactive
         if not self.object.is_active and self._inactive_help_text:
             message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
-        
+
         # Set toast message directly on request for middleware
         toast_message = {
             'message': message,
             'type': 'success' if form.cleaned_data['is_active'] else 'warning'
         }
-        
+
         # Debug statements
         # ic("⚠️ Setting toast_message on request:", toast_message)
-        
+
         # Set on request
         setattr(self.request, 'toast_message', toast_message)
-        
+
         # ALSO set directly in session for reliability
         if hasattr(self.request, 'session'):
             self.request.session['pending_toast'] = toast_message
             self.request.session.modified = True
             # ic("⚠️ Also set pending_toast in session")
-        
+
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_default_success_url()
         # ic("⚠️ Redirecting to:", success_url)
-        
+
         return HttpResponseRedirect(success_url)
 
 class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
@@ -506,7 +506,7 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         super().setup(request, *args, **kwargs)
         # Get and cache place
         self._place = self.get_place()
-        
+
         # Create inactive help text to be used in form and toast messages
         if self._place and not self._place.is_active:
             self._inactive_help_text = mark_safe(
@@ -519,18 +519,18 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'location'
-        
+
         # Get devices to show the user which devices will be deleted
         location = self.get_object()
         devices = location.devices.all().order_by(Lower('name'))
         context['devices'] = devices
         context['device_count'] = devices.count()
-        
+
         return context
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
-        
+
         # HTMX requests get a partial response
         if request.htmx:
             context = self.get_context_data(object=self.object)
@@ -544,7 +544,7 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         location = self.object
         # Store place_slug before deletion for redirect
         self.place_slug = self._place.slug
-        
+
         # Get active devices info before deletion
         active_devices = Device.objects.filter(
             location=location,
@@ -552,47 +552,47 @@ class LocationDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         ).annotate(
             sensor_count=Count('sensors', filter=Q(sensors__is_active=True))
         )
-        
-        devices_info = [f"{device.name} ({device.sensor_count} active sensors)" 
+
+        devices_info = [f"{device.name} ({device.sensor_count} active sensors)"
                        for device in active_devices]
-        
+
         message = (
             f"Deleted location <strong>{location.name}</strong> from "
             f"<i class='bi bi-house-gear'></i> {self._place.name}<br>"
             f"<small class='text-muted'>"
             f"Status: {'Active' if location.is_active else 'inactive'}"
         )
-        
+
         if devices_info:
             message += f"<br>Affected devices:<br>{'; '.join(devices_info)}"
-        
+
         message += "</small>"
-        
+
         # Add inactive warning to message if location is inactive
         if not location.is_active and self._inactive_help_text:
             message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
-        
+
         # Delete the location
         location.delete()
-        
+
         # Set toast message directly on request for middleware
         setattr(request, 'toast_message', {
             'message': message,
             'type': 'danger'
         })
-        
+
         # For HTMX requests, redirect with a special header
         if request.htmx:
             response = HttpResponse(status=204)
             response['HX-Redirect'] = self.get_success_url()
             return response
-            
+
         # For standard form submissions, do a regular redirect
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         # Use stored place_slug for redirect
-        return reverse('sensors:place_detail', 
+        return reverse('sensors:place_detail',
                       kwargs={'place_slug': self.place_slug})
 
 
@@ -612,17 +612,17 @@ class LocationCreateModalView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
     def form_valid(self, form):
         form.instance.place = self.get_place()
         self.object = form.save()
-        
+
         location_data = {
             "id": self.object.id,
             "name": self.object.name,
         }
-        
+
         script = f"""
         <script>
             htmx.trigger("body", "locationCreated", {json.dumps(location_data)});
             htmx.trigger("body", "closeModal", {{ "value": "#modal-container" }});
-            
+
             (function() {{
                 var self = document.currentScript;
                 self.parentElement.removeChild(self);

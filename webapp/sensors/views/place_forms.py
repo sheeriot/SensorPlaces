@@ -63,7 +63,7 @@ class PlaceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         inactive_help_text = kwargs.pop('inactive_help_text', None)
         cancel_url = kwargs.pop('cancel_url', None)
-        
+
         # Remove the referrer pop - we'll handle it through initial data instead
         # Pop parameters from FormDataMixin that we don't use
         kwargs.pop('place', None)
@@ -78,14 +78,14 @@ class PlaceForm(forms.ModelForm):
         self.helper.form_show_errors = True
         self.helper.error_text_inline = True
         self.helper.help_text_inline = True
-        
+
         # Make address field optional
         self.fields['address'].required = False
-        
+
         # If this is an existing Place, preserve its slug
         if self.instance and self.instance.pk:
             self.fields['slug'].initial = self.instance.slug
-        
+
         # Configure field properties
         # Setup Active field with proper ID and label
         checkbox_id = f"place-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
@@ -93,19 +93,19 @@ class PlaceForm(forms.ModelForm):
             'id': checkbox_id,
             'data-place-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
         })
-        
+
         # Set the label based on the current state
         if self.instance and self.instance.pk and not self.instance.is_active:
             self.fields['is_active'].label = 'inactive'
         else:
             self.fields['is_active'].label = 'Active'
-        
+
         # Set help text for inactive state if provided
         if inactive_help_text:
             self.fields['is_active'].help_text = inactive_help_text
         else:
             pass
-            
+
         self.fields['latitude'].label = None
         self.fields['longitude'].label = None
 
@@ -125,9 +125,9 @@ class PlaceForm(forms.ModelForm):
                     HTML("""
                         <div class="card mb-3">
                             <div class="card-body text-center">
-                                <img src="{{ object.siteplan_image.url }}" 
-                                     alt="Site Plan" 
-                                     class="img-fluid mb-2" 
+                                <img src="{{ object.siteplan_image.url }}"
+                                     alt="Site Plan"
+                                     class="img-fluid mb-2"
                                      style="max-height: 300px;">
                             </div>
                         </div>
@@ -202,7 +202,7 @@ class PlaceForm(forms.ModelForm):
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML(f"""
-                        <a href="{cancel_url}" 
+                        <a href="{cancel_url}"
                            class="btn btn-outline-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
@@ -222,11 +222,11 @@ class PlaceForm(forms.ModelForm):
         cleaned_data = super().clean()
         name = cleaned_data.get('name')
         current_slug = cleaned_data.get('slug')
-        
+
         # Set a default empty value for address if it's missing
         if 'address' not in cleaned_data or cleaned_data.get('address') is None:
             cleaned_data['address'] = ''
-        
+
         if name:
             # Only generate new slug if this is a new place or slug is missing
             if not current_slug:
@@ -238,45 +238,45 @@ class PlaceForm(forms.ModelForm):
                 slug_qs = Place.objects.filter(slug=slug)
                 if self.instance and self.instance.pk:
                     slug_qs = slug_qs.exclude(pk=self.instance.pk)
-                
+
                 while slug_qs.exists():
                     slug = f"{base_slug}-{counter}"
                     counter += 1
                     slug_qs = Place.objects.filter(slug=slug)
                     if self.instance and self.instance.pk:
                         slug_qs = slug_qs.exclude(pk=self.instance.pk)
-                
+
                 cleaned_data['slug'] = slug
             else:
                 # Keep existing slug
                 cleaned_data['slug'] = current_slug
-        
+
         return cleaned_data
 
     def clean_siteplan_image(self):
         siteplan_image = self.cleaned_data.get('siteplan_image')
-        
+
         if siteplan_image:
             try:
                 # Always reset to beginning
                 siteplan_image.seek(0)
-                
+
                 img = Image.open(siteplan_image)
-                
+
                 # Basic dimension check
                 if img.width < 200 or img.height < 200:
                     raise forms.ValidationError(
                         f'Image must be at least 200x200 pixels. '
                         f'Uploaded image is {img.width}x{img.height} pixels.'
                     )
-                
+
                 # Reset file pointer one final time
                 siteplan_image.seek(0)
                 return siteplan_image
-                    
+
             except Exception as e:
                 raise forms.ValidationError(f"Image validation failed: {str(e)}")
-        
+
         return siteplan_image
 
     def clean_latitude(self):
@@ -306,11 +306,11 @@ class PlaceDeleteForm(forms.ModelForm):
         required=True,
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
-    
+
     class Meta:
         model = Place
         fields = []  # No fields from the model are needed
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Pre-fill with the place name for testing convenience
@@ -320,12 +320,12 @@ class PlaceDeleteForm(forms.ModelForm):
             if 'confirmation_name' not in self.initial:
                 # Set initial value to match the place name
                 self.initial['confirmation_name'] = self.instance.name
-    
+
     def clean_confirmation_name(self):
         confirmation_name = self.cleaned_data.get('confirmation_name')
         # Ensure instance has a name attribute
         place_name = self.instance.name if self.instance and hasattr(self.instance, 'name') else ""
-        
+
         if confirmation_name != place_name:
             raise forms.ValidationError(
                 "The name you entered doesn't match the place name. Please try again."

@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (dropzones.length === 0) {
         console.warn('No dropzones found on the page. Drag-and-drop will not be initialized for locations.');
     }
-    
+
     let draggedItem = null;
 
     draggables.forEach(draggable => {
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const deviceId = draggedItem.dataset.deviceId;
             console.log('drop: Device ID from dataset:', deviceId);
-            
+
             const deviceName = draggedItem.querySelector('td:first-child span')?.textContent || 'this device';
             const newLocationId = this.dataset.locationId;
             const newLocationName = this.querySelector('.fw-bold')?.textContent || 'this location';
@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.warn('drop: Invalid drop target (unassigned or missing ID). Aborting.');
                 return;
             }
-            
+
             if (!deviceId) {
                 console.error('drop: Could not determine deviceId. Aborting move.');
                 if (window.ToastUi) {
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 return;
             }
-            
+
             const moveUrl = `/api/${placeSlug}/device/${deviceId}/move/`;
 
             // 1. Populate and show the modal
@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (modalInstance) {
                     modalInstance.hide();
                 }
-                
+
                 // Show success toast
                 if (window.ToastUi) {
                     window.ToastUi.success(data.message);

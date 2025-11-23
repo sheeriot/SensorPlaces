@@ -22,4 +22,4 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(convert_device_ids_to_lowercase, migrations.RunPython.noop),
-    ] 
+    ]

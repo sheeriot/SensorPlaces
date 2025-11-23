@@ -90,4 +90,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Expose to global scope for initialization from templates
-window.liveCountsUpdater = liveCountsUpdater; 
+window.liveCountsUpdater = liveCountsUpdater;

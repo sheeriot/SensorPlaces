@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize all modal handlers
     initializeDeleteConfirmationInput();
-    
+
     // Initialize debug listeners for all known modals if debug is on
     if (scriptConfig.debug) {
         initializeModalDebug('deleteLocationModal');

@@ -5,7 +5,7 @@ const sensorFormManager = {
 
     init() {
         if (this.config.debug) console.log('[SensorForm] Initializing');
-        
+
         // --- InfluxDB fields toggle ---
         const dataTypeSelectForInflux = document.getElementById('id_data_type');
         if (dataTypeSelectForInflux) {
@@ -35,7 +35,7 @@ const sensorFormManager = {
     initOverride(type) {
         const overrideCheckbox = document.getElementById(`id_${type}_override`);
         const targetInput = document.getElementById(`id_${type}`);
-        
+
         if (overrideCheckbox && targetInput) {
             targetInput.disabled = !overrideCheckbox.checked;
             overrideCheckbox.addEventListener('change', function() {
@@ -48,7 +48,7 @@ const sensorFormManager = {
                         'min_value': '',
                         'max_value': ''
                     }[type];
-                    
+
                     targetInput.value = defaultValue;
                     if (type === 'min_value' || type === 'max_value') {
                         const placeholderValue = {
@@ -88,11 +88,11 @@ const sensorFormManager = {
         try {
             const response = await window.utils.fetchWithCSRF(url);
             if (!response.ok) throw new Error('Failed to load form.');
-            
+
             const html = await response.text();
             modalBody.innerHTML = html;
             modal.show();
-            
+
             const form = modalBody.querySelector('form');
             this.handleModalFormSubmission(form, modal, modalBody);
         } catch (error) {
@@ -104,7 +104,7 @@ const sensorFormManager = {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(form);
-            
+
             try {
                 const response = await window.utils.fetchWithCSRF(form.action, {
                     method: 'POST',
@@ -134,12 +134,12 @@ const sensorFormManager = {
     handleSensorTypeChange() {
         const sensorTypeSelect = document.getElementById('id_sensor_type');
         const selectedOption = sensorTypeSelect.options[sensorTypeSelect.selectedIndex];
-        
+
         if (this.config.debug) console.log(`[SensorForm] Sensor Type changed to: ${selectedOption.value}`);
 
         const data = this.getSensorTypeDefaults();
         if (this.config.debug) console.log('[SensorForm] Read SensorType data from attributes:', data);
-        
+
         this.updateFormFields(data);
     },
 
@@ -181,4 +181,4 @@ const sensorFormManager = {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => sensorFormManager.init()); 
+document.addEventListener('DOMContentLoaded', () => sensorFormManager.init());

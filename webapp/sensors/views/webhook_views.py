@@ -40,7 +40,7 @@ class WebhookReceiverView(View):
         device_id = data.get('device_id')
         if not device_id:
             return HttpResponse("No device_id provided in payload.", status=400)
-        
+
         try:
             device = Device.objects.get(device_id__iexact=device_id, location__place=place)
         except Device.DoesNotExist:
@@ -114,7 +114,7 @@ class SwitchBotWebhookReceiverView(View):
                     fields_to_write[measurement] = value
                 except (ValueError, TypeError):
                     logger.warning(f"Could not convert value '{context[key]}' for '{key}' to float.")
-        
+
         if fields_to_write:
             try:
                 # For SwitchBot, we can use a generic measurement name like 'sensor_reading'
@@ -122,9 +122,9 @@ class SwitchBotWebhookReceiverView(View):
                 # Or, we can create separate measurements. Let's write them as separate fields in one measurement.
                 tags = {'device_id': device.device_id, 'device_name': device.name}
                 write_to_influx(influx_source, "switchbot_reading", fields_to_write, tags)
-                
+
             except Exception as e:
                 logger.error(f"Failed to write SwitchBot data to InfluxDB for device '{device_id}': {e}")
                 return JsonResponse({'status': 'error', 'message': 'Failed to write to database.'}, status=500)
 
-        return JsonResponse({'status': 'success'}) 
+        return JsonResponse({'status': 'success'})

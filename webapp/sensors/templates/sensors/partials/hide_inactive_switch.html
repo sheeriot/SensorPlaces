@@ -5,12 +5,12 @@ Supported models: place, location, device, sensor
 
 <div id="hide-inactive-switch-container" {% if lock_hide_inactive %}title="This is always off for this view"{% endif %}>
     <div class="form-check form-switch">
-        <input class="form-check-input hide-inactive-switch hide-inactive-{{ model }}-switch" 
-               type="checkbox" 
-               id="hideInactive{{ model|capfirst }}Switch" 
+        <input class="form-check-input hide-inactive-switch hide-inactive-{{ model }}-switch"
+               type="checkbox"
+               id="hideInactive{{ model|capfirst }}Switch"
                data-model="{{ model }}"
                {% if hide_inactive %}checked{% endif %}
                {% if lock_hide_inactive %}disabled readonly{% endif %}>
         <label class="form-check-label" for="hideInactive{{ model|capfirst }}Switch">Hide inactive</label>
     </div>
-</div> 
+</div>

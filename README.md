@@ -45,4 +45,4 @@ docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 ## License
 
-This project is part of the SheerIoT organization. 
+This project is part of the SheerIoT organization.

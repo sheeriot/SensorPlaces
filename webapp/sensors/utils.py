@@ -30,7 +30,7 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
         return []
 
     client = get_influxdb_client(sensor.influx_source)
-    
+
     query = f'''
     SELECT *
     FROM "{sensor.influx_measurement}"
@@ -39,7 +39,7 @@ def get_sensor_readings(sensor, start=None, stop=None, limit=100):
     AND time <= {stop if stop else "NOW()"}
     LIMIT {limit}
     '''
-    
+
     try:
         result = client.query(query)
         readings = []
@@ -64,7 +64,7 @@ def get_latest_influx_reading(sensor):
         return None
 
     client = get_influxdb_client(sensor.influx_source)
-    
+
     # Determine the correct filter field. If 'frmpayload' is in the measurement name,
     # it's very likely LoRaWAN data and should use 'dev_eui'.
     if 'frmpayload' in sensor.influx_measurement:
@@ -72,7 +72,7 @@ def get_latest_influx_reading(sensor):
     else:
         # Fallback to the original logic for other measurement types
         filter_field = "dev_eui" if sensor.device.is_lorawan else "device_id"
-    
+
     device_id_val = sensor.device.device_id
 
     query = f'''
@@ -82,27 +82,27 @@ def get_latest_influx_reading(sensor):
     ORDER BY time DESC
     LIMIT 1
     '''
-    
+
     # ic(f"Querying InfluxDB for latest reading for sensor '{sensor.name}' (pk={sensor.pk}) with query: {query}")
-    
+
     try:
         reader = client.query(query, language="sql")
         df = reader.to_pandas()
         # ic("Raw response from InfluxDB:", df)
-        
+
         # This is the robust way to check for an empty DataFrame.
         if df.empty:
             # ic("InfluxDB query returned no data.")
             return None
-        
+
         latest = df.iloc[0]
         # ic("Latest row from DataFrame:", latest)
-        
+
         # Check for pandas NaT (Not a Time) and NaN (Not a Number)
         if pd.notna(latest['time']) and pd.notna(latest['value']):
             # Convert to Python native types before returning
             py_time = latest['time'].to_pydatetime()
-            
+
             # Ensure the datetime is timezone-aware (assume UTC).
             if py_time.tzinfo is None:
                 py_time = py_time.replace(tzinfo=dt_timezone.utc)
@@ -114,7 +114,7 @@ def get_latest_influx_reading(sensor):
         else:
             # ic("InfluxDB returned a row with null time or value.")
             return None
-            
+
     except Exception as e:
         ic(f"Error during InfluxDB latest reading query for sensor '{sensor.name}': {e}")
         return None
@@ -142,10 +142,10 @@ def update_sensor_live_value(sensor):
 
     # Proceed with the check.
     from .switchbot_client import get_status
-    
+
     new_value = None
     new_timestamp = None
-    
+
     if sensor.effective_data_type and sensor.effective_data_type.startswith('INFLUX'):
         try:
             latest_reading = get_latest_influx_reading(sensor)
@@ -154,14 +154,14 @@ def update_sensor_live_value(sensor):
                 new_timestamp = latest_reading['time']
         except Exception:
             pass  # Errors are logged in get_latest_influx_reading
-    
+
     elif sensor.device.is_switchbot:
         try:
             status_data = get_status(sensor.device.device_id)
             if status_data.get('statusCode') == 100:
                 live_body = status_data.get('body', {})
                 live_values = {k.lower(): v for k, v in live_body.items()}
-                
+
                 if sensor.sensor_type and sensor.sensor_type.name.lower() in live_values:
                     live_value = live_values[sensor.sensor_type.name.lower()]
                     if live_value is not None:
@@ -171,11 +171,11 @@ def update_sensor_live_value(sensor):
             pass
 
     # --- Update the sensor object ---
-    
+
     # Always update the last_checked time
     sensor.last_checked_timestamp = timezone.now()
     update_fields = ['last_checked_timestamp']
-    
+
     value_was_updated = False
     # Only update the cached value if the new reading is actually newer
     if new_timestamp and (sensor.cached_reading_timestamp is None or new_timestamp > sensor.cached_reading_timestamp):
@@ -185,7 +185,7 @@ def update_sensor_live_value(sensor):
         value_was_updated = True
 
     sensor.save(update_fields=update_fields)
-    
+
     return value_was_updated
 
 
@@ -225,7 +225,7 @@ def update_sensor_live_value(sensor):
 
 # def add_toast_message(request, title: str, message: str, message_type: str = 'info'):
 #     """Add a toast message directly to the request object.
-    
+
 #     Args:
 #         request: The request object to attach the message to
 #         title: The title of the message (may be used in modal views)
@@ -237,48 +237,48 @@ def update_sensor_live_value(sensor):
 #     #     'message': message,
 #     #     'type': message_type
 #     # })
-    
+
 #     # Ensure message type is valid
 #     valid_types = ['success', 'info', 'warning', 'danger']
 #     if message_type not in valid_types:
 #         message_type = 'info'
-    
+
 #     # Format the message if title is provided
 #     formatted_message = f"{title}: {message}" if title else message
-    
+
 #     request.toast_message = {
 #         'message': formatted_message,
 #         'type': message_type,
 #         'addToHistory': True  # API responses should be added to history
 #     }
-    
+
 #     # ic("Toast message added to request:", request.toast_message)
 
 # def mark_toast_as_read(request, toast_id, read_status=True):
 #     """Mark a toast notification as read/unread.
-    
+
 #     Args:
 #         request: The request object
 #         toast_id: The ID of the toast to mark
 #         read_status: Boolean indicating whether to mark as read (True) or unread (False)
-    
+
 #     Returns:
 #         JsonResponse with updated unread count
 #     """
 #     if not request.user.is_authenticated:
 #         return JsonResponse({'error': 'Authentication required'}, status=401)
-    
+
 #     try:
 #         toast = ToastNotification.objects.get(id=toast_id, user=request.user)
 #         toast.read = read_status
 #         toast.save()
-        
+
 #         # Get updated unread count
 #         unread_count = ToastNotification.objects.filter(
 #             user=request.user,
 #             read=False
 #         ).count()
-        
+
 #         return JsonResponse({
 #             'success': True,
 #             'unread_count': unread_count
@@ -288,16 +288,16 @@ def update_sensor_live_value(sensor):
 
 # def clear_toast_history(request):
 #     """Clear all toast notifications for the current user.
-    
+
 #     Args:
 #         request: The request object
-    
+
 #     Returns:
 #         JsonResponse indicating success/failure
 #     """
 #     if not request.user.is_authenticated:
 #         return JsonResponse({'error': 'Authentication required'}, status=401)
-    
+
 #     try:
 #         ToastNotification.objects.filter(user=request.user).delete()
 #         return JsonResponse({'success': True})
@@ -320,7 +320,7 @@ def generate_sparkline(timestamps: List[datetime]) -> Optional[str]:
             aware_timestamps.append(ts.replace(tzinfo=dt_timezone.utc))
         else:
             aware_timestamps.append(ts)
-    
+
     aware_timestamps.sort()
 
     x_values = aware_timestamps
@@ -328,7 +328,7 @@ def generate_sparkline(timestamps: List[datetime]) -> Optional[str]:
     y_values = np.random.uniform(0, 1, len(x_values))
 
     fig, ax = plt.subplots(figsize=(4, 0.4), dpi=120)
-    
+
     # Plot the readings as dots
     ax.scatter(x_values, y_values, s=8, alpha=0.5, color='dodgerblue', edgecolor='none')
 
@@ -337,7 +337,7 @@ def generate_sparkline(timestamps: List[datetime]) -> Optional[str]:
     end_time = datetime.now(dt_timezone.utc)
     ax.set_xlim(start_time, end_time)
     ax.set_ylim(0, 1) # Set Y-lim to the data range
-    
+
     # --- Configure Spines & Ticks for a minimal look ---
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -354,14 +354,14 @@ def generate_sparkline(timestamps: List[datetime]) -> Optional[str]:
     # Use axes coordinates to place text just below the bottom spine.
     ax.text(0, -0.1, 'first', ha='left', va='top', fontsize=12, color='gray', transform=ax.transAxes, clip_on=False)
     ax.text(1, -0.1, 'now', ha='right', va='top', fontsize=12, color='gray', transform=ax.transAxes, clip_on=False)
-    
+
     # --- Save to buffer ---
     buf = BytesIO()
     plt.tight_layout(pad=0)
     plt.savefig(buf, format='png', transparent=True, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
     buf.seek(0)
-    
+
     image_base64 = base64.b64encode(buf.read()).decode('utf-8')
     buf.close()
 

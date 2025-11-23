@@ -1,8 +1,8 @@
 /**
  * Toggle Active Handler
- * 
+ *
  * Manages active/inactive state toggling for locations, devices, and sensors
- * 
+ *
  * Configuration:
  * -------------
  * To enable debugging, set debug: true in toggleActiveConfig below
@@ -25,7 +25,7 @@ const toggleActiveConfig = {
 // Card structure validator
 function validateCardStructure(card, index) {
     const issues = [];
-    
+
     // Check for required class and ID
     if (!card.classList.contains('card')) {
         issues.push('Missing required class="card"');
@@ -39,9 +39,9 @@ function validateCardStructure(card, index) {
     const header = children.find(child => child.classList.contains('card-header'));
     const body = children.find(child => child.classList.contains('card-body'));
     const footer = children.find(child => child.classList.contains('card-footer'));
-    const unexpectedChildren = children.filter(child => 
-        !child.classList.contains('card-header') && 
-        !child.classList.contains('card-body') && 
+    const unexpectedChildren = children.filter(child =>
+        !child.classList.contains('card-header') &&
+        !child.classList.contains('card-body') &&
         !child.classList.contains('card-footer')
     );
 
@@ -63,7 +63,7 @@ function validateCardStructure(card, index) {
         } else if (cardTitles.length > 1) {
             issues.push(`Found ${cardTitles.length} .card-title elements (should be exactly 1)`);
         }
-        
+
         // Check for old ID-based card titles
         const idBasedTitles = header.querySelectorAll('#card-title');
         if (idBasedTitles.length > 0) {
@@ -87,7 +87,7 @@ function validateCardStructure(card, index) {
 // Card status reporter
 function reportCardStatus() {
     if (!toggleActiveConfig.debug) return;
-    
+
     document.querySelectorAll('.card-body').forEach((cardBody, index) => {
         const card = cardBody.closest('.card');
         if (!card) {
@@ -97,11 +97,11 @@ function reportCardStatus() {
 
         // Start card report group first
         console.group(`Card ${index + 1}: ${card.querySelector('.card-title, #card-title')?.textContent?.trim() || 'Untitled'} (${card.id || 'no-id'})`);
-        
+
         // Validate card structure (now inside the group)
         const { header: cardHeader, issues } = validateCardStructure(card, index);
         const cardTitle = cardHeader?.querySelector('.card-title, #card-title')?.textContent?.trim();
-        
+
         // 1. Card Structure Info
         console.debug('Card Structure:', {
             id: card.id || 'UnnamedCard',
@@ -204,19 +204,19 @@ const toggleActiveManager = {
             }
 
             const data = await response.json();
-            
+
             if (toggleActiveConfig.debug) {
                 console.debug('Server Response:', data);
             }
-            
+
             if (data.success) {
                 // Find all elements that match this model type and ID
                 const wrappers = document.querySelectorAll(`.toggle-button-wrapper[data-${modelType}-id="${id}"]`);
                 const rows = document.querySelectorAll(`[data-${modelType}-id="${id}"]`);
-                
+
                 // Find the hideInactive state for this model type
                 const hideInactiveState = this.getHideInactiveState(modelType);
-                
+
                 // Update all toggle buttons
                 const toggleButtons = document.querySelectorAll(`.toggle-active-button[data-${modelType}-id="${id}"]`);
                 toggleButtons.forEach(button => {
@@ -246,7 +246,7 @@ const toggleActiveManager = {
 
                     // Update row attributes to match server state
                     row.setAttribute(`data-${modelType}-active`, data.new_state.toString());
-                    
+
                     // Update classes based on active state
                     if (data.new_state) {
                         row.classList.remove('opacity-50', 'text-muted', 'd-none');
@@ -266,7 +266,7 @@ const toggleActiveManager = {
                                 cell.classList.add('opacity-50', 'text-muted');
                             }
                         });
-                        
+
                         // Check if hideInactive is enabled for this type
                         if (hideInactiveState) {
                             if (toggleActiveConfig.debug) {
@@ -294,7 +294,7 @@ const toggleActiveManager = {
                     if (modelType === 'device') {
                         const deviceDetailCard = document.getElementById('device-detail-card');
                         const sensorsCard = document.getElementById('sensors-card');
-                        
+
                         if (deviceDetailCard && sensorsCard) {
                             if (data.new_state) {
                                 // If device is now active, remove opacity and show the switch
@@ -378,13 +378,13 @@ const toggleActiveManager = {
                 if (toggleActiveConfig.debug) {
                     console.warn('Toggle Status Warning:', data.message);
                 }
-                
+
                 this.showToast({
                     message: data.message,
                     type: 'warning',
                     addToHistory: true
                 });
-                
+
                 return data;
             } else {
                 throw new Error(data.message || `Failed to update ${modelType} status`);
@@ -471,8 +471,8 @@ const toggleActiveManager = {
             console.log('showToast called with:', { messageOrObject, type, addToHistory });
         }
 
-        const toastData = typeof messageOrObject === 'object' 
-            ? messageOrObject 
+        const toastData = typeof messageOrObject === 'object'
+            ? messageOrObject
             : { message: messageOrObject, type, addToHistory };
 
         if (window.toastSystem) {
@@ -633,4 +633,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Export for use in other modules
-window.toggleActiveManager = toggleActiveManager; 
+window.toggleActiveManager = toggleActiveManager;

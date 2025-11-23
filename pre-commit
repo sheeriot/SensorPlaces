@@ -1,5 +1,0 @@
-#!/bin/bash
-# Pre-commit script to run tests
-echo "Running tests..."
-docker compose run --rm test
-

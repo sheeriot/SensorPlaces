@@ -18,4 +18,3 @@ django-htmx
 
 # psycopg2-binary
 # pyotp
-

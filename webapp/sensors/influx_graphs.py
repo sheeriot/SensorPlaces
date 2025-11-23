@@ -22,7 +22,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
     if not sensor.influx_source:
         ic("Sensor has no InfluxDB source configured.")
         return [], 0
-    
+
     # Determine the correct filter field based on sensor's device type.
     filter_field = "dev_eui"
     device_id_val = sensor.device.device_id
@@ -31,7 +31,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
     try:
         client = get_influxdb_client(sensor.influx_source)
         measurement = sensor.influx_measurement
-        
+
         time_filter = f"time >= '{start_date.isoformat()}' AND time <= '{end_date.isoformat()}'"
 
         if sensor.data_type == 'INFLUX_CUMULATIVE_RESET':
@@ -67,7 +67,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
             return [], query_time
 
         df['time'] = df['time'].dt.tz_localize('UTC')
-        
+
         results = []
         decimal_places = sensor.sensor_type.decimal_places
         precision = Decimal('1e-' + str(decimal_places)) if decimal_places is not None else None
@@ -80,7 +80,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
                 results.append((row['time'], float(value)))
             else:
                 results.append((row['time'], None))
-                
+
         return results, query_time
 
     except Exception as e:
@@ -96,5 +96,5 @@ def get_lorawan_sensor_data(sensor: Sensor, start_date: datetime, end_date: date
     if not isinstance(sensor, Sensor) or not sensor.device.is_lorawan:
         ic("Attempted to query non-LoRaWAN sensor with get_lorawan_sensor_data")
         return [], 0
-    
-    return get_influx_sensor_data(sensor, start_date, end_date) 
+
+    return get_influx_sensor_data(sensor, start_date, end_date)

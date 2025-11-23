@@ -73,7 +73,7 @@ wheels/
 *.log
 *.sqlite3
 *.sqlite3-journal
-logs/ 
+logs/
 
 */scratch/*
 */scratch/**

@@ -81,13 +81,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'django.contrib.sites',
-    
+
     # Allauth
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
-    
+
     # Your apps
     'sensors',
     'widget_tweaks',

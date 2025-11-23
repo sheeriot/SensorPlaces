@@ -40,19 +40,19 @@ def migrate_data(apps, schema_editor):
 
     for symbol, name in UNITS:
         Unit.objects.get_or_create(symbol=symbol, defaults={'name': name})
-    
+
     for sensor in Sensor.objects.all():
         if sensor.sensor_type_old:
             sensor_type_name = dict(SENSOR_TYPES).get(sensor.sensor_type_old)
             if sensor_type_name:
                 sensor_type_obj = SensorType.objects.get(name=sensor_type_name)
                 sensor.sensor_type = sensor_type_obj
-        
+
         if sensor.unit_old:
             unit_obj = Unit.objects.filter(symbol=sensor.unit_old).first()
             if unit_obj:
                 sensor.unit = unit_obj
-        
+
         sensor.save()
 
 class Migration(migrations.Migration):

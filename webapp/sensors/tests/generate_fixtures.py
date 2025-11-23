@@ -42,7 +42,7 @@ FIXTURES = [
 def generate_fixtures():
     """Generate fixture files from the database."""
     print("Generating fixture files...")
-    
+
     for model, filename in FIXTURES:
         output_path = FIXTURE_DIR / filename
         cmd = [
@@ -51,13 +51,13 @@ def generate_fixtures():
             '--indent', '2',
             '-o', str(output_path)
         ]
-        
+
         try:
             subprocess.run(cmd, check=True)
             print(f"✅ Created {filename}")
         except subprocess.CalledProcessError as e:
             print(f"❌ Error creating {filename}: {e}")
-    
+
     print("\nFixture generation complete!")
     print(f"Fixtures saved to: {FIXTURE_DIR}")
     print("\nTo use these fixtures in your tests, add them to your TestCase class:")
@@ -74,4 +74,4 @@ def generate_fixtures():
     """)
 
 if __name__ == '__main__':
-    generate_fixtures() 
+    generate_fixtures()

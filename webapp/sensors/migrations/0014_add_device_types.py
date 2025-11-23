@@ -2,7 +2,7 @@ from django.db import migrations
 
 def create_device_types(apps, schema_editor):
     DeviceType = apps.get_model('sensors', 'DeviceType')
-    
+
     # Define the device types with their icons and descriptions
     device_types = [
         {
@@ -47,7 +47,7 @@ def create_device_types(apps, schema_editor):
         }
         # Note: 'Other' type was already created in the previous migration
     ]
-    
+
     # Create each device type
     for device_type in device_types:
         DeviceType.objects.get_or_create(
@@ -74,4 +74,4 @@ class Migration(migrations.Migration):
             create_device_types,
             reverse_code=remove_device_types
         ),
-    ] 
+    ]

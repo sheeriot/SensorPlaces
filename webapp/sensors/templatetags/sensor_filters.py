@@ -20,7 +20,7 @@ def subtract(value, arg):
 
 @register.simple_tag
 def load_leaflet_once():
-    return ''  # Deprecated - Leaflet is now loaded in base.html 
+    return ''  # Deprecated - Leaflet is now loaded in base.html
 
 @register.filter
 def filter_active_count(locations):
@@ -41,4 +41,4 @@ def add(value, arg):
         try:
             return int(value) + int(arg)
         except (ValueError, TypeError):
-            return "" 
+            return ""

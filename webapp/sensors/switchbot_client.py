@@ -22,7 +22,7 @@ def _headers():
     data = f"{token}{t}{nonce}".encode("utf-8")
     secret_bytes = secret.encode("utf-8")
     sign = base64.b64encode(hmac.new(secret_bytes, msg=data, digestmod=sha256).digest()).decode("utf-8")
-    
+
     return {
         "Authorization": token,
         "Content-Type": "application/json; charset=utf8",

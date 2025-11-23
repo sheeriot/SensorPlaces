@@ -60,7 +60,7 @@ class InfluxSourceCreateView(CreateView):
         context = super().get_context_data(**kwargs)
         context['place'] = self.place
         return context
-    
+
     def get_template_names(self):
         if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return ["sensors/influxsource_form_modal.html"]
@@ -125,7 +125,6 @@ class InfluxSourceDeleteView(DeleteView):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'success': True, 'redirect_url': self.get_success_url()})
         return HttpResponse(status=204, headers={'HX-Redirect': self.get_success_url()})
-    
+
     def get_success_url(self):
         return reverse("sensors:place_detail", kwargs={'place_slug': self.place_slug})
- 

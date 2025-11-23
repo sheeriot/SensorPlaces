@@ -42,7 +42,7 @@ const PlaceMapLocationPicker = {
 
         // Initialize map
         const map = L.map(placePickerConfig.mapContainerId).setView([initialLat, initialLng], placePickerConfig.zoom);
-        
+
         // Add tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -100,7 +100,7 @@ const PlaceMapLocationPicker = {
     updateCoordinates(lat, lng, latInput, lngInput) {
         latInput.value = lat.toFixed(5);
         lngInput.value = lng.toFixed(5);
-        
+
         // Trigger change event on inputs
         [latInput, lngInput].forEach(input => {
             input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -134,4 +134,4 @@ const PlaceMapLocationPicker = {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     PlaceMapLocationPicker.initialize();
-}); 
+});

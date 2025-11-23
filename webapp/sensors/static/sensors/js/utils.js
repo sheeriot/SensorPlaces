@@ -16,7 +16,7 @@ window.utils = {
 
     fetchWithCSRF: async function(url, options = {}) {
         const csrfToken = this.getCookie('csrftoken');
-        
+
         const defaultHeaders = {
             'X-CSRFToken': csrfToken,
             'X-Requested-With': 'XMLHttpRequest'
@@ -63,7 +63,7 @@ window.utils = {
         const offsetHours = Math.floor(Math.abs(offset) / 60);
         const offsetMinutes = Math.abs(offset) % 60;
         const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
-        
+
         return `${dateStr} ${timeStr} ${offsetString} (${shortTZ})`;
     },
 

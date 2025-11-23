@@ -31,7 +31,7 @@ const deviceFormManager = {
                 }
             });
         }
-        
+
         locationSelect.addEventListener('change', (event) => {
             if (this.config.debug) console.log('%c--- Location Select Changed ---', 'color: blue; font-weight: bold;');
             this.handleLocationChange(event.currentTarget, deviceForm);
@@ -46,13 +46,13 @@ const deviceFormManager = {
             console.log('[DeviceForm] handleLocationCreated triggered.');
             console.table(event.detail);
         }
-        
+
         const { id, name } = event.detail;
         const locationSelect = document.getElementById('id_location');
 
         if (locationSelect) {
             if (this.config.debug) console.log('[DeviceForm] Found location select. Updating options and disabling field.');
-            
+
             // Clear existing options
             while (locationSelect.firstChild) {
                 locationSelect.removeChild(locationSelect.firstChild);
@@ -61,7 +61,7 @@ const deviceFormManager = {
             // Add the new option and assume it's active
             locationSelect.dataset[`isactive-${id}`] = 'true';
             locationSelect.dataset[`locationname-${id}`] = name;
-            
+
             const newOption = new Option(name, id, true, true);
             locationSelect.add(newOption, null);
 
@@ -128,7 +128,7 @@ const deviceFormManager = {
             const breadcrumb = document.getElementById('breadcrumb-location');
             if (breadcrumb) {
                 if (this.config.debug) console.log(`[DeviceForm] Updating breadcrumb to "${locationName}"`);
-                
+
                 breadcrumb.textContent = locationName;
 
                 const placeSlug = document.body.dataset.placeSlug;
@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.locationCreated) {
                     if (deviceFormManager.config.debug) console.log('[DeviceForm] locationCreated trigger found. Handling event.');
                     deviceFormManager.handleLocationCreated({ detail: data.locationCreated });
-                    
+
                     const modalElement = document.getElementById('modal-container');
                     if (modalElement) {
                         const modal = bootstrap.Modal.getInstance(modalElement);
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (deviceFormManager.config.debug) console.log('[DeviceForm] Modal instance not found, cannot close.');
                         }
                     }
-                    
+
                     // We've handled this response, so we don't want HTMX to swap anything.
                     evt.detail.shouldSwap = false;
                 }
@@ -194,4 +194,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-}); 
+});

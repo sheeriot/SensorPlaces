@@ -1,7 +1,7 @@
 /**
  * Common JavaScript functionality for the sensors application
- * 
-*/ 
+ *
+*/
 // System Configuration
 const commonConfig = {
     debug: false,
@@ -21,7 +21,7 @@ window.sensorPlaces = {
 // Add global error handler for uncaught promise rejections
 window.addEventListener('unhandledrejection', event => {
     // Only suppress the specific extension-related error
-    if (event.reason && event.reason.message && 
+    if (event.reason && event.reason.message &&
         event.reason.message.includes('message channel closed')) {
         event.preventDefault(); // Prevent the error from appearing in console
     }
@@ -37,30 +37,30 @@ function initializeGlobalState() {
 
     // Get all data attributes from body
     window.sensorPlaces.bodyData = Object.assign({}, body.dataset);
-    
+
     // Set specific commonly used values
     window.sensorPlaces.currentPlaceSlug = body.dataset.placeSlug || 'none';
     window.sensorPlaces.toastUnreadCount = parseInt(body.dataset.toastUnreadCount || '0', 10);
-    
+
     if (commonConfig.debug) console.log('[initializeGlobalState] Global state initialized:', {
         placeSlug: window.sensorPlaces.currentPlaceSlug,
         unreadCount: window.sensorPlaces.toastUnreadCount,
         allBodyData: window.sensorPlaces.bodyData
     });
-    
+
     // For backward compatibility (can be removed later)
     window.currentPlaceSlug = window.sensorPlaces.currentPlaceSlug;
-    
+
     return true;
 }
 
 // Initialize core functionality
 function initializeCore() {
     if (commonConfig.debug) console.log('[initializeCore] Starting initialization sequence');
-    
+
     // Initialize global state first
     initializeGlobalState();
-    
+
     try {
         // 1. Initialize active status checkbox system
         if (window.activeStatusCheckbox?.initialize) {
@@ -166,7 +166,7 @@ class LiveValueFetcher {
             const url = `/api/${this.placeSlug}/sensors/live-values/?pks=${[...pksToFetch].join(',')}`;
             const response = await window.utils.fetchWithCSRF(url);
             if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-            
+
             const data = await response.json();
             if (data.status !== 'success') throw new Error(data.message || 'API returned an error');
 

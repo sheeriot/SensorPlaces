@@ -12,16 +12,16 @@
         </h5>
         <div class="btn-group">
             {% if model_name == 'location' %}
-                <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}?next={{ absolute_url|urlencode }}" 
+                <a href="{% url 'sensors:location_update' place_slug=place.slug slug=location.slug %}?next={{ absolute_url|urlencode }}"
                    class="btn btn-warning btn-sm">
                     <i class="bi bi-pencil"></i>
                 </a>
-                <a href="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}" 
+                <a href="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}"
                    class="btn btn-danger btn-sm">
                     <i class="bi bi-trash"></i>
                 </a>
             {% else %}
-                <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}" 
+                <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=location.slug %}"
                    class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-eye-fill"></i>
                 </a>
@@ -41,7 +41,7 @@
                     <div>{{ location.place.name }}</div>
                 </div>
             </div>
-            
+
             <!-- Right side: Status & Counts -->
             <div class="col-5">
                 <div>
@@ -54,4 +54,4 @@
             </div>
         </div>
     </div>
-</div> 
+</div>

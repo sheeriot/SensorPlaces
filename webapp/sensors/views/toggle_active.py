@@ -77,7 +77,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             deactivated_items = []
             if was_active and not obj.is_active:
                 deactivated_items = self._deactivate_dependencies(model_type, obj)
-            
+
             # If we didn't deactivate items but have dependencies, use those for the response
             if not deactivated_items and dependencies and not obj.is_active:
                 deactivated_items = dependencies
@@ -91,7 +91,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
 
             # Build the toast message
             toast_message = self._build_toast_message(model_type, obj, place, was_active, deactivated_items, help_text)
-            
+
             # Set toast message using our standard pattern
             request.toast_message = toast_message
 
@@ -115,7 +115,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
                 'success': False,
                 'error': str(e)
             }, status=500)
-    
+
     def _build_toast_message(self, model_type, obj, place, was_active, deactivated_items, help_text=None):
         """Build a standard toast message for toggle operations"""
         # Build basic path info based on model type
@@ -141,16 +141,16 @@ class ToggleActiveView(LoginRequiredMixin, View):
             f"{'Activated' if obj.is_active else 'Deactivated'} {model_type}: "
             f"<strong>{name_path}</strong>{dependency_info}"
         )
-        
+
         # Add help text if provided and object is inactive
         if help_text and not obj.is_active:
             message += f"<br><small class='text-warning'>{help_text}</small>"
-        
+
         return {
             'message': message,
             'type': 'success' if obj.is_active else 'warning'
         }
-    
+
     def _get_device_help_text(self, device):
         """Get help text for device inactivation from DeviceUpdateView"""
         try:
@@ -162,7 +162,7 @@ class ToggleActiveView(LoginRequiredMixin, View):
             return help_text
         except Exception as e:
             return None
-            
+
     def _get_sensor_help_text(self, sensor):
         """Get help text for sensor inactivation from SensorUpdateView"""
         try:
@@ -174,11 +174,11 @@ class ToggleActiveView(LoginRequiredMixin, View):
             return help_text
         except Exception as e:
             return None
-    
+
     def _deactivate_dependencies(self, model_type, obj):
         """Deactivate dependent items and return information about them"""
         deactivated = []
-        
+
         if model_type == 'device':
             # Deactivate all sensors in this device
             sensors = Sensor.objects.filter(device=obj, is_active=True)
@@ -190,16 +190,16 @@ class ToggleActiveView(LoginRequiredMixin, View):
                     'name': sensor.name,
                     'type': 'sensor'
                 })
-        
+
         return deactivated
-    
+
     def _get_device_dependencies(self, device):
         """Get active sensors that will be affected by device toggle"""
         active_sensors = Sensor.objects.filter(
             device=device,
             is_active=True
         ).values('id', 'name')
-        
+
         dependencies = []
         for sensor in active_sensors:
             dependencies.append({
@@ -207,5 +207,5 @@ class ToggleActiveView(LoginRequiredMixin, View):
                 'name': sensor['name'],
                 'type': 'sensor'
             })
-        
+
         return dependencies

@@ -1,24 +1,24 @@
 /**
  * Hide Inactive Handler
- * 
+ *
  * Manages hide-inactive switches and dispatches state change events.
  * Controls visibility of inactive rows based on switch state.
- * 
+ *
  * Debug Mode:
  * -----------
  * To enable debug mode, either:
  * 1. Add ?debug=true to your URL: http://your-site/page?debug=true
  * 2. Set hideInactiveConfig.debug = true in the console
- * 
+ *
  * Debug Output:
  * - Switch initialization status
  * - State change events with timestamps
  * - Row visibility updates
- * 
+ *
  * Example URLs:
  * http://localhost:8000/sensors/?debug=true
  * http://localhost:8000/sensors/places/?debug=true
- * 
+ *
  * Switch Requirements:
  * - Must have class 'hideInactive-switch'
  * - Must have data-model attribute with valid model name
@@ -54,10 +54,10 @@ const hideInactiveHandler = {
         if (hideInactiveConfig.debug) {
             console.log('Initializing hideInactiveHandler...');
         }
-        
+
         // Find and initialize all switches
         const switches = document.querySelectorAll(this.config.switchSelector);
-        
+
         if (hideInactiveConfig.debug) {
             console.log(`Found ${switches.length} hide-inactive switches`);
         }
@@ -89,7 +89,7 @@ const hideInactiveHandler = {
                 // Restore state from localStorage if no URL override
                 const storedStateJSON = localStorage.getItem(`hideInactive_${model}`);
                 const storedState = storedStateJSON ? JSON.parse(storedStateJSON) : null;
-                
+
                 if (hideInactiveConfig.debug) {
                     const serverState = switchEl.checked;
                     console.log(`[${model}] Initializing switch. Stored state: ${storedState}, Server-rendered state: ${serverState}`);
@@ -98,7 +98,7 @@ const hideInactiveHandler = {
                     }
                 }
             }
-            
+
             // Set up change listener
             switchEl.addEventListener('change', (e) => {
                 const newState = e.target.checked;
@@ -108,7 +108,7 @@ const hideInactiveHandler = {
 
                 // Set a cookie for the server to read
                 document.cookie = `hideInactive_${model}=${newState};path=/;max-age=31536000;samesite=lax`;
-                
+
                 if (hideInactiveConfig.debug) {
                     console.log(`[${model}] Switch state changed to: ${newState}. Stored in localStorage and cookie.`);
                 }
@@ -158,7 +158,7 @@ const hideInactiveHandler = {
                 sensors: inactiveSensors.length
             });
         }
-        
+
         // First, handle hiding
         if (hideInactive) {
             inactiveLocations.forEach(row => row.classList.add('d-none'));

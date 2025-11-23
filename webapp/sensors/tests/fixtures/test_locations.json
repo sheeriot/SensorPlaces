@@ -1,158 +1,546 @@
 [
 {
   "model": "sensors.location",
-  "pk": 1,
   "fields": {
-    "name": "ArkCovenant",
-    "place": 1,
-    "x_pos": "71.01",
-    "y_pos": "81.72",
-    "is_active": false,
-    "created_at": "2025-02-25T22:42:12.924Z",
-    "updated_at": "2025-03-14T17:27:07.159Z"
-  }
-},
-{
-  "model": "sensors.location",
-  "pk": 3,
-  "fields": {
-    "name": "Aardvark",
-    "place": 1,
-    "x_pos": "35.78",
-    "y_pos": "58.37",
+    "name": "Tournaments",
+    "slug": "tournaments",
+    "place": [
+      "texaspinballfestival"
+    ],
+    "description": null,
+    "x_pos": "29.13",
+    "y_pos": "32.85",
     "is_active": true,
-    "created_at": "2025-02-26T17:42:24.941Z",
-    "updated_at": "2025-03-14T17:27:07.154Z"
+    "created_at": "2025-03-21T15:18:32.066Z",
+    "updated_at": "2025-07-17T13:24:37.383Z"
   }
 },
 {
   "model": "sensors.location",
-  "pk": 8,
   "fields": {
-    "name": "Saloon",
-    "place": 1,
-    "x_pos": "26.77",
-    "y_pos": "31.96",
+    "name": "Solid State Row",
+    "slug": "solid-state-row",
+    "place": [
+      "texaspinballfestival"
+    ],
+    "description": null,
+    "x_pos": "85.80",
+    "y_pos": "73.81",
     "is_active": true,
-    "created_at": "2025-03-04T19:30:07.840Z",
-    "updated_at": "2025-03-14T17:27:07.157Z"
+    "created_at": "2025-03-24T14:55:47.548Z",
+    "updated_at": "2025-07-17T13:24:37.382Z"
   }
 },
 {
   "model": "sensors.location",
-  "pk": 11,
   "fields": {
-    "name": "cubby",
-    "place": 5,
-    "x_pos": "22.91",
-    "y_pos": "33.08",
+    "name": "Shed",
+    "slug": "shed",
+    "place": [
+      "5702hb"
+    ],
+    "description": "",
+    "x_pos": "69.43",
+    "y_pos": "86.80",
     "is_active": true,
-    "created_at": "2025-03-08T18:31:35.209Z",
-    "updated_at": "2025-03-09T00:04:57.212Z"
+    "created_at": "2025-03-25T13:35:27.409Z",
+    "updated_at": "2025-08-07T10:45:23.119Z"
   }
 },
 {
   "model": "sensors.location",
-  "pk": 13,
   "fields": {
-    "name": "burnt",
-    "place": 5,
-    "x_pos": "63.01",
-    "y_pos": "76.70",
+    "name": "Pool House",
+    "slug": "pool-house",
+    "place": [
+      "5702hb"
+    ],
+    "description": null,
+    "x_pos": "22.05",
+    "y_pos": "31.99",
     "is_active": true,
-    "created_at": "2025-03-08T22:45:17.257Z",
-    "updated_at": "2025-03-14T17:52:49.169Z"
+    "created_at": "2025-03-25T15:09:25.118Z",
+    "updated_at": "2025-07-17T13:24:37.377Z"
   }
 },
 {
   "model": "sensors.location",
-  "pk": 23,
   "fields": {
-    "name": "Matych",
-    "place": 10,
-    "x_pos": "31.69",
-    "y_pos": "79.54",
-    "is_active": true,
-    "created_at": "2025-03-12T22:46:47.706Z",
-    "updated_at": "2025-03-14T17:32:04.460Z"
-  }
-},
-{
-  "model": "sensors.location",
-  "pk": 24,
-  "fields": {
-    "name": "Closet",
-    "place": 10,
-    "x_pos": "71.47",
-    "y_pos": "19.41",
-    "is_active": true,
-    "created_at": "2025-03-13T10:03:42.308Z",
-    "updated_at": "2025-03-14T17:33:10.177Z"
-  }
-},
-{
-  "model": "sensors.location",
-  "pk": 27,
-  "fields": {
-    "name": "Shangster",
-    "place": 11,
-    "x_pos": "50.00",
-    "y_pos": "50.00",
-    "is_active": true,
-    "created_at": "2025-03-13T19:19:41.862Z",
-    "updated_at": "2025-03-13T21:58:35.303Z"
-  }
-},
-{
-  "model": "sensors.location",
-  "pk": 28,
-  "fields": {
-    "name": "Darkroom",
-    "place": 11,
+    "name": "bb",
+    "slug": "bb",
+    "place": [
+      "temp"
+    ],
+    "description": null,
     "x_pos": "50.00",
     "y_pos": "50.00",
     "is_active": false,
-    "created_at": "2025-03-13T21:58:03.753Z",
-    "updated_at": "2025-03-13T21:59:47.627Z"
+    "created_at": "2025-03-25T21:46:24.024Z",
+    "updated_at": "2025-07-17T13:24:37.386Z"
   }
 },
 {
   "model": "sensors.location",
-  "pk": 29,
   "fields": {
-    "name": "asdf11gh5555sadfrg",
-    "place": 11,
+    "name": "Red Guest House",
+    "slug": "red-guest-house",
+    "place": [
+      "timmy-home"
+    ],
+    "description": null,
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-03-28T17:10:46.410Z",
+    "updated_at": "2025-07-17T13:24:37.378Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Missile",
+    "slug": "missile",
+    "place": [
+      "volcano-lair"
+    ],
+    "description": null,
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-04-24T19:15:22.180Z",
+    "updated_at": "2025-07-17T13:24:37.375Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Tunnel",
+    "slug": "tunnel",
+    "place": [
+      "volcano-lair"
+    ],
+    "description": null,
+    "x_pos": "77.79",
+    "y_pos": "54.14",
+    "is_active": true,
+    "created_at": "2025-05-12T17:54:32.319Z",
+    "updated_at": "2025-07-17T13:24:37.383Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "monorail",
+    "slug": "monorail",
+    "place": [
+      "volcano-lair"
+    ],
+    "description": null,
+    "x_pos": "2.08",
+    "y_pos": "48.19",
+    "is_active": true,
+    "created_at": "2025-05-12T17:55:25.148Z",
+    "updated_at": "2025-07-17T13:24:37.384Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Roof",
+    "slug": "roof",
+    "place": [
+      "volcano-lair"
+    ],
+    "description": null,
+    "x_pos": "38.36",
+    "y_pos": "88.56",
+    "is_active": true,
+    "created_at": "2025-05-12T17:56:14.700Z",
+    "updated_at": "2025-07-17T13:24:37.379Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Septic",
+    "slug": "septic",
+    "place": [
+      "5702hb"
+    ],
+    "description": null,
+    "x_pos": "46.73",
+    "y_pos": "46.60",
+    "is_active": true,
+    "created_at": "2025-06-19T21:07:50.223Z",
+    "updated_at": "2025-07-17T13:24:37.380Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Septic",
+    "slug": "septic",
+    "place": [
+      "15601cl"
+    ],
+    "description": null,
+    "x_pos": "22.25",
+    "y_pos": "42.21",
+    "is_active": true,
+    "created_at": "2025-06-20T13:31:40.349Z",
+    "updated_at": "2025-07-17T13:24:37.381Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "AC1",
+    "slug": "ac1",
+    "place": [
+      "5702hb"
+    ],
+    "description": null,
+    "x_pos": "28.14",
+    "y_pos": "48.96",
+    "is_active": true,
+    "created_at": "2025-06-20T17:24:38.159Z",
+    "updated_at": "2025-07-17T13:24:37.373Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Office",
+    "slug": "office",
+    "place": [
+      "opeongo-point"
+    ],
+    "description": null,
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-07-07T12:07:18.953Z",
+    "updated_at": "2025-07-17T13:24:37.376Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Front Fence",
+    "slug": "front-fence",
+    "place": [
+      "5702hb"
+    ],
+    "description": null,
+    "x_pos": "78.31",
+    "y_pos": "54.02",
+    "is_active": true,
+    "created_at": "2025-07-16T11:42:49.810Z",
+    "updated_at": "2025-07-17T13:24:37.374Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "15601cl"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
     "x_pos": "50.00",
     "y_pos": "50.00",
     "is_active": false,
-    "created_at": "2025-03-14T01:19:24.814Z",
-    "updated_at": "2025-03-14T01:57:37.505Z"
+    "created_at": "2025-08-04T12:17:12.808Z",
+    "updated_at": "2025-08-04T12:17:12.808Z"
   }
 },
 {
   "model": "sensors.location",
-  "pk": 30,
   "fields": {
-    "name": "hidden-room",
-    "place": 10,
-    "x_pos": "76.02",
-    "y_pos": "68.67",
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "5702hb"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-08-04T12:17:12.809Z",
+    "updated_at": "2025-08-04T12:17:12.809Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "opeongo-point"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-08-04T12:17:12.810Z",
+    "updated_at": "2025-08-04T12:17:12.810Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "texaspinballfestival"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-08-04T12:17:12.811Z",
+    "updated_at": "2025-08-04T12:17:12.811Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "timmy-home"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-08-04T12:17:12.812Z",
+    "updated_at": "2025-08-04T12:17:12.812Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "volcano-lair"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-08-04T12:17:12.812Z",
+    "updated_at": "2025-08-04T12:17:12.812Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "temp"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": false,
+    "created_at": "2025-08-04T12:17:12.813Z",
+    "updated_at": "2025-08-04T12:17:12.813Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Unassigned Devices",
+    "slug": "unassigned-devices",
+    "place": [
+      "moms"
+    ],
+    "description": "Default location for devices that are not yet physically placed.",
+    "x_pos": "72.16",
+    "y_pos": "26.49",
+    "is_active": false,
+    "created_at": "2025-10-16T10:19:09.362Z",
+    "updated_at": "2025-10-16T10:19:09.362Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Laundry",
+    "slug": "laundry",
+    "place": [
+      "moms"
+    ],
+    "description": "",
+    "x_pos": "18.79",
+    "y_pos": "37.66",
     "is_active": true,
-    "created_at": "2025-03-14T15:44:17.035Z",
-    "updated_at": "2025-03-14T17:33:10.180Z"
+    "created_at": "2025-10-16T22:09:25.405Z",
+    "updated_at": "2025-10-18T15:11:11.393Z"
   }
 },
 {
   "model": "sensors.location",
-  "pk": 31,
   "fields": {
-    "name": "door",
-    "place": 11,
+    "name": "Garage",
+    "slug": "garage",
+    "place": [
+      "moms"
+    ],
+    "description": "",
+    "x_pos": "36.12",
+    "y_pos": "33.44",
+    "is_active": true,
+    "created_at": "2025-10-16T22:43:00.610Z",
+    "updated_at": "2025-10-16T22:43:00.610Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Family",
+    "slug": "family",
+    "place": [
+      "moms"
+    ],
+    "description": "Family Room",
+    "x_pos": "52.01",
+    "y_pos": "34.31",
+    "is_active": true,
+    "created_at": "2025-10-18T16:56:01.599Z",
+    "updated_at": "2025-10-18T16:56:01.599Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Ping Pong",
+    "slug": "ping-pong",
+    "place": [
+      "moms"
+    ],
+    "description": "",
+    "x_pos": "10.06",
+    "y_pos": "50.25",
+    "is_active": true,
+    "created_at": "2025-10-18T16:59:03.529Z",
+    "updated_at": "2025-10-18T16:59:03.529Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Backyard",
+    "slug": "backyard",
+    "place": [
+      "moms"
+    ],
+    "description": "",
+    "x_pos": "62.80",
+    "y_pos": "29.91",
+    "is_active": true,
+    "created_at": "2025-10-18T17:03:25.884Z",
+    "updated_at": "2025-10-22T13:14:43.070Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Vinyl",
+    "slug": "vinyl",
+    "place": [
+      "moms"
+    ],
+    "description": "",
+    "x_pos": "15.54",
+    "y_pos": "83.08",
+    "is_active": true,
+    "created_at": "2025-10-18T17:04:38.794Z",
+    "updated_at": "2025-10-18T17:04:38.794Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Office",
+    "slug": "office",
+    "place": [
+      "5702hb"
+    ],
+    "description": "",
     "x_pos": "50.00",
     "y_pos": "50.00",
     "is_active": true,
-    "created_at": "2025-03-14T19:29:53.983Z",
-    "updated_at": "2025-03-14T19:34:08.634Z"
+    "created_at": "2025-10-29T17:21:12.961Z",
+    "updated_at": "2025-10-29T17:21:12.961Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Atrium",
+    "slug": "atrium",
+    "place": [
+      "5702hb"
+    ],
+    "description": "",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-10-29T21:53:36.317Z",
+    "updated_at": "2025-10-29T21:53:36.317Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Living Room",
+    "slug": "living-room",
+    "place": [
+      "5702hb"
+    ],
+    "description": "",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-10-30T16:13:29.534Z",
+    "updated_at": "2025-10-30T16:13:29.534Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Back Porch",
+    "slug": "back-porch",
+    "place": [
+      "5702hb"
+    ],
+    "description": "",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-10-31T15:29:17.500Z",
+    "updated_at": "2025-10-31T15:29:17.500Z"
+  }
+},
+{
+  "model": "sensors.location",
+  "fields": {
+    "name": "Art Loft",
+    "slug": "art-loft",
+    "place": [
+      "5702hb"
+    ],
+    "description": "Pool House loft",
+    "x_pos": "50.00",
+    "y_pos": "50.00",
+    "is_active": true,
+    "created_at": "2025-11-10T15:33:39.868Z",
+    "updated_at": "2025-11-10T15:33:39.868Z"
   }
 }
 ]

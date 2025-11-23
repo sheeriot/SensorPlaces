@@ -17,14 +17,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.body.addEventListener('htmx:afterSettle', function(evt) {
         console.log('sensor-detail.js: HTMX settle event triggered on target:', evt.detail.target.id);
-        
+
         // If a new live value container might have been added, ensure fetcher is running and trigger a fetch.
         initializeLiveValueFetcher();
         if (liveValueFetcher) {
             console.log('sensor-detail.js: Triggering live value fetch after HTMX swap.');
             liveValueFetcher.fetch();
         }
-        
+
         const graphCardId = 'sensor-graph-card';
         if (evt.detail.target.id === graphCardId) {
             console.log('sensor-detail.js: Graph card content loaded. Initializing SensorChart.');
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (graphCardElement && !graphCardElement.sensorChart) {
                 // Store the chart instance on the element itself to prevent re-initialization
                 graphCardElement.sensorChart = new SensorChart(graphCardId);
-                
+
             } else {
                 console.log('sensor-detail.js: Chart already initialized or graph card not found. Skipping.');
             }

@@ -22,7 +22,7 @@
                 <div class="col-md-6">
                     <p><strong>Max Value:</strong> {{ object.max_value|default:"N/A" }}</p>
                     <p><strong>Decimal Places:</strong> {{ object.decimal_places|default:"N/A" }}</p>
-                    <p><strong>Allow Override:</strong> 
+                    <p><strong>Allow Override:</strong>
                         {% if object.allow_override %}
                             <i class="bi bi-check-circle-fill text-success"></i> Yes
                         {% else %}
@@ -36,4 +36,3 @@
     <a href="{% url 'sensors:sensortype_list' %}" class="btn btn-secondary mt-3">Back to List</a>
 </div>
 {% endblock %}
-

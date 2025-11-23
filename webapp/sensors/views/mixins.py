@@ -69,14 +69,14 @@ class ReferrerMixin:
             if hasattr(self, 'model') and self.model:
                 app_label = self.model._meta.app_label
                 model_name = self.model._meta.model_name
-                
+
                 url_name = f'{app_label}:{model_name}_list'
                 url_kwargs = {}
-                
+
                 # If 'place_slug' is in the view's kwargs, add it to the reverse call
                 if 'place_slug' in self.kwargs:
                     url_kwargs['place_slug'] = self.kwargs['place_slug']
-                
+
                 try:
                     return reverse(url_name, kwargs=url_kwargs)
                 except NoReverseMatch:
@@ -100,14 +100,14 @@ class ReferrerMixin:
                 # This will fail on a CreateView, which is expected.
                 # ic(f"Exception in get_cancel_url's try block: {e}")
                 pass
-        
+
         # ic("No cancel URL found, returning to root.")
         return reverse('sensors:place_list')
 
 
 class PlaceAnnotationMixin:
     """Mixin to retrieve and cache the place object from URL kwargs."""
-    
+
     kwargs: dict
     _place: Optional[Place] = None
 
@@ -129,7 +129,7 @@ class PlaceAnnotationMixin:
             )
 
         return get_object_or_404(Place, slug=place_slug)
-    
+
     def get_annotated_locations(self, place: Place) -> QuerySet[Location]:
         """Get annotated locations for a place using the function from views_fun.py."""
         return get_annotated_locations(place)
@@ -141,84 +141,84 @@ class PlaceAnnotationMixin:
             context = super().get_context_data(**kwargs)
         except AttributeError:
             context = {}
-        
+
         # Get place - should have been set in setup
         place = getattr(self, '_place', self.get_place())
-        
+
         # Always ensure place is in context
         context['place'] = place
-        
+
         # If we have a place, add place data to context
         if place:
             # Add annotated locations if needed
             if 'locations' not in context:
                 context['locations'] = self.get_annotated_locations(place)
-        
+
         return context
 
 
 class FormDataMixin:
     """Mixin that injects place and location data into form kwargs."""
-    
+
     def get_form_kwargs(self) -> Dict[str, Any]:
         """Add place and locations data to form kwargs."""
         kwargs = super().get_form_kwargs()
-        
+
         # Add place data if available (from PlaceAnnotationMixin)
         place = getattr(self, '_place', None)
         if place:
             kwargs['place'] = place
-            
+
             # Add annotated locations if they're needed by the form
             if hasattr(self, 'get_annotated_locations'):
                 kwargs['locations'] = get_annotated_locations(place)
-        
+
         # Pass inactive_help_text if available
         if hasattr(self, '_inactive_help_text'):
             kwargs['inactive_help_text'] = self._inactive_help_text
-            
+
         # Pass active devices if available
         if hasattr(self, '_devices_active'):
             kwargs['devices_active'] = self._devices_active
-            
+
         return kwargs
 
 
 class ToastMixin:
     """Mixin to add toast message helpers to views."""
-    
+
     request: HttpRequest
-    
+
     def add_toast(self, message: str, type: str = 'info') -> Dict[str, str]:
         """Add a single toast message."""
         toast_data = {
             'message': message,
             'type': type
         }
-        
+
         # Initialize toast_message as list if doesn't exist
         if not hasattr(self.request, 'toast_message'):
             setattr(self.request, 'toast_message', [])
         # If it's a single message, convert to list
         elif not isinstance(self.request.toast_message, list):
             setattr(self.request, 'toast_message', [self.request.toast_message])
-            
+
         # Add the new toast
         self.request.toast_message.append(toast_data)
         return toast_data
-    
+
     def add_success_toast(self, message: str) -> Dict[str, str]:
         """Add a success toast message."""
         return self.add_toast(message, 'success')
-    
+
     def add_info_toast(self, message: str) -> Dict[str, str]:
         """Add an info toast message."""
         return self.add_toast(message, 'info')
-    
+
     def add_warning_toast(self, message: str) -> Dict[str, str]:
         """Add a warning toast message."""
         return self.add_toast(message, 'warning')
-    
+
     def add_danger_toast(self, message: str) -> Dict[str, str]:
         """Add a danger toast message."""
         return self.add_toast(message, 'danger')

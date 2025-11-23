@@ -5,11 +5,11 @@
 {% for provider in socialaccount_providers %}
   {% if provider.id == "google" %}
     <div class="d-grid gap-2 mb-3">
-      <a class="btn btn-outline-dark" 
+      <a class="btn btn-outline-dark"
          href="{% provider_login_url provider.id process='login' %}">
         <i class="bi bi-google me-2"></i>
         Sign in with {{ provider.name }}
       </a>
     </div>
   {% endif %}
-{% endfor %} 
+{% endfor %}

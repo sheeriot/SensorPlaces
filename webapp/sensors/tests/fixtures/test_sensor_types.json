@@ -1,0 +1,236 @@
+[
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Temperature",
+      "description": "",
+      "default_unit": [
+        "Celsius"
+      ],
+      "default_data_type": "INFLUX",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": true,
+      "decimal_places": 1,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Humidity",
+      "description": "",
+      "default_unit": [
+        "%RH"
+      ],
+      "default_data_type": "INFLUX",
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "allow_override": false,
+      "decimal_places": 0,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Pressure",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Light",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Sound",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Motion",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Carbon Dioxide",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Volatile Organic Compounds",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Particulate Matter 2.5",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Particulate Matter 10",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Other",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Distance",
+      "description": "",
+      "default_unit": [
+        "millimetre"
+      ],
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": true,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "rainfall",
+      "description": "",
+      "default_unit": [
+        "millimetre"
+      ],
+      "default_data_type": "INFLUX_CUMULATIVE_RESET",
+      "min_value": 0.0,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Battery",
+      "description": "",
+      "default_unit": [
+        "Percent"
+      ],
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Status",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  },
+  {
+    "model": "sensors.sensortype",
+    "fields": {
+      "name": "Lightlevel",
+      "description": "",
+      "default_unit": null,
+      "default_data_type": "DIRECT",
+      "min_value": null,
+      "max_value": null,
+      "allow_override": false,
+      "decimal_places": null,
+      "default_stale_threshold_seconds": 300
+    }
+  }
+]

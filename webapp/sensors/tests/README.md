@@ -85,4 +85,4 @@ To check test coverage:
 1. Install coverage: `pip install coverage`
 2. Run tests with coverage: `coverage run --source='sensors' manage.py test sensors`
 3. Generate a report: `coverage report`
-4. For a detailed HTML report: `coverage html` (then open `htmlcov/index.html`) 
+4. For a detailed HTML report: `coverage html` (then open `htmlcov/index.html`)

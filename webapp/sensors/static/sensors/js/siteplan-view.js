@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const scriptConfig = {
         debug: true
     };
-    
+
     const sitePlanView = {
         // State
         state: {
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
             initialized: false,
             placeSlug: null
         },
-    
+
         // Helper Methods
         percentToImageCoords(xPercent, yPercent) {
             const bounds = this.state.imageBounds;
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const imageY = (yPercent / 100) * bounds[1][0];
             return [imageY, imageX];
         },
-    
+
         // Available building icons
         buildingIcons: [
             'building',
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'house-heart',
             'hospital'
         ],
-    
+
         // Get random building icon
         getRandomIcon(locationName) {
             const idx = Math.floor(Math.random() * this.buildingIcons.length);
@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             return selectedIcon;
         },
-    
+
         // Create marker icon
         createIcon(isActive, iconType, locationName) {
             if (scriptConfig.debug) {
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `
             });
         },
-    
+
         // Create marker popup
         createMarkerPopup(location) {
             return `
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
         },
-    
+
         // Initialize the view
         initialize() {
             // Prevent multiple initializations
@@ -97,14 +97,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return Promise.resolve();
             }
             if (scriptConfig.debug) console.log('%c[siteplan-view.js] Initializing...', 'color: blue; font-weight: bold;');
-    
+
             // Listen for hide-inactive state changes
             window.addEventListener('hideInactiveStateChanged', (event) => {
                 if (event.detail.model === 'location') {
                     this.updateMarkersVisibility(event.detail.hideInactive);
                 }
             });
-    
+
             // Listen for siteplan updates
             window.addEventListener('siteplan-update', (event) => {
                 if (scriptConfig.debug) {
@@ -113,12 +113,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.table(Array.from(this.state.locations.values()));
                     console.log('Current markers state:', Array.from(this.state.markers.entries()));
                 }
-                
+
                 if (event.detail.locations) {
                     this.updateLocations(event.detail.locations);
                 }
             });
-    
+
             return new Promise((resolve) => {
                 const container = document.getElementById('siteplan-container');
                 if (!container) {
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 if (scriptConfig.debug) console.log('[siteplan-view.js] Found #siteplan-container element.', container);
-    
+
                 // Get the image URL and locations data
                 const imageUrl = container.dataset.imageUrl;
                 const locationsData = container.dataset.locations;
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log(`[siteplan-view.js] Image URL from data attribute: "${imageUrl}"`);
                     console.log(`[siteplan-view.js] Locations JSON from data attribute (first 100 chars): "${locationsData.substring(0, 100)}..."`);
                 }
-                
+
                 this.state.placeSlug = container.dataset.placeSlug;
                 if (!imageUrl) {
                     if (scriptConfig.debug) console.error('[siteplan-view.js] CRITICAL: Found container, but data-image-url is empty or missing. Cannot proceed.');
@@ -144,23 +144,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     resolve();
                     return;
                 }
-    
+
                 // Debug logging
                 if (scriptConfig.debug) {
                     console.log('Found container');
                     console.log('Image URL:', imageUrl);
                     console.log('Place Slug:', this.state.placeSlug);
                 }
-    
+
                 // Create a temporary image to get dimensions
                 const img = new Image();
                 img.onload = () => {
                     // Store image bounds
                     this.state.imageBounds = [[0, 0], [img.height, img.width]];
-                    
+
                     // Initialize the map
                     this.initializeMap(container, imageUrl);
-                    
+
                     // Add markers if we have location data
                     try {
                         const rawData = container.dataset.locations || '[]';
@@ -171,14 +171,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             console.log('Parsed locations:');
                             console.table(locations);
                         }
-                        
+
                         // Store locations in state using string IDs
                         locations.forEach(location => {
                             this.state.locations.set(location.slug, location);
                         });
-                        
+
                         this.addMarkers(locations);
-    
+
                         // Set initial visibility based on switch state
                         const locationSwitch = document.querySelector('.hideInactive-switch[data-model="location"]');
                         if (locationSwitch) {
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             console.error('Raw data was:', container.dataset.locations);
                         }
                     }
-    
+
                     this.state.initialized = true;
                     resolve();
                 };
@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 img.src = imageUrl;
             });
         },
-    
+
         // Initialize Leaflet map
         initializeMap(container, imageUrl) {
             // Check if map is already initialized
@@ -218,14 +218,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 return;
             }
-    
+
             // --- New Sizing Logic ---
             const siteplanWrapper = container.closest('.siteplan-wrapper');
             if (siteplanWrapper) {
                 this.setWrapperSize(siteplanWrapper, false); // Initial size for card
             }
             // --- End New Sizing Logic ---
-    
+
             // Initialize the map with minimal controls
             this.state.map = L.map(container, {
                 crs: L.CRS.Simple,
@@ -242,10 +242,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 minZoom: -2,         // Match editor settings
                 maxZoom: 2          // Match editor settings
             });
-    
+
             // Create zoom control but don't add it yet
             this.state.map.zoomControl = L.control.zoom();
-    
+
             // Add image overlay with loading handler
             this.state.imageOverlay = L.imageOverlay(imageUrl, this.state.imageBounds)
                 .addTo(this.state.map)
@@ -255,42 +255,42 @@ document.addEventListener('DOMContentLoaded', function() {
                         siteplanWrapper.classList.add('loaded');
                     }
                 });
-    
+
             // The aspect ratio is now handled by the explicit height calculation above
-            
+
             // Initial fit
             this.fitMapPerfectly();
-    
+
             // Create a ResizeObserver for the wrapper
             const resizeObserver = new ResizeObserver(() => {
                 requestAnimationFrame(() => this.fitMapPerfectly());
             });
-    
+
             // Observe both wrapper and container
             if (siteplanWrapper) resizeObserver.observe(siteplanWrapper);
             resizeObserver.observe(container);
-    
+
             // Also handle window resize
             window.addEventListener('resize', () => {
                 requestAnimationFrame(() => this.fitMapPerfectly());
             });
-    
+
             // Add modal logic after map is initialized
             const modalElement = document.getElementById('siteplan-view-modal');
             const originalParent = siteplanWrapper ? siteplanWrapper.parentElement : null;
-    
+
             if (modalElement && siteplanWrapper && originalParent) {
                 const modalBody = modalElement.querySelector('.modal-body');
-    
+
                 modalElement.addEventListener('shown.bs.modal', () => {
                     if (scriptConfig.debug) console.log('Expanding map to modal.');
                     modalBody.appendChild(siteplanWrapper);
-                    
+
                     this.setWrapperSize(siteplanWrapper, true); // Recalculate size for modal
-    
+
                     this.state.map.invalidateSize();
                     this.fitMapPerfectly();
-    
+
                     // Enable interactions
                     this.state.map.dragging.enable();
                     this.state.map.touchZoom.enable();
@@ -300,16 +300,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.state.map.keyboard.enable();
                     this.state.map.zoomControl.addTo(this.state.map);
                 });
-    
+
                 modalElement.addEventListener('hidden.bs.modal', () => {
                     if (scriptConfig.debug) console.log('Collapsing map back to card.');
                     originalParent.appendChild(siteplanWrapper);
-    
+
                     this.setWrapperSize(siteplanWrapper, false); // Recalculate size for card
-    
+
                     this.state.map.invalidateSize();
                     this.fitMapPerfectly();
-    
+
                     // Disable interactions
                     this.state.map.dragging.disable();
                     this.state.map.touchZoom.disable();
@@ -321,24 +321,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         },
-    
+
         // Set wrapper size based on context (card or modal)
         setWrapperSize(wrapper, forModal = false) {
             if (!wrapper || !this.state.imageBounds) return;
-    
+
             const imageWidth = this.state.imageBounds[1][1];
             const imageHeight = this.state.imageBounds[1][0];
             const aspectRatio = imageHeight / imageWidth;
-    
+
             if (forModal) {
                 // For modal: calculate size based on viewport
                 const modalPadding = 80; // Combined vertical/horizontal padding
                 const availableWidth = window.innerWidth - modalPadding;
                 const availableHeight = window.innerHeight - modalPadding;
-                
+
                 let newHeight = availableWidth * aspectRatio;
                 let newWidth = availableWidth;
-    
+
                 if (newHeight > availableHeight) {
                     newHeight = availableHeight;
                     newWidth = newHeight / aspectRatio;
@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const maxHeight = window.innerHeight * 0.6; // Max 60% of viewport height
                 wrapper.style.height = `${Math.min(calculatedHeight, maxHeight)}px`;
             }
-    
+
             if (scriptConfig.debug) {
                 console.log(`Set wrapper size (forModal: ${forModal})`, {
                     width: wrapper.style.width,
@@ -361,48 +361,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         },
-    
+
         // Update fitMapPerfectly method to match editor's implementation
         fitMapPerfectly() {
             if (!this.state.map || !this.state.imageBounds) return;
-            
+
             // Force a size update
             this.state.map.invalidateSize();
-            
+
             // Fit bounds exactly
             this.state.map.fitBounds(this.state.imageBounds, {
                 animate: false,
                 padding: [0, 0]
             });
         },
-    
+
         // Add markers to the map
         addMarkers(locations) {
             if (!this.state.map || !this.state.imageBounds) return;
-    
+
             // Shuffle available icons before assigning
             this.buildingIcons = this.buildingIcons
                 .map(value => ({ value, sort: Math.random() }))
                 .sort((a, b) => a.sort - b.sort)
                 .map(({ value }) => value);
-            
+
             if (scriptConfig.debug) {
                 console.log('Available icons after shuffle:');
                 console.table(this.buildingIcons);
             }
-            
+
             locations.forEach(location => {
                 const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
-                
+
                 // Get random icon type for this location
                 const iconType = this.getRandomIcon(location.name);
-                
+
                 // Create marker with popup
                 const marker = L.marker(coords, {
                     icon: this.createIcon(location.is_active, iconType, location.name),
                     title: location.name
                 });
-    
+
                 // Add popup with location info
                 marker.bindPopup(this.createMarkerPopup(location), {
                     offset: [0, -10],
@@ -412,16 +412,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     autoPanPadding: [50, 50],
                     keepInView: true
                 });
-    
+
                 // Show popup on hover
                 marker.on('mouseover', function() {
                     this.openPopup();
                 });
-                
+
                 marker.on('mouseout', function() {
                     this.closePopup();
                 });
-    
+
                 // Add click event to scroll to the location
                 marker.on('click', () => {
                     if (scriptConfig.debug) {
@@ -435,21 +435,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 });
-    
+
                 // Add to map and store reference
                 marker.addTo(this.state.map);
-    
+
                 // Storing for later reference
                 marker.iconType = iconType;
                 this.state.markers.set(location.slug, marker);
             });
         },
-    
+
         // Update markers visibility based on hide-inactive state
         updateMarkersVisibility(hideInactive) {
             this.state.markers.forEach((marker, slug) => {
                 const location = this.state.locations.get(slug);
-    
+
                 // A location might not (yet) exist for a marker during updates, so we check.
                 if (location && !location.is_active) {
                     const element = marker.getElement();
@@ -459,38 +459,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         },
-    
+
         updateLocations(updates) {
             if (scriptConfig.debug) {
                 console.log('Starting updateLocations with:', updates);
             }
-    
+
             let needsVisibilityCheck = false;
-    
+
             // The 'updates' object contains key-value pairs of { slug: locationData }
             Object.entries(updates).forEach(([slug, updatedData]) => {
                 const existingLocation = this.state.locations.get(slug);
                 const existingMarker = this.state.markers.get(slug);
-    
+
                 if (existingLocation && existingMarker) {
                     // Merge the updated data into our local state
                     const newLocationData = { ...existingLocation, ...updatedData };
                     this.state.locations.set(slug, newLocationData);
-    
+
                     // Update the marker's visual representation
                     const coords = this.percentToImageCoords(newLocationData.x_pos, newLocationData.y_pos);
                     const icon = this.createIcon(newLocationData.is_active, existingMarker.iconType, newLocationData.name);
-                    
+
                     existingMarker.setLatLng(coords);
                     existingMarker.setIcon(icon);
-    
+
                     // Also update the popup content
                     existingMarker.setPopupContent(this.createMarkerPopup(newLocationData));
-                    
+
                     if (scriptConfig.debug) {
                         console.log(`Updated location ${slug} with new data:`, newLocationData);
                     }
-                    
+
                     needsVisibilityCheck = true;
                 } else {
                     if (scriptConfig.debug) {
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
-    
+
             if (needsVisibilityCheck) {
                 // After all updates, re-evaluate visibility based on the current switch state
                 const locationSwitch = document.querySelector('.hideInactive-switch[data-model="location"]');
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     };
-    
+
     // Initialize when DOM is loaded
     if (!sitePlanView.state.initialized) {
         sitePlanView.initialize().then(() => {
@@ -517,5 +517,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Export for use in other modules
-    window.sitePlanView = sitePlanView; 
-}); 
+    window.sitePlanView = sitePlanView;
+});

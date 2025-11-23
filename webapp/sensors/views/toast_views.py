@@ -21,17 +21,17 @@ class ToastListView(LoginRequiredMixin, ListView):
     template_name = 'sensors/toast_list.html'
     context_object_name = 'toasts'
     paginate_by = 20
-    
+
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         self.place = get_object_or_404(Place, slug=kwargs.get('place_slug'))
-    
+
     def get_queryset(self):
         return ToastNotification.objects.filter(
             user=self.request.user,
             place=self.place
         ).order_by('-created_at')
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['place'] = self.place
@@ -42,17 +42,17 @@ class ToastListView(LoginRequiredMixin, ListView):
 @method_decorator(csrf_protect, name='dispatch')
 class ToastAPIView(LoginRequiredMixin, View):
     """Single API endpoint for all toast-related operations."""
-    
+
     def get(self, request, place_slug):
         """Handle GET requests for toast messages.
-        
+
         Query Parameters:
             show_all: bool - If True, return all messages, if False only unread
         """
         try:
             place = get_object_or_404(Place, slug=place_slug)
             show_all = request.GET.get('show_all', 'false').lower() == 'true'
-            
+
             # Base query with read status annotation
             notifications = ToastNotification.objects.filter(
                 user=request.user,
@@ -65,7 +65,7 @@ class ToastAPIView(LoginRequiredMixin, View):
                     )
                 )
             )
-            
+
             # Filter unread if not showing all
             if not show_all:
                 notifications = notifications.filter(
@@ -74,7 +74,7 @@ class ToastAPIView(LoginRequiredMixin, View):
                         toast_id=OuterRef('pk')
                     ))
                 )
-            
+
             # Get the last 50 notifications
             history = notifications.order_by('-created_at')[:50].values(
                 'id',
@@ -83,7 +83,7 @@ class ToastAPIView(LoginRequiredMixin, View):
                 'created_at',
                 'read'
             )
-            
+
             return JsonResponse({
                 'success': True,
                 'history': list(history),
@@ -92,7 +92,7 @@ class ToastAPIView(LoginRequiredMixin, View):
                     place=place
                 )
             })
-            
+
         except Exception as e:
             return JsonResponse({
                 'success': False,
@@ -101,7 +101,7 @@ class ToastAPIView(LoginRequiredMixin, View):
 
     def post(self, request, place_slug):
         """Handle POST requests for marking messages as read.
-        
+
         POST Data:
             action: str - 'mark_read' or 'mark_all_read'
             toast_id: int - Single ID to mark as read (for 'mark_read' action)
@@ -111,7 +111,7 @@ class ToastAPIView(LoginRequiredMixin, View):
             place = get_object_or_404(Place, slug=place_slug)
             data = json.loads(request.body)
             action = data.get('action')
-            
+
             if action == 'mark_read':
                 # Handle single toast_id
                 toast_id = data.get('toast_id')
@@ -120,34 +120,34 @@ class ToastAPIView(LoginRequiredMixin, View):
                 else:
                     # Fall back to toast_ids list
                     toast_ids = data.get('toast_ids')
-                
+
                 if not toast_ids:
                     return JsonResponse({
                         'success': False,
                         'error': 'toast_id or toast_ids is required'
                     }, status=400)
-                
+
                 # Convert single ID to list
                 if isinstance(toast_ids, int):
                     toast_ids = [toast_ids]
-                
+
                 # Verify all toasts belong to this place and user
                 toasts = ToastNotification.objects.filter(
                     id__in=toast_ids,
                     user=request.user,
                     place=place
                 )
-                
+
                 if len(toasts) != len(toast_ids):
                     raise PermissionDenied("Some toast messages don't belong to this place or user")
-                
+
                 # Mark toasts as read
                 for toast in toasts:
                     ToastReadStatus.objects.get_or_create(
                         user=request.user,
                         toast=toast
                     )
-                
+
                 return JsonResponse({
                     'success': True,
                     'message': f'Marked {len(toasts)} messages as read',
@@ -156,7 +156,7 @@ class ToastAPIView(LoginRequiredMixin, View):
                         place=place
                     )
                 })
-            
+
             elif action == 'mark_all_read':
                 # Get all unread notifications for this user in this place
                 unread_notifications = ToastNotification.objects.filter(
@@ -165,7 +165,7 @@ class ToastAPIView(LoginRequiredMixin, View):
                 ).exclude(
                     toastreadstatus__user=request.user
                 )
-                
+
                 # Mark all as read
                 count = 0
                 for toast in unread_notifications:
@@ -174,19 +174,19 @@ class ToastAPIView(LoginRequiredMixin, View):
                         toast=toast
                     )
                     count += 1
-                
+
                 return JsonResponse({
                     'success': True,
                     'message': f'Marked all {count} messages as read',
                     'unread_count': 0  # After marking all as read, count is 0
                 })
-            
+
             else:
                 return JsonResponse({
                     'success': False,
                     'error': f'Unknown action: {action}'
                 }, status=400)
-            
+
         except json.JSONDecodeError:
             return JsonResponse({
                 'success': False,

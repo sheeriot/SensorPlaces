@@ -56,7 +56,7 @@
                                 <span class="page-link">Previous</span>
                             </li>
                         {% endif %}
-                        
+
                         {% for i in toasts.paginator.page_range %}
                             {% if toasts.number == i %}
                                 <li class="page-item active">
@@ -68,7 +68,7 @@
                                 </li>
                             {% endif %}
                         {% endfor %}
-                        
+
                         {% if toasts.has_next %}
                             <li class="page-item">
                                 <a class="page-link" href="?page={{ toasts.next_page_number }}">Next</a>

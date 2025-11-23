@@ -29,4 +29,4 @@ accesslog = '-'
 loglevel = 'info'
 
 # Keep the workers alive for so many seconds
-keepalive = 2 
+keepalive = 2

@@ -10,7 +10,7 @@
         </h5>
         <div class="btn-group">
             {% if model_name == 'sensor' %}
-                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}?next={{ request.build_absolute_uri|urlencode }}" 
+                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}?next={{ request.build_absolute_uri|urlencode }}"
                    class="btn btn-warning btn-sm">
                     <i class="bi bi-pencil"></i>
                 </a>
@@ -109,4 +109,4 @@
             </div>
         </div>
     </div>
-</div> 
+</div>
