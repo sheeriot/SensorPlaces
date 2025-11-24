@@ -313,13 +313,13 @@ class PlaceDeleteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Pre-fill with the place name for testing convenience
-        if self.instance and hasattr(self.instance, 'name') and self.instance.name:
-            if 'initial' not in kwargs:
-                self.initial = {}
-            if 'confirmation_name' not in self.initial:
-                # Set initial value to match the place name
-                self.initial['confirmation_name'] = self.instance.name
+        self.helper = FormHelper()
+        self.helper.form_tag = True
+        self.helper.form_method = 'post'
+        self.helper.layout = Layout(
+            'confirmation_name',
+            HTML('<button type="submit" class="btn btn-danger">Delete Place</button>')
+        )
 
     def clean_confirmation_name(self):
         confirmation_name = self.cleaned_data.get('confirmation_name')

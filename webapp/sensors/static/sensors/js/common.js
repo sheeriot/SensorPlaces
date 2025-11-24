@@ -230,3 +230,50 @@ window.LiveValueFetcher = LiveValueFetcher;
 window.sensorPlaces.isInitialized = function(module) {
     return window.sensorPlaces.initialized[module] || false;
 };
+
+// Global event listeners (moved from base.html)
+document.addEventListener('DOMContentLoaded', () => {
+    // HTMX Modal Handling
+    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+        var target = evt.detail.target;
+        if (target && target.id === 'modal-content') {
+            var modalContainer = document.getElementById('modal-container');
+            if (modalContainer) {
+                var modal = new bootstrap.Modal(modalContainer);
+                modal.show();
+            }
+        }
+    });
+
+    // Global listener to close Bootstrap modals based on a custom event
+    document.addEventListener('closeModal', function(event) {
+        if (commonConfig.debug) console.log('Received closeModal event:', event.detail);
+        const modalSelector = event.detail.value || event.detail; // Handle both object and string detail
+        if (modalSelector) {
+            const modalElement = document.querySelector(modalSelector);
+            if (modalElement) {
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    if (commonConfig.debug) console.log('Hiding modal:', modalSelector);
+                    modalInstance.hide();
+                } else {
+                    console.warn('Could not find a Bootstrap modal instance for selector:', modalSelector);
+                }
+            } else {
+                console.warn('Could not find modal element with selector:', modalSelector);
+            }
+        }
+    });
+
+    // Diagnostic listener for HTMX responses
+    document.addEventListener('htmx:afterRequest', function(evt) {
+        if (commonConfig.debug) {
+            const xhr = evt.detail.xhr;
+            console.log('HTMX request completed to:', xhr.responseURL);
+            const triggerHeader = xhr.getResponseHeader('HX-Trigger-After-Settle');
+            if (triggerHeader) {
+                console.log('Server sent HX-Trigger-After-Settle:', triggerHeader);
+            }
+        }
+    });
+});

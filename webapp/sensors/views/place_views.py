@@ -349,6 +349,12 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'sensors/place_confirm_delete.html'
     slug_url_kwarg = 'place_slug'
     slug_field = 'slug'
+    form_class = PlaceDeleteForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['instance'] = self.object
+        return kwargs
 
     def get_object(self, queryset=None):
         return get_object_or_404(Place, slug=self.kwargs['place_slug'])
@@ -356,25 +362,24 @@ class PlaceDeleteView(LoginRequiredMixin, DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['place'] = self.object
+        context['form'] = self.get_form()
         return context
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            context = self.get_context_data(object=self.object)
-            html = render_to_string('sensors/place_confirm_delete_modal.html', context, request=request)
-            return JsonResponse({'html': html})
-        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        self.object.delete()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': True, 'redirect_url': self.get_success_url()})
-        return HttpResponseRedirect(self.get_success_url())
+        form = self.get_form()
+        if form.is_valid():
+            self.object.delete()
+            success_url = self.get_success_url()
+            if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'redirect_url': success_url})
+            return HttpResponseRedirect(success_url)
+        else:
+            return self.form_invalid(form)
 
     def get_success_url(self):
         return self.request.POST.get('next', reverse_lazy('sensors:place_list'))
+
 
 @login_required
 def place_stats(request, place_slug):
@@ -390,8 +395,7 @@ def place_stats(request, place_slug):
         'sensors_active': sensors_active,
         'sensors_inactive': sensors_inactive
     }
-    # ic(context) # This line was removed as per the edit hint
-    return JsonResponse(context)
+    return JsonResponse({'success': True, 'stats': context})
 
 
 # Utility Forms

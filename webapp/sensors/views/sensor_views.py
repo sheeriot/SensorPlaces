@@ -105,6 +105,9 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             context['device'] = self._device
             context['location'] = self._device.location
             context['sensors'] = self._device.sensors_sorted
+        else:
+            context['device'] = None
+            context['location'] = None
 
         # Add live counts to context
         context.update(get_live_counts_context(self._place))

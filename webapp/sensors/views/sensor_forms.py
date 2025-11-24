@@ -6,8 +6,6 @@ from crispy_forms.bootstrap import FormActions
 
 from ..models import Sensor, SensorType
 
-from icecream import ic
-
 
 class SensorTypeSelect(forms.Select):
     def __init__(self, *args, **kwargs):
