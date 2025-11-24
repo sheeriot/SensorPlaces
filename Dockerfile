@@ -39,5 +39,3 @@ RUN chmod +x docker-entrypoint.sh
 
 # Set final workdir
 WORKDIR /opt/app/webapp
-
- 

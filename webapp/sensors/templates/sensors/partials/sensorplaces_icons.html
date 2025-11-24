@@ -66,7 +66,7 @@
                         <p class="text-center mb-3">Please select a place to continue:</p>
                         <div class="list-group">
                             {% for place in places %}
-                                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}" 
+                                <a href="{% url 'sensors:place_detail' place_slug=place.slug %}"
                                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                     {{ place.name }}
                                     <span class="badge bg-primary rounded-pill">
@@ -83,4 +83,4 @@
             </div>
         </div>
     </div>
-{% endif %} 
+{% endif %}

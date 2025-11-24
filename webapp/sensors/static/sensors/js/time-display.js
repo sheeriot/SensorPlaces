@@ -26,20 +26,20 @@ const timeDisplay = {
         }
 
         if (timeDisplayConfig.debug) console.log('Updating time display...');
-        
+
         const now = new Date();
         const hour = now.getHours();
-        
+
         // Set color based on time of day
         const newColor = hour >= 5 && hour < 11 ? this.themes.morning.color :
                         hour >= 11 && hour < 17 ? this.themes.afternoon.color :
                         hour >= 17 && hour < 21 ? this.themes.evening.color :
                         this.themes.night.color;
-        
+
         if (timeDisplayConfig.debug) {
             console.log(`Updating time display color for hour ${hour} to ${newColor}`);
         }
-        
+
         timeSpan.style.color = newColor;
 
         // Format date in YYYY/MM/DD format
@@ -47,7 +47,7 @@ const timeDisplay = {
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
         const dateStr = `${year}/${month}/${day}`;
-        
+
         const timeStr = now.toLocaleString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
@@ -65,15 +65,15 @@ const timeDisplay = {
         const offsetHours = Math.floor(Math.abs(offset) / 60);
         const offsetMinutes = Math.abs(offset) % 60;
         const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
-        
+
         const displayString = `<small>${dateStr} ${timeStr} ${offsetString} (${shortTZ})</small>`;
         if (timeDisplayConfig.debug) {
             console.log('Updating time display with:', displayString);
         }
-        
+
         // Update display with compact format
         timeSpan.innerHTML = displayString;
-        
+
         // Update tooltip with full details
         const isoTime = now.toISOString();
         const unixTime = Math.floor(now.getTime() / 1000);
@@ -88,12 +88,12 @@ const timeDisplay = {
             hour12: false,
             timeZoneName: 'long'
         });
-        
+
         const tooltipContent = `${fullTimeString}\nISO: ${isoTime}\nUNIX: ${unixTime}\nClick to copy current timestamp`;
         if (timeDisplayConfig.debug) {
             console.log('Updating tooltip content:', tooltipContent);
         }
-        
+
         timeSpan.setAttribute('data-bs-title', tooltipContent);
     },
 
@@ -113,7 +113,7 @@ const timeDisplay = {
         timeSpan.addEventListener('click', function() {
             const now = new Date();
             const isoString = now.toISOString();
-            
+
             if (timeDisplayConfig.debug) {
                 console.log('Copying timestamp to clipboard:', isoString);
             }
@@ -121,7 +121,7 @@ const timeDisplay = {
             navigator.clipboard.writeText(isoString).then(() => {
                 const tooltip = bootstrap.Tooltip.getInstance(this);
                 const originalTitle = this.getAttribute('data-bs-title');
-                
+
                 if (timeDisplayConfig.debug) {
                     console.log('Timestamp copied, showing confirmation');
                 }
@@ -168,7 +168,7 @@ async function sendTimezoneToServer() {
 // Initialize time display when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     if (timeDisplayConfig.debug) console.log('Initializing time display system');
-    
+
     // Send timezone to server
     sendTimezoneToServer();
 
@@ -180,9 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Time display tooltip initialized');
         }
     }
-    
+
     // Start the time display system
     timeDisplay.update();
     setInterval(() => timeDisplay.update(), 1000);
     timeDisplay.initializeTimestampCopy();
-}); 
+});

@@ -12,9 +12,9 @@
                 <a href="{% url 'sensors:influxsource_update' place_slug=place.slug pk=source.pk %}" class="btn btn-outline-warning" title="Edit">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
-                <button type="button" class="btn btn-outline-danger delete-influx-source" 
+                <button type="button" class="btn btn-outline-danger delete-influx-source"
                         data-url="{% url 'sensors:influxsource_delete' place_slug=place.slug pk=source.pk %}"
-                        data-bs-toggle="modal" 
+                        data-bs-toggle="modal"
                         data-bs-target="#deleteInfluxSourceModal"
                         title="Delete">
                     <i class="bi bi-trash-fill"></i>

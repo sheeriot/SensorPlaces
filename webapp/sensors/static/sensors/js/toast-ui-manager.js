@@ -17,19 +17,19 @@ const createToastSystem = () => {
 
         initialize() {
             if (this.initialized) return true;
-            
+
             this.historyButton = document.getElementById('toast-history-button');
             this.historyBadge = document.getElementById('toast-history-badge');
-            
+
             if (!this.historyButton || !this.historyBadge) return false;
 
             this.toastUnreadCount = window.sensorPlaces?.toastUnreadCount || 0;
             this.historyButton.addEventListener('click', this._handleHistoryButtonClick.bind(this));
-            
+
             this.initialized = true;
             return true;
         },
-        
+
         // Private method for handling history button click
         async _handleHistoryButtonClick(event) {
             event.preventDefault();
@@ -41,7 +41,7 @@ const createToastSystem = () => {
 
             // Setup modal reset handler
             this._setupModalResetHandler(historyModal);
-            
+
             // Show modal
             const modal = new bootstrap.Modal(historyModal, {
                 backdrop: true, keyboard: true, focus: true
@@ -57,12 +57,12 @@ const createToastSystem = () => {
                 this._showHistoryError(historyModal);
             }
         },
-        
+
         // Set up modal reset handler
         _setupModalResetHandler(historyModal) {
             const handleModalHidden = () => {
                 this.historyButton.focus();
-                
+
                 // Reset content
                 const historyList = historyModal.querySelector('#toastHistoryList');
                 if (historyList) {
@@ -72,18 +72,18 @@ const createToastSystem = () => {
                             Loading notifications...
                         </div>`;
                 }
-                
+
                 // Reset checkbox
                 const showAllCheckbox = historyModal.querySelector('#showAllToasts');
                 if (showAllCheckbox) {
                     showAllCheckbox.checked = false;
                     showAllCheckbox.parentNode.replaceChild(showAllCheckbox.cloneNode(true), showAllCheckbox);
                 }
-                
+
                 // Clean up Bootstrap modal
                 const backdrop = document.querySelector('.modal-backdrop');
                 if (backdrop) backdrop.remove();
-                
+
                 historyModal.style.display = '';
                 historyModal.classList.remove('show');
                 historyModal.removeAttribute('aria-modal');
@@ -95,7 +95,7 @@ const createToastSystem = () => {
             historyModal.removeEventListener('hidden.bs.modal', handleModalHidden);
             historyModal.addEventListener('hidden.bs.modal', handleModalHidden);
         },
-        
+
         // Set up history modal event handlers
         _setupHistoryEventHandlers(historyModal, placeSlug) {
             // Set up show all toggle
@@ -109,7 +109,7 @@ const createToastSystem = () => {
             // Set up mark all as read handlers
             const markAllReadBtn = historyModal.querySelector('#markAllRead');
             const confirmMarkAllReadBtn = document.querySelector('#confirmMarkAllRead');
-            
+
             if (markAllReadBtn) {
                 markAllReadBtn.addEventListener('click', () => {
                     const confirmModal = new bootstrap.Modal(document.getElementById('mark-all-read-modal'));
@@ -123,13 +123,13 @@ const createToastSystem = () => {
                 });
             }
         },
-        
+
         // Handle marking all as read
         async _markAllAsRead(placeSlug, historyModal) {
             try {
                 const response = await window.utils.fetchWithCSRF(
                     toastConfig.apiEndpoint(placeSlug),
-                    { 
+                    {
                         method: 'POST',
                         body: JSON.stringify({
                             action: 'mark_all_read'
@@ -156,7 +156,7 @@ const createToastSystem = () => {
                 console.error('Error marking all as read:', error);
             }
         },
-        
+
         // Show error in history modal
         _showHistoryError(historyModal) {
             const historyList = historyModal.querySelector('#toastHistoryList');
@@ -171,15 +171,15 @@ const createToastSystem = () => {
 
         updateBadge(count) {
             if (!this.historyBadge) return;
-            
+
             this.toastUnreadCount = parseInt(count, 10) || 0;
             this.historyBadge.textContent = this.toastUnreadCount || '';
-            
+
             // Toggle visibility
             this.historyBadge.classList.toggle('d-none', this.toastUnreadCount <= 0);
-            
+
             if (this.historyButton) {
-                this.historyButton.setAttribute('aria-label', 
+                this.historyButton.setAttribute('aria-label',
                     `Notification History (${this.toastUnreadCount} unread)`);
             }
         },
@@ -206,7 +206,7 @@ const createToastSystem = () => {
 
             this._createAndShowToast(toastData);
         },
-        
+
         // Create and display a toast notification
         _createAndShowToast(toastData) {
             // Get or create container
@@ -225,7 +225,7 @@ const createToastSystem = () => {
             toastEl.setAttribute('role', 'alert');
             toastEl.setAttribute('aria-live', 'assertive');
             toastEl.setAttribute('aria-atomic', 'true');
-            
+
             // Set toast content
             const iconType = this._getIconForToastType(toastData.type);
             toastEl.innerHTML = `
@@ -241,7 +241,7 @@ const createToastSystem = () => {
             toastContainer.insertAdjacentElement('afterbegin', toastEl);
             this._showBootstrapToast(toastEl, toastContainer);
         },
-        
+
         // Get the appropriate icon for a toast type
         _getIconForToastType(type) {
             switch (type) {
@@ -251,7 +251,7 @@ const createToastSystem = () => {
                 default: return 'info-circle';
             }
         },
-        
+
         // Display a Bootstrap toast with animation
         _showBootstrapToast(toastEl, toastContainer) {
             requestAnimationFrame(() => {
@@ -265,11 +265,11 @@ const createToastSystem = () => {
                     autohide: true,
                     animation: true
                 });
-                
+
                 // Add fade transition and cleanup
                 toastEl.style.transition = 'opacity 0.15s linear';
                 toast.show();
-                
+
                 toastEl.addEventListener('hidden.bs.toast', () => {
                     toastEl.addEventListener('transitionend', () => {
                         toastEl.remove();
@@ -289,10 +289,10 @@ const createToastSystem = () => {
                 if (toastConfig.debug) {
                     console.log(`Loading toast history for place ${placeSlug}, showAll=${showAll}`);
                 }
-                
+
                 // Use a URL with proper query parameter formatting
                 const url = `${toastConfig.apiEndpoint(placeSlug)}?show_all=${showAll ? 'true' : 'false'}`;
-                
+
                 const data = await window.utils.fetchWithCSRF(url);
 
                 if (data.success) {
@@ -317,7 +317,7 @@ const createToastSystem = () => {
                 this._showHistoryErrorMessage(historyList);
             }
         },
-        
+
         // Show empty history message
         _showEmptyHistoryMessage(historyList) {
             historyList.innerHTML = `
@@ -326,7 +326,7 @@ const createToastSystem = () => {
                     No notifications
                 </div>`;
         },
-        
+
         // Show history error message
         _showHistoryErrorMessage(historyList) {
             historyList.innerHTML = `
@@ -335,7 +335,7 @@ const createToastSystem = () => {
                     Error loading notifications
                 </div>`;
         },
-        
+
         // Render history items and set up event handlers
         _renderHistoryItems(historyList, historyData, showAll, placeSlug) {
             const template = document.getElementById('toast-history-item-template');
@@ -350,16 +350,16 @@ const createToastSystem = () => {
             }).join('');
 
             historyList.innerHTML = historyHtml;
-            
+
             // Set up event handlers
             this._setupHistoryItemHandlers(historyList, placeSlug, showAll, historyData);
         },
-        
+
         // Render a single history item from template
         _renderSingleHistoryItem(template, toast, showAll) {
             const element = template.content.cloneNode(true);
             const container = element.querySelector('[data-toast-id]');
-            
+
             // Set container attributes
             container.dataset.toastId = toast.id;
             container.classList.toggle('read', toast.read);
@@ -386,7 +386,7 @@ const createToastSystem = () => {
 
             return container.outerHTML;
         },
-        
+
         // Set up event handlers for history items
         _setupHistoryItemHandlers(historyList, placeSlug, showAll, historyData) {
             // Add event listeners to checkboxes
@@ -404,7 +404,7 @@ const createToastSystem = () => {
                     historyList, placeSlug, showAll, historyData);
             }
         },
-        
+
         // Mark a single toast as read
         async _markSingleToastAsRead(checkbox, placeSlug, showAll) {
             const toastId = parseInt(checkbox.dataset.toastId, 10);
@@ -425,7 +425,7 @@ const createToastSystem = () => {
                 if (response.success) {
                     toastItem.classList.add('read');
                     if (!showAll) toastItem.classList.add('d-none');
-                    
+
                     // Update badge
                     if (response.unread_count !== undefined) {
                         this.updateBadge(response.unread_count);
@@ -436,7 +436,7 @@ const createToastSystem = () => {
                 checkbox.checked = false;
             }
         },
-        
+
         // Mark all history items as read
         async _markAllHistoryAsRead(historyList, placeSlug, showAll, historyData) {
             try {
@@ -456,7 +456,7 @@ const createToastSystem = () => {
                     unreadItems.forEach(item => {
                         item.classList.add('read');
                         if (!showAll) item.classList.add('d-none');
-                        
+
                         const checkbox = item.querySelector('.form-check-input');
                         if (checkbox) checkbox.checked = true;
                     });
@@ -487,7 +487,7 @@ const createToastSystem = () => {
 const initializeToastSystem = () => {
     if (!window.toastSystem) createToastSystem();
     window.toastSystem.initialize();
-    
+
     if (document.readyState === 'complete') {
         processServerToast();
     } else {
@@ -513,7 +513,7 @@ const processServerToast = () => {
     try {
         // Process toast messages
         const serverToastElements = toastContainer.querySelectorAll('.server-toast-message');
-        
+
         if (serverToastElements.length === 0) {
             _processDirectToastFallback();
             return;
@@ -528,7 +528,7 @@ const processServerToast = () => {
                 try {
                     const toastData = JSON.parse(toastScript.textContent);
                     toastData.addToHistory = false;  // Badge count is already in template
-                    
+
                     // Add a slight delay between toasts
                     setTimeout(() => {
                         if (window.toastSystem && typeof window.toastSystem.show === 'function') {
@@ -538,7 +538,7 @@ const processServerToast = () => {
                             window.showToast(toastData.message, toastData.type);
                         }
                     }, index * 300);
-                    
+
                     toastMessage.setAttribute('data-processed', 'true');
                 } catch (e) {
                     console.error('Error processing toast:', e, toastScript.textContent);
@@ -565,11 +565,11 @@ const _processDirectToastFallback = () => {
                     window.showToast(directData.message, directData.type);
                 }
             } catch (e) {
-                console.error('Error processing direct toast:', e, 
+                console.error('Error processing direct toast:', e,
                               directToast.querySelector('script')?.textContent || 'No script content');
             }
         }
     } catch (e) {
         console.error('Error in _processDirectToastFallback:', e);
     }
-}; 
+};

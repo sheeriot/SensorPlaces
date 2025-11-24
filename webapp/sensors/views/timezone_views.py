@@ -18,4 +18,4 @@ def set_user_timezone(request: HttpRequest) -> JsonResponse:
         else:
             return JsonResponse({'status': 'error', 'message': 'Timezone not provided'}, status=400)
     except json.JSONDecodeError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400) 
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)

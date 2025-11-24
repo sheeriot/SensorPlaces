@@ -29,7 +29,7 @@ class SensorTypeSelect(forms.Select):
         # Load cache just in time
         if self.sensor_types_cache is None:
             self._load_cache()
-            
+
         option = super().create_option(name, value, label, selected, index, subindex, attrs)
         if value and self.sensor_types_cache and value in self.sensor_types_cache:
             sensor_type = self.sensor_types_cache[value]
@@ -46,12 +46,12 @@ class SensorForm(forms.ModelForm):
     class Meta:
         model = Sensor
         fields = [
-            'device', 'name', 'is_active', 'sensor_type', 
-            'unit', 'unit_override', 
+            'device', 'name', 'is_active', 'sensor_type',
+            'unit', 'unit_override',
             'data_type', 'data_type_override',
             'min_value', 'min_value_override',
             'max_value', 'max_value_override',
-            'graph_type', 
+            'graph_type',
             'influx_source', 'influx_measurement'
         ]
         widgets = {
@@ -88,20 +88,20 @@ class SensorForm(forms.ModelForm):
         inactive_help_text = kwargs.pop('inactive_help_text', None)
         kwargs.pop('locations', None)
         kwargs.pop('devices_active', None)
-        
+
         super().__init__(*args, **kwargs)
-                
+
         # Set default device if provided
         if self.device:
             self.fields['device'].widget = forms.HiddenInput()
             self.fields['device'].initial = self.device.pk
-            
+
             # If device is inactive, sensor must be inactive
             if not self.device.is_active:
                 self.fields['is_active'].initial = False
                 self.fields['is_active'].widget.attrs['disabled'] = True
                 self.fields['is_active'].label = 'inactive'  # Set initial label
-                
+
                 # Set help text for inactive state
                 self.fields['is_active'].help_text = mark_safe(
                     f'<i class="bi bi-exclamation-triangle me-2"></i>'
@@ -112,7 +112,7 @@ class SensorForm(forms.ModelForm):
             self.fields['is_active'].initial = False
             self.fields['is_active'].widget.attrs['disabled'] = True
             self.fields['is_active'].label = 'inactive'  # Set initial label
-            
+
             # Set help text for inactive state
             self.fields['is_active'].help_text = mark_safe(
                 f'<i class="bi bi-exclamation-triangle me-2"></i>'
@@ -123,7 +123,7 @@ class SensorForm(forms.ModelForm):
             self.fields['is_active'].label = 'Inactive'
         else:
             self.fields['is_active'].label = 'Active'  # Set initial label
-            
+
         self.fields['name'].label = "Sensor Name"
         self.fields['sensor_type'].label = "Sensor Type"
         self.fields['graph_type'].label = "Graph Type"
@@ -171,7 +171,7 @@ class SensorForm(forms.ModelForm):
         sensor_type = None
         if self.instance and self.instance.sensor_type:
             sensor_type = self.instance.sensor_type
-        
+
         # If a sensor type is selected, check its allow_override flag
         if sensor_type and not sensor_type.allow_override:
             # Disable override fields if not allowed
@@ -303,12 +303,12 @@ class SensorForm(forms.ModelForm):
             if unit_override and cleaned_data.get('unit') == sensor_type.default_unit:
                 cleaned_data['unit'] = None
                 cleaned_data['unit_override'] = False
-            
+
             # If data type override is selected but matches the default, clear it
             if data_type_override and cleaned_data.get('data_type') == sensor_type.default_data_type:
                 cleaned_data['data_type'] = None
                 cleaned_data['data_type_override'] = False
-            
+
             # If min value override is selected but matches the default, clear it
             if min_value_override and cleaned_data.get('min_value') == sensor_type.min_value:
                 cleaned_data['min_value'] = None
@@ -322,14 +322,14 @@ class SensorForm(forms.ModelForm):
         # --- New override logic ---
         if unit_override and not cleaned_data.get('unit'):
             self.add_error('unit', "Unit must be specified when overriding.")
-        
+
         if data_type_override and not cleaned_data.get('data_type'):
             self.add_error('data_type', "Data type must be specified when overriding.")
 
         # Clear values if not overriding to fall back to SensorType defaults
         if not unit_override:
             cleaned_data['unit'] = None
-            
+
         if not data_type_override:
             cleaned_data['data_type'] = None
         if not min_value_override:
@@ -351,7 +351,7 @@ class SensorForm(forms.ModelForm):
         if device and not device.is_active and cleaned_data.get('is_active', False):
             cleaned_data['is_active'] = False
             self.add_error('is_active', "Sensor cannot be active when its device is inactive.")
-            
+
         # Additionally check if the device's location is inactive
         if device and device.location and not device.location.is_active and cleaned_data.get('is_active', False):
             cleaned_data['is_active'] = False
@@ -396,7 +396,7 @@ class LoRaWANSensorForm(forms.ModelForm):
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <label for="id_influx_source" class="form-label mb-0">Influx source</label>
                         <a href="{% url 'sensors:influxsource_create' place_slug=view.place.slug %}"
-                           class="btn btn-sm btn-outline-primary" 
+                           class="btn btn-sm btn-outline-primary"
                            id="add-influx-source-btn">
                             <i class="bi bi-plus-circle"></i> Source
                         </a>

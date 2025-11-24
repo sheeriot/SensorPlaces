@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    
+
     document.body.addEventListener('sensorAdded', function (evt) {
         console.group("Caught sensorAdded event");
         const detail = evt.detail;
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
             noSensorsMessage.classList.add('d-none');
             console.log("Hid 'no sensors' message.");
         }
-        
+
         // 3. Increment the sensor count
         const sensorCountEl = deviceWrapper.querySelector(`#sensor-count-${deviceId}`);
         if (sensorCountEl) {
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
         console.group("Caught sensorDeleted event");
         const detail = evt.detail;
         console.log("Detail:", detail);
-        
+
         const sensorId = detail.sensorId;
         const deviceId = detail.deviceId;
         const deviceWrapper = document.getElementById(`device-context-wrapper-${deviceId}`);
@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log("Delete confirmation modal hidden.");
             }
         }
-        
+
         console.groupEnd();
     });
 

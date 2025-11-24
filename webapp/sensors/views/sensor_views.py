@@ -91,7 +91,7 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
-        
+
         # Add hide_inactive state from GET param or cookie
         hide_inactive_param = self.request.GET.get('hide_inactive')
         if hide_inactive_param is not None:
@@ -105,10 +105,10 @@ class SensorListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             context['device'] = self._device
             context['location'] = self._device.location
             context['sensors'] = self._device.sensors_sorted
-        
+
         # Add live counts to context
         context.update(get_live_counts_context(self._place))
-        
+
         return context
 
 def parse_date_to_local_tz(date_str):
@@ -172,12 +172,12 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     model = Sensor
     context_object_name = 'sensor'
     template_name = 'sensors/sensor_detail.html'
-    
+
     def get_queryset(self):
         """Get sensors for this place with annotations."""
         # Use the cached place
         base_queryset = super().get_queryset()
-        
+
         # Filter sensors for this place and prefetch related fields
         queryset = base_queryset.filter(
             device__location__place=self._place
@@ -186,12 +186,12 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
             'device__location',
             'device__location__place',
         )
-        
+
         # Get the last reading if it exists
         last_reading = SensorReading.objects.filter(
             sensor=OuterRef('pk')
         ).order_by('-timestamp')
-        
+
         # Annotate with the last reading value and timestamp
         return queryset.annotate(
             last_value=Subquery(
@@ -205,7 +205,7 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
         context['absolute_url'] = self.request.build_absolute_uri()
-        
+
         # Add device and location to context
         sensor = self.get_object()
 
@@ -221,18 +221,18 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
 
         context['device'] = device
         context['location'] = device.location
-        
+
         # Add all sensors for the device to the context
         context['sensors'] = Sensor.objects.filter(device=device).order_by(Lower('name'))
         context['narrow_view'] = True
-        
+
         # Use the new helper to parse date range from URL kwargs
         start_date, end_date, start_date_iso, end_date_iso, delta = _parse_date_range_from_params(self.kwargs)
 
         context['start_date_iso'] = start_date_iso
         context['end_date_iso'] = end_date_iso
         context['delta'] = delta
-        
+
         # The readings for the graph ARE filtered by the date range
         # This part is now handled by the async graph card view for LoRaWAN,
         # but we keep it for other sensor types.
@@ -252,15 +252,15 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
                 reading_count=Count('id')
             )
             context['reading_stats'] = stats
-        
+
         # Generate sparkline based on the filtered graph data
         if not sensor.device.is_lorawan:
             timestamps = [reading.timestamp for reading in context.get('readings', [])]
             # context['sparkline_image'] = generate_sparkline(timestamps) # Removed as per edit hint
-        
+
         # Add locations for the place_nav_card
         context['locations'] = get_annotated_locations(self._place)
-        
+
         return context
 
 
@@ -311,7 +311,7 @@ class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add device and location to context
         context['device'] = sensor.device
         context['location'] = sensor.device.location
-        
+
         # Pass the sensor's live value to the template
         context['live_value'] = sensor.cached_reading_value
         context['live_timestamp'] = sensor.cached_reading_timestamp
@@ -319,7 +319,7 @@ class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # We no longer fetch stats on initial load.
         # The date range is set by the JS, so we don't need to parse it here either.
         context['reading_stats'] = {}
-        
+
         return context
 
 
@@ -347,16 +347,16 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
     def get_sensor_inactive_help_text(self, sensor, device=None):
         """
         Generate help text for sensor inactive status.
-        
+
         Args:
             sensor: The sensor object
             device: The sensor's device (optional)
-            
+
         Returns:
             str: HTML string with warning message or None
         """
         inactive_help_text = None
-            
+
         # If device is inactive, create help text about that
         if device and not device.is_active:
             # For existing sensors, check if active when they shouldn't be
@@ -364,11 +364,11 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
                 # Fix the inconsistency - set sensor to inactive
                 sensor.is_active = False
                 sensor.save()
-                
+
                 # Just log the inconsistency with ic
                 # ic(f"Fixed inconsistency: Sensor {sensor.id} ({sensor.name}) was active "
                 #    f"but its Device {device.id} ({device.name}) is inactive.")
-            
+
             # Standard message for inactive device
             inactive_help_text = mark_safe(
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
@@ -380,30 +380,30 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 'If deactivated, this sensor will no longer collect data and readings will not be available.'
             )
-        
+
         return inactive_help_text
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['place'] = self._place
         kwargs['device'] = self._device
-        
+
         # Set is_active based on device status
         if self._device:
             kwargs.setdefault('initial', {})['is_active'] = self._device.is_active
-        
+
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['model_name'] = 'sensor'
         # Place is already in context from PlaceAnnotationMixin
-        
+
         # Add device and location data
         if hasattr(self, '_device') and self._device:
             context['device'] = self._device
             context['location'] = self._device.location
-        
+
         return context
 
     def get_default_success_url(self):
@@ -426,7 +426,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
         })
 
     def form_valid(self, form):
-        
+
         # Ensure is_active is set correctly based on device status
         if self._device.is_active and not form.instance.is_active:
             # If device is active but form has inactive sensor, respect the form value
@@ -437,12 +437,12 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
         else:
             # If device is active and no explicit choice, make sensor active
             form.instance.is_active = True
-        
+
         # Save the form to get the object
         self.object = form.save()
         sensor = self.object
 
-        
+
         message = (
             f"Created sensor <strong>{sensor.name}</strong> in "
             f"<i class='bi bi-house-gear'></i> {self._place.name} > "
@@ -455,18 +455,18 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             f"Status: {'Active' if sensor.is_active else 'inactive'}"
             f"</small>"
         )
-        
+
         # Add inactive warning to message if sensor is inactive
         inactive_help_text = self.get_sensor_inactive_help_text(sensor, self._device)
         if not sensor.is_active and inactive_help_text:
             message += f"<br><small class='text-warning'>{inactive_help_text}</small>"
-        
+
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if sensor.is_active else 'warning'
         })
-        
+
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
@@ -526,11 +526,11 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
         # Get and cache place
         self._place = self.get_place()
         self._locations = get_annotated_locations(self._place)
-        
+
         # Default inactive_help_text to None
         self._inactive_help_text = None
         self._device = None
-        
+
         try:
             # Try to get the sensor if we're updating
             sensor = self.get_object()
@@ -540,34 +540,34 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
                 inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
             )
             self._device = get_object_or_404(device_qs, pk=device_pk)
-            
+
             # Get help text based on sensor active state and its device
             self._inactive_help_text = self.get_sensor_inactive_help_text(sensor, self._device)
-            
+
         except Exception as e:
             # If we can't get the object yet (e.g., in a GET request before the object exists)
             # ic(f"Error in SensorUpdateView.setup: {str(e)}")
             pass
-            
+
     def get_sensor_inactive_help_text(self, sensor, device=None):
         """
         Generate help text for sensor inactive status.
-        
+
         Args:
             sensor: The sensor object
             device: The sensor's device (optional)
-            
+
         Returns:
             str: HTML string with warning message or None
         """
         inactive_help_text = None
-        
+
         if not sensor:
             return None
-            
+
         if not device:
             device = sensor.device
-            
+
         # If device is inactive, create help text about that
         if device and not device.is_active:
             # Check if sensor is active when it shouldn't be
@@ -575,11 +575,11 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
                 # Fix the inconsistency - set sensor to inactive
                 sensor.is_active = False
                 sensor.save()
-                
+
                 # Just log the inconsistency with ic
                 # ic(f"Fixed inconsistency: Sensor {sensor.pk} ({sensor.name}) was active "
                 #    f"but its Device {device.pk} ({device.name}) is inactive.")
-            
+
             # Standard message for inactive device
             inactive_help_text = mark_safe(
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
@@ -591,7 +591,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
                 '<i class="bi bi-exclamation-triangle me-2"></i>'
                 'If deactivated, this sensor will no longer collect data and readings will not be available.'
             )
-        
+
         return inactive_help_text
 
     def get_form_kwargs(self):
@@ -604,16 +604,16 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
+
         # Explicitly add the form to the context to solve the crash
         if 'form' not in context:
             context['form'] = self.get_form()
-            
+
         context['model_name'] = 'sensor'
-        
+
         sensor = self.object # Use self.object which is already fetched by UpdateView
         device = sensor.device
-        
+
         # You can still annotate the device if needed for other parts of the template
         # but the primary object relationships are already there.
         device_annotated = Device.objects.annotate(
@@ -623,7 +623,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
 
         context['device'] = device_annotated
         context['location'] = device_annotated.location
-        
+
         return context
 
     def get_default_success_url(self):
@@ -638,7 +638,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
 
     def form_valid(self, form):
 
-        
+
         # Store original values before save
         sensor = self.get_object()
         self._original_values = {
@@ -649,21 +649,21 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             'data_type': sensor.data_type,
             'unit_id': sensor.unit_id
         }
-        
+
         # Ensure is_active is set correctly based on device status
         if not self._device.is_active and form.instance.is_active:
             # If device is inactive, sensor must be inactive
             form.instance.is_active = False
-        
+
         # Save the form
         self.object = form.save()
         sensor = self.object
         device = sensor.device
         location = device.location
         place = location.place
-        
+
         changes = []
-        
+
         if hasattr(self, '_original_values'):
             if self._original_values['name'] != sensor.name:
                 changes.append(f"name: {self._original_values['name']} → {sensor.name}")
@@ -688,21 +688,21 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             f"<i class='bi bi-geo-alt'></i> {location.name} > "
             f"<i class='bi bi-hdd-rack'></i> {device.name}"
         )
-        
+
         if changes:
             message += f"<br><small class='text-muted'>Changes: {', '.join(changes)}</small>"
-        
+
         # Add inactive warning to message if sensor is inactive
         if not sensor.is_active and self._inactive_help_text:
             message += f"<br><small class='text-warning'>{self._inactive_help_text}</small>"
-        
+
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success' if sensor.is_active else 'warning',
             'place_id': place.pk  # Use place_id instead of place object
         })
-        
+
         # Get the success URL and return HttpResponseRedirect
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
@@ -716,12 +716,12 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         super().setup(request, *args, **kwargs)
         # Get and cache place
         self._place = self.get_place()
-        
+
         # Create inactive help text to be used in form and toast messages
         try:
             sensor = self.get_object()
             device = sensor.device
-            
+
             if device and not device.is_active:
                 self._inactive_help_text = mark_safe(
                     '<i class="bi bi-exclamation-triangle me-2"></i>'
@@ -736,26 +736,26 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         context = super().get_context_data(**kwargs)
         sensor = self.get_object()
         device = sensor.device
-        
+
         # Add device and location to context
         context['device'] = device
         context['location'] = device.location
         context['place'] = device.location.place # Pass the place object for breadcrumbs
         # Place is already in context from PlaceAnnotationMixin
         context['model_name'] = 'sensor'
-        
+
         # Add sensor_url for cancel button
         context['sensor_url'] = reverse('sensors:sensor_detail', kwargs={
             'place_slug': self._place.slug,
             'pk': sensor.pk
         })
-        
+
         # Add a fallback cancel URL
         context['cancel_fallback_url'] = reverse('sensors:device_detail', kwargs={
             'place_slug': self._place.slug,
             'pk': device.pk
         })
-        
+
         return context
 
     def get(self, request, *args, **kwargs):
@@ -765,7 +765,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         if 'HX-Request' in request.headers:
             context = self.get_context_data(object=self.object)
             return render(request, 'sensors/partials/sensor_confirm_delete_modal.html', context)
-        
+
         # Otherwise, render the full page
         return super().get(request, *args, **kwargs)
 
@@ -775,7 +775,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         device = sensor.device
         location = device.location
         place = location.place
-        
+
         # Store the IDs BEFORE deleting the object
         sensor_id = sensor.pk
         device_id = device.pk
@@ -783,17 +783,17 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
 
         # Delete the sensor
         sensor.delete()
-        
+
         # Create toast message
         message = f"Deleted sensor <strong>{sensor_name}</strong> from {device.name}."
-        
+
         # Set toast message directly on request for middleware
         setattr(request, 'toast_message', {
             'message': message,
             'type': 'warning',
             'place_id': place.pk
         })
-        
+
         # For HTMX requests from the modal, send back an event trigger
         if 'HX-Request' in request.headers:
             response = HttpResponse(status=204) # No Content
@@ -804,7 +804,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
                 }
             })
             return response
-            
+
         # Standard response for non-HTMX requests (fallback)
         success_url = self.get_success_url()
         return HttpResponseRedirect(success_url)
@@ -849,9 +849,9 @@ class SensorReadingListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
             })
 
         return queryset.select_related(
-            'sensor', 
-            'sensor__device', 
-            'sensor__device__location', 
+            'sensor',
+            'sensor__device',
+            'sensor__device__location',
             'sensor__device__location__place'
         ).order_by('-timestamp')
 
@@ -916,7 +916,7 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
         """Cache common values during view setup"""
         super().setup(request, *args, **kwargs)
         # Place is already set by PlaceAnnotationMixin
-        
+
         # Get and cache the sensor
         sensor_pk = self.kwargs.get('sensor_pk')
         if sensor_pk:
@@ -957,7 +957,7 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
         device = sensor.device
         location = device.location
         place = location.place
-        
+
         message = (
             f"Created reading for sensor: "
             f"<i class='bi bi-house-gear'></i> {place.name} > "
@@ -969,13 +969,13 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
             f"Timestamp: {reading.timestamp}"
             f"</small>"
         )
-        
+
         # Set toast message directly on request for middleware
         setattr(self.request, 'toast_message', {
             'message': message,
             'type': 'success'
         })
-        
+
         return response
 
     def get_success_url(self):
@@ -990,34 +990,34 @@ class SensorReadingCreateView(LoginRequiredMixin, PlaceAnnotationMixin, CreateVi
 @csrf_protect
 def test_sensor_readings(request, place_slug, sensor_pk):
     """Test sensor readings from InfluxDB for the last 60 minutes"""
-    sensor = get_object_or_404(Sensor, 
+    sensor = get_object_or_404(Sensor,
                               pk=sensor_pk,
                               device__location__place__slug=place_slug)
-    
+
     # Only test InfluxDB sensors
     if sensor.data_type != 'INFLUX':
         return JsonResponse({
             'status': 'error',
             'message': 'This sensor does not use InfluxDB as its data source'
         }, status=400)
-    
+
     try:
         # Get readings for the last 60 minutes
         from datetime import timedelta
         from django.utils import timezone
-        
+
         # Get readings for the last hour
         stop = timezone.now()
         start = stop - timedelta(minutes=60)
-        
+
         # readings = get_sensor_readings(sensor=sensor, start=start, stop=stop, limit=100) # Removed as per edit hint
-        
+
         if not readings: # Changed from 'not readings' to 'if not readings'
             return JsonResponse({
                 'status': 'warning',
                 'message': 'Connection successful but no data found in the last 60 minutes'
             })
-        
+
         # Calculate summary statistics
         values = [reading['value'] for reading in readings]
         summary = {
@@ -1029,14 +1029,14 @@ def test_sensor_readings(request, place_slug, sensor_pk):
             'last_timestamp': readings[-1]['timestamp'],
             'unit': sensor.unit
         }
-        
+
         return JsonResponse({
             'status': 'success',
             'message': f'Successfully retrieved {len(readings)} readings',
             'summary': summary,
             'readings': readings[:10]  # Return first 10 readings for display
         })
-        
+
     except Exception as e:
         return JsonResponse({
             'status': 'error',
@@ -1063,12 +1063,12 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
             return lorawan_sensor_data_api(request, place_slug, pk)
 
         # --- The rest of this function is for local DB sensors ---
-        
+
         start_time = timezone.now()
         user_timezone_str = request.GET.get('timezone')
         if user_timezone_str:
             timezone.activate(user_timezone_str)
-        
+
         # Use the new helper to parse date range from GET parameters
         start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
         ic("Date range from params:", start_date, end_date)
@@ -1087,7 +1087,7 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
 
         readings = list(queryset.order_by('timestamp').values('timestamp', 'value'))
         ic("Final number of readings found:", len(readings))
-        
+
         # Format data into the structure expected by the frontend chart
         serializable_data_points = []
         if readings:
@@ -1119,7 +1119,7 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
                 'data_points': serializable_data_points
             }
         }
-        
+
         return JsonResponse(response_data)
 
     except Exception as e:
@@ -1140,7 +1140,7 @@ def lorawan_sensor_data_api(request, place_slug, pk):
         user_timezone_str = request.GET.get('timezone')
         if user_timezone_str:
             timezone.activate(user_timezone_str)
-        
+
         sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
     except Sensor.DoesNotExist:
         return JsonResponse({"error": "Sensor not found"}, status=404)
@@ -1205,11 +1205,11 @@ def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: 
             pk=sensor_pk,
             device__location__place__slug=place_slug
         )
-        
+
         # Get start and end dates from query parameters
         start_str = request.GET.get('start')
         end_str = request.GET.get('end')
-        
+
         queryset = SensorReading.objects.filter(sensor=sensor)
 
         if start_str and end_str:
@@ -1225,11 +1225,11 @@ def sensor_readings_table_api(request: HttpRequest, place_slug: str, sensor_pk: 
             queryset = queryset.filter(timestamp__gte=time_threshold)
 
         readings = queryset.order_by('-timestamp')
-        
+
         # Render the template partial
         from django.template.loader import render_to_string
         html = render_to_string('sensors/includes/sensor_readings_table.html', {'readings': readings, 'sensor': sensor})
-        
+
         return JsonResponse({'html': html})
 
     except Exception as e:
@@ -1277,10 +1277,10 @@ def sensor_live_values_api(request: HttpRequest, place_slug: str) -> JsonRespons
         return JsonResponse({'status': 'error', 'message': 'No sensor PKs provided.'}, status=400)
 
     pks = [int(pk) for pk in pks_str.split(',') if pk.isdigit()]
-    
+
     # Ensure sensors belong to the place to prevent data leakage
     sensors = Sensor.objects.filter(pk__in=pks, device__location__place__slug=place_slug)
-    
+
     payload = {}
     for sensor in sensors:
         try:

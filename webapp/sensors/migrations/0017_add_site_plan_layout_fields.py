@@ -21,4 +21,4 @@ class Migration(migrations.Migration):
             name='site_plan_y',
             field=models.FloatField(default=0),
         ),
-    ] 
+    ]

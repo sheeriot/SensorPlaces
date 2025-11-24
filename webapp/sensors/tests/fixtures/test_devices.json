@@ -1,184 +1,600 @@
 [
-    {
-        "model": "sensors.device",
-        "pk": 1,
-        "fields": {
-            "name": "Thermostat",
-            "model": "T-1000",
-            "manufacturer": "Cyberdyne",
-            "device_id": "12345",
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 2,
-        "fields": {
-            "name": "Shelly-yy",
-            "model": "Shelly H&T",
-            "manufacturer": "Shelly",
-            "device_id": "yy",
-            "place": 1,
-            "location": 2,
-            "device_type": 1,
-            "is_active": false
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 3,
-        "fields": {
-            "name": "Shelly-yy",
-            "model": "Shelly H&T",
-            "manufacturer": "Shelly",
-            "device_id": "yy",
-            "place": 1,
-            "location": 2,
-            "device_type": 1,
-            "is_active": false
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 4,
-        "fields": {
-            "name": "a",
-            "model": "a",
-            "manufacturer": "a",
-            "device_id": "aaa",
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 5,
-        "fields": {
-            "name": "b",
-            "model": "b",
-            "manufacturer": "b",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 6,
-        "fields": {
-            "name": "c",
-            "model": "c",
-            "manufacturer": "c",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 7,
-        "fields": {
-            "name": "d",
-            "model": "d",
-            "manufacturer": "d",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 8,
-        "fields": {
-            "name": "e",
-            "model": "e",
-            "manufacturer": "e",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 9,
-        "fields": {
-            "name": "f",
-            "model": "f",
-            "manufacturer": "f",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 10,
-        "fields": {
-            "name": "g",
-            "model": "g",
-            "manufacturer": "g",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 11,
-        "fields": {
-            "name": "h",
-            "model": "h",
-            "manufacturer": "h",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 12,
-        "fields": {
-            "name": "i",
-            "model": "i",
-            "manufacturer": "i",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    },
-    {
-        "model": "sensors.device",
-        "pk": 13,
-        "fields": {
-            "name": "j",
-            "model": "j",
-            "manufacturer": "j",
-            "device_id": null,
-            "place": 1,
-            "location": 1,
-            "device_type": 1,
-            "is_active": true
-        }
-    }
+{
+  "model": "sensors.device",
+  "pk": 1,
+  "fields": {
+    "name": "Sharpshooter",
+    "model": null,
+    "manufacturer": null,
+    "device_id": null,
+    "notes": null,
+    "location": [
+      "texaspinballfestival",
+      "solid-state-row"
+    ],
+    "device_type": [
+      "Controller"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-03-24T14:56:17.547Z",
+    "updated_at": "2025-07-04T12:24:50.612Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 2,
+  "fields": {
+    "name": "MPPT",
+    "model": "SmartSolar MPPT 75|15",
+    "manufacturer": "Victron Energy!",
+    "device_id": null,
+    "notes": null,
+    "location": [
+      "5702hb",
+      "shed"
+    ],
+    "device_type": [
+      "Controller"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": false,
+    "created_at": "2025-03-25T13:37:19.880Z",
+    "updated_at": "2025-07-04T12:24:50.614Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 3,
+  "fields": {
+    "name": "Foosball",
+    "model": "Cyclone II",
+    "manufacturer": "Tornado",
+    "device_id": "xxyyz",
+    "notes": null,
+    "location": [
+      "5702hb",
+      "pool-house"
+    ],
+    "device_type": [
+      "Sensor Hub"
+    ],
+    "is_lorawan": true,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": false,
+    "created_at": "2025-03-25T21:31:31.221Z",
+    "updated_at": "2025-08-07T11:51:54.778Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 5,
+  "fields": {
+    "name": "Stargate",
+    "model": null,
+    "manufacturer": null,
+    "device_id": null,
+    "notes": null,
+    "location": [
+      "5702hb",
+      "shed"
+    ],
+    "device_type": [
+      "Sensor Hub"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": false,
+    "created_at": "2025-03-28T17:00:52.899Z",
+    "updated_at": "2025-07-04T12:24:50.615Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 6,
+  "fields": {
+    "name": "SepticPump5702HB",
+    "model": "PM Mini Gen3",
+    "manufacturer": "Shelley",
+    "device_id": "dcda0ce76924",
+    "notes": null,
+    "location": [
+      "5702hb",
+      "septic"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-06-19T21:15:01.518Z",
+    "updated_at": "2025-07-24T18:14:29.869Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 7,
+  "fields": {
+    "name": "SepticPumpCampbell",
+    "model": "PM Mini 3G",
+    "manufacturer": "Shelly",
+    "device_id": "5432045d3f8c",
+    "notes": null,
+    "location": [
+      "15601cl",
+      "septic"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-06-20T13:45:26.000Z",
+    "updated_at": "2025-07-08T11:36:20.373Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 8,
+  "fields": {
+    "name": "Sphere1",
+    "model": "SHHT-1",
+    "manufacturer": "Shelly",
+    "device_id": null,
+    "notes": null,
+    "location": [
+      "5702hb",
+      "ac1"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-06-20T17:28:34.186Z",
+    "updated_at": "2025-07-26T01:02:47.657Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 9,
+  "fields": {
+    "name": "weather1",
+    "model": "WTS-506",
+    "manufacturer": "Milesight",
+    "device_id": "24e124454c376261",
+    "notes": null,
+    "location": [
+      "5702hb",
+      "front-fence"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": true,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-07-16T11:57:50.333Z",
+    "updated_at": "2025-07-19T20:25:45.780Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 10,
+  "fields": {
+    "name": "Asteroids",
+    "model": "TankStick",
+    "manufacturer": "X-Arcade",
+    "device_id": "1111",
+    "notes": null,
+    "location": [
+      "5702hb",
+      "pool-house"
+    ],
+    "device_type": [
+      "Server"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": false,
+    "created_at": "2025-07-19T20:20:09.340Z",
+    "updated_at": "2025-08-07T11:51:25.226Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 12,
+  "fields": {
+    "name": "AeX1",
+    "model": "HomeSensor",
+    "manufacturer": "Tektelic",
+    "device_id": "647fda0000003996",
+    "notes": null,
+    "location": [
+      "5702hb",
+      "shed"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": true,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-08-05T11:55:43.455Z",
+    "updated_at": "2025-08-07T10:45:33.482Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 14,
+  "fields": {
+    "name": "RS-4E",
+    "model": "HomeSensor",
+    "manufacturer": "Tektelic",
+    "device_id": "647fda0000008a4e",
+    "notes": "",
+    "location": [
+      "5702hb",
+      "art-loft"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-08-07T11:53:14.065Z",
+    "updated_at": "2025-11-10T15:35:12.388Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 15,
+  "fields": {
+    "name": "poohlevel2",
+    "model": "LDDS-75",
+    "manufacturer": "Dragino",
+    "device_id": "a840412211832a97",
+    "notes": null,
+    "location": [
+      "5702hb",
+      "septic"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": true,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-08-09T11:01:07.981Z",
+    "updated_at": "2025-08-09T11:01:07.981Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 18,
+  "fields": {
+    "name": "Flood-Shelly",
+    "model": "WaterSensor",
+    "manufacturer": "Switchbot",
+    "device_id": "b8f862.0dccc4",
+    "notes": "",
+    "location": [
+      "moms",
+      "laundry"
+    ],
+    "device_type": [
+      "Data Logger"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-10-16T22:53:02.809Z",
+    "updated_at": "2025-10-23T10:56:26.324Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 53,
+  "fields": {
+    "name": "MomHub",
+    "model": "Hub 2",
+    "manufacturer": "SwitchBot",
+    "device_id": "CDAC487E68C8",
+    "notes": "",
+    "location": [
+      "moms",
+      "family"
+    ],
+    "device_type": [
+      "SwitchBot Hub"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": true,
+    "created_at": "2025-10-18T16:51:23.326Z",
+    "updated_at": "2025-10-18T16:56:48.130Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 54,
+  "fields": {
+    "name": "Mom-T1",
+    "model": "WoIOSensor",
+    "manufacturer": "SwitchBot",
+    "device_id": "CE2A84063C5A",
+    "notes": "",
+    "location": [
+      "moms",
+      "garage"
+    ],
+    "device_type": [
+      "WoIOSensor"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "CDAC487E68C8",
+    "is_active": true,
+    "created_at": "2025-10-18T16:51:23.346Z",
+    "updated_at": "2025-10-19T10:45:02.419Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 55,
+  "fields": {
+    "name": "Mom-T2",
+    "model": "WoIOSensor",
+    "manufacturer": "SwitchBot",
+    "device_id": "CE2A8646103F",
+    "notes": "",
+    "location": [
+      "moms",
+      "ping-pong"
+    ],
+    "device_type": [
+      "WoIOSensor"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "CDAC487E68C8",
+    "is_active": true,
+    "created_at": "2025-10-18T16:51:23.370Z",
+    "updated_at": "2025-10-18T17:02:49.346Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 57,
+  "fields": {
+    "name": "PlugDesk",
+    "model": "Plug Mini (US)",
+    "manufacturer": "SwitchBot",
+    "device_id": "84FCE6F2BE3A",
+    "notes": "",
+    "location": [
+      "moms",
+      "vinyl"
+    ],
+    "device_type": [
+      "Plug Mini (US)"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": true,
+    "created_at": "2025-10-18T16:51:37.222Z",
+    "updated_at": "2025-10-18T17:05:01.078Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 59,
+  "fields": {
+    "name": "pilotlight",
+    "model": null,
+    "manufacturer": null,
+    "device_id": null,
+    "notes": "",
+    "location": [
+      "moms",
+      "family"
+    ],
+    "device_type": null,
+    "is_lorawan": false,
+    "is_switchbot": false,
+    "switchbot_hub_device_id": null,
+    "is_active": true,
+    "created_at": "2025-10-20T13:59:11.032Z",
+    "updated_at": "2025-10-20T14:12:21.239Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 60,
+  "fields": {
+    "name": "Mom-T3",
+    "model": "WoIOSensor",
+    "manufacturer": "SwitchBot",
+    "device_id": "D83534384E3D",
+    "notes": "",
+    "location": [
+      "moms",
+      "backyard"
+    ],
+    "device_type": [
+      "WoIOSensor"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "CDAC487E68C8",
+    "is_active": true,
+    "created_at": "2025-10-23T11:11:12.013Z",
+    "updated_at": "2025-10-23T11:13:10.765Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 61,
+  "fields": {
+    "name": "LaundryDrain",
+    "model": "Water Detector",
+    "manufacturer": "SwitchBot",
+    "device_id": "F2B203860536",
+    "notes": "",
+    "location": [
+      "moms",
+      "laundry"
+    ],
+    "device_type": [
+      "Water Detector"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": true,
+    "created_at": "2025-10-23T11:11:12.057Z",
+    "updated_at": "2025-10-23T11:11:37.952Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 62,
+  "fields": {
+    "name": "Plug Mini 1",
+    "model": "Plug Mini (US)",
+    "manufacturer": "SwitchBot",
+    "device_id": "3C8427B06C0A",
+    "notes": "",
+    "location": [
+      "5702hb",
+      "office"
+    ],
+    "device_type": [
+      "Plug Mini (US)"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": false,
+    "created_at": "2025-10-30T15:52:16.274Z",
+    "updated_at": "2025-10-30T16:13:48.976Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 63,
+  "fields": {
+    "name": "I2",
+    "model": "WoIOSensor",
+    "manufacturer": "SwitchBot",
+    "device_id": "C76A00461C1C",
+    "notes": "",
+    "location": [
+      "5702hb",
+      "atrium"
+    ],
+    "device_type": [
+      "WoIOSensor"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": true,
+    "created_at": "2025-10-30T15:52:16.323Z",
+    "updated_at": "2025-11-10T13:28:40.615Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 64,
+  "fields": {
+    "name": "O1",
+    "model": "WoIOSensor",
+    "manufacturer": "SwitchBot",
+    "device_id": "C76A00467957",
+    "notes": "",
+    "location": [
+      "5702hb",
+      "back-porch"
+    ],
+    "device_type": [
+      "WoIOSensor"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": true,
+    "created_at": "2025-10-30T15:52:16.399Z",
+    "updated_at": "2025-10-31T15:29:42.785Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 65,
+  "fields": {
+    "name": "O2",
+    "model": "WoIOSensor",
+    "manufacturer": "SwitchBot",
+    "device_id": "C76A01863A76",
+    "notes": null,
+    "location": [
+      "5702hb",
+      "unassigned-devices"
+    ],
+    "device_type": [
+      "WoIOSensor"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": false,
+    "created_at": "2025-10-30T15:52:16.442Z",
+    "updated_at": "2025-10-30T15:52:16.465Z"
+  }
+},
+{
+  "model": "sensors.device",
+  "pk": 66,
+  "fields": {
+    "name": "Hub",
+    "model": "Hub 2",
+    "manufacturer": "SwitchBot",
+    "device_id": "ECD6F046E27A",
+    "notes": "",
+    "location": [
+      "5702hb",
+      "living-room"
+    ],
+    "device_type": [
+      "SwitchBot Hub"
+    ],
+    "is_lorawan": false,
+    "is_switchbot": true,
+    "switchbot_hub_device_id": "000000000000",
+    "is_active": true,
+    "created_at": "2025-10-30T15:52:16.487Z",
+    "updated_at": "2025-10-31T15:27:09.957Z"
+  }
+}
 ]

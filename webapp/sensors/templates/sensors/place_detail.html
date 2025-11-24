@@ -13,9 +13,9 @@
     <div class="row gx-2 my-1">
     <!-- Left Column: Place Details -->
     <div class="col-md-4">
-        
+
         {% include "sensors/includes/place_detail_card.html" with place=place place_map_html=place_map_html %}
-        
+
         {% include 'sensors/includes/place_nav_card.html' %}
 
         {% if place.is_active %}
@@ -46,7 +46,7 @@
 
         <!-- Device List Card -->
         {% include "sensors/includes/device_list_card.html" with object_list=locations %}
-    
+
         <!-- InfluxDB Sources Card -->
         {% include "sensors/influxsource_list.html" %}
     </div>

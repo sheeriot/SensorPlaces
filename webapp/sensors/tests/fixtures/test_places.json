@@ -1,62 +1,114 @@
 [
 {
   "model": "sensors.place",
-  "pk": 1,
+  "fields": {
+    "name": "TexasPinballFestival",
+    "slug": "texaspinballfestival",
+    "address": "7600 John Q Hammons Dr, Frisco Texas 75034",
+    "latitude": "33.100580",
+    "longitude": "-96.817520",
+    "is_active": true,
+    "siteplan_image": "siteplan_images/002-texas-pinball-festival-2024.jpg",
+    "created_at": "2025-03-21T12:49:14.699Z",
+    "updated_at": "2025-03-21T12:49:14.699Z"
+  }
+},
+{
+  "model": "sensors.place",
   "fields": {
     "name": "5702HB",
     "slug": "5702hb",
-    "address": "5702 Hudson Bend Rd, Austin, TX 78734",
-    "latitude": "35.464580",
-    "longitude": "-82.507320",
+    "address": "5702 Hudson Bend Road, Austin, Texas 78734",
+    "latitude": "30.423510",
+    "longitude": "-97.932600",
     "is_active": true,
-    "siteplan_image": "siteplan_images/5702hb-siteplan_sJ7vPfm.png",
-    "created_at": "2025-02-25T22:30:59.021Z",
-    "updated_at": "2025-03-14T17:25:07.410Z"
+    "siteplan_image": "siteplan_images/5702hb-siteplan.png",
+    "created_at": "2025-03-25T11:18:56.663Z",
+    "updated_at": "2025-10-18T16:19:03.611Z"
   }
 },
 {
   "model": "sensors.place",
-  "pk": 5,
   "fields": {
-    "name": "Opeongo Pointy",
-    "slug": "opeongo-point",
-    "address": "1849 Opeongo Point Rd",
-    "latitude": "35.234890",
-    "longitude": "-75.531010",
-    "is_active": false,
-    "siteplan_image": "siteplan_images/3bedroom-converted_4jAR5Sr.jpeg",
-    "created_at": "2025-03-08T18:13:57.132Z",
-    "updated_at": "2025-03-14T17:52:39.497Z"
-  }
-},
-{
-  "model": "sensors.place",
-  "pk": 10,
-  "fields": {
-    "name": "Shedy",
-    "slug": "shed",
-    "address": "",
-    "latitude": "30.423800",
-    "longitude": "-97.932100",
-    "is_active": true,
-    "siteplan_image": "siteplan_images/3bedroom-converted_E6I8pxF.jpeg",
-    "created_at": "2025-03-12T21:10:22.040Z",
-    "updated_at": "2025-03-14T22:56:06.339Z"
-  }
-},
-{
-  "model": "sensors.place",
-  "pk": 11,
-  "fields": {
-    "name": "Heaven",
-    "slug": "carpet",
-    "address": "",
-    "latitude": "31.300850",
-    "longitude": "-106.501460",
+    "name": "Temp",
+    "slug": "temp",
+    "address": "x",
+    "latitude": "30.279110",
+    "longitude": "-97.753340",
     "is_active": false,
     "siteplan_image": "",
-    "created_at": "2025-03-12T21:12:15.147Z",
-    "updated_at": "2025-03-14T19:29:04.355Z"
+    "created_at": "2025-03-25T21:46:07.578Z",
+    "updated_at": "2025-03-25T22:15:11.496Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "fields": {
+    "name": "Timmy home",
+    "slug": "timmy-home",
+    "address": "121 lakewood trail leander texas",
+    "latitude": "30.544160",
+    "longitude": "-97.810320",
+    "is_active": true,
+    "siteplan_image": "",
+    "created_at": "2025-03-28T17:04:58.101Z",
+    "updated_at": "2025-03-28T17:19:32.035Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "fields": {
+    "name": "Volcano Lair",
+    "slug": "volcano-lair",
+    "address": "",
+    "latitude": "23.506900",
+    "longitude": "-75.802300",
+    "is_active": true,
+    "siteplan_image": "siteplan_images/volcano-lair.jpg",
+    "created_at": "2025-03-28T17:15:20.559Z",
+    "updated_at": "2025-05-12T17:58:30.330Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "fields": {
+    "name": "15601CL",
+    "slug": "15601cl",
+    "address": "15601 Cedar Ledge",
+    "latitude": "30.415700",
+    "longitude": "-97.920500",
+    "is_active": true,
+    "siteplan_image": "siteplan_images/15601cl_siteplan.png",
+    "created_at": "2025-06-20T13:20:13.596Z",
+    "updated_at": "2025-06-20T13:20:13.596Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "fields": {
+    "name": "Opeongo Point",
+    "slug": "opeongo-point",
+    "address": "1849 Opeongo Point Road",
+    "latitude": "44.682390",
+    "longitude": "-76.702400",
+    "is_active": true,
+    "siteplan_image": "",
+    "created_at": "2025-07-07T12:07:07.744Z",
+    "updated_at": "2025-07-07T12:07:07.744Z"
+  }
+},
+{
+  "model": "sensors.place",
+  "fields": {
+    "name": "Moms",
+    "slug": "moms",
+    "address": "234 Bicknell Cres,\r\nKingston, Ontario",
+    "latitude": "44.223950",
+    "longitude": "-76.580030",
+    "is_active": true,
+    "siteplan_image": "siteplan_images/mom_floorplan.png",
+    "created_at": "2025-10-16T10:19:09.340Z",
+    "updated_at": "2025-10-18T16:09:13.836Z"
   }
 }
 ]

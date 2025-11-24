@@ -32,14 +32,14 @@ class LocationForm(forms.ModelForm):
         inactive_help_text = kwargs.pop('inactive_help_text', None)
         cancel_url = kwargs.pop('cancel_url', None)
         form_action = kwargs.pop('form_action', None)
-        
+
         # Pop anything that might come from FormDataMixin
         kwargs.pop('locations', None)
         kwargs.pop('devices_active', None)
         super().__init__(*args, **kwargs)
-        
+
         self.fields['name'].label = 'Location Name'
-        
+
         # Setup crispy form helper
         self.helper = FormHelper()
         self.helper.form_id = 'location-form'
@@ -50,14 +50,14 @@ class LocationForm(forms.ModelForm):
                 'hx-post': form_action,
                 'hx-swap': 'outerHTML',
             }
-        
+
         # Setup Active field with proper ID and label
         checkbox_id = f"location-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
         self.fields['is_active'].widget.attrs.update({
             'id': checkbox_id,
             'data-location-id': str(self.instance.pk) if self.instance and self.instance.pk else 'new'
         })
-        
+
         # If this is a new location, make slug read-only
         if not self.instance.pk:
             self.fields['slug'].widget.attrs['readonly'] = True
@@ -66,13 +66,13 @@ class LocationForm(forms.ModelForm):
         # If we have a place, pre-select it and handle cascading inactive state
         if self.place:
             self.fields['place'].initial = self.place
-            
+
             # If place is inactive, location must be inactive
             if not self.place.is_active:
                 self.fields['is_active'].initial = False
                 self.fields['is_active'].widget.attrs['disabled'] = True
                 self.fields['is_active'].label = 'inactive'  # Set initial label
-                
+
                 # Set help text for inactive state
                 self.fields['is_active'].help_text = mark_safe(
                     f'<i class="bi bi-exclamation-triangle me-2"></i>'
@@ -86,7 +86,7 @@ class LocationForm(forms.ModelForm):
             self.fields['is_active'].label = 'inactive' if not self.instance.is_active else 'Active'
         else:
             self.fields['is_active'].label = 'Active'
-        
+
         # Set help text for inactive state if provided from view
         if inactive_help_text:
             # Ensure help text doesn't have nested form-text divs
@@ -100,7 +100,7 @@ class LocationForm(forms.ModelForm):
                     self.fields['is_active'].help_text = inactive_help_text
             else:
                 self.fields['is_active'].help_text = inactive_help_text
-        
+
         # Form layout with crispy forms
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
@@ -121,7 +121,7 @@ class LocationForm(forms.ModelForm):
                 HTML('<hr class="mt-4">'),
                 Div(
                     HTML(f"""
-                        <a href="{cancel_url}" 
+                        <a href="{cancel_url}"
                            class="btn btn-outline-secondary" data-bs-dismiss="modal">
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
@@ -136,11 +136,11 @@ class LocationForm(forms.ModelForm):
                 css_class='mt-3'
             )
         )
-        
+
     def clean(self):
         cleaned_data = super().clean()
         place = cleaned_data.get('place') or self.place
-        
+
         # Ensure place is set
         if not place and self.place:
             cleaned_data['place'] = self.place
@@ -154,10 +154,10 @@ class LocationForm(forms.ModelForm):
                 query = query.exclude(pk=self.instance.pk)
             if query.exists():
                 self.add_error('name', 'A location with this name already exists in this place.')
-        
+
         # Enforce that location must be inactive if place is inactive
         if place and not place.is_active and cleaned_data.get('is_active', False):
             cleaned_data['is_active'] = False
             self.add_error('is_active', 'Location cannot be active when its place is inactive.')
-            
+
         return cleaned_data

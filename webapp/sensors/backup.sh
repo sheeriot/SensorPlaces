@@ -55,4 +55,4 @@ echo "Backup file is located at: ${BACKUP_PATH}"
 # Uncomment the following line to enable cleanup.
 # find "${BACKUP_DIR}" -name "sensorplaces-db-backup-*.sqlite3" -type f | sort -r | tail -n +6 | xargs -r rm --
 
-echo "Done." 
+echo "Done."

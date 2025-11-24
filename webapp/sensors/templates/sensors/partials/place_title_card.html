@@ -20,10 +20,10 @@
                 <span>
                     <i class="bi bi-geo-alt me-1"></i>{{ place.latitude }}, {{ place.longitude }}
                 </span>
-                <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openPlaceMap" 
+                <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openPlaceMap"
                     data-place-map-popout="true"
-                    data-bs-toggle="modal" 
-                    data-bs-target="#placeMapModal" 
+                    data-bs-toggle="modal"
+                    data-bs-target="#placeMapModal"
                     data-place-lat="{{ place.latitude }}"
                     data-place-lon="{{ place.longitude }}"
                     data-place-name="{{ place.name }}"
@@ -46,7 +46,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0">
-                <div id="placeMapContainer" class="place-map-container" 
+                <div id="placeMapContainer" class="place-map-container"
                      data-place-lat="{{ place.latitude }}"
                      data-place-lon="{{ place.longitude }}"
                      data-place-name="{{ place.name }}"

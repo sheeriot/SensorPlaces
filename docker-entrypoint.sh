@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [ "$RUN_TESTS" = "true" ]; then
+    echo "Running in test mode"
+    exec "$@"
+fi
+
 # Wait for the database to be ready
 # Note: This is a simple loop. For production, a more robust solution like wait-for-it.sh is recommended.
 # echo "Waiting for database..."
@@ -25,4 +30,4 @@ fi
 
 # Execute the command passed to the script
 echo "Executing command: $@"
-exec "$@" 
+exec "$@"

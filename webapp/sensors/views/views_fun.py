@@ -9,11 +9,11 @@ from icecream import ic
 
 def get_annotated_places():
     """Get annotated places with minimal counts for the landing page/index view.
-    
+
     Optimized for performance with only essential annotations:
     - active_locations_count: Count of active locations
     - devices_active_count: Count of active devices
-    
+
     Returns:
         QuerySet: Places with minimal annotations, ordered by active status and name.
     """
@@ -48,7 +48,7 @@ def get_location_data(location) -> Dict[str, Any]:
 
 def get_place_counts(place):
     """Get device and sensor counts for a place.
-    
+
     Returns a tuple of six values:
     - locations_active_count
     - locations_inactive_count
@@ -59,12 +59,12 @@ def get_place_counts(place):
     """
     locations_active_count = Location.objects.filter(place=place, is_active=True).exclude(name="Unassigned Devices").count()
     locations_inactive_count = Location.objects.filter(place=place, is_active=False).exclude(name="Unassigned Devices").count()
-    
+
     # Correctly count active devices by checking the entire hierarchy.
     # An active device requires its location and place to also be active.
     devices_active_count = Device.objects.filter(
-        location__place=place, 
-        is_active=True, 
+        location__place=place,
+        is_active=True,
         location__is_active=True,
         location__place__is_active=True
     ).count()
@@ -72,10 +72,10 @@ def get_place_counts(place):
     # Inactive devices are any devices that do not meet the "active" criteria.
     total_devices = Device.objects.filter(location__place=place).count()
     devices_inactive_count = total_devices - devices_active_count
-    
+
     # Correctly count active sensors, also checking the full hierarchy.
     sensors_active_count = Sensor.objects.filter(
-        device__location__place=place, 
+        device__location__place=place,
         is_active=True,
         device__is_active=True,
         device__location__is_active=True,
@@ -85,16 +85,16 @@ def get_place_counts(place):
     # Inactive sensors are any sensors that do not meet the "active" criteria.
     total_sensors = Sensor.objects.filter(device__location__place=place).count()
     sensors_inactive_count = total_sensors - sensors_active_count
-    
+
     return locations_active_count, locations_inactive_count, devices_active_count, devices_inactive_count, sensors_active_count, sensors_inactive_count
 
 def get_place_data(place, request=None, include_json=True):
     """Get complete place data including locations and statistics.
-    
+
     Returns a dictionary with all place-related data.
     """
     import json
-    
+
     # Get annotated locations
     result = {}
 
@@ -110,23 +110,23 @@ def get_place_data(place, request=None, include_json=True):
         ).order_by('-is_active', Lower('name')),
         to_attr='devices_sorted'
     )
-    
+
     locations = get_annotated_locations(place).prefetch_related(devices_prefetch).order_by('-is_active', Lower('name'))
 
     result['locations'] = locations
-    
+
     # Add hide_inactive state from request if available
     if request:
         hide_inactive_cookie = request.COOKIES.get('hideInactive_location', 'false')
         result['hide_inactive'] = hide_inactive_cookie.lower() == 'true'
     else:
         result['hide_inactive'] = False # Default if no request
-        
+
     # Add JSON data if requested
     if include_json:
         locations_data = [get_location_data(loc) for loc in locations]
         result['locations_json'] = json.dumps(locations_data)
-    
+
     # Add statistics
     locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)
     result.update({
@@ -137,7 +137,7 @@ def get_place_data(place, request=None, include_json=True):
         'sensors_active_count': sensors_active,
         'sensors_inactive_count': sensors_inactive
     })
-    
+
     return result
 
 def get_live_counts_context(place):

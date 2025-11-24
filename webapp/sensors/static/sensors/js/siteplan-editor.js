@@ -24,7 +24,7 @@ const sitePlanSystem = {
     DEFAULT_ZOOM: 2,
     MIN_ZOOM: 0,
     MAX_ZOOM: 4,
-    
+
     // State
     state: {
         editorMap: null,        // Editor Leaflet map instance
@@ -48,7 +48,7 @@ const sitePlanSystem = {
             this.logDebug('error', 'Required containers not found');
             return;
         }
-        
+
         // Initialize the Bootstrap modal
         const modal = this.modal;
         if (!modal) {
@@ -112,17 +112,17 @@ const sitePlanSystem = {
                     marker.remove();
                 }
             });
-            
+
             // Clear state
             this.state.markers.clear();
             this.state.isDirty = false;
-            
+
             // Remove map last
             this.state.editorMap.remove();
             this.state.editorMap = null;
             this.state.imageOverlay = null;
             this.state.imageBounds = null;
-            
+
             this.logDebug('initialization', 'Editor cleaned up');
         }
     },
@@ -130,7 +130,7 @@ const sitePlanSystem = {
     setupEditor() {
         const container = this.editorContainer;
         const imageUrl = this.viewContainer.dataset.imageUrl;
-        
+
         if (!container || !imageUrl) return;
 
         container.dataset.editorReady = 'false';
@@ -148,10 +148,10 @@ const sitePlanSystem = {
             // Set container aspect ratio to match image
             const aspectRatio = (img.height / img.width) * 100;
             container.style.paddingBottom = `${aspectRatio}%`;
-            
+
             // Store bounds and initialize
             this.state.imageBounds = [[0, 0], [img.height, img.width]];
-            
+
             // Wait for modal transition to complete
             setTimeout(() => {
                 this.logDebug('initialization', 'Container dimensions after modal transition:', {
@@ -159,7 +159,7 @@ const sitePlanSystem = {
                     height: container.offsetHeight,
                     style: container.style.cssText
                 });
-                
+
                 this.initializeEditorMap(container, imageUrl);
             }, 300); // Wait for Bootstrap's default transition duration
         };
@@ -211,7 +211,7 @@ const sitePlanSystem = {
             });
 
         // The aspect ratio is now handled by the explicit height calculation above
-        
+
         // Initial fit
         this.fitMapPerfectly();
 
@@ -250,13 +250,13 @@ const sitePlanSystem = {
 
             locations.forEach(location => {
                 const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
-                
+
                 // Get the existing icon type from the view
                 const viewMarker = window.sitePlanView.state.markers.get(location.slug);
                 const iconType = viewMarker ? viewMarker.iconType : window.sitePlanView.getRandomIcon(location.name);
-                
+
                 const icon = window.sitePlanView.createIcon(location.is_active, iconType, location.name);
-                
+
                 const marker = L.marker(coords, {
                     icon: icon,
                     title: location.name,
@@ -277,7 +277,7 @@ const sitePlanSystem = {
                 marker.on('mouseover', function() {
                     this.openPopup();
                 });
-                
+
                 marker.on('mouseout', function() {
                     this.closePopup();
                 });
@@ -309,13 +309,13 @@ const sitePlanSystem = {
                     isDragging = false;
                     this.getElement().classList.remove('dragging');
                     this.getElement().style.opacity = '1';
-                    
+
                     // Validate new position is within bounds
                     const newPos = this.getLatLng();
                     const bounds = sitePlanSystem.state.imageBounds;
-                    
+
                     if (!bounds) return;
-                    
+
                     // If outside bounds, return to original position
                     if (newPos.lat < bounds[0][0] || newPos.lat > bounds[1][0] ||
                         newPos.lng < bounds[0][1] || newPos.lng > bounds[1][1]) {
@@ -325,7 +325,7 @@ const sitePlanSystem = {
                 });
 
                 marker.addTo(this.state.editorMap);
-                
+
                 // Store marker reference with original position in percentages
                 this.state.markers.set(location.slug, {
                     marker,
@@ -387,7 +387,7 @@ const sitePlanSystem = {
                 const currentPos = this.imageCoordsToPercent(marker.getLatLng());
                 const x_pos = currentPos.x_pos;
                 const y_pos = currentPos.y_pos;
-                
+
                 // Compare with original position (both are percentages)
                 // Use a small tolerance to avoid floating point issues
                 if (Math.abs(x_pos - originalPosition.x_pos) > 0.01 || Math.abs(y_pos - originalPosition.y_pos) > 0.01) {
@@ -430,7 +430,7 @@ const sitePlanSystem = {
                 this.logDebug('error', 'Save failed with non-OK response:', response);
                 return;
             }
-            
+
             const data = await response.json();
             this.logDebug('network', 'Parsed response data:', data);
 
@@ -442,7 +442,7 @@ const sitePlanSystem = {
 
             // Success case
             this.state.isDirty = false;
-            
+
             // Update the view's location data
             if (data.changes && data.changes.locations) {
                 // Get the full location data from the view's state and merge
@@ -461,26 +461,26 @@ const sitePlanSystem = {
                     }
                     return acc;
                 }, {});
-                
+
                 this.logDebug('saves', 'Dispatching siteplan-update event with locations:', updatedLocations);
-                
+
                 // Dispatch update event with an object, not an array
                 window.dispatchEvent(new CustomEvent('siteplan-update', {
                     detail: { locations: updatedLocations }
                 }));
             }
-            
+
             // Close the modal
             const modal = bootstrap.Modal.getInstance(this.modal);
             if (modal) {
                 modal.hide();
             }
-            
+
             // Show success toast
             this.showToast(data.message || 'Changes saved successfully', data.type || 'warning');
-            
+
             this.logDebug('success', 'Changes saved successfully:', data);
-            
+
         } catch (error) {
             this.logDebug('error', 'Save failed due to network or unexpected error:', error);
             this.showToast('A network error occurred while saving. Please check your connection.', 'danger');
@@ -490,17 +490,17 @@ const sitePlanSystem = {
     // Function to ensure map fits perfectly
     fitMapPerfectly() {
         if (!this.state.editorMap || !this.state.imageBounds) return;
-        
+
         // Only update if container is visible
         const container = this.editorContainer;
         if (!container || container.offsetWidth === 0) return;
-        
+
         this.state.editorMap.invalidateSize();
         this.state.editorMap.fitBounds(this.state.imageBounds, {
             animate: false,
             padding: [0, 0]
         });
-        
+
         this.logDebug('operation', 'Map fit updated', {
             containerSize: `${container.offsetWidth}x${container.offsetHeight}`
         });
@@ -526,4 +526,4 @@ const sitePlanSystem = {
 document.addEventListener('DOMContentLoaded', () => sitePlanSystem.initialize());
 
 // Export for use in other modules
-window.sitePlanSystem = sitePlanSystem; 
+window.sitePlanSystem = sitePlanSystem;

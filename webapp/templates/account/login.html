@@ -26,7 +26,7 @@
                 <i class="bi bi-google me-2"></i>Sign in with Google
               </a>
             </div>
-            
+
             <p class="text-center text-muted small mb-3">
               {% trans 'or use your email to sign in' %}
             </p>
@@ -34,7 +34,7 @@
 
           <form class="login" method="POST" action="{% url 'account_login' %}">
             {% csrf_token %}
-            
+
             {% if form.errors %}
               <div class="alert alert-danger">
                 {% trans "Please check your credentials and try again." %}
@@ -91,4 +91,4 @@
     </div>
   </div>
 </div>
-{% endblock %} 
+{% endblock %}

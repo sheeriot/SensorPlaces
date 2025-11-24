@@ -12,4 +12,4 @@ fi
 # Make the file executable
 chmod +x ./docker-entrypoint.sh
 
-echo "Setup complete. You can now run 'docker-compose up' to start the application." 
+echo "Setup complete. You can now run 'docker-compose up' to start the application."

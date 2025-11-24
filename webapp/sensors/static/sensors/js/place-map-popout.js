@@ -1,8 +1,8 @@
 /**
  * Place Map Popout System
- * 
+ *
  * Manages the popout map functionality for places view
- * 
+ *
  * Configuration:
  * -------------
  * To enable debugging, set debug: true in mapPopoutConfig below
@@ -34,7 +34,7 @@ const placeMapPopout = {
             console.group('Place Map Popout System');
             console.log("Initializing popout map system");
         }
-        
+
         // First check if we should initialize on this page
         const mapTrigger = document.getElementById('openPlaceMap');
         if (!mapTrigger || !mapTrigger.hasAttribute('data-place-map-popout')) {
@@ -58,10 +58,10 @@ const placeMapPopout = {
         if (mapPopoutConfig.debug) {
             console.log("Found popout map container");
         }
-        
+
         this.setupMap(mapContainer);
         this.setupEventListeners(mapTrigger);
-        
+
         if (mapPopoutConfig.debug) {
             console.groupEnd();
         }
@@ -97,7 +97,7 @@ const placeMapPopout = {
 
         // Initialize the map
         this.map = L.map(container.id).setView([lat, lon], 13);
-        
+
         // Add the tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mapPopoutConfig.debug) {
         console.group('Place Map Popout Initialization');
     }
-    
+
     const openMapBtn = document.getElementById('openPlaceMap');
     if (!openMapBtn) {
         if (mapPopoutConfig.debug) {
@@ -199,10 +199,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mapPopoutConfig.debug) {
         console.log('Found map trigger button with initialization flag');
     }
-    
+
     placeMapPopout.initialize();
-    
+
     if (mapPopoutConfig.debug) {
         console.groupEnd();
     }
-}); 
+});

@@ -28,7 +28,7 @@ from sensors.switchbot_client import list_devices, get_status
 #     data = f"{token}{t}{nonce}".encode("utf-8")
 #     secret_bytes = secret.encode("utf-8")
 #     sign = base64.b64encode(hmac.new(secret_bytes, msg=data, digestmod=sha256).digest()).decode("utf-8")
-    
+
 #     return {
 #         "Authorization": token,
 #         "Content-Type": "application/json; charset=utf8",
@@ -87,7 +87,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"Fetching status for device {device_id}...")
                 status = get_status(device_id)
                 self.stdout.write(json.dumps(status, indent=2))
-            
+
             elif command == 'inspect':
                 device_id = options['device_id']
                 self.stdout.write(f"Inspecting cloud data for device {device_id}...")
@@ -111,7 +111,7 @@ class Command(BaseCommand):
     def _create_device(self, device_item, location, sensor_types):
         """Helper function to create a single device, returns 1 if created, 0 otherwise."""
         device_id = device_item['deviceId']
-        
+
         device, created = Device.objects.get_or_create(
             device_id=device_id,
             defaults={
@@ -127,7 +127,7 @@ class Command(BaseCommand):
 
         if created:
             api_device_type_str = device.model
-            
+
             if 'Hub' in api_device_type_str:
                 device_type_name = "SwitchBot Hub"
             else:
@@ -140,12 +140,12 @@ class Command(BaseCommand):
             device.device_type = device_type
             device.save()
             self.stdout.write(self.style.SUCCESS(f"Imported new device: {device.name} ({device_id})"))
-        
+
         # Auto-create sensors for meter devices
         api_device_type_str = device.model
         meter_types = ["Meter", "Meter Plus", "Outdoor Meter", "Meter Pro", "WoSensorTH"]
         if any(meter_type in api_device_type_str for meter_type in meter_types):
-            
+
             s1, s1_created = Sensor.objects.get_or_create(
                 device=device,
                 sensor_type=sensor_types['temperature'],
@@ -237,7 +237,7 @@ class Command(BaseCommand):
         for dev_info in all_devices_with_status:
             idx_str = dev_info['import_idx']
             status_str = dev_info['status']
-            
+
             if dev_info['is_new']:
                 status_str = self.style.WARNING(status_str)
 
@@ -248,7 +248,7 @@ class Command(BaseCommand):
         if not new_devices_to_import:
             self.stdout.write(self.style.SUCCESS("\nAll devices are in sync. Nothing to import."))
             return
-        
+
         self.stdout.write("\n  [0] Quit")
         choice_str = input(f"Enter number(s) to import into '{place.name}' (e.g. '1 3' or 'all'), or 0 to quit: ").lower().strip()
 
@@ -266,7 +266,7 @@ class Command(BaseCommand):
             'humidity': SensorType.objects.get_or_create(name="Humidity", defaults={'default_unit': percent_rh_unit})[0],
             'battery': SensorType.objects.get_or_create(name="Battery", defaults={'default_unit': percent_unit})[0]
         }
-        
+
         unassigned_location = place.get_unassigned_location()
         created_total = 0
 
@@ -280,7 +280,7 @@ class Command(BaseCommand):
             except ValueError:
                 self.stderr.write(self.style.ERROR("Invalid input. Please enter numbers, 'all', or '0'."))
                 return
-        
+
         for index in indices_to_import:
             device_to_import = new_devices_to_import[index]
             created_total += self._create_device(device_to_import, unassigned_location, sensor_types)

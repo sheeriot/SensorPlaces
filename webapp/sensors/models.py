@@ -18,6 +18,18 @@ def validate_image_size(image):
     if filesize > megabyte_limit * 1024 * 1024:
         raise ValidationError(f"Image size cannot exceed {megabyte_limit}MB")
 
+class NameManager(models.Manager):
+    def get_by_natural_key(self, name):
+        return self.get(name=name)
+
+class PlaceManager(models.Manager):
+    def get_by_natural_key(self, slug):
+        return self.get(slug=slug)
+
+class LocationManager(models.Manager):
+    def get_by_natural_key(self, place_slug, slug):
+        return self.get(place__slug=place_slug, slug=slug)
+
 class Place(models.Model):
     name: CharField = models.CharField(max_length=100)
     slug: CharField = models.SlugField(unique=True, null=True, blank=True)
@@ -123,13 +135,20 @@ class Place(models.Model):
         )
         return location
 
+    objects = PlaceManager()
+
+    def natural_key(self):
+        return (self.slug,)
+
     class Meta:
         verbose_name_plural = '1. Places'
         ordering = ['-is_active', Lower('name')]
 
 @receiver(post_save, sender=Place)
 def create_unassigned_location_for_place(sender, instance, created, **kwargs):
-    if created:
+    print(f"DEBUG: signal fired for {instance}, created={created}, kwargs={kwargs}")
+    # Skip creating unassigned location during fixture loading (raw=True)
+    if created and not kwargs.get('raw', False):
         instance.get_unassigned_location()
 
 class Location(models.Model):
@@ -173,11 +192,11 @@ class Location(models.Model):
         # Enforce that the 'Unassigned Devices' location can never be active
         if self.slug == 'unassigned-devices' and self.is_active:
             self.is_active = False
-        
+
         # If parent place is inactive, location must be inactive
         if hasattr(self, 'place') and self.place and not self.place.is_active:
             self.is_active = False
-        
+
         # Auto-generate slug if it's not set
         if not self.slug:
             self.slug = slugify(self.name)
@@ -193,7 +212,7 @@ class Location(models.Model):
         # If location is being deactivated, deactivate all its devices
         if not self.is_active and self.pk:  # Only for existing locations
             Device.objects.filter(location=self).update(is_active=False)
-            
+
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -207,6 +226,12 @@ class Location(models.Model):
     def y_coord_value(self) -> Optional[float]:
         return float(self.y_pos) if self.y_pos is not None else None
 
+    objects = LocationManager()
+
+    def natural_key(self):
+        return (self.place.slug, self.slug)
+    natural_key.dependencies = ['sensors.place']
+
     class Meta:
         verbose_name_plural = '2. Locations'
         ordering = ['-is_active', 'name']
@@ -215,9 +240,14 @@ class Location(models.Model):
 class Unit(models.Model):
     name = models.CharField(max_length=50, unique=True)
     symbol = models.CharField(max_length=10)
-    
+
     def __str__(self):
         return f"{self.name} ({self.symbol})"
+
+    objects = NameManager()
+
+    def natural_key(self):
+        return (self.name,)
 
     class Meta:
         verbose_name_plural = 'Units'
@@ -238,6 +268,11 @@ class DeviceType(models.Model):
     def __str__(self):
         return self.name
 
+    objects = NameManager()
+
+    def natural_key(self):
+        return (self.name,)
+
     class Meta:
         verbose_name_plural = '6. Device Types'
         ordering = ['name']
@@ -249,8 +284,8 @@ class Device(models.Model):
     device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
     notes: TextField = models.TextField(blank=True, null=True, help_text="Internal notes for this device.")
     location: ForeignKey = models.ForeignKey(
-        Location, 
-        on_delete=models.CASCADE, 
+        Location,
+        on_delete=models.CASCADE,
         related_name='devices',
     )
     device_type = models.ForeignKey(
@@ -281,16 +316,16 @@ class Device(models.Model):
     def save(self, *args, **kwargs):
         # Run full validation first
         self.full_clean()
-        
+
         # If location is inactive, device must be inactive
         if self.location and not self.location.is_active:
             self.is_active = False
-        
+
         # Check if this is an existing device being deactivated
         if self.pk and not self.is_active:
             # Deactivate all associated sensors
             Sensor.objects.filter(device=self).update(is_active=False)
-            
+
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):
@@ -359,7 +394,7 @@ class Sensor(models.Model):
     device: ForeignKey = models.ForeignKey('Device', on_delete=models.CASCADE, related_name='sensors')
     is_active: BooleanField = models.BooleanField(default=True, verbose_name='Active Status')
     sensor_type = models.ForeignKey('SensorType', on_delete=models.SET_NULL, null=True, blank=True)
-    
+
     # Modified fields to allow fallback to SensorType defaults
     unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
     unit_override = models.BooleanField(default=False)
@@ -372,7 +407,7 @@ class Sensor(models.Model):
         choices=[('LINE', 'Line Graph'), ('SCATTER', 'Scatter Plot'), ('BAR', 'Bar Graph')],
         default='SCATTER'
     )
-    
+
     # New fields for value overrides
     min_value = models.FloatField(null=True, blank=True)
     min_value_override = models.BooleanField(default=False)
@@ -388,8 +423,8 @@ class Sensor(models.Model):
     cached_reading_timestamp = models.DateTimeField(null=True, blank=True)
     last_checked_timestamp = models.DateTimeField(null=True, blank=True, help_text="The last time the application checked for a new value from the source.")
     stale_threshold_override_seconds = models.PositiveIntegerField(
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         help_text="Override the default stale time from the sensor type, in seconds."
     )
 
@@ -424,7 +459,7 @@ class Sensor(models.Model):
         if self.max_value_override and self.max_value is not None:
             return self.max_value
         return self.sensor_type.max_value if self.sensor_type else None
-    
+
     @property
     def effective_decimal_places(self):
         if self.sensor_type and self.sensor_type.decimal_places is not None:
@@ -453,7 +488,7 @@ class Sensor(models.Model):
             raise ValidationError({
                 'is_active': 'Sensor cannot be active when its device is inactive.'
             })
-            
+
         # Also check if the device's location is inactive
         if self.is_active and self.device.location and not self.device.location.is_active:
             raise ValidationError({
@@ -463,15 +498,15 @@ class Sensor(models.Model):
     def save(self, *args, **kwargs):
         # Run validation
         self.full_clean()
-        
+
         # If device is inactive, sensor must be inactive
         if not self.device.is_active:
             self.is_active = False
-        
+
         # Also check if the device's location is inactive
         if self.device.location and not self.device.location.is_active:
             self.is_active = False
-            
+
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -499,12 +534,12 @@ class Sensor(models.Model):
 class SensorType(models.Model):
     name = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True)
-    
+
     # New fields for defaults
     default_unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
     default_data_type = models.CharField(
-        max_length=30, 
-        choices=Sensor.DATA_TYPES, 
+        max_length=30,
+        choices=Sensor.DATA_TYPES,
         default='DIRECT',
         blank=True
     )
@@ -514,8 +549,8 @@ class SensorType(models.Model):
     decimal_places = models.PositiveIntegerField(null=True, blank=True, help_text="Number of decimal places to display for sensor readings.")
     default_stale_threshold_seconds = models.PositiveIntegerField(
         default=300,
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         help_text="Default stale time for this sensor type, in seconds. Default is 5 minutes."
     )
 
@@ -524,6 +559,11 @@ class SensorType(models.Model):
 
     def get_absolute_url(self):
         return reverse('sensors:sensortype_detail', kwargs={'pk': self.pk})
+
+    objects = NameManager()
+
+    def natural_key(self):
+        return (self.name,)
 
     class Meta:
         verbose_name_plural = '7. Sensor Types'

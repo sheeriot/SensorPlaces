@@ -26,11 +26,11 @@ class SensorChart {
         const sensorId = this.graphCard.dataset.sensorId;
         const placeholder = document.getElementById(`graph-placeholder-${sensorId}`);
         const content = document.getElementById(`graph-content-${sensorId}`);
-        
+
         if (isLoading) {
             if (placeholder) placeholder.classList.add('d-none');
             if (content) content.classList.remove('d-none');
-            
+
             const chartCanvas = document.getElementById('sensorChart');
             if (this.chart) this.chart.destroy();
             if (chartCanvas) {
@@ -61,14 +61,14 @@ class SensorChart {
                 // As a fallback, try resolving relative to the window origin
                 url = new URL(apiUrl, window.location.origin);
             }
-            
+
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             url.searchParams.set('timezone', userTimezone);
             console.log('Fetching data from URL:', url.toString());
 
             const response = await window.utils.fetchWithCSRF(url.toString());
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
+
             const responseData = await response.json();
 
             if (responseData.status !== 'success') {
@@ -86,7 +86,7 @@ class SensorChart {
                     console.warn('Unexpected keys in API response payload:', unexpectedKeys);
                 }
             }
-            
+
             // --- Populate Footer Stats ---
             const queryTimeEl = document.getElementById('graph-query-time');
             if (queryTimeEl && data.query_time_ms) {
@@ -103,9 +103,9 @@ class SensorChart {
             if (data.data_points && data.data_points.length > 0) {
                 const firstPoint = data.data_points[0][0];
                 const lastPoint = data.data_points[data.data_points.length - 1][0];
-                
+
                 const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
-                
+
                 if (firstReadingEl) {
                     firstReadingEl.textContent = `First: ${new Date(firstPoint).toLocaleString(undefined, options)}`;
                 }
@@ -122,7 +122,7 @@ class SensorChart {
             this.originalUnit = this.graphCard.dataset.sensorUnit;
 
             this.originalData = data.data_points.map(p => [new Date(p[0]), p[1]]);
-            
+
             const tempUnitSelect = document.getElementById('temp-unit-select');
             if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
                 tempUnitSelect.dispatchEvent(new Event('change'));
@@ -179,7 +179,7 @@ class SensorChart {
             if (content) content.classList.add('d-none');
             return; // Exit if no data
         }
-        
+
         const displayUnit = this.graphCard.dataset.sensorUnit || '';
         const minValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
         const maxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
@@ -191,7 +191,7 @@ class SensorChart {
 
         const chartData = data.map(item => ({ x: item[0], y: item[1] }));
         const chartType = type === 'SCATTER' ? 'scatter' : (type === 'BAR' ? 'bar' : 'line');
-        
+
         const yAxisOptions = { title: { display: true, text: `Value (${displayUnit})` } };
         if (minValue !== null) yAxisOptions.min = minValue;
         if (maxValue !== null) yAxisOptions.max = maxValue;
@@ -209,7 +209,7 @@ class SensorChart {
             afterDraw: (chart) => {
                 const ctx = chart.ctx;
                 const chartArea = chart.chartArea;
-                
+
                 const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const offset = new Date().toLocaleDateString(undefined, { day:'2-digit', timeZoneName: 'short' }).substring(4);
 
@@ -244,7 +244,7 @@ class SensorChart {
                         min: start.getTime(),
                         max: end.getTime(),
                         type: 'time',
-                        time: { 
+                        time: {
                             unit: timeStep.unit,
                             stepSize: timeStep.stepSize,
                             tooltipFormat: 'MMM d, yyyy, HH:mm:ss',
@@ -266,7 +266,7 @@ class SensorChart {
 
                                 // Only draw labels that fall on our exact step interval
                                 if (date.getHours() % stepHours !== 0) {
-                                    return ''; 
+                                    return '';
                                 }
 
                                 if (date.getHours() === 0 && date.getMinutes() === 0) {
@@ -348,19 +348,19 @@ class SensorChart {
         }
 
         if (dataPointsHeader) dataPointsHeader.textContent = `Value (${displayUnit})`;
-        
+
         if (dataPointsBody && dataPointsCard) {
             dataPointsBody.innerHTML = '';
 
             if (chartData.length > 0) {
                 dataPointsCard.classList.remove('d-none');
-                
+
                 let rows = [];
                 chartData.slice().reverse().forEach(item => {
                     const valueDisplay = (item.y !== null && typeof item.y !== 'undefined') ? item.y.toFixed(decimalPlaces) : 'N/A';
                     rows.push([window.utils.formatTimestamp(item.x), valueDisplay]);
                 });
-                
+
                 // Using the new library
                 if (dataTableElement && window.simpleDatatables) {
                     this.dataTable = new simpleDatatables.DataTable(dataTableElement, {
@@ -431,7 +431,7 @@ class SensorChart {
             applyBtn.addEventListener('click', () => {
                 console.log("SensorChart: Apply button clicked.");
                 document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
-                
+
                 const startDt = this.fp_start.selectedDates[0];
                 const endDt_raw = this.fp_end.selectedDates[0];
                 console.log("SensorChart: Apply dates:", startDt, endDt_raw);
@@ -442,7 +442,7 @@ class SensorChart {
                 }
 
                 let endDt = new Date(endDt_raw.getTime());
-                
+
                 const today = new Date();
                 if (endDt.getFullYear() === today.getFullYear() &&
                     endDt.getMonth() === today.getMonth() &&
@@ -451,15 +451,15 @@ class SensorChart {
                 } else {
                     endDt.setHours(23, 59, 59, 999);
                 }
-                
+
                 this.graphCard.dataset.startDate = startDt.toISOString();
                 this.graphCard.dataset.endDate = endDt.toISOString();
-                
+
                 const apiUrl = new URL(this.graphCard.dataset.apiUrl, window.location.origin);
                 apiUrl.searchParams.delete('delta');
                 apiUrl.searchParams.set('start_date', this.graphCard.dataset.startDate);
                 apiUrl.searchParams.set('end_date', this.graphCard.dataset.endDate);
-                
+
                 this.fetchData(apiUrl.toString());
             });
         }
@@ -495,7 +495,7 @@ class SensorChart {
 
                 this.graphCard.dataset.startDate = start.toISOString();
                 this.graphCard.dataset.endDate = end.toISOString();
-                
+
                 // Update flatpickr instances
                 this.fp_start.setDate(start, false);
                 this.fp_end.setDate(end, false);

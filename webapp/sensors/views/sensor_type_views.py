@@ -29,7 +29,7 @@ class SensorTypeUpdateView(UpdateView):
     model = SensorType
     form_class = SensorTypeForm
     template_name = 'sensors/sensortype_form.html'
-    
+
     def get_success_url(self):
         return reverse_lazy('sensors:sensortype_detail', kwargs={'pk': self.object.pk})
 
@@ -37,4 +37,3 @@ class SensorTypeUpdateView(UpdateView):
         kwargs = super().get_form_kwargs()
         kwargs['cancel_url'] = self.get_success_url()
         return kwargs
-

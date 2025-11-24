@@ -1,0 +1,114 @@
+[
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "Celsius",
+      "symbol": "ºC"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "Fahrenheit",
+      "symbol": "ºF"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "K",
+      "symbol": "K"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "%RH",
+      "symbol": "%"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "Pa",
+      "symbol": "PA"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "hPa",
+      "symbol": "HPA"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "lux",
+      "symbol": "LUX"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "dB",
+      "symbol": "DB"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "ppm",
+      "symbol": "PPM"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "ppb",
+      "symbol": "PPB"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "μg/m³",
+      "symbol": "UGM3"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "(None)",
+      "symbol": "NONE"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "metre",
+      "symbol": "m"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "millimetre",
+      "symbol": "mm"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "Relative Humidity",
+      "symbol": "%RH"
+    }
+  },
+  {
+    "model": "sensors.unit",
+    "fields": {
+      "name": "Percent",
+      "symbol": "%"
+    }
+  }
+]

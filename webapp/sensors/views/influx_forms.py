@@ -47,4 +47,4 @@ class InfluxSourceForm(forms.ModelForm):
                 raise forms.ValidationError(
                     "An InfluxDB source with this name already exists for this place."
                 )
-        return cleaned_data 
+        return cleaned_data

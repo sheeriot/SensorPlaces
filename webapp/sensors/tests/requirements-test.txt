@@ -6,4 +6,4 @@ selenium==4.15.2
 webdriver-manager==4.0.1
 
 # For fixture generation
-django-extensions==3.2.3 
+django-extensions==3.2.3

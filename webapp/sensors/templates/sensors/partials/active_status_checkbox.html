@@ -8,7 +8,7 @@ This template expects:
 
 {% load crispy_forms_field %}
 
-<div id="div_{{ field.html_name }}" 
+<div id="div_{{ field.html_name }}"
      class="form-check d-flex align-items-start gap-2 {% if not field.value %}opacity-50 text-muted{% endif %}"
      data-field-name="{{ field.html_name }}"
      data-model-name="{{ model_name|default:'unknown' }}"

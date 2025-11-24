@@ -21,7 +21,7 @@ This template expects:
                 <i class="bi bi-exclamation-triangle-fill text-warning ms-1" title="{{ location.devices_active_count }} active device(s) in Unassigned!"></i>
             {% endif %}
         </div>
-        
+
         <!-- Device Names Column -->
         <div class="col-6 small text-muted text-truncate" title="Unassigned Devices (click to edit)">
             {% for device in location.device_list|slice:":5" %}

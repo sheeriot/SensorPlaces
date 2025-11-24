@@ -17,7 +17,7 @@ def create_default_device_type(apps, schema_editor):
         icon='bi-device-hdd',
         is_active=True
     )
-    
+
     # Update all existing devices to use this device type
     Device = apps.get_model('sensors', 'Device')
     Device.objects.all().update(device_type_new_id=other_type.id)
@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
             remove_existing_sensors,
             reverse_code=migrations.RunPython.noop
         ),
-        
+
         # Create the DeviceType model
         migrations.CreateModel(
             name='DeviceType',
@@ -56,39 +56,39 @@ class Migration(migrations.Migration):
                 'ordering': ['name'],
             },
         ),
-        
+
         # Update Device model options
         migrations.AlterModelOptions(
             name='device',
             options={'verbose_name_plural': '4. Devices'},
         ),
-        
+
         # Add temporary nullable field
         migrations.AddField(
             model_name='device',
             name='device_type_new',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='devices', to='sensors.devicetype'),
         ),
-        
+
         # Create default device type and update existing devices
         migrations.RunPython(
             create_default_device_type,
             reverse_code=reverse_device_type_migration
         ),
-        
+
         # Make the field required
         migrations.AlterField(
             model_name='device',
             name='device_type_new',
             field=models.ForeignKey(on_delete=django.db.models.deletion.SET_NULL, related_name='devices', to='sensors.devicetype', null=True),
         ),
-        
+
         # Remove the old field
         migrations.RemoveField(
             model_name='device',
             name='device_type',
         ),
-        
+
         # Rename the new field
         migrations.RenameField(
             model_name='device',
@@ -96,4 +96,3 @@ class Migration(migrations.Migration):
             new_name='device_type',
         ),
     ]
-

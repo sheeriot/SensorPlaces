@@ -20,7 +20,7 @@
     <div class="card-body p-0">
         <div class="list-group list-group-flush rounded-bottom">
             {% for device in location.devices.all %}
-            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" 
+            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}"
                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
                       {% if device.pk == current_device.pk %}current-device{% endif %}"
                data-active="{{ device.is_active|lower }}"
@@ -42,4 +42,4 @@
             {% endfor %}
         </div>
     </div>
-</div> 
+</div>

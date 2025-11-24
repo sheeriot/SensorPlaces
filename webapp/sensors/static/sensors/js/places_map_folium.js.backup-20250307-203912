@@ -15,7 +15,7 @@ const placesMapFoliumSystem = {
         if (this.state.debug) {
             console.group('Places Map Folium');
             console.log('Initializing at:', new Date().toISOString());
-            
+
             // Log if hide-inactive system is available
             console.log('Hide Inactive System:', {
                 available: !!window.hideInactiveManager,
@@ -78,13 +78,13 @@ const placesMapFoliumSystem = {
                 }
                 return null;
             };
-            
+
             const map = findMap();
             if (map) {
                 resolve(map);
                 return;
             }
-            
+
             const observer = new MutationObserver((mutations, obs) => {
                 const map = findMap();
                 if (map) {
@@ -157,7 +157,7 @@ const placesMapFoliumSystem = {
         }
 
         this.state.map = leafletMap;
-        
+
         // Set up map interaction tracking
         this.state.map.on('zoomend dragend', () => {
             if (!this.state.userHasAdjustedView) {
@@ -167,7 +167,7 @@ const placesMapFoliumSystem = {
 
         this.setupMapEventHandlers(foliumMap);
         this.initializeMarkerSystem();
-        
+
         if (this.state.debug) {
             console.log('Map initialization complete');
             console.groupEnd();
@@ -196,7 +196,7 @@ const placesMapFoliumSystem = {
 
             let attempts = 0;
             const maxAttempts = 50; // 5 seconds maximum wait
-            
+
             const checkMap = setInterval(() => {
                 attempts++;
                 if (this.state.debug) {
@@ -277,7 +277,7 @@ const placesMapFoliumSystem = {
 
         const markers = markerPane.querySelectorAll('.leaflet-marker-icon');
         const visibleMarkers = [];
-        
+
         markers.forEach(marker => {
             const placeMarker = marker.querySelector('.place-marker');
             if (!placeMarker) return;
@@ -376,9 +376,9 @@ const placesMapFoliumSystem = {
                 console.log('Current zoom:', this.state.map.getZoom());
                 console.log('Applying bounds:', bounds);
             }
-            
+
             this.state.map.fitBounds(bounds);
-            
+
             if (this.state.debug) {
                 console.log('New zoom:', this.state.map.getZoom());
             }
@@ -414,7 +414,7 @@ const placesMapFoliumSystem = {
                 }
             }
         });
-        
+
         resizeObserver.observe(mapElement);
         window.addEventListener('resize', () => {
             if (this.state.map) {
@@ -441,7 +441,7 @@ const placesMapFoliumSystem = {
         // First, analyze all markers without modifying them
         const markerStates = [];
         const markers = Array.from(markerPane.querySelectorAll('.leaflet-marker-icon'));
-        
+
         if (this.state.debug) {
             console.log('Found marker elements:', markers.length);
             console.log('Marker elements:', markers.map(m => ({
@@ -483,7 +483,7 @@ const placesMapFoliumSystem = {
                         console.group('New Markers Added');
                         console.log('Number of new nodes:', mutation.addedNodes.length);
                     }
-                    
+
                     Array.from(mutation.addedNodes)
                         .filter(node => node instanceof Element)
                         .forEach(node => {
@@ -521,10 +521,10 @@ const placesMapFoliumSystem = {
     isMarkerElement(node) {
         // First check if it's an Element
         if (!(node instanceof Element)) return false;
-        
+
         // Then check if it has the marker class
-        return Array.from(node.classList || []).some(cls => 
-            cls.includes('marker') || 
+        return Array.from(node.classList || []).some(cls =>
+            cls.includes('marker') ||
             cls.includes('Marker')
         );
     },
@@ -536,11 +536,11 @@ const placesMapFoliumSystem = {
         if (!placeMarker) return;
 
         const isActive = placeMarker.dataset.placeActive === 'true';
-        
+
         if (!isActive) {
             node.classList.add('opacity-50', 'text-muted');
             node.style.opacity = '0.5';
-            
+
             // Handle visibility based on current state
             node.style.display = this.state.hideInactiveState ? 'none' : '';
             if (this.state.hideInactiveState) {
@@ -566,4 +566,4 @@ const placesMapFoliumSystem = {
 
 document.addEventListener('DOMContentLoaded', () => {
     placesMapFoliumSystem.initialize();
-}); 
+});

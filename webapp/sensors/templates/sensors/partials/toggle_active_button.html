@@ -9,9 +9,9 @@ This template expects:
 {% endcomment %}
 
 <div class="form-check form-switch">
-  <input class="form-check-input toggle-active-button" 
-         type="checkbox" 
-         role="switch" 
+  <input class="form-check-input toggle-active-button"
+         type="checkbox"
+         role="switch"
          id="toggle-{{ type }}-{{ id }}"
          data-model-type="{{ type }}"
          data-{{ type }}-id="{{ id }}"
@@ -19,4 +19,4 @@ This template expects:
          data-object-name="{{ object_name }}"
          {% if is_active %}checked{% endif %}
          {% if disabled %}disabled{% endif %}>
-</div> 
+</div>

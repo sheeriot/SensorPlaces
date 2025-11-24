@@ -12,7 +12,7 @@ def migrate_device_place_to_location(apps, schema_editor):
     # Since 'place' is removed in a previous migration, we need to access it through the historical model
     # This is a bit of a trick to get the historical data
     db_alias = schema_editor.connection.alias
-    
+
     # We can't query on the historical model directly, so we need to be a bit more creative
     # We'll get all devices that have a null location, and then get their historical place
     devices_to_migrate = Device.objects.using(db_alias).filter(location__isnull=True)
@@ -24,7 +24,7 @@ def migrate_device_place_to_location(apps, schema_editor):
             # by looking at the state before the field was removed.
             # This is complex, and for this case, we'll assume a simpler approach will work.
             # We will try to get the 'place_id' directly from the database row.
-            
+
             # This is a bit of a raw query, but it's the most reliable way to get the old data
             with schema_editor.connection.cursor() as cursor:
                 cursor.execute("SELECT place_id FROM sensors_device WHERE id = %s", [device.id])
@@ -42,7 +42,7 @@ def migrate_device_place_to_location(apps, schema_editor):
                                 'description': 'Default location for devices that are not yet physically placed.'
                             }
                         )
-                        
+
                         # Assign the device to this location
                         device.location = unassigned_location
                         device.save(update_fields=['location'])

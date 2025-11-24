@@ -1,210 +1,1159 @@
 [
 {
   "model": "sensors.sensor",
-  "pk": 3,
+  "pk": 1,
   "fields": {
-    "name": "scenter",
-    "sensor_type": "OTHER",
-    "device": 9,
-    "unit": "ppm",
-    "data_type": "INFLUX",
-    "influx_source": 1,
-    "influx_measurement": "sensor_readings",
+    "name": "Goal1",
+    "device": 3,
     "is_active": false,
-    "created_at": "2025-02-28T11:58:12.100Z",
-    "updated_at": "2025-03-05T03:09:15.635Z"
+    "sensor_type": [
+      "Particulate Matter 10"
+    ],
+    "unit": [
+      "μg/m³"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": "sensor_readings",
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-03-25T22:20:11.330Z",
+    "updated_at": "2025-08-10T12:33:22.396Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 2,
+  "fields": {
+    "name": "Goal2",
+    "device": 3,
+    "is_active": false,
+    "sensor_type": [
+      "Motion"
+    ],
+    "unit": [
+      "Celsius"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-03-25T22:47:06.455Z",
+    "updated_at": "2025-08-10T12:33:22.397Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 5,
+  "fields": {
+    "name": "voltage",
+    "device": 6,
+    "is_active": false,
+    "sensor_type": [
+      "Other"
+    ],
+    "unit": [
+      "(None)"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": "2025-11-23T18:10:25.707Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-06-20T14:28:54.833Z",
+    "updated_at": "2025-08-10T12:33:22.402Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 6,
   "fields": {
-    "name": "xy",
-    "sensor_type": "TEMP",
-    "device": 9,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "voltage",
+    "device": 7,
+    "is_active": true,
+    "sensor_type": [
+      "Other"
+    ],
+    "unit": [
+      "(None)"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T12:15:57.819Z",
-    "updated_at": "2025-03-03T20:40:17.054Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": "2025-11-23T18:09:33.563Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-06-20T17:22:18.651Z",
+    "updated_at": "2025-08-10T12:33:22.404Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 7,
   "fields": {
-    "name": "bob2456",
-    "sensor_type": "TEMP",
-    "device": 1,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "apower",
+    "device": 7,
+    "is_active": true,
+    "sensor_type": [
+      "Other"
+    ],
+    "unit": [
+      "(None)"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T16:17:47.479Z",
-    "updated_at": "2025-03-03T16:59:29.528Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": "2025-11-23T18:09:33.534Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-06-21T23:53:55.367Z",
+    "updated_at": "2025-08-10T12:33:22.402Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 8,
   "fields": {
-    "name": "toast",
-    "sensor_type": "TEMP",
-    "device": 1,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "current",
+    "device": 7,
+    "is_active": true,
+    "sensor_type": [
+      "Other"
+    ],
+    "unit": [
+      "(None)"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T16:34:34.022Z",
-    "updated_at": "2025-03-03T16:34:34.022Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": "2025-11-23T18:09:33.547Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-06-21T23:53:55.451Z",
+    "updated_at": "2025-08-10T12:33:22.403Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 9,
   "fields": {
-    "name": "take45",
-    "sensor_type": "TEMP",
-    "device": 1,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "current",
+    "device": 6,
+    "is_active": true,
+    "sensor_type": [
+      "Other"
+    ],
+    "unit": [
+      "(None)"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T16:35:39.414Z",
-    "updated_at": "2025-03-03T16:57:12.201Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": "2025-11-23T18:10:25.691Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-06-22T18:08:56.024Z",
+    "updated_at": "2025-08-10T12:33:22.401Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 10,
   "fields": {
-    "name": "lizard2",
-    "sensor_type": "TEMP",
-    "device": 1,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "apower",
+    "device": 6,
+    "is_active": true,
+    "sensor_type": [
+      "Other"
+    ],
+    "unit": [
+      "(None)"
+    ],
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T16:39:31.399Z",
-    "updated_at": "2025-03-03T16:47:22.841Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": "2025-11-23T18:10:25.667Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-06-22T18:08:56.102Z",
+    "updated_at": "2025-08-10T12:33:22.400Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 11,
   "fields": {
-    "name": "take4",
-    "sensor_type": "TEMP",
-    "device": 1,
-    "unit": "other",
-    "data_type": "DB",
-    "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T16:42:24.291Z",
-    "updated_at": "2025-03-03T16:51:16.268Z"
+    "name": "temperature",
+    "device": 9,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": [
+      "Celsius"
+    ],
+    "unit_override": false,
+    "data_type": "INFLUX",
+    "data_type_override": false,
+    "graph_type": "LINE",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 7,
+    "influx_measurement": "device_frmpayload_data_temperature",
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-07-26T16:34:17.819Z",
+    "updated_at": "2025-08-10T13:11:34.736Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 12,
   "fields": {
-    "name": "x",
-    "sensor_type": "TEMP",
-    "device": 1,
-    "unit": "other",
-    "data_type": "DB",
-    "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T16:52:16.836Z",
-    "updated_at": "2025-03-03T16:54:24.963Z"
+    "name": "rainfall",
+    "device": 9,
+    "is_active": true,
+    "sensor_type": [
+      "rainfall"
+    ],
+    "unit": [
+      "millimetre"
+    ],
+    "unit_override": false,
+    "data_type": "INFLUX_CUMULATIVE_RESET",
+    "data_type_override": false,
+    "graph_type": "LINE",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 7,
+    "influx_measurement": "device_frmpayload_data_rainfall_total",
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-07-27T15:58:54.236Z",
+    "updated_at": "2025-08-13T12:25:35.724Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 13,
+  "fields": {
+    "name": "humidity",
+    "device": 9,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": [
+      "%RH"
+    ],
+    "unit_override": false,
+    "data_type": "INFLUX",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 7,
+    "influx_measurement": "device_frmpayload_data_humidity",
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-07-27T16:51:29.128Z",
+    "updated_at": "2025-08-10T12:33:22.394Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 14,
+  "fields": {
+    "name": "Temperature",
+    "device": 12,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": null,
+    "data_type_override": false,
+    "graph_type": "LINE",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 9,
+    "influx_measurement": "device_frmpayload_data_ambient_temperature",
+    "cached_reading_value": 10.8,
+    "cached_reading_timestamp": "2025-10-30T15:36:13.158Z",
+    "last_checked_timestamp": "2025-10-30T15:46:18.042Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-08-07T10:45:05.525Z",
+    "updated_at": "2025-10-30T15:32:41.108Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 15,
+  "fields": {
+    "name": "humidity",
+    "device": 12,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": [
+      "%RH"
+    ],
+    "unit_override": false,
+    "data_type": "INFLUX",
+    "data_type_override": false,
+    "graph_type": "LINE",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 9,
+    "influx_measurement": "device_frmpayload_data_relative_humidity",
+    "cached_reading_value": 85.5,
+    "cached_reading_timestamp": "2025-10-30T15:36:13.158Z",
+    "last_checked_timestamp": "2025-10-30T15:46:26.116Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-08-07T11:50:40.437Z",
+    "updated_at": "2025-08-10T12:33:22.405Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 16,
+  "fields": {
+    "name": "Temperature",
+    "device": 14,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "INFLUX",
+    "data_type_override": false,
+    "graph_type": "LINE",
+    "min_value": 10.0,
+    "min_value_override": true,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 9,
+    "influx_measurement": "device_frmpayload_data_ambient_temperature",
+    "cached_reading_value": 16.3,
+    "cached_reading_timestamp": "2025-11-11T13:00:17.810Z",
+    "last_checked_timestamp": "2025-11-11T13:12:24.594Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-08-07T11:53:54.357Z",
+    "updated_at": "2025-10-28T23:34:40.517Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 17,
   "fields": {
-    "name": "lid",
-    "sensor_type": "PRESS",
+    "name": "Humidity",
     "device": 14,
-    "unit": "other",
-    "data_type": "DB",
-    "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-03T20:44:01.342Z",
-    "updated_at": "2025-03-04T03:21:06.018Z"
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "INFLUX",
+    "data_type_override": false,
+    "graph_type": "LINE",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 9,
+    "influx_measurement": "device_frmpayload_data_relative_humidity",
+    "cached_reading_value": 51.0,
+    "cached_reading_timestamp": "2025-11-10T15:00:18.637Z",
+    "last_checked_timestamp": "2025-11-10T15:34:16.486Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-08-07T11:54:40.699Z",
+    "updated_at": "2025-10-30T15:49:16.480Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 18,
+  "fields": {
+    "name": "pooh_gap",
+    "device": 15,
+    "is_active": true,
+    "sensor_type": [
+      "Distance"
+    ],
+    "unit": [
+      "millimetre"
+    ],
+    "unit_override": false,
+    "data_type": "INFLUX",
+    "data_type_override": false,
+    "graph_type": "LINE",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": 10,
+    "influx_measurement": "device_frmpayload_data_distance",
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": "2025-11-23T18:10:19.761Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-08-10T12:41:11.678Z",
+    "updated_at": "2025-08-10T12:41:11.678Z"
   }
 },
 {
   "model": "sensors.sensor",
   "pk": 19,
   "fields": {
-    "name": "Leg",
-    "sensor_type": "TEMP",
-    "device": 13,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "flood",
+    "device": 18,
+    "is_active": true,
+    "sensor_type": [
+      "Other"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-04T01:02:14.794Z",
-    "updated_at": "2025-03-04T03:23:33.074Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-17T11:41:04.181Z",
+    "updated_at": "2025-10-27T11:58:44.293Z"
   }
 },
 {
   "model": "sensors.sensor",
-  "pk": 20,
+  "pk": 28,
   "fields": {
-    "name": "lips",
-    "sensor_type": "TEMP",
-    "device": 13,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "Mom-T1 Battery",
+    "device": 54,
+    "is_active": true,
+    "sensor_type": [
+      "Battery"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-04T01:02:40.154Z",
-    "updated_at": "2025-03-04T03:20:24.398Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-21T12:04:52.378Z",
+    "updated_at": "2025-10-21T12:04:52.378Z"
   }
 },
 {
   "model": "sensors.sensor",
-  "pk": 21,
+  "pk": 32,
   "fields": {
-    "name": "soup",
-    "sensor_type": "HUM",
-    "device": 9,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "Mom-T1 Humidity",
+    "device": 54,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-05T02:58:01.470Z",
-    "updated_at": "2025-03-05T03:09:26.048Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-21T12:42:51.481Z",
+    "updated_at": "2025-10-21T12:42:51.481Z"
   }
 },
 {
   "model": "sensors.sensor",
-  "pk": 22,
+  "pk": 36,
   "fields": {
-    "name": "nuts",
-    "sensor_type": "TEMP",
-    "device": 9,
-    "unit": "other",
-    "data_type": "DB",
+    "name": "Mom-T1 Temperature",
+    "device": 54,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
     "influx_source": null,
-    "influx_measurement": "sensor_readings",
-    "is_active": false,
-    "created_at": "2025-03-05T02:58:16.456Z",
-    "updated_at": "2025-03-05T03:15:39.849Z"
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-22T13:15:09.143Z",
+    "updated_at": "2025-10-22T13:15:09.143Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 45,
+  "fields": {
+    "name": "LaundryDrain Battery",
+    "device": 61,
+    "is_active": true,
+    "sensor_type": [
+      "Battery"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-23T12:15:26.088Z",
+    "updated_at": "2025-10-23T12:15:26.088Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 46,
+  "fields": {
+    "name": "LaundryDrain Status",
+    "device": 61,
+    "is_active": true,
+    "sensor_type": [
+      "Status"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-23T15:46:20.646Z",
+    "updated_at": "2025-10-23T15:46:20.646Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 54,
+  "fields": {
+    "name": "MomHub Temperature",
+    "device": 53,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-24T13:00:55.943Z",
+    "updated_at": "2025-10-24T13:00:55.943Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 55,
+  "fields": {
+    "name": "MomHub Lightlevel",
+    "device": 53,
+    "is_active": true,
+    "sensor_type": [
+      "Lightlevel"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-25T10:51:37.827Z",
+    "updated_at": "2025-10-25T10:51:37.827Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 56,
+  "fields": {
+    "name": "MomHub Humidity",
+    "device": 53,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-25T10:51:40.019Z",
+    "updated_at": "2025-10-25T10:51:40.019Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 57,
+  "fields": {
+    "name": "Mom-T3 Temperature",
+    "device": 60,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-25T10:53:12.593Z",
+    "updated_at": "2025-10-25T10:53:12.593Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 58,
+  "fields": {
+    "name": "Mom-T3 Battery",
+    "device": 60,
+    "is_active": true,
+    "sensor_type": [
+      "Battery"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-25T10:53:18.916Z",
+    "updated_at": "2025-10-25T10:53:18.916Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 59,
+  "fields": {
+    "name": "Mom-T3 Humidity",
+    "device": 60,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-25T10:53:19.815Z",
+    "updated_at": "2025-10-25T10:53:19.815Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 62,
+  "fields": {
+    "name": "Mom-T2 Temperature",
+    "device": 55,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-27T12:01:00.244Z",
+    "updated_at": "2025-10-27T12:01:00.244Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 63,
+  "fields": {
+    "name": "Mom-T2 Battery",
+    "device": 55,
+    "is_active": true,
+    "sensor_type": [
+      "Battery"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-27T12:01:01.425Z",
+    "updated_at": "2025-10-27T12:01:01.425Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 64,
+  "fields": {
+    "name": "Mom-T2 Humidity",
+    "device": 55,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": null,
+    "cached_reading_timestamp": null,
+    "last_checked_timestamp": null,
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-27T12:01:03.441Z",
+    "updated_at": "2025-10-27T12:01:03.441Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 65,
+  "fields": {
+    "name": "Hub Temperature",
+    "device": 66,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 19.1,
+    "cached_reading_timestamp": "2025-10-31T15:27:35.833Z",
+    "last_checked_timestamp": "2025-10-31T15:27:50.907Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-31T15:27:35.814Z",
+    "updated_at": "2025-10-31T15:27:35.814Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 66,
+  "fields": {
+    "name": "Hub Lightlevel",
+    "device": 66,
+    "is_active": true,
+    "sensor_type": [
+      "Lightlevel"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 13.0,
+    "cached_reading_timestamp": "2025-10-31T15:27:50.884Z",
+    "last_checked_timestamp": "2025-10-31T15:27:50.884Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-31T15:27:43.332Z",
+    "updated_at": "2025-10-31T15:27:43.332Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 67,
+  "fields": {
+    "name": "Hub Humidity",
+    "device": 66,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 43.0,
+    "cached_reading_timestamp": "2025-10-31T15:27:44.795Z",
+    "last_checked_timestamp": "2025-10-31T15:27:50.622Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-31T15:27:44.773Z",
+    "updated_at": "2025-10-31T15:27:44.773Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 68,
+  "fields": {
+    "name": "O1 Temperature",
+    "device": 64,
+    "is_active": true,
+    "sensor_type": [
+      "Temperature"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 14.4,
+    "cached_reading_timestamp": "2025-10-31T15:29:55.852Z",
+    "last_checked_timestamp": "2025-10-31T15:30:01.068Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-31T15:29:55.824Z",
+    "updated_at": "2025-10-31T15:29:55.824Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 69,
+  "fields": {
+    "name": "O1 Battery",
+    "device": 64,
+    "is_active": true,
+    "sensor_type": [
+      "Battery"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 60.0,
+    "cached_reading_timestamp": "2025-10-31T15:30:01.021Z",
+    "last_checked_timestamp": "2025-10-31T15:30:01.022Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-31T15:29:56.753Z",
+    "updated_at": "2025-10-31T15:29:56.753Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 70,
+  "fields": {
+    "name": "O1 Humidity",
+    "device": 64,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 60.0,
+    "cached_reading_timestamp": "2025-10-31T15:29:57.479Z",
+    "last_checked_timestamp": "2025-10-31T15:30:01.045Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-10-31T15:29:57.458Z",
+    "updated_at": "2025-10-31T15:29:57.458Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 72,
+  "fields": {
+    "name": "I2 Battery",
+    "device": 63,
+    "is_active": true,
+    "sensor_type": [
+      "Battery"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 60.0,
+    "cached_reading_timestamp": "2025-11-10T13:28:58.233Z",
+    "last_checked_timestamp": "2025-11-10T13:28:58.233Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-11-10T13:28:52.861Z",
+    "updated_at": "2025-11-10T13:28:52.861Z"
+  }
+},
+{
+  "model": "sensors.sensor",
+  "pk": 73,
+  "fields": {
+    "name": "I2 Humidity",
+    "device": 63,
+    "is_active": true,
+    "sensor_type": [
+      "Humidity"
+    ],
+    "unit": null,
+    "unit_override": false,
+    "data_type": "DIRECT",
+    "data_type_override": false,
+    "graph_type": "SCATTER",
+    "min_value": null,
+    "min_value_override": false,
+    "max_value": null,
+    "max_value_override": false,
+    "influx_source": null,
+    "influx_measurement": null,
+    "cached_reading_value": 36.0,
+    "cached_reading_timestamp": "2025-11-10T13:28:53.429Z",
+    "last_checked_timestamp": "2025-11-10T13:28:58.252Z",
+    "stale_threshold_override_seconds": null,
+    "created_at": "2025-11-10T13:28:53.413Z",
+    "updated_at": "2025-11-10T13:28:53.413Z"
   }
 }
 ]

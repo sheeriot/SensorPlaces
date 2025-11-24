@@ -31,4 +31,4 @@
     {% with device_is_active=device.is_active %}
         {% include 'sensors/partials/sensor_row.html' with device=device sensor=sensor parent_is_active=parent_is_active device_is_active=device_is_active hide_inactive=hide_inactive %}
     {% endwith %}
-{% endfor %} 
+{% endfor %}

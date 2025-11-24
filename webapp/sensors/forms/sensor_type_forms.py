@@ -10,7 +10,7 @@ class SensorTypeForm(forms.ModelForm):
     class Meta:
         model = SensorType
         fields = [
-            'name', 'description', 'default_unit', 'default_data_type', 
+            'name', 'description', 'default_unit', 'default_data_type',
             'min_value', 'max_value', 'allow_override', 'decimal_places'
         ]
 
@@ -38,4 +38,3 @@ class SensorTypeForm(forms.ModelForm):
                 HTML(f'<a href="{cancel_url}" class="btn btn-secondary">Cancel</a>')
             )
         )
-

@@ -1,4 +1,4 @@
-<form id="deleteLocationForm" method="post" action="{% url 'sensors:location_delete' place_slug=place.slug slug=object.slug %}">
+<form hx-post="{% url 'sensors:location_delete' place_slug=place.slug slug=object.slug %}" hx-target="this">
     {% csrf_token %}
     <div class="modal-header bg-danger text-white">
         <h5 class="modal-title" id="deleteLocationModalLabel">
@@ -19,7 +19,7 @@
             </div>
             <div class="mb-3">
                 <label for="delete-confirm-input" class="form-label">To proceed, please type the number of devices that will be deleted (<strong>{{ device_count }}</strong>) and click Delete.</label>
-                <input type="text" class="form-control" id="delete-confirm-input" autocomplete="off">
+                <input type="text" class="form-control delete-confirm-input" id="delete-confirm-input" autocomplete="off" data-expected="{{ device_count }}">
             </div>
         {% else %}
             <p>Are you sure you want to permanently delete the location <strong><i class="bi bi-geo-alt"></i> {{ object.name }}</strong>?</p>
@@ -29,28 +29,8 @@
     </div>
     <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" id="confirm-delete-button" class="btn btn-danger" {% if device_count > 0 %}disabled{% endif %}>
+        <button type="submit" id="confirm-delete-button" class="btn btn-danger confirm-delete-button" {% if device_count > 0 %}disabled{% endif %}>
             <i class="bi bi-trash"></i> Delete
         </button>
     </div>
 </form>
-
-{% if device_count > 0 %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const confirmInput = document.getElementById('delete-confirm-input');
-    const deleteButton = document.getElementById('confirm-delete-button');
-    const expectedCount = '{{ device_count }}';
-
-    if (confirmInput && deleteButton) {
-        confirmInput.addEventListener('input', function() {
-            if (confirmInput.value === expectedCount) {
-                deleteButton.disabled = false;
-            } else {
-                deleteButton.disabled = true;
-            }
-        });
-    }
-});
-</script>
-{% endif %}

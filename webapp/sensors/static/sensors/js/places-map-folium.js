@@ -1,18 +1,18 @@
 /**
  * Places Map Folium System
  * Handles Folium map initialization and marker management
- * 
+ *
  * Debug Mode:
  * -----------
  * To enable debug tables and logging, add ?debug=true to your URL:
  * http://your-site/page?debug=true
- * 
+ *
  * Debug Output:
  * - Initialization status and source (URL vs code setting)
  * - Hide/Show inactive state changes
  * - Marker system analysis with visibility states
  * - Map bounds and view updates
- * 
+ *
  * Example URLs:
  * http://localhost:8000/sensors/?debug=true
  * http://localhost:8000/sensors/places/?debug=true
@@ -49,7 +49,7 @@ const placesMapFoliumSystem = {
         try {
             // First, make sure Leaflet is loaded
             await this.ensureLeafletLoaded();
-            
+
             const foliumMap = await this.waitForFoliumMap(mapContainer);
             if (!foliumMap) return;
 
@@ -67,7 +67,7 @@ const placesMapFoliumSystem = {
             console.error('Map initialization error:', error);
         }
     },
-    
+
     ensureLeafletLoaded() {
         return new Promise(resolve => {
             const checkLeaflet = () => {
@@ -79,13 +79,13 @@ const placesMapFoliumSystem = {
                     resolve();
                     return;
                 }
-                
+
                 if (this.state.debug) {
                     console.log('Waiting for Leaflet to load...');
                 }
                 setTimeout(checkLeaflet, 100);
             };
-            
+
             checkLeaflet();
         });
     },
@@ -96,13 +96,13 @@ const placesMapFoliumSystem = {
                 const map = container.querySelector('.folium-map');
                 return map?.classList.contains('leaflet-container') ? map : null;
             };
-            
+
             const map = findMap();
             if (map) {
                 resolve(map);
                 return;
             }
-            
+
             const observer = new MutationObserver((mutations, obs) => {
                 const map = findMap();
                 if (map) {
@@ -150,7 +150,7 @@ const placesMapFoliumSystem = {
         }
 
         this.state.map = leafletMap;
-        
+
         // Track user view adjustments
         this.state.map.on('zoomend dragend', () => {
             this.state.userHasAdjustedView = true;
@@ -205,7 +205,7 @@ const placesMapFoliumSystem = {
 
         const markers = markerPane.querySelectorAll('.leaflet-marker-icon');
         const visibleMarkers = [];
-        
+
         markers.forEach(marker => {
             const placeMarker = marker.querySelector('.place-marker');
             if (!placeMarker) return;
@@ -240,9 +240,9 @@ const placesMapFoliumSystem = {
         try {
             const boundsData = JSON.parse(mapEl.dataset.mapBounds || '{}');
             const boundsType = this.state.hideInactiveState ? 'active' : 'all';
-            
+
             // Use pre-calculated bounds if available
-            const bounds = boundsData[boundsType] ? 
+            const bounds = boundsData[boundsType] ?
                 [boundsData[boundsType].sw, boundsData[boundsType].ne] :
                 L.latLngBounds(markers).pad(0.1);
 
@@ -252,7 +252,7 @@ const placesMapFoliumSystem = {
                     bounds: bounds
                 });
             }
-            
+
             this.state.map.fitBounds(bounds);
         } catch (error) {
             console.error('Error fitting map to bounds:', error);
@@ -269,7 +269,7 @@ const placesMapFoliumSystem = {
                 this.state.map.invalidateSize();
             }
         });
-        
+
         resizeObserver.observe(mapElement);
     },
 
@@ -289,7 +289,7 @@ const placesMapFoliumSystem = {
                 const isCurrentlyHidden = placeMarker.classList.contains('d-none');
                 const lat = parseFloat(placeMarker.dataset.placeLat);
                 const lon = parseFloat(placeMarker.dataset.placeLon);
-                
+
                 return {
                     name: placeMarker.dataset.placeName || 'Unnamed',
                     id: placeMarker.dataset.placeId || 'N/A',
@@ -334,11 +334,11 @@ const placesMapFoliumSystem = {
         if (!placeMarker) return;
 
         const isActive = placeMarker.dataset.placeActive === 'true';
-        
+
         if (!isActive) {
             node.classList.add('opacity-50', 'text-muted');
             node.style.opacity = '0.5';
-            
+
             node.style.display = this.state.hideInactiveState ? 'none' : '';
             placeMarker.classList.toggle('d-none', this.state.hideInactiveState);
         }
@@ -363,4 +363,4 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         placesMapFoliumSystem.initialize();
     }, 100);
-}); 
+});
