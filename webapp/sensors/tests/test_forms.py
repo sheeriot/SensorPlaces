@@ -1,4 +1,5 @@
 from django.test import TestCase
+import inspect
 from sensors.views.place_forms import PlaceForm, PlaceDeleteForm
 from sensors.views.location_forms import LocationForm
 from sensors.views.device_forms import DeviceForm
@@ -12,7 +13,6 @@ import datetime
 import random
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
-from .test_utils import skip_unless_beta
 
 
 class PlaceFormTest(TestCase):
@@ -37,7 +37,9 @@ class PlaceFormTest(TestCase):
         }
         form = PlaceForm(data=form_data)
         self.assertTrue(form.is_valid())
-        print("===> test_forms.py --> test_valid_form PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_slug_generation(self):
         """Test that slug is generated correctly"""
@@ -51,7 +53,9 @@ class PlaceFormTest(TestCase):
         self.assertTrue(form.is_valid())
         place = form.save()
         self.assertEqual(place.slug, 'new-test-place')
-        print("===> test_forms.py --> test_slug_generation PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_latitude_validation(self):
         """Test that latitude is validated correctly"""
@@ -65,7 +69,9 @@ class PlaceFormTest(TestCase):
         form = PlaceForm(data=form_data)
         self.assertFalse(form.is_valid())
         self.assertIn('latitude', form.errors)
-        print("===> test_forms.py --> test_latitude_validation PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_longitude_validation(self):
         """Test that longitude is validated correctly"""
@@ -79,7 +85,9 @@ class PlaceFormTest(TestCase):
         form = PlaceForm(data=form_data)
         self.assertFalse(form.is_valid())
         self.assertIn('longitude', form.errors)
-        print("===> test_forms.py --> test_longitude_validation PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_siteplan_image_validation(self):
         """Test that siteplan image is validated correctly"""
@@ -94,7 +102,9 @@ class PlaceFormTest(TestCase):
         # Test with no image (should be valid)
         form = PlaceForm(data=form_data)
         self.assertTrue(form.is_valid())
-        print("===> test_forms.py --> test_siteplan_image_validation PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
 
 class LocationFormTest(TestCase):
@@ -154,7 +164,9 @@ class LocationFormTest(TestCase):
         }
         form = LocationForm(data=form_data, place=place)
         self.assertTrue(form.is_valid())
-        print("===> test_forms.py --> test_valid_form (LocationFormTest) PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_inactive_place_constraint(self):
         """Test that a location's is_active is automatically set to False if its place is inactive"""
@@ -198,14 +210,22 @@ class LocationFormTest(TestCase):
         self.assertIn('is_active', form.errors)
         # Check that the right error message is raised
         self.assertIn('Location cannot be active', str(form.errors['is_active']))
-        print("===> test_forms.py --> test_inactive_place_constraint PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
 
-@skip_unless_beta("Skipping Beta Tests: DeviceFormTest")
 class DeviceFormTest(TestCase):
     """Test the DeviceForm validation"""
 
     def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            username='testuser',
+            password='testpassword'
+        )
+        self.client.login(username='testuser', password='testpassword')
+
         self.place = Place.objects.create(
             name='Test Place',
             slug='test-place',
@@ -272,7 +292,9 @@ class DeviceFormTest(TestCase):
 
         form = DeviceForm(data=form_data)
         self.assertTrue(form.is_valid())
-        print("===> test_forms.py --> test_valid_form (DeviceFormTest) PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_inactive_location_constraint(self):
         """Test that device can't be active if location is inactive"""
@@ -301,7 +323,9 @@ class DeviceFormTest(TestCase):
         # Check non_field_errors or specific field error depending on implementation
         errors = form.errors.as_data()
         self.assertTrue(any('is_active' in str(e) or 'A device cannot be active' in str(e) for e in form.errors.values()) or '__all__' in form.errors)
-        print("===> test_forms.py --> test_inactive_location_constraint PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_device_form_uniqueness(self):
         """Test device form uniqueness validation"""
@@ -331,7 +355,9 @@ class DeviceFormTest(TestCase):
         })
         self.assertFalse(form_duplicate.is_valid())
         self.assertIn('device_id', form_duplicate.errors)
-        print("===> test_forms.py --> test_device_form_uniqueness PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_device_form_update_toast(self):
         """Test that updating a device and changing its name creates a toast notification"""
@@ -366,11 +392,12 @@ class DeviceFormTest(TestCase):
         self.assertIn('pending_toast', self.client.session)
         self.assertIn('message', self.client.session['pending_toast'])
         self.assertIn('Updated Toast Device', self.client.session['pending_toast']['message'])
-        self.assertIn('name: Original Name', self.client.session['pending_toast']['message'])
-        print("===> test_forms.py --> test_device_form_update_toast PASS")
+        self.assertIn('Name: Original Name &rarr; Updated Toast Device', self.client.session['pending_toast']['message'])
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
 
-@skip_unless_beta("Skipping Beta Tests: SensorFormTest")
 class SensorFormTest(TestCase):
     """Test the SensorForm validation"""
 
@@ -436,7 +463,9 @@ class SensorFormTest(TestCase):
         if not form.is_valid():
              print(f"Form errors: {form.errors}")
         self.assertTrue(form.is_valid())
-        print("===> test_forms.py --> test_valid_form (SensorFormTest) PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_inactive_device_constraint(self):
         """Test that a sensor's is_active is automatically set to False if its device is inactive"""
@@ -472,7 +501,9 @@ class SensorFormTest(TestCase):
         self.assertIn('is_active', form.errors)
         # Check that the right error message is raised
         self.assertIn('Sensor cannot be active', str(form.errors['is_active']))
-        print("===> test_forms.py --> test_inactive_device_constraint PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_influx_fields_required(self):
         """Test that InfluxDB fields are required when data_type is INFLUX"""
@@ -513,7 +544,9 @@ class SensorFormTest(TestCase):
         if not form.is_valid():
             print(f"Form errors 2: {form.errors}")
         self.assertTrue(form.is_valid())
-        print("===> test_forms.py --> test_influx_fields_required PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_form_html_rendering(self):
         """Test that the SensorForm correctly generates HTML with form tags"""
@@ -536,7 +569,9 @@ class SensorFormTest(TestCase):
         has_submit = self._layout_has_submit(form.helper.layout)
         self.assertTrue(has_submit, "Form should include a submit button")
 
-        print("===> test_forms.py --> test_form_html_rendering PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def _get_layout_field_names(self, layout):
         """Extract field names from a layout object recursively"""
@@ -569,7 +604,6 @@ class SensorFormTest(TestCase):
         return False
 
 
-@skip_unless_beta("Skipping Beta Tests: ToastMessageTestCase")
 class ToastMessageTestCase(TestCase):
     """Test that toast messages are correctly generated for form submissions"""
 
@@ -636,7 +670,9 @@ class ToastMessageTestCase(TestCase):
         if 'pending_toast' in session:
             del session['pending_toast']
             session.save()
-        print("===> test_forms.py --> test_create_toast_messages PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_update_device_toast_messages(self):
         """Test that updating a device generates correct toast messages with changed fields"""
@@ -675,7 +711,9 @@ class ToastMessageTestCase(TestCase):
         self.assertIn('message', self.client.session['pending_toast'])
         self.assertIn('Updated Toast Device', self.client.session['pending_toast']['message'])
         # Note: Old name is not included in the toast message currently
-        print("===> test_forms.py --> test_update_device_toast_messages PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_toggle_active_toast_messages(self):
         """Test that toggling active status generates correct toast messages"""
@@ -714,7 +752,9 @@ class ToastMessageTestCase(TestCase):
         toast_key = 'toast_data' if 'toast_data' in response_data else 'toast'
         self.assertTrue(toast_key in response_data)
         self.assertIn('message', response_data[toast_key])
-        print("===> test_forms.py --> test_toggle_active_toast_messages PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_place_delete_form_validation(self):
         """Test that PlaceDeleteForm requires the correct name confirmation"""
@@ -741,4 +781,6 @@ class ToastMessageTestCase(TestCase):
         }
         form = PlaceDeleteForm(data=form_data, instance=test_place)
         self.assertTrue(form.is_valid())
-        print("===> test_forms.py --> test_place_delete_form_validation PASS")
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")

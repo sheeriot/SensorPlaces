@@ -564,7 +564,8 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             form,
             status_changed,
             location_changed,
-            original_location
+            original_location,
+            form.changed_data
         )
 
         setattr(self.request, 'toast_message', toast_message)
@@ -574,10 +575,19 @@ class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
     def form_invalid(self, form):
         return super().form_invalid(form)
 
-    def construct_toast_message(self, form, status_changed, location_changed, original_location):
+    def construct_toast_message(self, form, status_changed, location_changed, original_location, changed_data):
         device = self.object
         message_parts = [f"Updated device <strong>{device.name}</strong>"]
         details = []
+
+        # List of fields to check for changes
+        fields_to_check = ['name', 'model', 'manufacturer', 'device_id']
+
+        for field in fields_to_check:
+            if field in changed_data:
+                old_value = form.initial.get(field, 'N/A')
+                new_value = form.cleaned_data.get(field, 'N/A')
+                details.append(f"{field.replace('_', ' ').capitalize()}: {old_value} &rarr; {new_value}")
 
         if location_changed:
             if device.location and device.location.slug != 'unassigned-devices':

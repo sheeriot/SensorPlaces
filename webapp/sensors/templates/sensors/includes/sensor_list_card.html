@@ -28,7 +28,7 @@
             {% endif %}
         </div>
 
-        <div id="sensor-list-{{ device.pk|default:location.pk|default:place.pk }}" class="list-group list-group-flush">
+        <div id="sensor-list-{% if device %}{{ device.pk }}{% elif location %}{{ location.pk }}{% else %}{{ place.pk }}{% endif %}" class="list-group list-group-flush">
 
             {% if device %}
                 {# Device View: just list the sensors for this device #}

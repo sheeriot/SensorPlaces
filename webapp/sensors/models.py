@@ -146,7 +146,7 @@ class Place(models.Model):
 
 @receiver(post_save, sender=Place)
 def create_unassigned_location_for_place(sender, instance, created, **kwargs):
-    print(f"DEBUG: signal fired for {instance}, created={created}, kwargs={kwargs}")
+    # print(f"DEBUG: signal fired for {instance}, created={created}, kwargs={kwargs}")
     # Skip creating unassigned location during fixture loading (raw=True)
     if created and not kwargs.get('raw', False):
         instance.get_unassigned_location()

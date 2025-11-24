@@ -7,9 +7,6 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Submit
 
 
-from icecream import ic
-
-
 class DeviceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
 
@@ -38,9 +35,6 @@ class DeviceForm(forms.ModelForm):
         self.devices_active = kwargs.pop('devices_active', None)
         kwargs.pop('inactive_help_text', None) # Pop and discard
         cancel_url = kwargs.pop('cancel_url', None)
-        ic.enable()
-        ic("DeviceForm.__init__ called")
-        ic(f"kwargs: {kwargs}")
 
         super().__init__(*args, **kwargs)
 
@@ -101,7 +95,6 @@ class DeviceForm(forms.ModelForm):
             self.location = location_initial  # Set the form's location
             # Handle location-based activation constraints
             if not location_initial.is_active:
-                ic(f"Initial location '{location_initial.name}' is inactive, disabling 'is_active' field.")
                 self.fields['is_active'].widget.attrs['disabled'] = True
                 self.fields['is_active'].label = 'inactive'
 
@@ -195,9 +188,7 @@ class DeviceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        # ic(cleaned_data)
         if self.errors:
-            # ic(self.errors.as_json())
             pass # Commented out ic(self.errors.as_json())
         name = cleaned_data.get('name')
         location = cleaned_data.get('location') or self.location
@@ -253,7 +244,6 @@ class DeviceForm(forms.ModelForm):
                     f"A device with ID '{device_id}' already exists in this place "
                     f"(in location '{duplicate.location.name}')."
                 ))
-                # ic(self.errors.as_json()) # Commented out ic(self.errors.as_json())
 
         return cleaned_data
 
