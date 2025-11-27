@@ -170,21 +170,47 @@ def update_sensor_live_value(sensor):
         except Exception:
             pass
 
+    else:
+        # Fallback for DIRECT or other types: check local DB for the latest reading
+        try:
+            # Import locally to avoid circular import
+            from .models import SensorReading
+            latest_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
+            if latest_reading:
+                ic(f"Found local reading for sensor {sensor.name}: {latest_reading.value} at {latest_reading.timestamp}")
+                new_value = latest_reading.value
+                new_timestamp = latest_reading.timestamp
+            else:
+                ic(f"No local reading found for sensor {sensor.name}")
+        except Exception as e:
+            ic(f"Error getting local reading for sensor {sensor.name}: {e}")
+            pass
+
+
+
     # --- Update the sensor object ---
 
     # Always update the last_checked time
-    sensor.last_checked_timestamp = timezone.now()
-    update_fields = ['last_checked_timestamp']
+    # Use .update() to bypass the full_clean() called in Sensor.save()
+    # This prevents validation errors from blocking live value updates
+
+    update_kwargs = {
+        'last_checked_timestamp': timezone.now()
+    }
 
     value_was_updated = False
     # Only update the cached value if the new reading is actually newer
     if new_timestamp and (sensor.cached_reading_timestamp is None or new_timestamp > sensor.cached_reading_timestamp):
+        update_kwargs['cached_reading_value'] = new_value
+        update_kwargs['cached_reading_timestamp'] = new_timestamp
+
+        # Update the instance as well (though refresh_from_db in view would catch it)
         sensor.cached_reading_value = new_value
         sensor.cached_reading_timestamp = new_timestamp
-        update_fields.extend(['cached_reading_value', 'cached_reading_timestamp'])
         value_was_updated = True
 
-    sensor.save(update_fields=update_fields)
+    sensor.last_checked_timestamp = update_kwargs['last_checked_timestamp']
+    sensor.__class__.objects.filter(pk=sensor.pk).update(**update_kwargs)
 
     return value_was_updated
 

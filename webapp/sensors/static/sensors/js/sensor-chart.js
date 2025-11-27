@@ -11,6 +11,7 @@ class SensorChart {
         this.originalData = [];
         this.currentGraphType = this.graphCard.dataset.graphType;
         this.originalUnit = this.graphCard.dataset.sensorUnit;
+        this.unitName = this.graphCard.dataset.sensorUnitName; // Need to add this data attr
         this.sensorType = this.graphCard.dataset.sensorType;
         this.dataTable = null;
 
@@ -44,7 +45,7 @@ class SensorChart {
 
     // --- Data Fetching and Processing ---
     async fetchData(apiUrl) {
-        console.log('SensorChart: fetchData called with URL:', apiUrl);
+        if (this.sensorChartConfig.debug) console.log('SensorChart: fetchData called with URL:', apiUrl);
         this.showLoadingState(true);
 
         if (!apiUrl) {
@@ -64,7 +65,7 @@ class SensorChart {
 
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             url.searchParams.set('timezone', userTimezone);
-            console.log('Fetching data from URL:', url.toString());
+            if (this.sensorChartConfig.debug) console.log('Fetching data from URL:', url.toString());
 
             const response = await window.utils.fetchWithCSRF(url.toString());
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -160,7 +161,7 @@ class SensorChart {
 
     // --- Chart Rendering ---
     renderChart(data, type) {
-        console.log(`SensorChart: renderChart called with ${data.length} data points and type: ${type}`);
+        if (this.sensorChartConfig.debug) console.log(`SensorChart: renderChart called with ${data.length} data points and type: ${type}`);
         const sensorId = this.graphCard.dataset.sensorId;
         const placeholder = document.getElementById(`graph-placeholder-${sensorId}`);
         const content = document.getElementById(`graph-content-${sensorId}`);
@@ -356,8 +357,19 @@ class SensorChart {
                 dataPointsCard.classList.remove('d-none');
 
                 let rows = [];
+                const isBoolean = (this.originalUnit === '' && this.sensorType && this.sensorType.toLowerCase() === 'boolean');
+
                 chartData.slice().reverse().forEach(item => {
-                    const valueDisplay = (item.y !== null && typeof item.y !== 'undefined') ? item.y.toFixed(decimalPlaces) : 'N/A';
+                    let valueDisplay;
+                    if (item.y !== null && typeof item.y !== 'undefined') {
+                        if (isBoolean) {
+                            valueDisplay = item.y > 0 ? 'True' : 'False';
+                        } else {
+                            valueDisplay = item.y.toFixed(decimalPlaces);
+                        }
+                    } else {
+                        valueDisplay = 'N/A';
+                    }
                     rows.push([window.utils.formatTimestamp(item.x), valueDisplay]);
                 });
 
@@ -376,6 +388,8 @@ class SensorChart {
                             info: "Showing {start} to {end} of {rows} entries",
                         }
                     });
+                } else {
+                     if (this.sensorChartConfig.debug) console.warn('Simple-DataTables library not found or table element missing', { element: dataTableElement, library: window.simpleDatatables });
                 }
             } else {
                 dataPointsCard.classList.add('d-none');
@@ -385,12 +399,12 @@ class SensorChart {
 
     // --- Event Listeners and Initialization ---
     initialize() {
-        console.log("SensorChart: Initializing for graph card:", this.graphCard.id);
+        if (this.sensorChartConfig.debug) console.log("SensorChart: Initializing for graph card:", this.graphCard.id);
         if (!this.graphCard) {
             console.error("SensorChart: Initialization failed, graph card not found.");
             return;
         }
-        console.log("SensorChart: Initializing flatpickr and event listeners.");
+        if (this.sensorChartConfig.debug) console.log("SensorChart: Initializing flatpickr and event listeners.");
         this.fp_start = flatpickr("#start-date-picker", {
             altInput: true,
             altFormat: "M j, Y",
@@ -418,23 +432,23 @@ class SensorChart {
         start.setDate(start.getDate() - 3);
         this.fp_start.setDate(start, false);
         this.fp_end.setDate(end, false);
-        console.log("SensorChart: Initial date range set:", start, "to", end);
+        if (this.sensorChartConfig.debug) console.log("SensorChart: Initial date range set:", start, "to", end);
 
         this.setupEventListeners();
     }
 
     setupEventListeners() {
-        console.log("SensorChart: Setting up event listeners.");
+        if (this.sensorChartConfig.debug) console.log("SensorChart: Setting up event listeners.");
         const applyBtn = document.getElementById('apply-date-range');
         if(applyBtn) {
-            console.log("SensorChart: Attaching listener to Apply button.");
+            if (this.sensorChartConfig.debug) console.log("SensorChart: Attaching listener to Apply button.");
             applyBtn.addEventListener('click', () => {
-                console.log("SensorChart: Apply button clicked.");
+                if (this.sensorChartConfig.debug) console.log("SensorChart: Apply button clicked.");
                 document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
 
                 const startDt = this.fp_start.selectedDates[0];
                 const endDt_raw = this.fp_end.selectedDates[0];
-                console.log("SensorChart: Apply dates:", startDt, endDt_raw);
+                if (this.sensorChartConfig.debug) console.log("SensorChart: Apply dates:", startDt, endDt_raw);
 
                 if (!startDt || !endDt_raw) {
                     alert("Please select both a start and end date.");
@@ -476,10 +490,10 @@ class SensorChart {
         });
         if (this.sensorChartConfig.debug) console.log('sensor-chart.js: Event listener for graphTypeChange added to graphCard.');
 
-        console.log("SensorChart: Attaching listeners to date range preset buttons.");
+        if (this.sensorChartConfig.debug) console.log("SensorChart: Attaching listeners to date range preset buttons.");
         document.querySelectorAll('.date-range-preset').forEach(button => {
             button.addEventListener('click', () => {
-                console.log("SensorChart: Date range preset button clicked:", button.dataset.range);
+                if (this.sensorChartConfig.debug) console.log("SensorChart: Date range preset button clicked:", button.dataset.range);
                 document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
 
@@ -510,10 +524,11 @@ class SensorChart {
 
         const tempUnitSelect = document.getElementById('temp-unit-select');
         if (tempUnitSelect) {
-            console.log("SensorChart: Attaching listener to temperature unit selector.");
+            if (this.sensorChartConfig.debug) console.log("SensorChart: Attaching listener to temperature unit selector.");
             tempUnitSelect.addEventListener('change', () => {
                 const selectedUnit = tempUnitSelect.value;
-                console.log("SensorChart: Temperature unit changed to:", selectedUnit);
+                if (this.sensorChartConfig.debug) console.log("SensorChart: Temperature unit changed to:", selectedUnit);
+
                 let dataToRender = [];
 
                 if ((selectedUnit === 'C' && this.originalUnit.includes('C')) || (selectedUnit === 'F' && this.originalUnit.includes('F'))) {

@@ -215,12 +215,17 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Ensure the live value is fresh before rendering the detail card
         if sensor.data_type and sensor.data_type.startswith('INFLUX'):
             update_sensor_live_value(sensor)
+        elif sensor.data_type == 'DIRECT':
+            update_sensor_live_value(sensor)
+
 
         device_qs = Device.objects.annotate(
             active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
             inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
         )
         device = get_object_or_404(device_qs, pk=sensor.device.pk)
+
+        ic(f"SensorDetailView context - Sensor: {sensor.name}, Cached Value: {sensor.cached_reading_value}")
 
         context['device'] = device
         context['location'] = device.location
@@ -276,6 +281,7 @@ class SensorLiveValueView(LoginRequiredMixin, View):
         try:
             sensor = get_object_or_404(Sensor, pk=sensor_pk)
             update_sensor_live_value(sensor)
+            ic(f"SensorLiveValueView - Sensor: {sensor.name}, Cached Value: {sensor.cached_reading_value}")
 
             if sensor.cached_reading_value is not None:
                 response_data = {
@@ -310,6 +316,8 @@ class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Update the live value before rendering the card
         if sensor.data_type and sensor.data_type.startswith('INFLUX'):
             update_sensor_live_value(sensor)
+        elif sensor.data_type == 'DIRECT':
+             update_sensor_live_value(sensor)
 
         # Add device and location to context
         context['device'] = sensor.device
@@ -319,7 +327,10 @@ class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['live_value'] = sensor.cached_reading_value
         context['live_timestamp'] = sensor.cached_reading_timestamp
 
+        ic(f"SensorGraphCardView context - Sensor: {sensor.name}, Live Value: {context.get('live_value')}")
+
         # We no longer fetch stats on initial load.
+
         # The date range is set by the JS, so we don't need to parse it here either.
         context['reading_stats'] = {}
 
@@ -715,25 +726,17 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
     template_name = 'sensors/sensor_confirm_delete.html'
     object: Sensor
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-        # Get and cache place
-        self._place = self.get_place()
+    def get(self, request, *args, **kwargs):
+        """Handle GET requests, checking for HTMX."""
+        self.object = self.get_object()
+        context = self.get_context_data(object=self.object)
 
-        # Create inactive help text to be used in form and toast messages
-        try:
-            sensor = self.get_object()
-            device = sensor.device
+        # If it's an HTMX request, render the modal partial
+        if 'HX-Request' in request.headers:
+            return render(request, 'sensors/partials/sensor_confirm_delete_modal.html', context)
 
-            if device and not device.is_active:
-                self._inactive_help_text = mark_safe(
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This sensor is inactive because Device "{device.name}" is inactive.'
-                )
-            else:
-                self._inactive_help_text = None
-        except Exception as e:
-            self._inactive_help_text = None
+        # Otherwise, render the full page using the template_name
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -761,17 +764,6 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
 
         return context
 
-    def get(self, request, *args, **kwargs):
-        """Handle GET requests, checking for HTMX."""
-        self.object = self.get_object()
-        # If it's an HTMX request, render the modal partial
-        if 'HX-Request' in request.headers:
-            context = self.get_context_data(object=self.object)
-            return render(request, 'sensors/partials/sensor_confirm_delete_modal.html', context)
-
-        # Otherwise, render the full page
-        return super().get(request, *args, **kwargs)
-
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         sensor = self.object
@@ -797,15 +789,12 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             'place_id': place.pk
         })
 
-        # For HTMX requests from the modal, send back an event trigger
+        # For HTMX requests from the modal, send back an event trigger AND a redirect
         if 'HX-Request' in request.headers:
-            response = HttpResponse(status=204) # No Content
-            response['HX-Trigger'] = json.dumps({
-                'sensorDeleted': {
-                    'sensorId': sensor_id,
-                    'deviceId': device_id
-                }
-            })
+             # Standard response for non-HTMX requests (fallback)
+            success_url = self.get_success_url()
+            response = HttpResponse(status=200)
+            response["HX-Redirect"] = success_url
             return response
 
         # Standard response for non-HTMX requests (fallback)
@@ -1296,15 +1285,19 @@ def sensor_live_values_api(request: HttpRequest, place_slug: str) -> JsonRespons
                     'status': 'success',
                     'value': sensor.cached_reading_value,
                     'timestamp': sensor.cached_reading_timestamp.isoformat(),
-                    'unit_symbol': sensor.effective_unit.symbol,
+                    'unit_symbol': sensor.effective_unit.symbol if sensor.effective_unit else '',
+                    'unit_name': sensor.effective_unit.name if sensor.effective_unit else '',
+                    'sensor_type': sensor.sensor_type.name if sensor.sensor_type else '',
                     'decimal_places': sensor.effective_decimal_places
                 }
             else:
                 payload[sensor.pk] = {'status': 'no_reading'}
         except Exception as e:
+            ic(f"Error updating live value for sensor {sensor.pk}: {e}")
             payload[sensor.pk] = {'status': 'error', 'message': str(e)}
 
     # For any requested PKs that weren't found or didn't belong to the place
+
     found_pks = {s.pk for s in sensors}
     for pk in pks:
         if pk not in found_pks:

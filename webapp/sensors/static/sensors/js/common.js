@@ -201,12 +201,22 @@ class LiveValueFetcher {
     updateSingleContainer(container, sensorData) {
         let html = '';
         if (sensorData && sensorData.status === 'success') {
-            const value = parseFloat(sensorData.value).toFixed(sensorData.decimal_places || 2);
+            let valueDisplay = parseFloat(sensorData.value).toFixed(sensorData.decimal_places || 2);
             const unit = sensorData.unit_symbol || '';
+
+            // Handle Boolean type
+            const isBoolean = (sensorData.unit_name && sensorData.unit_name.toLowerCase() === 'boolean') ||
+                              (sensorData.sensor_type && sensorData.sensor_type.toLowerCase() === 'boolean');
+
+            if (isBoolean) {
+                const val = parseFloat(sensorData.value);
+                valueDisplay = val > 0 ? 'True' : 'False';
+            }
+
             const timestamp = sensorData.timestamp ? new Date(sensorData.timestamp) : null;
             const naturalTime = timestamp && window.utils ? window.utils.getNaturalTime(timestamp) : '';
             html = `
-                <span class="badge bg-success-subtle text-success-emphasis rounded-1">${value}${unit}</span>
+                <span class="badge bg-success-subtle text-success-emphasis rounded-1">${valueDisplay}${unit ? ' ' + unit : ''}</span>
                 ${naturalTime ? `<small class="text-muted">(${naturalTime})</small>` : ''}
             `;
         } else if (sensorData && sensorData.status === 'no_reading') {
