@@ -187,31 +187,14 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = '/opt/app/static_files'
-# STATICFILES_DIRS = [
-#     BASE_DIR / "sensors" / "static",
-# ]
-
+STATICFILES_DIRS = [
+    # os.path.join(BASE_DIR, 'static'), This directory does not exist and causes a warning.
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# InfluxDB Configuration
-INFLUXDB_CONFIG = {
-    'host': 'localhost',
-    'port': 8086,
-    'token': 'your-influxdb-token',  # Replace with actual token
-    'org': 'your-org',
-    'bucket': 'sensor_data',
-    'bucket_mapping': {
-        'TEMP': 'temperature_data',
-        'HUM': 'humidity_data',
-        'PRESS': 'pressure_data',
-        'CO2': 'co2_data',
-        'OTHER': 'sensor_data'
-    }
-}
 
 # Media files (Uploaded files)
 MEDIA_URL = '/media/'
@@ -304,6 +287,12 @@ SECURE_REFERRER_POLICY = 'same-origin'
 # Cache busting version
 CACHE_VERSION = os.environ.get('CACHE_VERSION', str(int(time.time())))
 
+APPEND_SLASH = True
+
 # SwitchBot settings
 SWITCHBOT_TOKEN = os.environ.get("SWITCHBOT_TOKEN", None)
 SWITCHBOT_SECRET = os.environ.get("SWITCHBOT_SECRET", None)
+
+# Webhook Sniffer
+WEBHOOK_SNIFFER = os.environ.get('WEBHOOK_SNIFFER', 'False').lower() in ('true', '1', 't')
+ic(WEBHOOK_SNIFFER)

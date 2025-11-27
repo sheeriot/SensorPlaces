@@ -40,6 +40,8 @@ urlpatterns = [
 
     # Webhook URLs
     path('webhook/switchbot/<slug:place_slug>/', webhook_views.SwitchBotWebhookReceiverView.as_view(), name='switchbot_webhook_receiver'),
+    path('webhook/shelly/<slug:place_slug>/', webhook_views.ShellyWebhookReceiverView.as_view(), name='shelly_webhook_receiver_gen1'),
+    path('webhook/shelly/<slug:place_slug>/<str:device_id>/', webhook_views.ShellyWebhookReceiverView.as_view(), name='shelly_webhook_receiver'),
     path('webhook/<slug:place_slug>/<uuid:uuid>/', webhook_views.WebhookReceiverView.as_view(), name='webhook_receiver'),
 
     # Place-specific URLs

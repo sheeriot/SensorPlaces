@@ -239,7 +239,7 @@ class Location(models.Model):
 
 class Unit(models.Model):
     name = models.CharField(max_length=50, unique=True)
-    symbol = models.CharField(max_length=10)
+    symbol = models.CharField(max_length=10, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.symbol})"
@@ -368,6 +368,7 @@ class Sensor(models.Model):
         ('VOC', 'Volatile Organic Compounds'),
         ('PM25', 'Particulate Matter 2.5'),
         ('PM10', 'Particulate Matter 10'),
+        ('BOOLEAN', 'Boolean'),
         ('OTHER', 'Other'),
     ]
     DATA_TYPES = [
@@ -495,6 +496,31 @@ class Sensor(models.Model):
                 'is_active': 'Sensor cannot be active when its device\'s location is inactive.'
             })
 
+        # Data Type override validation
+        if self.data_type_override:
+            if not self.data_type:
+                raise ValidationError({'data_type': "A data type must be provided when override is checked."})
+
+            if not self.sensor_type:
+                raise ValidationError({'data_type_override': "Cannot override data type when no Sensor Type is assigned."})
+
+            if not self.sensor_type.allow_override:
+                raise ValidationError({
+                    'data_type_override': f"The Sensor Type '{self.sensor_type.name}' does not allow overrides."
+                })
+
+            if self.data_type == self.sensor_type.default_data_type:
+                raise ValidationError({
+                    'data_type': "The override data type cannot be the same as the default. To use the default, uncheck the override box."
+                })
+        elif self.data_type and self.sensor_type and self.pk:
+            # If a data_type is entered that is not the default, but override is NOT checked.
+            # This is ambiguous and should be disallowed.
+            if self.data_type != self.sensor_type.default_data_type:
+                 raise ValidationError({
+                    'data_type_override': "To set a data type that is different from the Sensor Type's default, you must check the override box."
+                })
+
     def save(self, *args, **kwargs):
         # Run validation
         self.full_clean()
@@ -572,6 +598,7 @@ class SensorType(models.Model):
 class SensorReading(models.Model):
     sensor: ForeignKey = models.ForeignKey('Sensor', on_delete=models.CASCADE, related_name='readings')
     value: FloatField = models.FloatField()
+    value_boolean = models.BooleanField(null=True, blank=True, help_text="Boolean value for this reading, if applicable.")
     timestamp: DateTimeField = models.DateTimeField(auto_now_add=True)
     notes: TextField = models.TextField(null=True, blank=True)
 

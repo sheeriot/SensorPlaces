@@ -6,6 +6,7 @@
     data-device-name="{{ sensor.device.name }}"
     data-sensor-type="{{ sensor.sensor_type.name }}"
     data-sensor-unit="{{ sensor.effective_unit.symbol }}"
+    data-sensor-unit-name="{{ sensor.effective_unit.name }}"
     data-min-value="{{ sensor.effective_min_value|default_if_none:'' }}"
     data-max-value="{{ sensor.effective_max_value|default_if_none:'' }}"
     data-decimal-places="{{ sensor.effective_decimal_places|default_if_none:'' }}"
@@ -15,7 +16,7 @@
     data-api-url="{% if sensor.device.is_lorawan %}{% url 'sensors:lorawan_sensor_data_api' place_slug=place.slug pk=sensor.pk %}{% else %}{% url 'sensors:sensor_readings_api' place_slug=place.slug pk=sensor.pk %}{% endif %}">
     <div class="card-header d-flex align-items-center">
         <h5 class="card-title mb-0 d-flex align-items-center">
-            <i class="bi bi-graph-up me-2"></i> InfluxDB Graph
+            <i class="bi bi-graph-up me-2"></i> Data Graph
             {% include 'sensors/partials/sensor_live_value_htmx.html' with component_id_suffix="header" sensor_pk=sensor.pk place_slug=place.slug %}
         </h5>
         <div class="ms-auto d-flex align-items-center">

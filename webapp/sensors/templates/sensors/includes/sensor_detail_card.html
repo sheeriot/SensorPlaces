@@ -15,9 +15,10 @@
                     <i class="bi bi-pencil"></i>
                 </a>
                 <button type="button" class="btn btn-danger btn-sm delete-sensor"
-                        data-url="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+                        hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+                        hx-target="#modal-content"
                         data-bs-toggle="modal"
-                        data-bs-target="#deleteSensorModal"
+                        data-bs-target="#modal-container"
                         title="Delete">
                     <i class="bi bi-trash"></i>
                 </button>
@@ -90,6 +91,7 @@
                 </div>
             </div>
         </div>
+        {% if 'INFLUX' in sensor.data_type or sensor.data_type != 'DIRECT' %}
         <hr class="my-2">
         <p class="card-text mb-1">
             <strong class="me-2">Influx Source:</strong>
@@ -99,6 +101,8 @@
             <strong class="me-2">Influx Measurement:</strong>
             <code class="user-select-all">{{ sensor.influx_measurement|default:"N/A" }}</code>
         </p>
+        {% endif %}
+
         <hr class="my-2">
         <div class="row small text-muted">
             <div class="col">
