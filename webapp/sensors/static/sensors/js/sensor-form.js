@@ -15,7 +15,7 @@ const sensorFormManager = {
 
         // --- Override toggles ---
         this.initOverride('unit');
-        this.initOverride('data_type');
+        // this.initOverride('data_type'); // Removed
         this.initOverride('min_value');
         this.initOverride('max_value');
 
@@ -32,9 +32,10 @@ const sensorFormManager = {
         }
 
         // --- Data Type Change Handler ---
+        // Just for Influx toggling now
         const dataTypeSelect = document.getElementById('id_data_type');
         if (dataTypeSelect) {
-            dataTypeSelect.addEventListener('change', () => this.handleDataTypeSelection());
+            // dataTypeSelect.addEventListener('change', () => this.handleDataTypeSelection()); // Removed override logic
         }
     },
 
@@ -50,7 +51,7 @@ const sensorFormManager = {
                     const defaults = sensorFormManager.getSensorTypeDefaults();
                     const defaultValue = {
                         'unit': defaults.unitId || '',
-                        'data_type': defaults.dataType || '',
+                        // 'data_type': defaults.dataType || '', // Removed
                         'min_value': '',
                         'max_value': ''
                     }[type];
@@ -76,7 +77,7 @@ const sensorFormManager = {
         }
         return {
             unitId: selectedOption.dataset.defaultUnitId,
-            dataType: selectedOption.dataset.defaultDataType,
+            // dataType: selectedOption.dataset.defaultDataType, // Removed
             minValue: selectedOption.dataset.minValue,
             maxValue: selectedOption.dataset.maxValue,
         };
@@ -147,7 +148,7 @@ const sensorFormManager = {
         if (this.config.debug) console.log('[SensorForm] Read SensorType data from attributes:', data);
 
         this.updateFormFields(data);
-        this.handleDataTypeSelection(); // After defaults are applied, check override status
+        // this.handleDataTypeSelection(); // Removed
     },
 
     updateFormFields(data) {
@@ -163,46 +164,22 @@ const sensorFormManager = {
         };
 
         if (fields.unit && !overrides.unit.checked) {
-            fields.unit.value = data.default_unit_id || '';
+            fields.unit.value = data.unitId || ''; // Corrected property name from defaults object
         }
-        if (fields.data_type && !overrides.data_type.checked) {
-            fields.data_type.value = data.default_data_type || '';
-        }
+        // if (fields.data_type && !overrides.data_type.checked) {
+        //     fields.data_type.value = data.default_data_type || '';
+        // }
         if (fields.min_value) {
-            fields.min_value.placeholder = data.min_value !== null ? data.min_value : 'Not set';
+            fields.min_value.placeholder = data.minValue !== undefined ? data.minValue : 'Not set'; // Corrected property name
         }
         if (fields.max_value) {
-            fields.max_value.placeholder = data.max_value !== null ? data.max_value : 'Not set';
+            fields.max_value.placeholder = data.maxValue !== undefined ? data.maxValue : 'Not set'; // Corrected property name
         }
         if (this.config.debug) console.log('[SensorForm] Form fields updated with defaults.');
     },
 
-    handleDataTypeSelection() {
-        if (this.config.debug) console.log('[SensorForm] Data Type selection changed, evaluating override.');
-        const defaults = this.getSensorTypeDefaults();
-        const dataTypeSelect = document.getElementById('id_data_type');
-        const overrideCheckbox = document.getElementById('id_data_type_override');
+    // handleDataTypeSelection() { ... } // Removed entire method
 
-        if (!overrideCheckbox || !dataTypeSelect) return;
-
-        // Only act if a sensor type with a default is selected
-        if (defaults.dataType) {
-            const isDifferent = dataTypeSelect.value !== defaults.dataType;
-
-            if (isDifferent && !overrideCheckbox.checked) {
-                // If user selects a non-default, we must override.
-                if(this.config.debug) console.log('[SensorForm] Non-default selected, checking override.');
-                overrideCheckbox.checked = true;
-                dataTypeSelect.disabled = false; // Ensure it's enabled
-            } else if (!isDifferent && overrideCheckbox.checked) {
-                // If user selects the default, we must NOT override.
-                if(this.config.debug) console.log('[SensorForm] Default selected, unchecking override.');
-                overrideCheckbox.checked = false;
-                // Dispatch event to trigger listener that disables the field
-                overrideCheckbox.dispatchEvent(new Event('change'));
-            }
-        }
-    },
 
     toggleInfluxFields() {
         const dataTypeSelect = document.getElementById('id_data_type');

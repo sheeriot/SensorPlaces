@@ -32,7 +32,7 @@ class SensorTypeSelect(forms.Select):
         if value and self.sensor_types_cache and value in self.sensor_types_cache:
             sensor_type = self.sensor_types_cache[value]
             option['attrs']['data-default-unit-id'] = sensor_type.default_unit.id if sensor_type.default_unit else ''
-            option['attrs']['data-default-data-type'] = sensor_type.default_data_type or ''
+            # option['attrs']['data-default-data-type'] = sensor_type.default_data_type or '' # Removed as default_data_type is no longer in SensorType
             option['attrs']['data-min-value'] = str(sensor_type.min_value) if sensor_type.min_value is not None else ''
             option['attrs']['data-max-value'] = str(sensor_type.max_value) if sensor_type.max_value is not None else ''
         return option
@@ -46,7 +46,7 @@ class SensorForm(forms.ModelForm):
         fields = [
             'device', 'name', 'is_active', 'sensor_type',
             'unit', 'unit_override',
-            'data_type', 'data_type_override',
+            'data_type',
             'min_value', 'min_value_override',
             'max_value', 'max_value_override',
             'graph_type',
@@ -68,7 +68,6 @@ class SensorForm(forms.ModelForm):
             'unit_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'graph_type': forms.Select(attrs={'class': 'form-select'}),
             'data_type': forms.Select(attrs={'class': 'form-select'}),
-            'data_type_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'min_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'min_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'max_value': forms.NumberInput(attrs={'class': 'form-control'}),
@@ -151,14 +150,11 @@ class SensorForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             if not self.instance.unit_override:
                 self.initial['unit'] = self.instance.effective_unit.pk if self.instance.effective_unit else None
-            if not self.instance.data_type_override:
-                self.initial['data_type'] = self.instance.effective_data_type
+            self.initial['data_type'] = self.instance.effective_data_type
 
         # Set labels for the override fields and remove help text for cleaner layout
         self.fields['unit_override'].label = "Override"
-        self.fields['data_type_override'].label = "Override"
         self.fields['unit_override'].help_text = None
-        self.fields['data_type_override'].help_text = None
         self.fields['min_value_override'].label = "Override"
         self.fields['max_value_override'].label = "Override"
         self.fields['min_value_override'].help_text = None
@@ -175,11 +171,12 @@ class SensorForm(forms.ModelForm):
             # Disable override fields if not allowed
             self.fields['unit'].disabled = True
             self.fields['unit_override'].disabled = True
-            self.fields['data_type'].disabled = True
-            self.fields['data_type_override'].disabled = True
+            # data_type is now always editable or controlled by other means,
+            # but since we removed the override flag, we just let it be.
+            # Or should we disable data_type dropdown if allow_override is false?
+            # The user asked to remove data_type_override logic.
+            pass
         else:
-            # If override is allowed, JavaScript will handle disabling the fields
-            # until the toggle is checked. We don't need to do it here.
             pass
         # --- End of new logic ---
 
@@ -227,7 +224,7 @@ class SensorForm(forms.ModelForm):
                 Column(
                     Div(
                         HTML('<label for="id_data_type" class="form-label mb-0">Data Type</label>'),
-                        Field('data_type_override', wrapper_class='form-check form-switch'),
+                        # Removed data_type_override field
                         css_class='d-flex justify-content-between align-items-baseline'
                     ),
                     Div(Field('data_type', id="id_data_type"), css_class="mb-1"),
@@ -290,7 +287,6 @@ class SensorForm(forms.ModelForm):
         influx_source = cleaned_data.get('influx_source')
         influx_measurement = cleaned_data.get('influx_measurement')
         unit_override = cleaned_data.get('unit_override')
-        data_type_override = cleaned_data.get('data_type_override')
         min_value_override = cleaned_data.get('min_value_override')
         max_value_override = cleaned_data.get('max_value_override')
 
@@ -301,11 +297,6 @@ class SensorForm(forms.ModelForm):
             if unit_override and cleaned_data.get('unit') == sensor_type.default_unit:
                 cleaned_data['unit'] = None
                 cleaned_data['unit_override'] = False
-
-            # If data type override is selected but matches the default, clear it
-            if data_type_override and cleaned_data.get('data_type') == sensor_type.default_data_type:
-                cleaned_data['data_type'] = None
-                cleaned_data['data_type_override'] = False
 
             # If min value override is selected but matches the default, clear it
             if min_value_override and cleaned_data.get('min_value') == sensor_type.min_value:
@@ -321,15 +312,10 @@ class SensorForm(forms.ModelForm):
         if unit_override and not cleaned_data.get('unit'):
             self.add_error('unit', "Unit must be specified when overriding.")
 
-        if data_type_override and not cleaned_data.get('data_type'):
-            self.add_error('data_type', "Data type must be specified when overriding.")
-
         # Clear values if not overriding to fall back to SensorType defaults
         if not unit_override:
             cleaned_data['unit'] = None
 
-        if not data_type_override:
-            cleaned_data['data_type'] = None
         if not min_value_override:
             cleaned_data['min_value'] = None
         if not max_value_override:

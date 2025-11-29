@@ -10,73 +10,28 @@
     </div>
     <div id="sensor-list-table" class="list-group list-group-flush overflow-auto">
         {% for location in object_list %}
-            <div class="list-group-item list-group-item-primary py-1 location-row {% if hide_inactive %}d-none{% endif %}" data-location-id="{{ location.id }}" data-location-active="{{ location.is_active|lower }}">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="{% if not location.is_active %}text-muted opacity-50{% endif %}">
-                        <strong><i class="bi bi-geo-alt me-2"></i>{{ location.name }}</strong>
-                        {% if not location.is_active %}
-                            <span class="badge bg-secondary ms-2">inactive</span>
-                        {% endif %}
-                    </div>
-                    <div class="d-flex align-items-center">
-                        {% if not location.devices_sorted %}
-                            <span class="text-muted fst-italic me-2">no devices</span>
-                        {% endif %}
-                        {% include "sensors/partials/device_add_button.html" with place=place location=location %}
+            {% if location.slug != 'unassigned-devices' %}
+                <div class="list-group-item list-group-item-primary py-1 location-row {% if hide_inactive %}d-none{% endif %}" data-location-id="{{ location.id }}" data-location-active="{{ location.is_active|lower }}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="{% if not location.is_active %}text-muted opacity-50{% endif %}">
+                            <strong><i class="bi bi-geo-alt me-2"></i>{{ location.name }}</strong>
+                            {% if not location.is_active %}
+                                <span class="badge bg-secondary ms-2">inactive</span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex align-items-center">
+                            {% if not location.devices_sorted %}
+                                <span class="text-muted fst-italic me-2">no devices</span>
+                            {% endif %}
+                            {% include "sensors/partials/device_add_button.html" with place=place location=location %}
+                        </div>
                     </div>
                 </div>
-            </div>
-            {% for device in location.devices_sorted %}
-                {% include "sensors/partials/device_row.html" with device=device hide_inactive=hide_inactive %}
-            {% endfor %}
+                {% for device in location.devices_sorted %}
+                    {% include "sensors/partials/device_row.html" with device=device hide_inactive=hide_inactive %}
+                {% endfor %}
+            {% endif %}
         {% endfor %}
 
     </div>
 </div>
-
-<div class="modal fade" id="deleteDeviceModal" tabindex="-1" aria-labelledby="deleteDeviceModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const deleteDeviceModal = document.getElementById('deleteDeviceModal');
-    if (deleteDeviceModal) {
-        deleteDeviceModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const url = button.dataset.url;
-            const modalContent = deleteDeviceModal.querySelector('.modal-content');
-
-            fetch(url, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                modalContent.innerHTML = data.html;
-                const deleteForm = modalContent.querySelector('#deleteDeviceForm');
-                deleteForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    fetch(deleteForm.action, {
-                        method: 'POST',
-                        body: new FormData(deleteForm),
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            window.location.href = data.redirect_url;
-                        }
-                    });
-                });
-            });
-        });
-    }
-});
-</script>

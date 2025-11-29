@@ -1,40 +1,41 @@
-<div id="unassigned-device-list-card" class="card my-1 unassigned-devices">
-    <div class="card-header d-flex justify-content-between align-items-center py-1">
-        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
-            <i class="bi bi-question-circle me-1"></i>
-            Unassigned Devices
-        </h5>
-        {% if request.resolver_match.url_name != 'unassigned_device_list' %}
-        <a href="{% url 'sensors:unassigned_device_list' place_slug=place.slug %}" class="btn btn-sm btn-outline-secondary" title="Manage unassigned devices">
-            <i class="bi bi-pencil-square me-1"></i> Manage
-        </a>
-        {% endif %}
-    </div>
-    <div class="table-responsive">
-        <table class="table table-light table-hover card-table mb-0">
-            <thead>
-                <tr>
-                    <th style="width: 25%">Name</th>
-                    <th style="width: 15%">Status</th>
-                    <th style="width: 15%">Type</th>
-                    <th style="width: 15%">Model</th>
-                    <th style="width: 15%">Manufacturer</th>
-                    <th style="width: 15%">Device ID</th>
-                    <th style="width: 10%" class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for device in unassigned_devices %}
-                    {% include "sensors/partials/unassigned_device_row.html" with place=place device=device %}
-                {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center text-muted p-3">
-                            <i class="bi bi-inbox fs-4"></i>
-                            <p class="mb-0 mt-2">No unassigned devices found.</p>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+{% comment %}
+    Unassigned Devices Card
+    Expected context:
+    - locations: List of location objects, including 'unassigned-devices'
+    - hide_inactive: boolean
+{% endcomment %}
+
+{% for location in locations %}
+    {% if location.slug == 'unassigned-devices' %}
+        <div id="unassigned-devices-card" class="card my-1 border-warning">
+            <div class="card-header bg-warning-subtle text-warning-emphasis d-flex justify-content-between align-items-center py-1"
+                 role="button"
+                 data-bs-toggle="collapse"
+                 data-bs-target="#unassignedDevicesCollapse"
+                 aria-expanded="false"
+                 aria-controls="unassignedDevicesCollapse">
+                <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
+                    <i class="bi bi-inbox me-2"></i>
+                    Unassigned Devices
+                </h5>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-warning text-dark me-2">{{ location.devices_sorted|length }}</span>
+                    <i class="bi bi-chevron-down toggle-icon transition-transform"></i>
+                </div>
+            </div>
+
+            <div id="unassignedDevicesCollapse" class="collapse">
+                <div class="list-group list-group-flush overflow-auto" style="max-height: 400px;">
+                    {% for device in location.devices_sorted %}
+                        {% include "sensors/partials/device_row.html" with device=device hide_inactive=False %}
+                    {% empty %}
+                        <div class="text-center p-3 text-muted">
+                            <p class="mb-0">No unassigned devices found.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    {% endif %}
+{% endfor %}

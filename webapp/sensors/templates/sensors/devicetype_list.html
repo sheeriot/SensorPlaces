@@ -1,0 +1,48 @@
+{% extends 'sensors/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Device Types</h2>
+        <a href="{% url 'sensors:devicetype_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Create New Device Type
+        </a>
+    </div>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Icon</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for devicetype in object_list %}
+            <tr>
+                <td><i class="bi {{ devicetype.icon }}"></i></td>
+                <td><a href="{% url 'sensors:devicetype_detail' pk=devicetype.pk %}">{{ devicetype.name }}</a></td>
+                <td>{{ devicetype.description|truncatewords:20 }}</td>
+                <td>
+                    {% if devicetype.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'sensors:devicetype_update' pk=devicetype.pk %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center">No device types found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

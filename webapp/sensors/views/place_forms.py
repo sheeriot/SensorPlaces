@@ -6,12 +6,16 @@ from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div  #, Submit, TemplateNameMixin
 
-from ..models import Place
+from ..models import Place, InfluxSource
 
 
 class PlaceForm(forms.ModelForm):
     referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
-    slug = forms.CharField(widget=forms.HiddenInput(), required=False)
+    slug = forms.CharField(
+        label='Slug (URL Identifier)',
+        required=False,
+        help_text='Unique identifier for URLs. Leave blank to auto-generate from name.'
+    )
     siteplan_image = forms.ImageField(
         required=False,
         widget=forms.FileInput(attrs={
@@ -25,7 +29,7 @@ class PlaceForm(forms.ModelForm):
 
     class Meta:
         model = Place
-        fields = ['name', 'address', 'is_active', 'latitude', 'longitude', 'slug', 'siteplan_image']
+        fields = ['name', 'address', 'is_active', 'latitude', 'longitude', 'slug', 'siteplan_image', 'default_influx_source']
         widgets = {
             'address': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -85,6 +89,9 @@ class PlaceForm(forms.ModelForm):
         # If this is an existing Place, preserve its slug
         if self.instance and self.instance.pk:
             self.fields['slug'].initial = self.instance.slug
+            self.fields['default_influx_source'].queryset = InfluxSource.objects.filter(place=self.instance)
+        else:
+            self.fields['default_influx_source'].queryset = InfluxSource.objects.none()
 
         # Configure field properties
         # Setup Active field with proper ID and label
@@ -146,11 +153,11 @@ class PlaceForm(forms.ModelForm):
             self.fields['siteplan_image'].help_text = 'Upload a site plan image (minimum 200x200 pixels)'
 
         self.helper.layout = Layout(
-            Field('slug', type='hidden'),
             Field('referrer', type='hidden'),
             Div(
                 Div(
-                    Div('name', css_class='col-12'),
+                    Div('name', css_class='col-md-6 col-12'),
+                    Div('slug', css_class='col-md-6 col-12'),
                     css_class='row mb-3'
                 ),
                 Div(
@@ -163,6 +170,10 @@ class PlaceForm(forms.ModelForm):
                         ),
                         css_class='col-12'
                     ),
+                    css_class='row mb-3'
+                ),
+                Div(
+                    Div('default_influx_source', css_class='col-12'),
                     css_class='row mb-3'
                 ),
                 Div(

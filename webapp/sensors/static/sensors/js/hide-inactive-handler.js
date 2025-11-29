@@ -28,6 +28,8 @@ const hideInactiveConfig = {
     debug: false
 };
 
+console.log(`hideInactiveConfig.debug status: ${hideInactiveConfig.debug}`);
+
 // Initialize debug mode from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('debug') === 'true') {

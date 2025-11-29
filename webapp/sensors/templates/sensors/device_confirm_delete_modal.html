@@ -10,7 +10,6 @@
             This action cannot be undone.
         </p>
         {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.META.HTTP_REFERER }}">
     </div>
     <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

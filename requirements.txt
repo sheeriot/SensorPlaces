@@ -18,3 +18,7 @@ django-htmx
 
 # psycopg2-binary
 # pyotp
+
+# if dev ?
+django-debug-toolbar
+django-debug-toolbar-template-profiler

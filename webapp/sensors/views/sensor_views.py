@@ -1240,8 +1240,9 @@ def update_graph_type(request, place_slug, pk):
         new_graph_type = data.get('graph_type')
 
         # Basic validation
-        if new_graph_type not in ['LINE', 'SCATTER', 'BAR']:
-            return JsonResponse({'success': False, 'error': 'Invalid graph type.'}, status=400)
+        allowed_types = ['LINE', 'SCATTER', 'BAR', 'STEP', 'ALARM_BAR', 'OVERLAY']
+        if new_graph_type not in allowed_types:
+            return JsonResponse({'success': False, 'error': f'Invalid graph type. Allowed: {", ".join(allowed_types)}'}, status=400)
 
         # Get the place and sensor
         place = get_object_or_404(Place, slug=place_slug)
@@ -1254,7 +1255,25 @@ def update_graph_type(request, place_slug, pk):
         return JsonResponse({'success': True, 'new_graph_type': new_graph_type})
 
     except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+        # Fallback for form-encoded requests (e.g., HTMX)
+        if request.POST.get('graph_type'):
+            new_graph_type = request.POST.get('graph_type')
+            allowed_types = ['LINE', 'SCATTER', 'BAR', 'STEP', 'ALARM_BAR', 'OVERLAY']
+            if new_graph_type not in allowed_types:
+                return JsonResponse({'success': False, 'error': 'Invalid graph type.'}, status=400)
+
+            place = get_object_or_404(Place, slug=place_slug)
+            sensor = get_object_or_404(Sensor, pk=pk, device__location__place=place)
+            sensor.graph_type = new_graph_type
+            sensor.save(update_fields=['graph_type'])
+
+            # Return a simple response for HTMX, possibly with a toast trigger
+            response = JsonResponse({'success': True})
+            # Add HX-Trigger header for toast if you have a mechanism for it
+            # response['HX-Trigger'] = json.dumps({'showToast': {'message': 'Graph type updated', 'type': 'success'}})
+            return response
+
+        return JsonResponse({'success': False, 'error': 'Invalid JSON or missing graph_type.'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 

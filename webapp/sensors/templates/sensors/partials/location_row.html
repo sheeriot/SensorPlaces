@@ -40,9 +40,9 @@ This template expects:
                 </a>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-location"
                         hx-get="{% url 'sensors:location_delete' place_slug=place.slug slug=location.slug %}"
-                        hx-target="#deleteLocationModal .modal-content"
+                        hx-target="#modal-content"
                         data-bs-toggle="modal"
-                        data-bs-target="#deleteLocationModal"
+                        data-bs-target="#modal-container"
                         title="Delete Location">
                     <i class="bi bi-trash-fill"></i>
                 </button>

@@ -7,7 +7,6 @@
       "default_unit": [
         "Celsius"
       ],
-      "default_data_type": "INFLUX",
       "min_value": null,
       "max_value": null,
       "allow_override": true,
@@ -23,7 +22,6 @@
       "default_unit": [
         "%RH"
       ],
-      "default_data_type": "INFLUX",
       "min_value": 0.0,
       "max_value": 100.0,
       "allow_override": false,
@@ -37,7 +35,6 @@
       "name": "Pressure",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -51,7 +48,6 @@
       "name": "Light",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -65,7 +61,6 @@
       "name": "Sound",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -79,7 +74,6 @@
       "name": "Motion",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -93,7 +87,6 @@
       "name": "Carbon Dioxide",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -107,7 +100,6 @@
       "name": "Volatile Organic Compounds",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -121,7 +113,6 @@
       "name": "Particulate Matter 2.5",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -135,7 +126,6 @@
       "name": "Particulate Matter 10",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -149,7 +139,6 @@
       "name": "Other",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -165,7 +154,6 @@
       "default_unit": [
         "millimetre"
       ],
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": true,
@@ -181,7 +169,6 @@
       "default_unit": [
         "millimetre"
       ],
-      "default_data_type": "INFLUX_CUMULATIVE_RESET",
       "min_value": 0.0,
       "max_value": null,
       "allow_override": false,
@@ -197,7 +184,6 @@
       "default_unit": [
         "Percent"
       ],
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -211,7 +197,6 @@
       "name": "Status",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,
@@ -225,7 +210,6 @@
       "name": "Lightlevel",
       "description": "",
       "default_unit": null,
-      "default_data_type": "DIRECT",
       "min_value": null,
       "max_value": null,
       "allow_override": false,

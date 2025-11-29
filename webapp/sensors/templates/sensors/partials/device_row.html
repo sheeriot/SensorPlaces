@@ -1,5 +1,4 @@
 <div class="list-group-item device-row py-2 {% if not device.is_active and hide_inactive %}d-none{% elif not device.is_active %}list-group-item-light text-muted opacity-50{% endif %}"
-    draggable="{% if device.location.slug == 'unassigned-devices' %}true{% else %}false{% endif %}"
     data-device-active="{{ device.is_active|lower }}"
     data-device-id="{{ device.pk }}"
     data-location-active="{% if device.location %}{{ device.location.is_active|lower }}{% else %}true{% endif %}"
@@ -39,13 +38,24 @@
         <!-- Actions -->
         <div class="col-2 text-end">
             <div class="btn-group btn-group-sm">
+                {% if device.location.slug == 'unassigned-devices' %}
+                <button type="button" class="btn btn-sm btn-outline-primary move-device"
+                        hx-get="{% url 'sensors:device_move_location' place_slug=device.location.place.slug pk=device.pk %}"
+                        hx-target="#modal-content"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal-container"
+                        title="Move Device">
+                    <i class="bi bi-box-arrow-in-up-right"></i>
+                </button>
+                {% endif %}
                 <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug pk=device.pk %}?next={{ absolute_url|urlencode }}" class="btn btn-sm btn-outline-warning">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-device"
-                        data-url="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}"
+                        hx-get="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}"
+                        hx-target="#modal-content"
                         data-bs-toggle="modal"
-                        data-bs-target="#deleteDeviceModal"
+                        data-bs-target="#modal-container"
                         title="Delete">
                     <i class="bi bi-trash-fill"></i>
                 </button>

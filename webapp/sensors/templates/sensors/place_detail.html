@@ -29,6 +29,9 @@
         <!-- Device List Card -->
         {% include "sensors/includes/location_list_card.html" with object_list=locations %}
 
+        <!-- Unassigned Devices Card -->
+        {% include "sensors/includes/unassigned_devices_card.html" %}
+
         <!-- Site Plan Card -->
         {% if place.siteplan_image %}
             {% include "sensors/includes/siteplan_card.html" with editable=True place=place %}

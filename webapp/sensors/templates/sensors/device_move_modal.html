@@ -1,0 +1,70 @@
+<div class="modal-header">
+    <h5 class="modal-title">Move Device</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+    <form id="moveDeviceForm" hx-post="{% url 'sensors:device_move_location' place_slug=place.slug pk=device.pk %}" hx-swap="none">
+        {% csrf_token %}
+        <div class="mb-3">
+            <p>Select a new location for <strong>{{ device.name }}</strong>:</p>
+            <select class="form-select" name="location_id" id="locationSelect" required>
+                <option value="" selected disabled>Choose location...</option>
+                {% for loc in locations %}
+                    <option value="{{ loc.pk }}" data-active="{{ loc.is_active|lower }}">
+                        {{ loc.name }} {% if not loc.is_active %}(Inactive){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="activationOptions" class="mb-3 d-none">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="make_active" id="makeActiveCheckbox" checked>
+                <label class="form-check-label" for="makeActiveCheckbox">
+                    Activate this device and its sensors upon moving
+                </label>
+            </div>
+            <div class="form-text text-success">
+                <i class="bi bi-check-circle me-1"></i> Destination location is active.
+            </div>
+        </div>
+
+        <div id="inactiveWarning" class="mb-3 d-none">
+            <div class="alert alert-warning py-2 small">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                The destination location is <strong>inactive</strong>. The device will remain inactive.
+            </div>
+        </div>
+    </form>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" form="moveDeviceForm" class="btn btn-primary">Move Device</button>
+</div>
+
+<script>
+    (function() {
+        const select = document.getElementById('locationSelect');
+        const activationOptions = document.getElementById('activationOptions');
+        const inactiveWarning = document.getElementById('inactiveWarning');
+        const makeActiveCheckbox = document.getElementById('makeActiveCheckbox');
+
+        if (select) {
+            select.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const isActive = selectedOption.dataset.active === 'true';
+
+                if (isActive) {
+                    activationOptions.classList.remove('d-none');
+                    inactiveWarning.classList.add('d-none');
+                    makeActiveCheckbox.disabled = false;
+                } else {
+                    activationOptions.classList.add('d-none');
+                    inactiveWarning.classList.remove('d-none');
+                    makeActiveCheckbox.disabled = true;
+                    makeActiveCheckbox.checked = false;
+                }
+            });
+        }
+    })();
+</script>

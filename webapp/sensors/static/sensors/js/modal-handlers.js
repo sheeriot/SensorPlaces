@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function() {
         debug: false
     };
 
+    console.log(`modalHandlersConfig.debug status: ${scriptConfig.debug}`);
+
     if (scriptConfig.debug) {
         console.log('Script modal-handlers.js loaded.');
     }
@@ -65,13 +67,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    /**
+     * Initializes generic modal cleanup.
+     * Clears the modal content when hidden to ensure fresh loading on next trigger.
+     */
+    function initializeModalCleanup() {
+        const modalContainer = document.getElementById('modal-container');
+        if (modalContainer) {
+            modalContainer.addEventListener('hidden.bs.modal', function () {
+                const modalContent = modalContainer.querySelector('#modal-content');
+                if (modalContent) {
+                    modalContent.innerHTML = '';
+                    if (scriptConfig.debug) {
+                        console.log('[ModalCleanup] Cleared modal content');
+                    }
+                }
+            });
+        }
+    }
+
     // Initialize all modal handlers
     initializeDeleteConfirmationInput();
+    initializeModalCleanup();
 
     // Initialize debug listeners for all known modals if debug is on
     if (scriptConfig.debug) {
         initializeModalDebug('deleteLocationModal');
         initializeModalDebug('siteplan-view-modal');
         initializeModalDebug('siteplan-editor');
+        initializeModalDebug('modal-container'); // Generic HTMX modal container
     }
 });

@@ -506,7 +506,7 @@ class SensorsViewTestCase(TestCase):
                 'sensor_type': self.sensor.sensor_type.pk,
                 'unit': self.sensor.unit.pk,
                 'data_type': self.sensor.data_type,
-                'graph_type': self.sensor.graph_type,
+                'graph_type': self.sensor.graph_type or '',
                 'description': 'An updated test sensor.'
             }
         )

@@ -29,9 +29,7 @@ This template expects the following context variables:
     </div>
     <div class="overflow-auto">
         {% for location in locations %}
-            {% if location.slug == 'unassigned-devices' %}
-                {% include "sensors/partials/unassigned_devices_row.html" with place=place location=location %}
-            {% else %}
+            {% if location.slug != 'unassigned-devices' %}
                 {% if place.is_active %}
                     {% include "sensors/partials/location_row.html" with place=place location=location hide_inactive=hide_inactive %}
                 {% else %}
@@ -46,15 +44,6 @@ This template expects the following context variables:
                 </a>
             </div>
         {% endfor %}
-    </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteLocationModal" tabindex="-1" aria-labelledby="deleteLocationModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <!-- Content will be loaded here dynamically -->
-        </div>
     </div>
 </div>
 

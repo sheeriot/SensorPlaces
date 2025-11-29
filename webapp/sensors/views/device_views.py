@@ -183,7 +183,8 @@ class DeviceListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         )
 
         qs = get_annotated_locations(self._place).prefetch_related(devices_prefetch)
-        qs = qs.exclude(slug='unassigned-devices')
+        # We no longer exclude 'unassigned-devices' so that it can be rendered in the unassigned_devices_card
+        # qs = qs.exclude(slug='unassigned-devices')
         return qs
 
     def get_context_data(self, **kwargs):
@@ -251,7 +252,9 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
 
     def get_queryset(self) -> QuerySet[Device]:
         if not hasattr(self, '_queryset'):
-            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
+            self._place_slug = self.kwargs.get('place_slug')
+            place = get_object_or_404(Place, slug=self._place_slug)
+            self._place = place
             base_queryset = super().get_queryset()
             self._queryset = base_queryset.filter(location__place=place)\
                 .annotate(
@@ -265,6 +268,19 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
                         to_attr='sensors_sorted'
                     ))
         return self._queryset
+
+    def get(self, request, *args, **kwargs):
+        try:
+            self.object = self.get_object()
+        except Http404:
+            # Device not found - redirect to place detail with toast
+            place_slug = self.kwargs.get('place_slug')
+            messages.error(request, "Device Not Found") # Fallback message
+
+            return HttpResponseRedirect(reverse('sensors:place_detail', kwargs={'place_slug': place_slug}))
+
+        context = self.get_context_data(object=self.object)
+        return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -613,6 +629,18 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
     """
     API View to move a device to a new location.
     """
+    def get(self, request, place_slug, pk):
+        device = get_object_or_404(Device, pk=pk, location__place__slug=place_slug)
+        place = device.location.place
+        locations = place.locations.exclude(slug='unassigned-devices').order_by('name')
+
+        context = {
+            'device': device,
+            'place': place,
+            'locations': locations,
+        }
+        return render(request, 'sensors/device_move_modal.html', context)
+
     def post(self, request, place_slug, pk):
         ic("DeviceMoveLocationView: POST request received.")
         try:
@@ -646,7 +674,9 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
             if make_active:
                 device.is_active = True
                 device.save(update_fields=['is_active'])
-                ic(f"Set device '{device.name}' to active.")
+                # Also activate all sensors associated with this device
+                device.sensors.all().update(is_active=True)
+                ic(f"Set device '{device.name}' and its sensors to active.")
 
             place = get_object_or_404(Place, slug=place_slug)
             place_counts = get_place_counts(place)
@@ -720,10 +750,9 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        if request.headers.get('HX-Request'):
             context = self.get_context_data(object=self.object)
-            html = render_to_string('sensors/device_confirm_delete_modal.html', context, request=request)
-            return JsonResponse({'html': html})
+            return render(request, 'sensors/device_confirm_delete_modal.html', context)
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -775,10 +804,15 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Delete the device
         device.delete()
 
-        # Get the success URL and return HttpResponseRedirect
+        # Get the success URL
         success_url = self.get_success_url()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'success': True, 'redirect_url': success_url})
+
+        # Handle HTMX request
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=200)
+            response['HX-Redirect'] = success_url
+            return response
+
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):

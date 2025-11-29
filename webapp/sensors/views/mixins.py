@@ -30,9 +30,18 @@ class ReferrerMixin:
     def get_form_kwargs(self) -> Dict[str, Any]:
         """
         Pass the correct cancel_url to the form.
+        Also populate the referrer field if available.
         """
         kwargs = super().get_form_kwargs()
         kwargs['cancel_url'] = self.get_cancel_url()
+
+        # Add initial referrer if not present, to populate the hidden field
+        if 'initial' not in kwargs:
+            kwargs['initial'] = {}
+        if 'referrer' not in kwargs['initial']:
+            # Use current request's referrer
+            kwargs['initial']['referrer'] = self.request.META.get('HTTP_REFERER', '')
+
         return kwargs
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
@@ -45,9 +54,21 @@ class ReferrerMixin:
 
     def get_success_url(self) -> str:
         """
-        Return the object's detail view URL.
+        Return the object's detail view URL, or the referrer if available.
         This provides a consistent redirect after a successful form submission.
         """
+        # First check if there is a referrer in the POST data
+        if self.request.method == 'POST':
+            referrer = self.request.POST.get('referrer')
+            if referrer:
+                 from django.utils.http import url_has_allowed_host_and_scheme
+                 if url_has_allowed_host_and_scheme(
+                     url=referrer,
+                     allowed_hosts={self.request.get_host()},
+                     require_https=self.request.is_secure()
+                 ):
+                     return referrer
+
         if not hasattr(self.object, 'get_absolute_url'):
             raise ImproperlyConfigured(
                 f"Object {self.object.__class__.__name__} does not have a get_absolute_url method."
