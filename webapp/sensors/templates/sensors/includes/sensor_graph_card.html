@@ -17,11 +17,13 @@
     <div class="card-header d-flex align-items-center">
         <h5 class="card-title mb-0 d-flex align-items-center">
             <i class="bi bi-graph-up me-2"></i> Data Graph
-            {% include 'sensors/partials/sensor_live_value_htmx.html' with component_id_suffix="header" sensor_pk=sensor.pk place_slug=place.slug %}
         </h5>
         <div class="ms-auto d-flex align-items-center">
+            <span class="me-2 fw-bold">Latest:</span>
+            {% include 'sensors/partials/sensor_live_value_htmx.html' with component_id_suffix="header" sensor_pk=sensor.pk place_slug=place.slug %}
+
             {% if sensor.sensor_type.name == 'Temperature' %}
-            <select id="temp-unit-select" class="form-select form-select-sm" style="width: auto;">
+            <select id="temp-unit-select" class="form-select form-select-sm ms-3" style="width: auto;">
                 <option value="C" {% if 'C' in sensor.effective_unit.symbol %}selected{% endif %}>Celsius (°C)</option>
                 <option value="F" {% if 'F' in sensor.effective_unit.symbol %}selected{% endif %}>Fahrenheit (°F)</option>
             </select>
@@ -48,6 +50,8 @@
         </div>
         <div id="graph-content-{{ sensor.pk }}" class="d-none" style="position: relative; height:400px;">
             <canvas id="sensorChart"></canvas>
+        </div>
+        <div id="graph-warning-{{ sensor.pk }}" class="alert alert-warning mt-2 d-none" role="alert">
         </div>
     </div>
     <div class="card-footer d-flex justify-content-between text-muted small">

@@ -29,4 +29,10 @@ urlpatterns = [
     # path('', HomeView.as_view(), name='home'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+if getattr(settings, 'DEBUG_TOOLBAR', False):
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns
+
 handler404 = error_views.custom_404

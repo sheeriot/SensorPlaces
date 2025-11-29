@@ -39,38 +39,19 @@
                 </div>
             </div>
             <div id="sensor-readings-table-container">
-                 {% include 'sensors/includes/sensor_readings_table.html' %}
+                 {% include 'sensors/includes/sensor_datapoints_card.html' %}
             </div>
         </div>
     </div>
 </div>
 
 <!-- Modals should be loaded dynamically, not included directly -->
-<div id="modal-container" class="modal fade" tabindex="-1" aria-labelledby="modal-title" aria-hidden="true">
-    <div class="modal-dialog">
-        <div id="modal-content" class="modal-content">
-             <!-- Modal content loaded via HTMX -->
-        </div>
-    </div>
-</div>
+<!-- modal-container is inherited from base.html -->
 
 {% endblock %}
 
-{% block page_js %}
+{% block extra_js %}
     <script src="{% static 'sensors/js/sensor-chart.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/sensor-detail.js' %}?v={{ APP_VERSION }}"></script>
-    <script>
-        // Cleanup modal content after it's hidden
-        document.addEventListener('DOMContentLoaded', function() {
-             var modalContainer = document.getElementById('modal-container');
-             if (modalContainer) {
-                 modalContainer.addEventListener('hidden.bs.modal', function () {
-                     var modalContent = modalContainer.querySelector('#modal-content');
-                     if (modalContent) {
-                         modalContent.innerHTML = '';
-                     }
-                 });
-             }
-        });
-    </script>
+    <script src="{% static 'sensors/js/modal-handlers.js' %}?v={{ APP_VERSION }}"></script>
 {% endblock %}

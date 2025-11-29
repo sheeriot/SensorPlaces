@@ -1,3 +1,6 @@
+// Local debug flag - set to true during development, false in production
+const SENSOR_CHART_DEBUG = true;
+
 class SensorChart {
     constructor(graphCardId) {
         this.graphCard = document.getElementById(graphCardId);
@@ -6,13 +9,21 @@ class SensorChart {
             return;
         }
 
-        this.sensorChartConfig = { debug: false };
+        // Use local constant for debug configuration
+        this.debug = SENSOR_CHART_DEBUG;
+
+        if (this.debug) {
+            console.log('SensorChart: Initializing...', { graphCardId });
+        }
+
         this.chart = null;
         this.originalData = [];
         this.currentGraphType = this.graphCard.dataset.graphType;
         this.originalUnit = this.graphCard.dataset.sensorUnit;
         this.unitName = this.graphCard.dataset.sensorUnitName; // Need to add this data attr
         this.sensorType = this.graphCard.dataset.sensorType;
+        this.originalMinValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
+        this.originalMaxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
         this.dataTable = null;
 
         this.initialize();
@@ -27,30 +38,60 @@ class SensorChart {
         const sensorId = this.graphCard.dataset.sensorId;
         const placeholder = document.getElementById(`graph-placeholder-${sensorId}`);
         const content = document.getElementById(`graph-content-${sensorId}`);
+        const loadingSpinner = document.getElementById(`graph-loading-${sensorId}`);
 
         if (isLoading) {
             if (placeholder) placeholder.classList.add('d-none');
-            if (content) content.classList.remove('d-none');
+            // Keep content visible but maybe dimmed? Or just show spinner overlay
+            if (loadingSpinner) loadingSpinner.classList.remove('d-none');
 
             const chartCanvas = document.getElementById('sensorChart');
-            if (this.chart) this.chart.destroy();
-            if (chartCanvas) {
-                const ctx = chartCanvas.getContext('2d');
-                ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
-                ctx.textAlign = "center";
-                ctx.fillText("Loading...", chartCanvas.width / 2, chartCanvas.height / 2);
-            }
+             // Don't destroy chart immediately to avoid flicker, just maybe show loading
+        } else {
+             if (loadingSpinner) loadingSpinner.classList.add('d-none');
+        }
+    }
+
+    showToast(message, type = 'info') {
+        // Use a global toast function if available, otherwise fallback to alert/log
+        if (window.showToast) {
+            window.showToast(message, type);
+        } else if (typeof bootstrap !== 'undefined' && document.getElementById('toast-container')) {
+            // Create a toast dynamically if container exists
+             const toastContainer = document.getElementById('toast-container');
+             const toastHtml = `
+                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                  <div class="d-flex">
+                    <div class="toast-body">
+                      ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                  </div>
+                </div>
+             `;
+             const tempDiv = document.createElement('div');
+             tempDiv.innerHTML = toastHtml;
+             const toastEl = tempDiv.firstElementChild;
+             toastContainer.appendChild(toastEl);
+             const toast = new bootstrap.Toast(toastEl);
+             toast.show();
+             toastEl.addEventListener('hidden.bs.toast', () => {
+                 toastEl.remove();
+             });
+        } else {
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
     }
 
     // --- Data Fetching and Processing ---
     async fetchData(apiUrl) {
-        if (this.sensorChartConfig.debug) console.log('SensorChart: fetchData called with URL:', apiUrl);
+        if (this.debug) console.log('SensorChart: fetchData called with URL:', apiUrl);
         this.showLoadingState(true);
 
         if (!apiUrl) {
             console.error('API URL is missing.');
             this.renderChart([], this.currentGraphType);
+            this.showLoadingState(false);
             return;
         }
         try {
@@ -65,7 +106,7 @@ class SensorChart {
 
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             url.searchParams.set('timezone', userTimezone);
-            if (this.sensorChartConfig.debug) console.log('Fetching data from URL:', url.toString());
+            if (this.debug) console.log('Fetching data from URL:', url.toString());
 
             const response = await window.utils.fetchWithCSRF(url.toString());
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -78,14 +119,16 @@ class SensorChart {
 
             const data = responseData.payload;
 
-            // --- Log unexpected keys if in debug mode ---
-            if (this.sensorChartConfig.debug) {
-                const expectedKeys = ['sensor', 'query_range', 'query_time_ms', 'data_points'];
-                const receivedKeys = Object.keys(data);
-                const unexpectedKeys = receivedKeys.filter(key => !expectedKeys.includes(key));
-                if (unexpectedKeys.length > 0) {
-                    console.warn('Unexpected keys in API response payload:', unexpectedKeys);
+            // --- Log Data ---
+            if (this.debug) {
+                console.log("Sensor Chart Data Payload:");
+                if (data.data_points && data.data_points.length > 0) {
+                     // Show first and last few points
+                     console.table(data.data_points.slice(0, 5).concat(data.data_points.slice(-5)));
+                } else {
+                    console.log("No data points returned.");
                 }
+                console.log(`Query Time: ${data.query_time_ms}ms`);
             }
 
             // --- Populate Footer Stats ---
@@ -130,16 +173,52 @@ class SensorChart {
             } else {
                 this.renderChart(this.originalData, this.currentGraphType);
             }
+
+            // Notify user if data is empty but successful
+            const warningEl = document.getElementById(`graph-warning-${this.graphCard.dataset.sensorId}`);
+            if (warningEl) warningEl.classList.add('d-none');
+
+            if (this.originalData.length === 0) {
+                this.showToast('No data found for the selected time range.', 'warning');
+            } else {
+                 // Check if data is outside min/max range
+                 // Use the dataset values which are strings, convert to float if they exist
+                 const effectiveMin = this.originalMinValue;
+                 const effectiveMax = this.originalMaxValue;
+
+                if (effectiveMin !== null || effectiveMax !== null) {
+                    let outOfRangeCount = 0;
+                    this.originalData.forEach(p => {
+                         const val = p[1];
+                         if (val !== null) {
+                             if ((effectiveMin !== null && val < effectiveMin) || (effectiveMax !== null && val > effectiveMax)) {
+                                 outOfRangeCount++;
+                             }
+                         }
+                    });
+
+                    if (outOfRangeCount > 0 && warningEl) {
+                         warningEl.textContent = `Warning: ${outOfRangeCount} of ${this.originalData.length} data points are outside the defined range (${effectiveMin !== null ? effectiveMin : '-∞'} to ${effectiveMax !== null ? effectiveMax : '+∞'}).`;
+                         warningEl.classList.remove('d-none');
+                    }
+                }
+            }
+
         } catch (error) {
             console.error('Error fetching or rendering chart:', error);
             const sensorId = this.graphCard.dataset.sensorId;
             const placeholder = document.getElementById(`graph-placeholder-${sensorId}`);
             const content = document.getElementById(`graph-content-${sensorId}`);
+
+            this.showToast('Failed to load graph data. See console for details.', 'danger');
+
             if (placeholder) {
                 placeholder.classList.remove('d-none');
                 placeholder.innerHTML = `<i class="bi bi-exclamation-triangle-fill fs-1 text-danger"></i><p class="mt-2 text-danger">Failed to load graph data.</p>`;
             }
             if (content) content.classList.add('d-none');
+        } finally {
+            this.showLoadingState(false);
         }
     }
 
@@ -161,7 +240,7 @@ class SensorChart {
 
     // --- Chart Rendering ---
     renderChart(data, type) {
-        if (this.sensorChartConfig.debug) console.log(`SensorChart: renderChart called with ${data.length} data points and type: ${type}`);
+        if (this.debug) console.log(`SensorChart: renderChart called with ${data.length} data points and type: ${type}`);
         const sensorId = this.graphCard.dataset.sensorId;
         const placeholder = document.getElementById(`graph-placeholder-${sensorId}`);
         const content = document.getElementById(`graph-content-${sensorId}`);
@@ -182,23 +261,101 @@ class SensorChart {
         }
 
         const displayUnit = this.graphCard.dataset.sensorUnit || '';
-        const minValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
-        const maxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
+        // const minValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
+        // const maxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
         const decimalPlaces = this.graphCard.dataset.decimalPlaces !== '' ? parseInt(this.graphCard.dataset.decimalPlaces) : 2;
         const sensorName = this.graphCard.dataset.sensorName || 'Sensor';
         const deviceName = this.graphCard.dataset.deviceName || 'Device';
 
-        if (this.chart) this.chart.destroy();
+        // Calculate effective min/max based on unit conversion
+        let effectiveMin = this.originalMinValue;
+        let effectiveMax = this.originalMaxValue;
+
+        if (effectiveMin !== null || effectiveMax !== null) {
+            // Check if conversion is needed
+            if (displayUnit.includes('F') && this.originalUnit.includes('C')) {
+                if (effectiveMin !== null) effectiveMin = this.celsiusToFahrenheit(effectiveMin);
+                if (effectiveMax !== null) effectiveMax = this.celsiusToFahrenheit(effectiveMax);
+            } else if (displayUnit.includes('C') && this.originalUnit.includes('F')) {
+                if (effectiveMin !== null) effectiveMin = this.fahrenheitToCelsius(effectiveMin);
+                if (effectiveMax !== null) effectiveMax = this.fahrenheitToCelsius(effectiveMax);
+            }
+        }
+
+        if (this.chart) {
+            this.chart.destroy();
+            this.chart = null;
+        } else {
+            // Safety check: verify if a chart instance is already attached to this canvas context
+            // This handles cases where this.chart ref was lost but Chart.js still tracks it
+            const existingChart = Chart.getChart(chartCanvas);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+        }
 
         const chartData = data.map(item => ({ x: item[0], y: item[1] }));
-        const chartType = type === 'SCATTER' ? 'scatter' : (type === 'BAR' ? 'bar' : 'line');
+        const typeUpper = type ? type.toUpperCase() : 'LINE';
+
+        // Map sensor graph type to Chart.js type and options
+        let chartType = 'line'; // default
+        let stepped = false;
+        let showLine = true;
+        let fill = false;
+        let pointRadius = 2;
+
+        if (typeUpper === 'SCATTER') {
+            chartType = 'scatter';
+            showLine = false;
+        } else if (typeUpper === 'BAR') {
+            chartType = 'bar';
+        } else if (typeUpper === 'STEP') {
+            chartType = 'line';
+            stepped = true;
+            fill = true;
+        } else if (typeUpper === 'ALARM_BAR') {
+             chartType = 'bar';
+             // For ALARM_BAR, we might want to transform data to 0/1 or similar if not already done backend-side.
+             // But assuming backend returns values, we just plot them.
+             // If "Alarm Events" implies binary, ensure data reflects that.
+        } else if (typeUpper === 'OVERLAY') {
+             // Overlay usually implies mixed types (line + points/bars).
+             // Chart.js handles mixed types via dataset controllers.
+             // For a simple single-dataset chart, 'line' with points is standard.
+             // If we need dual datasets (value vs alarm), we'd need structured data from backend
+             // distinguishing the two. Assuming single series for now.
+             chartType = 'line';
+             pointRadius = 6;
+             showLine = true; // or false depending on specific "Overlay" look
+        }
 
         const yAxisOptions = { title: { display: true, text: `Value (${displayUnit})` } };
-        if (minValue !== null) yAxisOptions.min = minValue;
-        if (maxValue !== null) yAxisOptions.max = maxValue;
+        // Use strict min/max to adhere to the sensor's defined range
+        if (effectiveMin !== null) yAxisOptions.min = effectiveMin;
+        if (effectiveMax !== null) yAxisOptions.max = effectiveMax;
+
         if (this.sensorType && this.sensorType.toLowerCase().includes('humidity')) {
             yAxisOptions.min = 0;
             yAxisOptions.max = 100;
+        }
+
+        // Special scales for Alarm types if needed
+        if (typeUpper === 'STEP' || typeUpper === 'ALARM_BAR') {
+             // e.g. beginAtZero: true
+             // yAxisOptions.beginAtZero = true;
+        }
+
+        if (this.debug) {
+            console.log('SensorChart: Render Configuration', {
+                sensorType: this.sensorType,
+                effectiveMin,
+                effectiveMax,
+                yAxisOptions: JSON.parse(JSON.stringify(yAxisOptions)), // Clone to avoid reference issues in log
+                dataRange: {
+                    min: chartData.length > 0 ? Math.min(...chartData.map(d => d.y)) : 'N/A',
+                    max: chartData.length > 0 ? Math.max(...chartData.map(d => d.y)) : 'N/A'
+                }
+            });
         }
 
         const start = new Date(this.graphCard.dataset.startDate);
@@ -223,23 +380,38 @@ class SensorChart {
             }
         };
 
+        const datasetConfig = {
+            label: `${sensorName} (${deviceName})`,
+            data: chartData,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: fill,
+            tension: 0.1,
+            pointRadius: pointRadius,
+            pointHoverRadius: 5,
+            stepped: stepped,
+            showLine: showLine
+        };
+
+        // Adjust colors or styles for specific types
+        if (typeUpper === 'ALARM_BAR') {
+            datasetConfig.backgroundColor = 'rgba(255, 99, 132, 0.5)';
+            datasetConfig.borderColor = 'rgba(255, 99, 132, 1)';
+        }
+
         this.chart = new Chart(chartCanvas.getContext('2d'), {
             type: chartType,
             data: {
-                datasets: [{
-                    label: `${sensorName} (${deviceName})`,
-                    data: chartData,
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    fill: chartType === 'line',
-                    tension: 0.1,
-                    pointRadius: 2,
-                    pointHoverRadius: 5
-                }]
+                datasets: [datasetConfig]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                },
                 scales: {
                     x: {
                         min: start.getTime(),
@@ -263,18 +435,21 @@ class SensorChart {
                             maxRotation: 0,
                             callback: function(value, index, ticks) {
                                 const date = new Date(value);
-                                const stepHours = this.chart.options.scales.x.time.stepSize;
+                                const unit = timeStep.unit;
+                                const stepSize = timeStep.stepSize;
 
                                 // Only draw labels that fall on our exact step interval
-                                if (date.getHours() % stepHours !== 0) {
-                                    return '';
+                                if (unit === 'hour') {
+                                    if (date.getHours() % stepSize !== 0) return '';
+                                } else if (unit === 'minute') {
+                                    if (date.getMinutes() % stepSize !== 0) return '';
                                 }
 
                                 if (date.getHours() === 0 && date.getMinutes() === 0) {
                                     return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
                                 }
                                 // For multi-day views, only show the hour.
-                                const durationHours = (this.max - this.min) / (1000 * 60 * 60);
+                                const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
                                 if (durationHours > 48) {
                                     return new Intl.DateTimeFormat(undefined, { hour: '2-digit', hour12: false }).format(date);
                                 }
@@ -287,13 +462,13 @@ class SensorChart {
                         },
                         grid: {
                             color: function(context) {
-                                if (context.tick.major) {
+                                if (context && context.tick && context.tick.major) {
                                     return 'rgba(218, 165, 32, 0.7)'; // Dark gold for major ticks (midnight)
                                 }
                                 return 'rgba(0, 0, 0, 0.1)';
                             },
                             lineWidth: function(context) {
-                                if (context.tick.major) {
+                                if (context && context.tick && context.tick.major) {
                                     return 2; // Bolder line for major ticks
                                 }
                                 return 1;
@@ -343,6 +518,11 @@ class SensorChart {
         const dataPointsCard = document.getElementById(`graph-datapoints-${sensorId}`);
         const dataTableElement = document.querySelector(`#graph-datapoints-${sensorId} table`);
 
+        // Stats elements
+        const statsCountEl = document.getElementById(`dp-stats-count-${sensorId}`);
+        const statsMinEl = document.getElementById(`dp-stats-min-${sensorId}`);
+        const statsMaxEl = document.getElementById(`dp-stats-max-${sensorId}`);
+
         if (this.dataTable) {
             this.dataTable.destroy();
             this.dataTable = null;
@@ -355,6 +535,25 @@ class SensorChart {
 
             if (chartData.length > 0) {
                 dataPointsCard.classList.remove('d-none');
+
+                // Calculate Stats
+                // We need to convert strings to floats for calculation
+                const values = chartData.map(d => {
+                    if (typeof d.y === 'string') return parseFloat(d.y);
+                    return d.y;
+                }).filter(y => y !== null && typeof y !== 'undefined' && !isNaN(y));
+
+                const count = values.length;
+                const min = values.length > 0 ? Math.min(...values) : null;
+                const max = values.length > 0 ? Math.max(...values) : null;
+
+                if (statsCountEl) statsCountEl.textContent = count;
+                if (statsMinEl) statsMinEl.textContent = min !== null ? `${min.toFixed(decimalPlaces)} ${displayUnit}` : '-';
+                if (statsMaxEl) statsMaxEl.textContent = max !== null ? `${max.toFixed(decimalPlaces)} ${displayUnit}` : '-';
+
+                if (this.debug) {
+                    console.log('Data Points Stats:', { count, min, max, displayUnit });
+                }
 
                 let rows = [];
                 const isBoolean = (this.originalUnit === '' && this.sensorType && this.sensorType.toLowerCase() === 'boolean');
@@ -382,14 +581,15 @@ class SensorChart {
                         },
                         searchable: false,
                         perPageSelect: false,
-                        paging: false,
+                        paging: true,
+                        perPage: 10,
                         labels: {
                             noRows: "No data points found",
                             info: "Showing {start} to {end} of {rows} entries",
                         }
                     });
                 } else {
-                     if (this.sensorChartConfig.debug) console.warn('Simple-DataTables library not found or table element missing', { element: dataTableElement, library: window.simpleDatatables });
+                     if (this.debug) console.warn('Simple-DataTables library not found or table element missing', { element: dataTableElement, library: window.simpleDatatables });
                 }
             } else {
                 dataPointsCard.classList.add('d-none');
@@ -399,12 +599,12 @@ class SensorChart {
 
     // --- Event Listeners and Initialization ---
     initialize() {
-        if (this.sensorChartConfig.debug) console.log("SensorChart: Initializing for graph card:", this.graphCard.id);
+        if (this.debug) console.log("SensorChart: Initializing for graph card:", this.graphCard.id);
         if (!this.graphCard) {
             console.error("SensorChart: Initialization failed, graph card not found.");
             return;
         }
-        if (this.sensorChartConfig.debug) console.log("SensorChart: Initializing flatpickr and event listeners.");
+        if (this.debug) console.log("SensorChart: Initializing flatpickr and event listeners.");
         this.fp_start = flatpickr("#start-date-picker", {
             altInput: true,
             altFormat: "M j, Y",
@@ -432,23 +632,23 @@ class SensorChart {
         start.setDate(start.getDate() - 3);
         this.fp_start.setDate(start, false);
         this.fp_end.setDate(end, false);
-        if (this.sensorChartConfig.debug) console.log("SensorChart: Initial date range set:", start, "to", end);
+        if (this.debug) console.log("SensorChart: Initial date range set:", start, "to", end);
 
         this.setupEventListeners();
     }
 
     setupEventListeners() {
-        if (this.sensorChartConfig.debug) console.log("SensorChart: Setting up event listeners.");
+        if (this.debug) console.log("SensorChart: Setting up event listeners.");
         const applyBtn = document.getElementById('apply-date-range');
         if(applyBtn) {
-            if (this.sensorChartConfig.debug) console.log("SensorChart: Attaching listener to Apply button.");
+            if (this.debug) console.log("SensorChart: Attaching listener to Apply button.");
             applyBtn.addEventListener('click', () => {
-                if (this.sensorChartConfig.debug) console.log("SensorChart: Apply button clicked.");
+                if (this.debug) console.log("SensorChart: Apply button clicked.");
                 document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
 
                 const startDt = this.fp_start.selectedDates[0];
                 const endDt_raw = this.fp_end.selectedDates[0];
-                if (this.sensorChartConfig.debug) console.log("SensorChart: Apply dates:", startDt, endDt_raw);
+                if (this.debug) console.log("SensorChart: Apply dates:", startDt, endDt_raw);
 
                 if (!startDt || !endDt_raw) {
                     alert("Please select both a start and end date.");
@@ -479,7 +679,7 @@ class SensorChart {
         }
 
         this.graphCard.addEventListener('graphTypeChange', (e) => {
-            if (this.sensorChartConfig.debug) console.log('sensor-chart.js: Received graphTypeChange event with detail:', e.detail);
+            if (this.debug) console.log('sensor-chart.js: Received graphTypeChange event with detail:', e.detail);
             this.currentGraphType = e.detail.newType;
             const tempUnitSelect = document.getElementById('temp-unit-select');
             if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
@@ -488,12 +688,12 @@ class SensorChart {
                 this.renderChart(this.originalData, this.currentGraphType);
             }
         });
-        if (this.sensorChartConfig.debug) console.log('sensor-chart.js: Event listener for graphTypeChange added to graphCard.');
+        if (this.debug) console.log('sensor-chart.js: Event listener for graphTypeChange added to graphCard.');
 
-        if (this.sensorChartConfig.debug) console.log("SensorChart: Attaching listeners to date range preset buttons.");
+        if (this.debug) console.log("SensorChart: Attaching listeners to date range preset buttons.");
         document.querySelectorAll('.date-range-preset').forEach(button => {
             button.addEventListener('click', () => {
-                if (this.sensorChartConfig.debug) console.log("SensorChart: Date range preset button clicked:", button.dataset.range);
+                if (this.debug) console.log("SensorChart: Date range preset button clicked:", button.dataset.range);
                 document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
 
@@ -524,10 +724,10 @@ class SensorChart {
 
         const tempUnitSelect = document.getElementById('temp-unit-select');
         if (tempUnitSelect) {
-            if (this.sensorChartConfig.debug) console.log("SensorChart: Attaching listener to temperature unit selector.");
+            if (this.debug) console.log("SensorChart: Attaching listener to temperature unit selector.");
             tempUnitSelect.addEventListener('change', () => {
                 const selectedUnit = tempUnitSelect.value;
-                if (this.sensorChartConfig.debug) console.log("SensorChart: Temperature unit changed to:", selectedUnit);
+                if (this.debug) console.log("SensorChart: Temperature unit changed to:", selectedUnit);
 
                 let dataToRender = [];
 

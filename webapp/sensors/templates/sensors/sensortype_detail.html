@@ -16,11 +16,10 @@
             <div class="row">
                 <div class="col-md-6">
                     <p><strong>Default Unit:</strong> {{ object.default_unit|default:"N/A" }}</p>
-                    <p><strong>Default Data Type:</strong> {{ object.get_default_data_type_display }}</p>
-                    <p><strong>Min Value:</strong> {{ object.min_value|default:"N/A" }}</p>
+                    <p><strong>Min Value:</strong> {{ object.min_value|default_if_none:"N/A" }}</p>
                 </div>
                 <div class="col-md-6">
-                    <p><strong>Max Value:</strong> {{ object.max_value|default:"N/A" }}</p>
+                    <p><strong>Max Value:</strong> {{ object.max_value|default_if_none:"N/A" }}</p>
                     <p><strong>Decimal Places:</strong> {{ object.decimal_places|default:"N/A" }}</p>
                     <p><strong>Allow Override:</strong>
                         {% if object.allow_override %}
@@ -33,6 +32,6 @@
             </div>
         </div>
     </div>
-    <a href="{% url 'sensors:sensortype_list' %}" class="btn btn-secondary mt-3">Back to List</a>
+    <a href="{% url 'sensors:sensortype_list' %}" class="btn btn-secondary mt-3"><i class="bi bi-list"> </i>Back to List</a>
 </div>
 {% endblock %}

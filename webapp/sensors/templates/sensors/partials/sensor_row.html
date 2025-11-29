@@ -2,10 +2,11 @@
 {% load humanize %}
 
 <div id="sensor-row-{{ sensor.pk }}"
-     class="list-group-item list-group-item-action d-flex align-items-center py-2 px-3 {% if not sensor.is_active or not sensor.device.is_active %}opacity-50{% endif %} {% if model_name == 'sensor' and sensor.pk == object.pk %}bg-primary-subtle{% endif %}"
+     class="list-group-item list-group-item-action d-flex align-items-center py-2 px-3 {% if not sensor.is_active or not sensor.device.is_active %}opacity-50 sensor-inactive{% endif %} {% if model_name == 'sensor' and sensor.pk == object.pk %}bg-primary-subtle{% endif %}"
      data-sensor-id="{{ sensor.pk }}"
      data-sensor-name="{{ sensor.name }}"
-     data-sensor-active="{{ sensor.is_active|lower }}">
+     data-sensor-active="{{ sensor.is_active|lower }}"
+     {% if not sensor.is_active and hide_inactive %}style="display: none !important;"{% endif %}>
 
     <!-- Name column -->
     <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none text-body flex-grow-1 d-flex align-items-center" style="min-width: 0;">
@@ -22,7 +23,11 @@
             {% if sensor.live_value is not None %}
                 <div class="d-flex flex-column">
                     <span class="badge bg-success-subtle text-success-emphasis rounded-1">
-                        {{ sensor.live_value|floatformat:sensor.effective_decimal_places }}{{ sensor.effective_unit.symbol }}
+                        {% if sensor.effective_unit.name|lower == 'boolean' or sensor.unit.name|lower == 'boolean' %}
+                            {% if sensor.live_value > 0 %}True{% else %}False{% endif %}
+                        {% else %}
+                            {{ sensor.live_value|floatformat:sensor.effective_decimal_places }}{{ sensor.effective_unit.symbol }}
+                        {% endif %}
                     </span>
                     {% if sensor.current_reading_timestamp %}
                         <small class="text-muted" style="font-size: 0.75em;">{{ sensor.current_reading_timestamp|naturaltime }}</small>

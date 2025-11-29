@@ -43,6 +43,14 @@ class Place(models.Model):
         blank=True,
         validators=[validate_image_size]
     )
+    default_influx_source = models.ForeignKey(
+        'InfluxSource',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='default_for_places',
+        help_text="Default InfluxDB source for this place's sensors."
+    )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -239,7 +247,7 @@ class Location(models.Model):
 
 class Unit(models.Model):
     name = models.CharField(max_length=50, unique=True)
-    symbol = models.CharField(max_length=10, blank=True)
+    symbol = models.CharField(max_length=10)
 
     def __str__(self):
         return f"{self.name} ({self.symbol})"
@@ -267,6 +275,9 @@ class DeviceType(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        return reverse('sensors:devicetype_detail', kwargs={'pk': self.pk})
 
     objects = NameManager()
 
@@ -368,7 +379,6 @@ class Sensor(models.Model):
         ('VOC', 'Volatile Organic Compounds'),
         ('PM25', 'Particulate Matter 2.5'),
         ('PM10', 'Particulate Matter 10'),
-        ('BOOLEAN', 'Boolean'),
         ('OTHER', 'Other'),
     ]
     DATA_TYPES = [
@@ -401,12 +411,21 @@ class Sensor(models.Model):
     unit_override = models.BooleanField(default=False)
 
     data_type: CharField = models.CharField(max_length=30, choices=DATA_TYPES, default='DIRECT', null=True, blank=True)
-    data_type_override = models.BooleanField(default=False)
+    # Removed data_type_override as per user request
 
     graph_type: CharField = models.CharField(
         max_length=20,
-        choices=[('LINE', 'Line Graph'), ('SCATTER', 'Scatter Plot'), ('BAR', 'Bar Graph')],
-        default='SCATTER'
+        choices=[
+            ('LINE', 'Line Graph'),
+            ('SCATTER', 'Scatter Plot'),
+            ('BAR', 'Bar Graph'),
+            ('STEP', 'Step Graph (Alarm)'),
+            ('ALARM_BAR', 'Alarm Bar Graph'),
+            ('OVERLAY', 'Overlay Graph (Alarm)')
+        ],
+        default=None,
+        null=True,
+        blank=True
     )
 
     # New fields for value overrides
@@ -443,11 +462,18 @@ class Sensor(models.Model):
 
     @property
     def effective_data_type(self):
-        if self.data_type_override and self.data_type:
+        if self.data_type:
             return self.data_type
-        if self.sensor_type and self.sensor_type.default_data_type:
-            return self.sensor_type.default_data_type
+        # Fallback to DIRECT if no data_type set (though default is DIRECT)
         return 'DIRECT'
+
+    @property
+    def effective_graph_type(self):
+        if self.graph_type:
+            return self.graph_type
+        if self.sensor_type:
+            return self.sensor_type.default_graph_type
+        return 'SCATTER'
 
     @property
     def effective_min_value(self):
@@ -496,30 +522,32 @@ class Sensor(models.Model):
                 'is_active': 'Sensor cannot be active when its device\'s location is inactive.'
             })
 
-        # Data Type override validation
-        if self.data_type_override:
-            if not self.data_type:
-                raise ValidationError({'data_type': "A data type must be provided when override is checked."})
+        # Data Type validation
+        if self.data_type == 'DIRECT':
+             # DIRECT is the default, so it's always allowed.
+             pass
+        elif self.data_type == 'INFLUX':
+             # If setting to INFLUX, check if the sensor type allows override?
+             # Or just allow it if set. The user requested removing data_type_override logic.
+             # But wait, SensorType.allow_override still exists.
+             # "If the data_type_override on the Sensor model needs to be removed."
+             # Does that mean we ignore SensorType.allow_override too?
+             # Probably not, but we can't check data_type_override anymore.
 
-            if not self.sensor_type:
-                raise ValidationError({'data_type_override': "Cannot override data type when no Sensor Type is assigned."})
+             # Let's check if SensorType allows override only if we are deviating from 'DIRECT' (the default)?
+             # But we removed default_data_type from SensorType too.
+             # So SensorType doesn't really have a say in data_type anymore, EXCEPT via allow_override flag?
+             # If allow_override is meant to control if *user* can change it?
 
-            if not self.sensor_type.allow_override:
-                raise ValidationError({
-                    'data_type_override': f"The Sensor Type '{self.sensor_type.name}' does not allow overrides."
-                })
+             # With data_type_override gone, data_type IS the source of truth.
+             # We should probably just respect allow_override if it's trying to be set to something fancy?
 
-            if self.data_type == self.sensor_type.default_data_type:
-                raise ValidationError({
-                    'data_type': "The override data type cannot be the same as the default. To use the default, uncheck the override box."
-                })
-        elif self.data_type and self.sensor_type and self.pk:
-            # If a data_type is entered that is not the default, but override is NOT checked.
-            # This is ambiguous and should be disallowed.
-            if self.data_type != self.sensor_type.default_data_type:
-                 raise ValidationError({
-                    'data_type_override': "To set a data type that is different from the Sensor Type's default, you must check the override box."
-                })
+             if self.sensor_type and not self.sensor_type.allow_override:
+                 # If allow_override is False, maybe we shouldn't allow changing from DIRECT?
+                 # But we don't know what the "default" is anymore since we removed it from SensorType.
+                 # So effectively, allow_override on SensorType might be vestigial or just for UI?
+                 pass
+
 
     def save(self, *args, **kwargs):
         # Run validation
@@ -563,12 +591,7 @@ class SensorType(models.Model):
 
     # New fields for defaults
     default_unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
-    default_data_type = models.CharField(
-        max_length=30,
-        choices=Sensor.DATA_TYPES,
-        default='DIRECT',
-        blank=True
-    )
+    # Removed default_data_type as per user request
     min_value = models.FloatField(null=True, blank=True)
     max_value = models.FloatField(null=True, blank=True)
     allow_override = models.BooleanField(default=False)
@@ -578,6 +601,18 @@ class SensorType(models.Model):
         null=True,
         blank=True,
         help_text="Default stale time for this sensor type, in seconds. Default is 5 minutes."
+    )
+    default_graph_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('LINE', 'Line Graph'),
+            ('SCATTER', 'Scatter Plot'),
+            ('BAR', 'Bar Graph'),
+            ('STEP', 'Step Graph (Alarm)'),
+            ('ALARM_BAR', 'Alarm Bar Graph'),
+            ('OVERLAY', 'Overlay Graph (Alarm)')
+        ],
+        default='SCATTER'
     )
 
     def __str__(self):

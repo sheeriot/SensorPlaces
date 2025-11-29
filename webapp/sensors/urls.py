@@ -8,6 +8,7 @@ from .views import (
     webhook_views,
     toggle_active,
     sensor_type_views,
+    device_type_views,
     timezone_views,
     toast_views,
 )
@@ -37,6 +38,12 @@ urlpatterns = [
     path('sensortype/create/', sensor_type_views.SensorTypeCreateView.as_view(), name='sensortype_create'),
     path('sensortype/<int:pk>/', sensor_type_views.SensorTypeDetailView.as_view(), name='sensortype_detail'),
     path('sensortype/<int:pk>/update/', sensor_type_views.SensorTypeUpdateView.as_view(), name='sensortype_update'),
+
+    # DeviceType URLs
+    path('devicetypes/', device_type_views.DeviceTypeListView.as_view(), name='devicetype_list'),
+    path('devicetype/create/', device_type_views.DeviceTypeCreateView.as_view(), name='devicetype_create'),
+    path('devicetype/<int:pk>/', device_type_views.DeviceTypeDetailView.as_view(), name='devicetype_detail'),
+    path('devicetype/<int:pk>/update/', device_type_views.DeviceTypeUpdateView.as_view(), name='devicetype_update'),
 
     # Webhook URLs
     path('webhook/switchbot/<slug:place_slug>/', webhook_views.SwitchBotWebhookReceiverView.as_view(), name='switchbot_webhook_receiver'),

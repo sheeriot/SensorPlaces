@@ -10,7 +10,7 @@
         </h5>
         <div class="btn-group">
             {% if model_name == 'sensor' %}
-                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}?next={{ request.build_absolute_uri|urlencode }}"
+                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}"
                    class="btn btn-warning btn-sm">
                     <i class="bi bi-pencil"></i>
                 </a>
@@ -52,11 +52,27 @@
                 <div class="mb-2">
                     <label class="form-label mb-0 small text-muted">Graph Type</label>
                     <div class="input-group input-group-sm graph-type-selector-{{ sensor.pk }}">
-                        <select class="form-select form-select-sm" name="graph_type">
-                            <option value="LINE" {% if sensor.graph_type == 'LINE' %}selected{% endif %}>Line</option>
-                            <option value="SCATTER" {% if sensor.graph_type == 'SCATTER' %}selected{% endif %}>Scatter</option>
-                            <option value="BAR" {% if sensor.graph_type == 'BAR' %}selected{% endif %}>Bar</option>
+                        <select id="sensor-graph-type-select"
+                                class="form-select form-select-sm"
+                                name="graph_type"
+                                data-default-type="{{ sensor.sensor_type.default_graph_type|default:'SCATTER' }}"
+                                data-current-type="{{ sensor.effective_graph_type }}">
+                            <option value="LINE" {% if sensor.effective_graph_type == 'LINE' %}selected{% endif %}>Line</option>
+                            <option value="SCATTER" {% if sensor.effective_graph_type == 'SCATTER' %}selected{% endif %}>Scatter</option>
+                            <option value="BAR" {% if sensor.effective_graph_type == 'BAR' %}selected{% endif %}>Bar</option>
+                            <option value="STEP" {% if sensor.effective_graph_type == 'STEP' %}selected{% endif %}>Step (Alarm)</option>
+                            <option value="ALARM_BAR" {% if sensor.effective_graph_type == 'ALARM_BAR' %}selected{% endif %}>Alarm Bar</option>
+                            <option value="OVERLAY" {% if sensor.effective_graph_type == 'OVERLAY' %}selected{% endif %}>Overlay (Alarm)</option>
                         </select>
+                        <button id="save-graph-type-btn"
+                                class="btn btn-primary d-none"
+                                type="button"
+                                hx-post="{% url 'sensors:update_graph_type' place_slug=place.slug pk=sensor.pk %}"
+                                hx-include="#sensor-graph-type-select"
+                                hx-swap="none"
+                                title="Save Graph Type">
+                            <i class="bi bi-check"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -65,13 +81,27 @@
             <div class="col-md-6">
                 <div class="mb-2">
                     <label class="form-label mb-0 small text-muted">Unit</label>
-                    <div>{{ sensor.effective_unit.symbol|default:"N/A" }}</div>
+                    <div>{% include "sensors/partials/unit_display.html" with unit=sensor.effective_unit %}</div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-2">
                     <label class="form-label mb-0 small text-muted">Data Type</label>
                     <div>{{ sensor.get_effective_data_type_display }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-2">
+                    <label class="form-label mb-0 small text-muted">Effective Min</label>
+                    <div>{{ sensor.effective_min_value|default_if_none:"-" }}</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-2">
+                    <label class="form-label mb-0 small text-muted">Effective Max</label>
+                    <div>{{ sensor.effective_max_value|default_if_none:"-" }}</div>
                 </div>
             </div>
         </div>
@@ -91,7 +121,7 @@
                 </div>
             </div>
         </div>
-        {% if 'INFLUX' in sensor.data_type or sensor.data_type != 'DIRECT' %}
+        {% if sensor.data_type and 'INFLUX' in sensor.data_type %}
         <hr class="my-2">
         <p class="card-text mb-1">
             <strong class="me-2">Influx Source:</strong>

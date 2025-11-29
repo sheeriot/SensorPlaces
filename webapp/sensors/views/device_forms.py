@@ -125,6 +125,10 @@ class DeviceForm(forms.ModelForm):
                 choices=choices
             )
 
+
+        # Determine if we should include data-bs-dismiss="modal"
+        cancel_attrs = 'data-bs-dismiss="modal"' if cancel_url == '#' else ''
+
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
             Row(
@@ -173,7 +177,7 @@ class DeviceForm(forms.ModelForm):
             HTML('<hr>'),
             Div(
                 HTML(f"""
-                    <a href="{cancel_url}" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <a href="{cancel_url}" class="btn btn-outline-secondary" {cancel_attrs}>
                         <i class="bi bi-x-lg me-1"></i> Cancel
                     </a>
                 """),

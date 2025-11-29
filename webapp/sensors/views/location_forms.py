@@ -101,6 +101,10 @@ class LocationForm(forms.ModelForm):
             else:
                 self.fields['is_active'].help_text = inactive_help_text
 
+        # Determine if we should include data-bs-dismiss="modal"
+        # Only include it if cancel_url is '#' (indicating a modal)
+        cancel_attrs = 'data-bs-dismiss="modal"' if cancel_url == '#' else ''
+
         # Form layout with crispy forms
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
@@ -122,7 +126,7 @@ class LocationForm(forms.ModelForm):
                 Div(
                     HTML(f"""
                         <a href="{cancel_url}"
-                           class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                           class="btn btn-outline-secondary" {cancel_attrs}>
                             <i class="bi bi-x-lg me-1"></i>Cancel
                         </a>
                     """),

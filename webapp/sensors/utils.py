@@ -1,3 +1,25 @@
+import logging
+import os
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+# --- Webhook Activity Recording ---
+LOGS_DIR = os.path.join(settings.BASE_DIR, 'logs')
+os.makedirs(LOGS_DIR, exist_ok=True)
+WEBHOOK_RECORD_FILE = os.path.join(LOGS_DIR, 'WEBHOOK_ACTIVITY.log')
+
+def record_webhook_activity(message: str):
+    """Appends a message to the webhook activity log file if WEBHOOK_SNIFFER is True."""
+    if settings.WEBHOOK_SNIFFER:
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+        try:
+            with open(WEBHOOK_RECORD_FILE, 'a') as f:
+                f.write(f"{now_str} | {message}\n")
+        except Exception as e:
+            logger.error(f"Failed to write to webhook record file: {e}")
+# --- End of Webhook Activity Recording ---
+
 import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
@@ -101,7 +123,11 @@ def get_latest_influx_reading(sensor):
         # Check for pandas NaT (Not a Time) and NaN (Not a Number)
         if pd.notna(latest['time']) and pd.notna(latest['value']):
             # Convert to Python native types before returning
-            py_time = latest['time'].to_pydatetime()
+            # Fix UserWarning about nanoseconds by flooring to microseconds
+            ts = latest['time']
+            if hasattr(ts, 'floor'):
+                 ts = ts.floor('us')
+            py_time = ts.to_pydatetime()
 
             # Ensure the datetime is timezone-aware (assume UTC).
             if py_time.tzinfo is None:

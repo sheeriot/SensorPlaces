@@ -42,6 +42,7 @@ class DeviceAdmin(admin.ModelAdmin):
     list_display = ('name', 'place_name', 'location', 'device_type', 'is_active', 'model', 'manufacturer', 'device_id', 'is_switchbot')
     list_filter = ('is_active', 'is_switchbot', 'location__place', 'location', 'device_type', 'manufacturer')
     search_fields = ('name', 'device_id', 'location__place__name', 'location__name')
+    readonly_fields = ('location',)
     list_editable = ('is_active', 'is_switchbot',)
     autocomplete_fields = ('location', 'device_type')
     ordering = ('name',)
@@ -67,16 +68,16 @@ class DeviceTypeAdmin(admin.ModelAdmin):
 
 @admin.register(SensorType)
 class SensorTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'default_unit', 'default_data_type', 'allow_override', 'min_value', 'max_value', 'decimal_places')
+    list_display = ('name', 'default_unit', 'allow_override', 'min_value', 'max_value', 'decimal_places')
     search_fields = ('name', 'description')
-    list_filter = ('allow_override', 'default_data_type')
+    list_filter = ('allow_override',)
     ordering = ('name',)
     fieldsets = (
         (None, {
             'fields': ('name', 'description')
         }),
         ('Defaults and Overrides', {
-            'fields': ('default_unit', 'default_data_type', 'allow_override')
+            'fields': ('default_unit', 'allow_override')
         }),
         ('Value Configuration', {
             'fields': ('min_value', 'max_value', 'decimal_places')
@@ -94,7 +95,7 @@ class SensorAdmin(admin.ModelAdmin):
     list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'effective_data_type_display', 'is_active')
     list_filter = ('sensor_type', 'is_active', 'device__location')
     search_fields = ('name', 'device__name')
-    readonly_fields = ('created_at', 'updated_at', 'cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_override_seconds')
+    readonly_fields = ('device', 'created_at', 'updated_at', 'cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_override_seconds')
     autocomplete_fields = ['device', 'sensor_type', 'influx_source']
 
     fieldsets = (
@@ -105,7 +106,7 @@ class SensorAdmin(admin.ModelAdmin):
             'fields': ('cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_override_seconds')
         }),
         ('Display & Data Type Settings', {
-            'fields': ('graph_type', ('unit', 'unit_override'), ('data_type', 'data_type_override'))
+            'fields': ('graph_type', ('unit', 'unit_override'), 'data_type')
         }),
         ('InfluxDB Settings', {
             'fields': ('influx_source', 'influx_measurement'),
@@ -121,7 +122,7 @@ class SensorAdmin(admin.ModelAdmin):
         """
         Override to update live sensor values before displaying them.
         """
-        queryset = super().get_queryset()
+        queryset = super().get_queryset(request)
         for sensor in queryset:
             if sensor.data_type and sensor.data_type.startswith('INFLUX'):
                 update_sensor_live_value(sensor)
