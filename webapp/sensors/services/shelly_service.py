@@ -97,7 +97,7 @@ class ShellyService:
     def _process_readings(self, device: Device, params: dict):
         key_map = {
             'apower': 'power', 'voltage': 'voltage', 'current': 'current',
-            'temperature': 'temperature', 'temp': 'temperature', 'humidity': 'humidity',
+            'temperature': 'temperature', 'temp': 'temperature', 'humidity': 'humidity', 'hum': 'humidity',
             'pm2.5': 'pm25', 'pm25': 'pm25', 'battery': 'battery',
             'flood': 'Water Detector', 'batV': 'Battery Voltage'
         }
