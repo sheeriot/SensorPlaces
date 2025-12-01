@@ -96,9 +96,12 @@ class ShellyService:
 
     def _process_readings(self, device: Device, params: dict):
         key_map = {
-            'apower': 'power', 'voltage': 'voltage', 'current': 'current',
-            'temperature': 'temperature', 'temp': 'temperature', 'humidity': 'humidity', 'hum': 'humidity',
-            'pm2.5': 'pm25', 'pm25': 'pm25', 'battery': 'battery',
+            'power': 'Power',
+            'apower': 'Power',
+            'current': 'Current',
+            'voltage': 'Voltage',
+            'temperature': 'Temperature', 'temp': 'Temperature', 'humidity': 'Humidity', 'hum': 'Humidity',
+            'pm2.5': 'PM2.5', 'pm25': 'PM2.5', 'battery': 'battery',
             'flood': 'Water Detector', 'batV': 'Battery Voltage'
         }
 
@@ -198,8 +201,8 @@ class ShellyService:
                     cached_status = ""
 
                 # Log final state to icecream
-                if sensor_obj:
-                     ic(sensor_obj.__dict__)
+                # if sensor_obj:
+                #      ic(sensor_obj.__dict__)
 
                 if settings.WEBHOOK_SNIFFER:
                     action_msg = f"{storage_system} {storage_status}{cached_status}."

@@ -1,20 +1,44 @@
 <div class="modal-header">
-    <h5 class="modal-title">Move Device</h5>
+    <h5 class="modal-title"><i class="bi bi-box-arrow-in-up-right me-2"></i>Move Device</h5>
     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 </div>
 <div class="modal-body">
     <form id="moveDeviceForm" hx-post="{% url 'sensors:device_move_location' place_slug=place.slug pk=device.pk %}" hx-swap="none">
         {% csrf_token %}
         <div class="mb-3">
-            <p>Select a new location for <strong>{{ device.name }}</strong>:</p>
+            <p><i class="bi bi-geo-alt"></i> Select a new location for <i class="bi bi-hdd"></i> <strong>{{ device.name }}</strong>:</p>
             <select class="form-select" name="location_id" id="locationSelect" required>
                 <option value="" selected disabled>Choose location...</option>
                 {% for loc in locations %}
                     <option value="{{ loc.pk }}" data-active="{{ loc.is_active|lower }}">
-                        {{ loc.name }} {% if not loc.is_active %}(Inactive){% endif %}
+                        {{ loc.name }}
+                        <span class="text-muted">
+                            ({% if loc.is_active %}
+                                {{ loc.active_device_count }} active
+                            {% else %}
+                                inactive, {{ loc.inactive_device_count }} inactive
+                            {% endif %})
+                        </span>
                     </option>
                 {% endfor %}
             </select>
+        </div>
+
+        <div class="mb-3">
+            <p class="mb-1">Sensors to be moved with this device:</p>
+            <ul class="list-group">
+                {% for sensor in device.sensors.all %}
+                <li class="list-group-item py-1 small">
+                    <i class="bi bi-thermometer"></i> {{ sensor.name }}
+                    <span class="text-muted"> ({{ sensor.sensor_type.name }})</span>
+                    {% if not sensor.is_active %}
+                    <span class="badge bg-secondary">inactive</span>
+                    {% endif %}
+                </li>
+                {% empty %}
+                <li class="list-group-item py-1 small text-muted">No sensors associated with this device.</li>
+                {% endfor %}
+            </ul>
         </div>
 
         <div id="activationOptions" class="mb-3 d-none">
@@ -32,14 +56,14 @@
         <div id="inactiveWarning" class="mb-3 d-none">
             <div class="alert alert-warning py-2 small">
                 <i class="bi bi-exclamation-triangle me-2"></i>
-                The destination location is <strong>inactive</strong>. The device will remain inactive.
+                The destination location is <strong>inactive</strong>. The device and its sensors will remain inactive.
             </div>
         </div>
     </form>
 </div>
 <div class="modal-footer">
-    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-    <button type="submit" form="moveDeviceForm" class="btn btn-primary">Move Device</button>
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>Cancel</button>
+    <button type="submit" form="moveDeviceForm" class="btn btn-primary"><i class="bi bi-box-arrow-in-up-right me-2"></i>Move Device</button>
 </div>
 
 <script>
@@ -48,6 +72,21 @@
         const activationOptions = document.getElementById('activationOptions');
         const inactiveWarning = document.getElementById('inactiveWarning');
         const makeActiveCheckbox = document.getElementById('makeActiveCheckbox');
+
+        // Handle modal size
+        const modalDialog = document.querySelector('#mainModal .modal-dialog');
+        if (modalDialog) {
+            modalDialog.classList.remove('modal-lg');
+            // On modal close, add it back for other modals
+            const modal = document.getElementById('mainModal');
+            if (modal) {
+                modal.addEventListener('hidden.bs.modal', () => {
+                    if (!modalDialog.classList.contains('modal-lg')) {
+                        modalDialog.classList.add('modal-lg');
+                    }
+                }, { once: true });
+            }
+        }
 
         if (select) {
             select.addEventListener('change', function() {

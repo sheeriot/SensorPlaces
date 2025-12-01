@@ -1,9 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const deviceMoveConfig = {
-        debug: true
+        debug: false
     };
-
-    if (deviceMoveConfig.debug) console.log('Device Move script loaded.');
 
     const modalContainer = document.getElementById('modal-container');
 
@@ -29,28 +27,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         newInstance.hide();
                     }
 
-                    // Ensure complete cleanup of backdrop and body styles
-                    // This fixes the issue where the background remains dimmed and page is frozen
-                    setTimeout(() => {
-                        // 1. Remove backdrops
-                        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-
-                        // 2. Reset body styles (restore scrolling)
-                        document.body.classList.remove('modal-open');
-                        document.body.style.overflow = '';
-                        document.body.style.paddingRight = '';
-
-                        // 3. Ensure the modal container itself is hidden and interaction is restored
-                        modalContainer.classList.remove('show');
-                        modalContainer.style.display = 'none';
-                        modalContainer.setAttribute('aria-hidden', 'true');
-                        modalContainer.removeAttribute('aria-modal');
-                        modalContainer.removeAttribute('role');
-
-                        // 4. Clear content
-                        const content = modalContainer.querySelector('.modal-content');
-                        if (content) content.innerHTML = '';
-                    }, 300); // Small delay to let Bootstrap animations finish
+                    // The 'hidden.bs.modal' event listener in modal-handlers.js will now handle cleanup.
 
                     // 2. Show Toast
                     if (window.ToastUi) {
@@ -58,27 +35,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
 
                     // 3. Remove the device row from the Unassigned list
-                    // The API response includes device info? Not explicitly the ID in top level,
-                    // but we can assume the form action URL has the ID or we can find it.
-                    // Actually, the View returns 'old_location_id', 'new_location_id', etc.
-                    // But we need the device ID to remove the specific row.
-
-                    // We can find the device ID from the form action URL or context?
-                    // Or we can assume the user hasn't clicked another move button in the meantime.
-
-                    // Better: The row removal logic.
-                    // We need to identify WHICH device row to remove.
-                    // Since we just submitted a form for a specific device...
-                    // The form's action URL is like /api/.../device/<pk>/move/
-
-                    const actionUrl = target.getAttribute('action') || target.getAttribute('hx-post'); // hx-post is on the form
-                    // Extract ID from URL: .../device/123/move/
+                    const actionUrl = target.getAttribute('action') || target.getAttribute('hx-post');
                     const match = actionUrl.match(/\/device\/(\d+)\/move\//);
+
                     if (match && match[1]) {
                         const deviceId = match[1];
-                        const deviceRow = document.querySelector(`.device-row[data-device-id="${deviceId}"]`);
+                        const deviceRow = document.querySelector(`#unassigned-devices-card .device-row[data-device-id="${deviceId}"]`);
 
                         if (deviceRow) {
+                            // Fade out and remove the row from the unassigned list
                             deviceRow.style.transition = 'opacity 0.5s ease';
                             deviceRow.style.opacity = '0';
 
@@ -86,8 +51,20 @@ document.addEventListener('DOMContentLoaded', function () {
                                 const parentContainer = deviceRow.parentElement;
                                 deviceRow.remove();
 
-                                // Check for empty state
-                                if (parentContainer && parentContainer.closest('#unassigned-devices-card')) {
+                                // Update the count badge for unassigned devices
+                                const unassignedCard = document.getElementById('unassigned-devices-card');
+                                if (unassignedCard) {
+                                    const countBadge = unassignedCard.querySelector('.card-header .badge');
+                                    if (countBadge) {
+                                        const currentCount = parseInt(countBadge.textContent, 10);
+                                        if (!isNaN(currentCount)) {
+                                            countBadge.textContent = Math.max(0, currentCount - 1);
+                                        }
+                                    }
+                                }
+
+                                // Check for empty state in unassigned list
+                                if (parentContainer) {
                                     const remainingDevices = parentContainer.querySelectorAll('.device-row');
                                     if (remainingDevices.length === 0) {
                                         const emptyStateHtml = `
@@ -97,11 +74,32 @@ document.addEventListener('DOMContentLoaded', function () {
                                         parentContainer.insertAdjacentHTML('beforeend', emptyStateHtml);
                                     }
                                 }
-                            }, 500);
+                            }, 500); // Wait for fade out
                         }
                     }
 
-                    // 4. Update Counts
+                    // 4. Add the device row to the new location
+                    if (data.device_row_html && data.new_location_id) {
+                        // Find the new location's row in the main device list
+                        const locationRow = document.querySelector(`.location-row[data-location-id="${data.new_location_id}"]`);
+
+                        if (locationRow) {
+                            // Insert the new device row right after the location header
+                            locationRow.insertAdjacentHTML('afterend', data.device_row_html);
+                            const newDeviceRow = locationRow.nextElementSibling;
+
+                            // Animate the new row appearing
+                            if (newDeviceRow && newDeviceRow.classList.contains('device-row')) {
+                                newDeviceRow.style.opacity = '0';
+                                newDeviceRow.style.transition = 'opacity 0.5s ease';
+                                setTimeout(() => {
+                                    newDeviceRow.style.opacity = '1';
+                                }, 100); // Short delay to ensure transition applies
+                            }
+                        }
+                    }
+
+                    // 5. Update Counts
                     if (typeof updateCounts === 'function') {
                         updateCounts(data);
                     } else {

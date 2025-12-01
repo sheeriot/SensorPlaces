@@ -630,9 +630,16 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
     API View to move a device to a new location.
     """
     def get(self, request, place_slug, pk):
-        device = get_object_or_404(Device, pk=pk, location__place__slug=place_slug)
+        device = get_object_or_404(
+            Device.objects.prefetch_related('sensors__sensor_type'),
+            pk=pk,
+            location__place__slug=place_slug
+        )
         place = device.location.place
-        locations = place.locations.exclude(slug='unassigned-devices').order_by('name')
+        locations = place.locations.exclude(pk=device.location.pk).exclude(slug='unassigned-devices').annotate(
+            active_device_count=Count('devices', filter=Q(devices__is_active=True)),
+            inactive_device_count=Count('devices', filter=Q(devices__is_active=False)),
+        ).order_by('name')
 
         context = {
             'device': device,
@@ -642,33 +649,29 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
         return render(request, 'sensors/device_move_modal.html', context)
 
     def post(self, request, place_slug, pk):
-        ic("DeviceMoveLocationView: POST request received.")
         try:
-            ic(f"Moving device_id {pk} in place {place_slug}")
-            device = get_object_or_404(Device, pk=pk, location__place__slug=place_slug)
-            ic(device)
+            device = get_object_or_404(
+                Device.objects.annotate(
+                    sensors_active_count=Count('sensors', filter=Q(sensors__is_active=True)),
+                    sensors_inactive_count=Count('sensors', filter=Q(sensors__is_active=False))
+                ),
+                pk=pk,
+                location__place__slug=place_slug
+            )
 
             # HTMX with hx-vals sends data as form-encoded, in request.POST
-            ic("Request POST data:", request.POST)
             new_location_id = request.POST.get('location_id')
             make_active = request.POST.get('make_active')
 
-            ic(f"New Location ID from POST: {new_location_id}")
-            ic(f"Make active flag: {make_active}")
-
             if not new_location_id:
-                ic("Error: Location ID not found in POST data.")
                 return JsonResponse({'error': 'Location ID is required.'}, status=400)
 
             new_location = get_object_or_404(Location, pk=new_location_id, place__slug=place_slug)
-            ic(new_location)
 
             old_location = device.location
-            ic(old_location)
 
             device.location = new_location
             device.save(update_fields=['location']) # Save location change first
-            ic("Device location updated.")
 
             # If the 'make_active' checkbox was checked, update the active status
             if make_active:
@@ -676,17 +679,19 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
                 device.save(update_fields=['is_active'])
                 # Also activate all sensors associated with this device
                 device.sensors.all().update(is_active=True)
-                ic(f"Set device '{device.name}' and its sensors to active.")
 
             place = get_object_or_404(Place, slug=place_slug)
             place_counts = get_place_counts(place)
-            ic(place_counts)
 
             # Recalculate counts AFTER all changes are saved
             old_location_active_count = old_location.devices.filter(is_active=True).count()
             new_location_active_count = new_location.devices.filter(is_active=True).count()
-            ic(f"Old location active count: {old_location_active_count}")
-            ic(f"New location active count: {new_location_active_count}")
+
+            # Render the device row HTML to be sent to the client
+            device_row_html = render_to_string(
+                'sensors/partials/device_row.html',
+                {'device': device, 'request': request}
+            )
 
             response_data = {
                 'success': True,
@@ -695,13 +700,12 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
                 'new_location_id': new_location.id,
                 'old_location_active_count': old_location_active_count,
                 'new_location_active_count': new_location_active_count,
-                'place_counts': place_counts
+                'place_counts': place_counts,
+                'device_row_html': device_row_html
             }
-            ic(response_data)
 
             return JsonResponse(response_data)
         except Exception as e:
-            ic(f"Error in DeviceMoveLocationView: {e}")
             return JsonResponse({'error': str(e)}, status=500)
 
 class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
@@ -752,6 +756,8 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         self.object = self.get_object()
         if request.headers.get('HX-Request'):
             context = self.get_context_data(object=self.object)
+            # Pass the referrer to the modal context so we can return after delete
+            context['referrer_url'] = request.META.get('HTTP_REFERER')
             return render(request, 'sensors/device_confirm_delete_modal.html', context)
         return super().get(request, *args, **kwargs)
 
@@ -804,8 +810,8 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         # Delete the device
         device.delete()
 
-        # Get the success URL
-        success_url = self.get_success_url()
+        # Get the success URL from the form or fall back to the default
+        success_url = request.POST.get('referrer_url', self.get_success_url())
 
         # Handle HTMX request
         if request.headers.get('HX-Request'):

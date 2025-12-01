@@ -18,7 +18,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
     Can filter by a relative time_range or an absolute start/end time.
     Also updates the sensor's cached reading with the latest data point found.
     """
-    ic(f"Querying data for InfluxDB sensor: {sensor.name} (ID: {sensor.pk}) from {start_date} to {end_date}")
+    # ic(f"Querying data for InfluxDB sensor: {sensor.name} (ID: {sensor.pk}) from {start_date} to {end_date}")
 
     if not sensor.influx_source:
         ic("Sensor has no InfluxDB source configured.")
@@ -33,7 +33,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
          filter_field = "dev_eui"
 
     device_id_val = sensor.device.device_id
-    ic(f"Using filter field '{filter_field}' with value '{device_id_val}' for measurement '{sensor.influx_measurement}'")
+    # ic(f"Using filter field '{filter_field}' with value '{device_id_val}' for measurement '{sensor.influx_measurement}'")
 
     try:
         client = get_influxdb_client(sensor.influx_source)
@@ -61,14 +61,15 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
                 WHERE {time_filter} AND "{filter_field}" = '{device_id_val}'
                 ORDER BY time ASC
             """
-        ic("Generated InfluxDB Query:", query)
+        # ic("Generated InfluxDB Query:", query)
 
         start_time = time.perf_counter()
         reader = client.query(query=query, language="sql")
         df = reader.to_pandas().reset_index()
         end_time = time.perf_counter()
-        query_time = (end_time - start_time) * 1000
-        ic(f"InfluxDB query completed in {query_time:.2f} ms, returned {len(df)} rows.")
+        query_time = int((end_time - start_time) * 1000)
+
+        ic(f"Influx: {len(df)} rows in {query_time} ms")
 
         if df.empty:
             return [], query_time

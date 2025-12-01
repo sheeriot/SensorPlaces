@@ -225,7 +225,7 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         )
         device = get_object_or_404(device_qs, pk=sensor.device.pk)
 
-        ic(f"SensorDetailView context - Sensor: {sensor.name}, Cached Value: {sensor.cached_reading_value}")
+        # ic(f"SensorDetailView context - Sensor: {sensor.name}, Cached Value: {sensor.cached_reading_value}")
 
         context['device'] = device
         context['location'] = device.location
@@ -327,7 +327,7 @@ class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['live_value'] = sensor.cached_reading_value
         context['live_timestamp'] = sensor.cached_reading_timestamp
 
-        ic(f"SensorGraphCardView context - Sensor: {sensor.name}, Live Value: {context.get('live_value')}")
+        # ic(f"SensorGraphCardView context - Sensor: {sensor.name}, Live Value: {context.get('live_value')}")
 
         # We no longer fetch stats on initial load.
 
@@ -1063,14 +1063,14 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
 
         # Use the new helper to parse date range from GET parameters
         start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
-        ic("Date range from params:", start_date, end_date)
+        # ic("Date range from params:", start_date, end_date)
 
         queryset = SensorReading.objects.filter(sensor=sensor)
-        ic("Initial queryset count:", queryset.count())
+        # ic("Initial queryset count:", queryset.count())
 
         if start_date and end_date:
             queryset = queryset.filter(timestamp__gte=start_date, timestamp__lt=end_date)
-            ic("Filtered queryset count:", queryset.count())
+            # ic("Filtered queryset count:", queryset.count())
         else:
             # Default to the last 24 hours if no range is provided, and set dates for response
             end_date = timezone.now()
@@ -1078,7 +1078,7 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
             queryset = queryset.filter(timestamp__gte=start_date)
 
         readings = list(queryset.order_by('timestamp').values('timestamp', 'value'))
-        ic("Final number of readings found:", len(readings))
+        # ic("Final number of readings found:", len(readings))
 
         # Format data into the structure expected by the frontend chart
         serializable_data_points = []
@@ -1089,7 +1089,7 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
 
         end_time = timezone.now()
         query_time_ms = (end_time - start_time).total_seconds() * 1000
-        ic("API execution time (ms):", query_time_ms)
+        # ic("API execution time (ms):", query_time_ms)
 
         response_data = {
             'status': 'success',
@@ -1140,7 +1140,7 @@ def lorawan_sensor_data_api(request, place_slug, pk):
     # Use the new helper to parse date range from GET parameters
     start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
 
-    ic(start_date, end_date)
+    # ic(start_date, end_date)
 
     try:
         from ..influx_graphs import get_influx_sensor_data

@@ -9,6 +9,10 @@ import time
 
 from icecream import ic
 
+
+# Application version for cache-busting
+APP_VERSION = os.environ.get('APP_VERSION', str(int(time.time())))
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -129,6 +133,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'sensors.context_processors.app_version_processor',
             ],
             'builtins': [
                 'django.templatetags.static',
@@ -283,9 +288,6 @@ else:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
 SECURE_REFERRER_POLICY = 'same-origin'
-
-# Cache busting version
-CACHE_VERSION = os.environ.get('CACHE_VERSION', str(int(time.time())))
 
 APPEND_SLASH = True
 

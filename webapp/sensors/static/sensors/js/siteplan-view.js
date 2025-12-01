@@ -4,10 +4,10 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Script siteplan-view.js loaded.');
+    // console.log('Script siteplan-view.js loaded.');
 
     const scriptConfig = {
-        debug: true
+        debug: false
     };
 
     const sitePlanView = {

@@ -11,4 +11,4 @@ def bust(path):
     Appends a timestamp to a URL for cache busting.
     """
     url = static(path)
-    return f"{url}?v={settings.CACHE_VERSION}"
+    return f"{url}?v={settings.APP_VERSION}"

@@ -16,9 +16,11 @@
 
         {% include "sensors/includes/place_detail_card.html" with place=place place_map_html=place_map_html %}
 
-        {% include 'sensors/includes/place_nav_card.html' %}
-
+        <!-- {% include 'sensors/includes/place_nav_card.html' %} -->
+        <!-- Unassigned Devices Card -->
+        {% include "sensors/includes/unassigned_devices_card.html" %}
         {% if place.is_active %}
+
             {% include 'sensors/includes/live_counts_card.html' %}
         {% endif %}
 
@@ -28,9 +30,6 @@
     <div class="col-md-8 {% if not place.is_active %}opacity-50{% endif %}">
         <!-- Device List Card -->
         {% include "sensors/includes/location_list_card.html" with object_list=locations %}
-
-        <!-- Unassigned Devices Card -->
-        {% include "sensors/includes/unassigned_devices_card.html" %}
 
         <!-- Site Plan Card -->
         {% if place.siteplan_image %}
@@ -58,7 +57,7 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="{% static 'sensors/js/siteplan-editor.js' %}"></script>
-<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
-<script src="{% static 'sensors/js/live-counts-updater.js' %}"></script>
+<script src="{% static 'sensors/js/siteplan-view.js' %}?v={{ APP_VERSION }}"></script>
+<script src="{% static 'sensors/js/siteplan-editor.js' %}?v={{ APP_VERSION }}"></script>
+<script src="{% static 'sensors/js/device-move.js' %}?v={{ APP_VERSION }}"></script>
 {% endblock %}

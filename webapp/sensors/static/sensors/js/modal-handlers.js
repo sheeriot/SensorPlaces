@@ -2,45 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const scriptConfig = {
         debug: false
     };
-
-    console.log(`modalHandlersConfig.debug status: ${scriptConfig.debug}`);
-
-    if (scriptConfig.debug) {
-        console.log('Script modal-handlers.js loaded.');
-    }
-
-    /**
-     * Attaches generic Bootstrap and HTMX event loggers to a modal.
-     * @param {string} modalId The ID of the modal element to debug.
-     */
-    function initializeModalDebug(modalId) {
-        if (!scriptConfig.debug) return;
-
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            console.log(`[ModalDebug] Initializing listeners for #${modalId}`);
-
-            modal.addEventListener('show.bs.modal', (event) => {
-                console.log(`[ModalDebug] #${modalId} Event: show.bs.modal`, { relatedTarget: event.relatedTarget });
-            });
-            modal.addEventListener('shown.bs.modal', () => {
-                console.log(`[ModalDebug] #${modalId} Event: shown.bs.modal`);
-            });
-            modal.addEventListener('hide.bs.modal', () => {
-                console.log(`[ModalDebug] #${modalId} Event: hide.bs.modal`);
-            });
-            modal.addEventListener('hidden.bs.modal', () => {
-                console.log(`[ModalDebug] #${modalId} Event: hidden.bs.modal`);
-            });
-
-            // Listen for HTMX content loads within the modal
-            modal.addEventListener('htmx:afterOnLoad', (evt) => {
-                console.log(`[ModalDebug] #${modalId} Event: htmx:afterOnLoad`, { xhr: evt.detail.xhr });
-            });
-        } else {
-            console.warn(`[ModalDebug] Modal element #${modalId} not found.`);
-        }
-    }
+    if (scriptConfig.debug) console.log(`modalHandlersConfig.debug status: ${scriptConfig.debug}`);
 
     /**
      * Initializes a confirmation input field within a modal.
@@ -82,6 +44,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         console.log('[ModalCleanup] Cleared modal content');
                     }
                 }
+
+                // Force cleanup of any lingering backdrops and body styles.
+                // This is a robust fix for the "frozen screen" issue that can happen
+                // when HTMX and Bootstrap modals interact.
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
             });
         }
     }
@@ -89,12 +61,4 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize all modal handlers
     initializeDeleteConfirmationInput();
     initializeModalCleanup();
-
-    // Initialize debug listeners for all known modals if debug is on
-    if (scriptConfig.debug) {
-        initializeModalDebug('deleteLocationModal');
-        initializeModalDebug('siteplan-view-modal');
-        initializeModalDebug('siteplan-editor');
-        initializeModalDebug('modal-container'); // Generic HTMX modal container
-    }
 });
