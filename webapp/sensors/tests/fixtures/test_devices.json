@@ -17,7 +17,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-03-24T14:56:17.547Z",
     "updated_at": "2025-07-04T12:24:50.612Z"
@@ -41,7 +40,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": false,
     "created_at": "2025-03-25T13:37:19.880Z",
     "updated_at": "2025-07-04T12:24:50.614Z"
@@ -65,7 +63,6 @@
     ],
     "is_lorawan": true,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": false,
     "created_at": "2025-03-25T21:31:31.221Z",
     "updated_at": "2025-08-07T11:51:54.778Z"
@@ -89,7 +86,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": false,
     "created_at": "2025-03-28T17:00:52.899Z",
     "updated_at": "2025-07-04T12:24:50.615Z"
@@ -113,7 +109,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-06-19T21:15:01.518Z",
     "updated_at": "2025-07-24T18:14:29.869Z"
@@ -137,7 +132,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-06-20T13:45:26.000Z",
     "updated_at": "2025-07-08T11:36:20.373Z"
@@ -161,7 +155,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-06-20T17:28:34.186Z",
     "updated_at": "2025-07-26T01:02:47.657Z"
@@ -185,7 +178,6 @@
     ],
     "is_lorawan": true,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-07-16T11:57:50.333Z",
     "updated_at": "2025-07-19T20:25:45.780Z"
@@ -209,7 +201,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": false,
     "created_at": "2025-07-19T20:20:09.340Z",
     "updated_at": "2025-08-07T11:51:25.226Z"
@@ -233,7 +224,6 @@
     ],
     "is_lorawan": true,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-08-05T11:55:43.455Z",
     "updated_at": "2025-08-07T10:45:33.482Z"
@@ -257,7 +247,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-08-07T11:53:14.065Z",
     "updated_at": "2025-11-10T15:35:12.388Z"
@@ -281,7 +270,6 @@
     ],
     "is_lorawan": true,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-08-09T11:01:07.981Z",
     "updated_at": "2025-08-09T11:01:07.981Z"
@@ -305,7 +293,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-10-16T22:53:02.809Z",
     "updated_at": "2025-10-23T10:56:26.324Z"
@@ -329,7 +316,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": true,
     "created_at": "2025-10-18T16:51:23.326Z",
     "updated_at": "2025-10-18T16:56:48.130Z"
@@ -353,7 +339,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "CDAC487E68C8",
     "is_active": true,
     "created_at": "2025-10-18T16:51:23.346Z",
     "updated_at": "2025-10-19T10:45:02.419Z"
@@ -377,7 +362,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "CDAC487E68C8",
     "is_active": true,
     "created_at": "2025-10-18T16:51:23.370Z",
     "updated_at": "2025-10-18T17:02:49.346Z"
@@ -401,7 +385,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": true,
     "created_at": "2025-10-18T16:51:37.222Z",
     "updated_at": "2025-10-18T17:05:01.078Z"
@@ -423,7 +406,6 @@
     "device_type": null,
     "is_lorawan": false,
     "is_switchbot": false,
-    "switchbot_hub_device_id": null,
     "is_active": true,
     "created_at": "2025-10-20T13:59:11.032Z",
     "updated_at": "2025-10-20T14:12:21.239Z"
@@ -447,7 +429,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "CDAC487E68C8",
     "is_active": true,
     "created_at": "2025-10-23T11:11:12.013Z",
     "updated_at": "2025-10-23T11:13:10.765Z"
@@ -471,7 +452,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": true,
     "created_at": "2025-10-23T11:11:12.057Z",
     "updated_at": "2025-10-23T11:11:37.952Z"
@@ -495,7 +475,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": false,
     "created_at": "2025-10-30T15:52:16.274Z",
     "updated_at": "2025-10-30T16:13:48.976Z"
@@ -519,7 +498,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": true,
     "created_at": "2025-10-30T15:52:16.323Z",
     "updated_at": "2025-11-10T13:28:40.615Z"
@@ -543,7 +521,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": true,
     "created_at": "2025-10-30T15:52:16.399Z",
     "updated_at": "2025-10-31T15:29:42.785Z"
@@ -567,7 +544,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": false,
     "created_at": "2025-10-30T15:52:16.442Z",
     "updated_at": "2025-10-30T15:52:16.465Z"
@@ -591,7 +567,6 @@
     ],
     "is_lorawan": false,
     "is_switchbot": true,
-    "switchbot_hub_device_id": "000000000000",
     "is_active": true,
     "created_at": "2025-10-30T15:52:16.487Z",
     "updated_at": "2025-10-31T15:27:09.957Z"
