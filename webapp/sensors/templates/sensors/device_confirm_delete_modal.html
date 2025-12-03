@@ -1,4 +1,6 @@
-<form id="deleteDeviceForm" method="post" action="{% url 'sensors:device_delete' place_slug=place.slug pk=object.pk %}">
+<form id="deleteDeviceForm"
+      hx-post="{% url 'sensors:device_delete' place_slug=place.slug pk=object.pk %}"
+      hx-swap="none">
     <div class="modal-header">
         <h5 class="modal-title" id="deleteDeviceModalLabel">Confirm Delete</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -10,6 +12,9 @@
             This action cannot be undone.
         </p>
         {% csrf_token %}
+        {% if referrer_url %}
+            <input type="hidden" name="referrer_url" value="{{ referrer_url }}">
+        {% endif %}
     </div>
     <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

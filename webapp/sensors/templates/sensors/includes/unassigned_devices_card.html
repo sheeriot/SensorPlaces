@@ -27,7 +27,7 @@
             <div id="unassignedDevicesCollapse" class="collapse">
                 <div class="list-group list-group-flush overflow-auto" style="max-height: 400px;">
                     {% for device in location.devices_sorted %}
-                        {% include "sensors/partials/device_row.html" with device=device hide_inactive=False %}
+                        {% include "sensors/partials/unassigned_device_row.html" with device=device %}
                     {% empty %}
                         <div class="text-center p-3 text-muted">
                             <p class="mb-0">No unassigned devices found.</p>

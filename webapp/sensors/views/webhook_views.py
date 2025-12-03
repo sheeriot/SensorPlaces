@@ -48,7 +48,7 @@ class WebhookReceiverView(View):
                     sensor_obj = process_sensor_reading(device, measurement, val_float)
 
                     influx_action = "Skipped Influx"
-                    if sensor_obj and sensor_obj.effective_data_type.startswith('INFLUX'):
+                    if sensor_obj and sensor_obj.data_type.startswith('INFLUX'):
                         if influx_source:
                             fields = {'value': val_float}
                             tags = {'device_id': device.device_id}
@@ -107,7 +107,7 @@ class SwitchBotWebhookReceiverView(View):
                     sensor_obj = process_sensor_reading(device, measurement, value)
 
                     influx_action = "Skipped Influx"
-                    if sensor_obj and sensor_obj.effective_data_type.startswith('INFLUX'):
+                    if sensor_obj and sensor_obj.data_type.startswith('INFLUX'):
                         if influx_source:
                             influx_fields[measurement] = value
                             influx_action = "Queued for Influx"

@@ -1,0 +1,25 @@
+{% load humanize %}
+{% if success %}
+    <div class="alert alert-success py-2 px-3">
+        <div class="d-flex justify-content-between">
+            <span><strong>Connection:</strong> OK</span>
+            <span>
+                <strong>Total Records:</strong> {{ record_count|intcomma }}
+            </span>
+        </div>
+        {% if latest_reading %}
+        <div>
+            <strong>Latest Reading:</strong>
+            {{ latest_reading.value|floatformat:2 }}
+            <span class="text-muted">at {{ latest_reading.time|naturaltime }}</span>
+        </div>
+        {% else %}
+        <div class="text-muted">No readings found.</div>
+        {% endif %}
+    </div>
+{% else %}
+    <div class="alert alert-danger py-2 px-3">
+        <h6 class="alert-heading mb-1">Connection Test Failed</h6>
+        <p class="mb-0 small font-monospace">{{ error|default:"An unknown error occurred." }}</p>
+    </div>
+{% endif %}

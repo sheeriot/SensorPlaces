@@ -7,6 +7,7 @@ from django.conf import settings
 
 from sensors.models import Device, DeviceType, Place, Location, Sensor, SensorType, Unit
 from sensors.switchbot_client import list_devices, get_status
+from sensors.views.views_fun import create_switchbot_device
 
 # --- Helper functions from your script ---
 
@@ -59,15 +60,18 @@ class Command(BaseCommand):
         subparsers = parser.add_subparsers(dest='command', required=True, help='Sub-command help')
 
         # Subcommand for "list"
-        subparsers.add_parser('list', help='List all SwitchBot devices.')
+        parser_list = subparsers.add_parser('list', help='List all SwitchBot devices.')
+        parser_list.add_argument('--place', type=str, help='The slug of the Place to list devices for.')
 
         # Subcommand for "status"
         parser_status = subparsers.add_parser('status', help='Get the status of a specific device.')
         parser_status.add_argument('device_id', type=str, help='The ID of the device to get status for.')
+        parser_status.add_argument('--place', type=str, required=True, help='The slug of the Place.')
 
         # Subcommand for "inspect"
         parser_inspect = subparsers.add_parser('inspect', help='Get the raw cloud data for a specific SwitchBot device.')
         parser_inspect.add_argument('device_id', type=str, help='The device ID to inspect.')
+        parser_inspect.add_argument('--place', type=str, required=True, help='The slug of the Place.')
 
         # Subcommand for "sync"
         parser_sync = subparsers.add_parser('sync', help='Sync SwitchBot devices with the database.')
@@ -75,24 +79,45 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         command = options['command']
+        place_slug = options.get('place')
+
+        place = None
+        if place_slug:
+            try:
+                place = Place.objects.get(slug=place_slug)
+                if not all([place.switchbot_enable, place.switchbot_token, place.switchbot_secret]):
+                    self.stderr.write(self.style.ERROR(f"SwitchBot integration is not fully configured for place '{place_slug}'."))
+                    return
+            except Place.DoesNotExist:
+                self.stderr.write(self.style.ERROR(f"Place with slug '{place_slug}' not found."))
+                return
 
         try:
             if command == 'list':
+                if not place:
+                    self.stderr.write(self.style.ERROR("The --place argument is required for the list command."))
+                    return
                 self.stdout.write("Fetching device list from SwitchBot API...")
-                devices = list_devices()
+                devices = list_devices(token=place.switchbot_token, secret=place.switchbot_secret)
                 self.stdout.write(json.dumps(devices, indent=2))
 
             elif command == 'status':
+                if not place:
+                    self.stderr.write(self.style.ERROR("The --place argument is required for the status command."))
+                    return
                 device_id = options['device_id']
                 self.stdout.write(f"Fetching status for device {device_id}...")
-                status = get_status(device_id)
+                status = get_status(device_id, token=place.switchbot_token, secret=place.switchbot_secret)
                 self.stdout.write(json.dumps(status, indent=2))
 
             elif command == 'inspect':
+                if not place:
+                    self.stderr.write(self.style.ERROR("The --place argument is required for the inspect command."))
+                    return
                 device_id = options['device_id']
                 self.stdout.write(f"Inspecting cloud data for device {device_id}...")
                 try:
-                    status = get_status(device_id)
+                    status = get_status(device_id, token=place.switchbot_token, secret=place.switchbot_secret)
                     self.stdout.write(json.dumps(status, indent=2))
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 404:
@@ -108,65 +133,6 @@ class Command(BaseCommand):
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"An unexpected error occurred: {e}"))
 
-    def _create_device(self, device_item, location, sensor_types):
-        """Helper function to create a single device, returns 1 if created, 0 otherwise."""
-        device_id = device_item['deviceId']
-
-        device, created = Device.objects.get_or_create(
-            device_id=device_id,
-            defaults={
-                'name': device_item['deviceName'],
-                'model': device_item.get('deviceType', 'Unknown'),
-                'manufacturer': 'SwitchBot',
-                'is_switchbot': True,
-                'switchbot_hub_device_id': device_item.get('hubDeviceId'),
-                'location': location,
-                'is_active': not location.slug == 'unassigned-devices'
-            }
-        )
-
-        if created:
-            api_device_type_str = device.model
-
-            if 'Hub' in api_device_type_str:
-                device_type_name = "SwitchBot Hub"
-            else:
-                device_type_name = api_device_type_str
-
-            device_type, _ = DeviceType.objects.get_or_create(
-                name=device_type_name,
-                defaults={'description': f'A {device_type_name} from SwitchBot.'}
-            )
-            device.device_type = device_type
-            device.save()
-            self.stdout.write(self.style.SUCCESS(f"Imported new device: {device.name} ({device_id})"))
-
-        # Auto-create sensors for meter devices
-        api_device_type_str = device.model
-        meter_types = ["Meter", "Meter Plus", "Outdoor Meter", "Meter Pro", "WoSensorTH"]
-        if any(meter_type in api_device_type_str for meter_type in meter_types):
-
-            s1, s1_created = Sensor.objects.get_or_create(
-                device=device,
-                sensor_type=sensor_types['temperature'],
-                defaults={'name': f'{device.name} Temperature'}
-            )
-            s2, s2_created = Sensor.objects.get_or_create(
-                device=device,
-                sensor_type=sensor_types['humidity'],
-                defaults={'name': f'{device.name} Humidity'}
-            )
-            s3, s3_created = Sensor.objects.get_or_create(
-                device=device,
-                sensor_type=sensor_types['battery'],
-                defaults={'name': f'{device.name} Battery'}
-            )
-
-            if created or any([s1_created, s2_created, s3_created]):
-                 self.stdout.write(self.style.SUCCESS(f"    - Ensured Temperature, Humidity, and Battery sensors for {device.name}."))
-
-        return 1 if created else 0
-
     def sync_devices(self, options):
         place_slug = options['place']
         try:
@@ -175,10 +141,14 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"Place with slug '{place_slug}' not found."))
             return
 
+        if not place.switchbot_enable or not place.switchbot_token or not place.switchbot_secret:
+            self.stderr.write(self.style.ERROR(f"SwitchBot integration is not enabled or configured for place '{place.name}'."))
+            return
+
         self.stdout.write(f"Starting SwitchBot sync for place: {place.name}")
 
         try:
-            api_devices_body = list_devices()['body']
+            api_devices_body = list_devices(token=place.switchbot_token, secret=place.switchbot_secret)['body']
             all_api_devices = api_devices_body.get('deviceList', [])
             all_api_infrared_devices = api_devices_body.get('infraredRemoteList', [])
             all_api_devices.extend(all_api_infrared_devices)
@@ -262,9 +232,9 @@ class Command(BaseCommand):
         percent_unit, _ = Unit.objects.get_or_create(name="Percent", defaults={'symbol': '%'})
 
         sensor_types = {
-            'temperature': SensorType.objects.get_or_create(name="Temperature", defaults={'default_unit': celsius_unit})[0],
-            'humidity': SensorType.objects.get_or_create(name="Humidity", defaults={'default_unit': percent_rh_unit})[0],
-            'battery': SensorType.objects.get_or_create(name="Battery", defaults={'default_unit': percent_unit})[0]
+            'temperature': SensorType.objects.get_or_create(name="Temperature", defaults={'unit': celsius_unit})[0],
+            'humidity': SensorType.objects.get_or_create(name="Humidity", defaults={'unit': percent_rh_unit})[0],
+            'battery': SensorType.objects.get_or_create(name="Battery", defaults={'unit': percent_unit})[0]
         }
 
         unassigned_location = place.get_unassigned_location()
@@ -283,6 +253,6 @@ class Command(BaseCommand):
 
         for index in indices_to_import:
             device_to_import = new_devices_to_import[index]
-            created_total += self._create_device(device_to_import, unassigned_location, sensor_types)
+            created_total += create_switchbot_device(device_to_import, unassigned_location, sensor_types, self.stdout, self.style)
 
         self.stdout.write(self.style.SUCCESS(f"\nSync complete. {created_total} new device(s) imported into '{place.name}'."))

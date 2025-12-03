@@ -11,6 +11,7 @@ from .views import (
     device_type_views,
     timezone_views,
     toast_views,
+    switchbot_views,
 )
 from .views.sensor_views import (
     SensorCreateView,
@@ -58,6 +59,12 @@ urlpatterns = [
     path('<slug:place_slug>/siteplan/', place_views.siteplan_view, name='siteplan'),
     path('<slug:place_slug>/siteplan/update/', place_views.siteplan_update, name='siteplan_update'),
 
+    # SwitchBot Integration
+    path('<slug:place_slug>/switchbot/', switchbot_views.switchbot_management_view, name='switchbot_management'),
+    path('<slug:place_slug>/switchbot/config/', switchbot_views.switchbot_config_update_view, name='switchbot_config_update'),
+    path('<slug:place_slug>/switchbot/import-device/', switchbot_views.import_switchbot_device_view, name='import_switchbot_device'),
+    path('<slug:place_slug>/switchbot/inspect-api-device/<str:device_id>/', switchbot_views.switchbot_inspect_api_device_view, name='switchbot_inspect_api_device'),
+
     # API URLs that are place-specific
     path('api/<slug:place_slug>/stats/', place_views.place_stats, name='place_stats_api'),
     path('api/<slug:place_slug>/toggle-active/', toggle_active.ToggleActiveView.as_view(), name='toggle_active'),
@@ -80,12 +87,11 @@ urlpatterns = [
     path('<slug:place_slug>/device/<int:pk>/', device_views.DeviceDetailView.as_view(), name='device_detail'),
     path('<slug:place_slug>/device/<int:pk>/update/', device_views.DeviceUpdateView.as_view(), name='device_update'),
     path('<slug:place_slug>/device/<int:pk>/delete/', device_views.DeviceDeleteView.as_view(), name='device_delete'),
-    path('<slug:place_slug>/device/<int:pk>/fetch-reading/', device_views.fetch_switchbot_reading, name='fetch_switchbot_reading'),
+    path('<slug:place_slug>/device/<int:pk>/fetch-reading/', switchbot_views.fetch_switchbot_reading, name='fetch_switchbot_reading'),
+    path('<slug:place_slug>/device/<int:pk>/inspect/', switchbot_views.SwitchbotInspectView.as_view(), name='inspect_switchbot_device'),
 
     # API endpoints for devices
-    path('api/<slug:place_slug>/device/<int:pk>/inspect/', device_views.device_inspect_view, name='device_inspect'),
     path('api/<slug:place_slug>/device/<int:pk>/move/', device_views.DeviceMoveLocationView.as_view(), name='device_move_location'),
-    path('api/<slug:place_slug>/device/<int:pk>/add-sensor/', device_views.add_switchbot_sensor, name='add_switchbot_sensor'),
 
     # Toast URLs
     path('<slug:place_slug>/toasts/', toast_views.ToastListView.as_view(), name='toast_list'),
@@ -93,6 +99,7 @@ urlpatterns = [
     # Sensor URLs
     path('<slug:place_slug>/device/<int:device_pk>/sensor/create/', SensorCreateView.as_view(), name='sensor_create'),
     path('<slug:place_slug>/device/<int:device_pk>/lorawan-sensor/create/', LoRaWANSensorCreateView.as_view(), name='lorawan_sensor_create'),
+    path('<slug:place_slug>/device/<int:device_pk>/add-switchbot-sensor/', switchbot_views.add_switchbot_sensor, name='add_switchbot_sensor'),
     path('<slug:place_slug>/sensors/', SensorListView.as_view(), name='sensor_list'),
     path('<slug:place_slug>/location/<int:location_pk>/sensors/', SensorListView.as_view(), name='location_sensors'),
     path('<slug:place_slug>/device/<int:device_pk>/sensors/', SensorListView.as_view(), name='device_sensors'),
@@ -106,6 +113,7 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:sensor_pk>/readings/', sensor_views.SensorReadingListView.as_view(), name='sensor_reading_list'),
 
     # API endpoints for sensor readings
+    path('api/<slug:place_slug>/sensor/<int:pk>/test-influx/', sensor_views.test_influx_connection, name='test_influx_connection'),
     path('api/<slug:place_slug>/sensor/<int:pk>/update-graph-type/', sensor_views.update_graph_type, name='update_graph_type'),
     path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_views.sensor_readings_api, name='sensor_readings_api'),
     path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_views.sensor_readings_table_api, name='sensor_readings_table_api'),

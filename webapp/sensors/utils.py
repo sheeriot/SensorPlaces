@@ -36,7 +36,7 @@ matplotlib.use('Agg')
 
 # --- DEBUG FLAG ---
 # Set to True to bypass the stale check and always query for live values.
-# DISABLE_STALE_CHECK = True
+DISABLE_STALE_CHECK = False
 
 
 def get_influxdb_client(influx_source):
@@ -87,20 +87,25 @@ def get_latest_influx_reading(sensor):
 
     client = get_influxdb_client(sensor.influx_source)
 
-    # Determine the correct filter field. If 'frmpayload' is in the measurement name,
-    # it's very likely LoRaWAN data and should use 'dev_eui'.
-    if 'frmpayload' in sensor.influx_measurement:
+    # Use the specific field name if available, otherwise default to 'value'
+    field_to_select = sensor.influx_field_name or 'value'
+
+    # Determine the correct filter field.
+    if sensor.influx_tag_key:
+        filter_field = sensor.influx_tag_key
+    elif sensor.influx_measurement and 'frmpayload' in sensor.influx_measurement:
+        filter_field = "dev_eui"
+    elif sensor.device.is_lorawan:
         filter_field = "dev_eui"
     else:
-        # Fallback to the original logic for other measurement types
-        filter_field = "dev_eui" if sensor.device.is_lorawan else "device_id"
+        filter_field = "device_id" # Default
 
     device_id_val = sensor.device.device_id
 
     query = f'''
     SELECT *
     FROM "{sensor.influx_measurement}"
-    WHERE "{filter_field}" = '{device_id_val}'
+    WHERE "{filter_field}" = '{device_id_val}' AND "{field_to_select}" IS NOT NULL
     ORDER BY time DESC
     LIMIT 1
     '''
@@ -121,7 +126,8 @@ def get_latest_influx_reading(sensor):
         # ic("Latest row from DataFrame:", latest)
 
         # Check for pandas NaT (Not a Time) and NaN (Not a Number)
-        if pd.notna(latest['time']) and pd.notna(latest['value']):
+        # Use the dynamically selected field name here
+        if pd.notna(latest['time']) and pd.notna(latest[field_to_select]):
             # Convert to Python native types before returning
             # Fix UserWarning about nanoseconds by flooring to microseconds
             ts = latest['time']
@@ -135,7 +141,7 @@ def get_latest_influx_reading(sensor):
 
             return {
                 'time': py_time,
-                'value': float(latest['value'])
+                'value': float(latest[field_to_select])
             }
         else:
             # ic("InfluxDB returned a row with null time or value.")
@@ -146,6 +152,119 @@ def get_latest_influx_reading(sensor):
         return None
     finally:
         client.close()
+
+def get_influx_record_count(sensor):
+    """
+    Counts the total number of records for a sensor in InfluxDB.
+    """
+    if not sensor.influx_source or not sensor.influx_measurement:
+        return 0
+
+    client = get_influxdb_client(sensor.influx_source)
+    field_to_count = sensor.influx_field_name or 'value'
+
+    # Determine the correct filter field for the WHERE clause
+    if sensor.influx_tag_key:
+        filter_field = sensor.influx_tag_key
+    elif sensor.influx_measurement and 'frmpayload' in sensor.influx_measurement:
+        filter_field = "dev_eui"
+    elif sensor.device.is_lorawan:
+        filter_field = "dev_eui"
+    else:
+        filter_field = "device_id" # Default
+
+    device_id_val = sensor.device.device_id
+
+    query = f'''
+    SELECT count("{field_to_count}")
+    FROM "{sensor.influx_measurement}"
+    WHERE "{filter_field}" = '{device_id_val}' AND "{field_to_count}" IS NOT NULL AND time >= now() - interval '10 year'
+    '''
+    try:
+        reader = client.query(query, language='sql')
+        df = reader.to_pandas()
+        if not df.empty:
+            # Access the first column by position to be robust
+            return df.iloc[0, 0]
+        return 0
+    except Exception as e:
+        # ic(f"Error during InfluxDB count query for sensor '{sensor.name}': {e}")
+        return 0
+    finally:
+        client.close()
+
+def write_sensor_reading_to_influx(sensor, value):
+    """
+    Writes a sensor reading to the appropriate InfluxDB source if the sensor is active
+    and the source is configured.
+    """
+    from django.utils import timezone
+    # ic(f"InfluxWrite: Attempting write for sensor '{sensor.name}' (active: {sensor.is_active})")
+    if not sensor.is_active:
+        # ic("InfluxWrite: Sensor is not active, skipping.")
+        return
+
+    place = sensor.device.location.place
+    influx_source = None
+
+    if sensor.device.is_switchbot:
+        influx_source = place.switchbot_influx_source
+        # ic(f"InfluxWrite: Sensor is SwitchBot. Using place's SwitchBot Influx source: {influx_source}")
+    else:
+        # This logic might need refinement for non-switchbot sensors
+        influx_source = sensor.influx_source or place.default_influx_source
+        # ic(f"InfluxWrite: Sensor is not SwitchBot. Using sensor's source or place's default: {influx_source}")
+
+    if not influx_source:
+        # ic("InfluxWrite: No InfluxDB source found. Skipping write.")
+        return
+
+    try:
+        client = get_influxdb_client(influx_source)
+
+        measurement_name = sensor.influx_measurement
+        if not measurement_name:
+            if sensor.device.is_switchbot:
+                measurement_name = 'switchbot_readings'
+            else:
+                measurement_name = 'sensor_readings' # A sensible default
+        # ic(f"InfluxWrite: Using measurement: {measurement_name}")
+
+        field_name = sensor.influx_field_name or 'value'
+
+        point = {
+            "measurement": measurement_name,
+            "tags": {
+                "device_id": str(sensor.device.device_id) if sensor.device.device_id else 'N/A',
+                "sensor_id": str(sensor.id),
+                "sensor_name": sensor.name,
+                "sensor_type": sensor.get_sensor_type_display(),
+                "place_name": place.name,
+                "location_name": sensor.device.location.name,
+            },
+            "fields": {field_name: float(value)},
+            "time": timezone.now()
+        }
+
+        # ic("InfluxWrite: Writing point:", point)
+        client.write(record=point)
+        # ic("InfluxWrite: Successfully wrote point to InfluxDB.")
+        client.close()
+
+        # _verify_influx_write(sensor)
+
+    except Exception as e:
+        ic(f"InfluxWrite: Error writing to InfluxDB for sensor '{sensor.name}': {e}")
+
+
+def _verify_influx_write(sensor):
+    """
+    Helper function to verify a write to InfluxDB by reading the latest value and count.
+    """
+    latest_reading = get_latest_influx_reading(sensor)
+    record_count = get_influx_record_count(sensor)
+    # ic(f"InfluxWrite Verify: Latest reading after write: {latest_reading}")
+    # ic(f"InfluxWrite Verify: Record count after write: {record_count}")
 
 
 def update_sensor_live_value(sensor):
@@ -158,13 +277,20 @@ def update_sensor_live_value(sensor):
     from django.utils import timezone
     from datetime import timedelta
 
+    # ic(f"LiveValue: Checking sensor '{sensor.name}' (pk={sensor.pk})")
+
     # Decide if it's time to check based on the stale threshold.
     if 'DISABLE_STALE_CHECK' in globals() and globals()['DISABLE_STALE_CHECK']:
+        # ic("LiveValue: DISABLE_STALE_CHECK is True, proceeding with check.")
         pass # Skip the check if the debug flag is set
     elif sensor.last_checked_timestamp:
         time_since_last_check = timezone.now() - sensor.last_checked_timestamp
+        # ic(f"LiveValue: Stale check values: last_checked={sensor.last_checked_timestamp}, threshold={sensor.effective_stale_threshold}s, since_last_check={time_since_last_check.total_seconds():.0f}s")
         if time_since_last_check < timedelta(seconds=sensor.effective_stale_threshold):
+            # ic(f"LiveValue: Not time to check yet. Last checked {time_since_last_check.total_seconds():.0f}s ago. Threshold is {sensor.effective_stale_threshold}s.")
             return False  # Not time to check yet.
+
+    # ic("LiveValue: Stale check passed. Fetching new data...")
 
     # Proceed with the check.
     from .switchbot_client import get_status
@@ -172,29 +298,36 @@ def update_sensor_live_value(sensor):
     new_value = None
     new_timestamp = None
 
-    if sensor.effective_data_type and sensor.effective_data_type.startswith('INFLUX'):
+    if sensor.device.is_switchbot:
+        # ic("LiveValue: Sensor is SwitchBot type. Querying API via Service.")
+        place = sensor.device.location.place
+        if place.switchbot_token and place.switchbot_secret:
+            try:
+                from .services.switchbot_service import SwitchBotService
+                service = SwitchBotService(place)
+                live_value = service.get_live_reading_for_sensor(sensor)
+
+                if live_value is not None:
+                    new_value = live_value
+                    new_timestamp = timezone.now()
+                    # ic(f"LiveValue: Found new value for '{sensor.name}' from SwitchBot Service: {new_value}")
+
+            except Exception as e:
+                # ic(f"LiveValue: Error calling SwitchBot service: {e}")
+                pass
+        else:
+            # ic("LiveValue: Missing SwitchBot credentials on place. Cannot query API.")
+            pass
+    elif sensor.data_type and sensor.data_type.startswith('INFLUX'):
+        # ic("LiveValue: Sensor is INFLUX type. Getting latest from InfluxDB.")
         try:
             latest_reading = get_latest_influx_reading(sensor)
             if latest_reading and latest_reading.get('value') is not None:
                 new_value = latest_reading['value']
                 new_timestamp = latest_reading['time']
-        except Exception:
+        except Exception as e:
+            # ic(f"LiveValue: Error getting Influx reading: {e}")
             pass  # Errors are logged in get_latest_influx_reading
-
-    elif sensor.device.is_switchbot:
-        try:
-            status_data = get_status(sensor.device.device_id)
-            if status_data.get('statusCode') == 100:
-                live_body = status_data.get('body', {})
-                live_values = {k.lower(): v for k, v in live_body.items()}
-
-                if sensor.sensor_type and sensor.sensor_type.name.lower() in live_values:
-                    live_value = live_values[sensor.sensor_type.name.lower()]
-                    if live_value is not None:
-                        new_value = live_value
-                        new_timestamp = timezone.now()
-        except Exception:
-            pass
 
     else:
         # Fallback for DIRECT or other types: check local DB for the latest reading
@@ -203,13 +336,14 @@ def update_sensor_live_value(sensor):
             from .models import SensorReading
             latest_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
             if latest_reading:
-                ic(f"Found local reading for sensor {sensor.name}: {latest_reading.value} at {latest_reading.timestamp}")
+                # ic(f"Found local reading for sensor {sensor.name}: {latest_reading.value} at {latest_reading.timestamp}")
                 new_value = latest_reading.value
                 new_timestamp = latest_reading.timestamp
             else:
-                ic(f"No local reading found for sensor {sensor.name}")
+                # ic(f"No local reading found for sensor {sensor.name}")
+                pass
         except Exception as e:
-            ic(f"Error getting local reading for sensor {sensor.name}: {e}")
+            # ic(f"Error getting local reading for sensor {sensor.name}: {e}")
             pass
 
 
@@ -227,6 +361,7 @@ def update_sensor_live_value(sensor):
     value_was_updated = False
     # Only update the cached value if the new reading is actually newer
     if new_timestamp and (sensor.cached_reading_timestamp is None or new_timestamp > sensor.cached_reading_timestamp):
+        # ic(f"LiveValue: New value '{new_value}' is fresher than cached value. Updating cache.")
         update_kwargs['cached_reading_value'] = new_value
         update_kwargs['cached_reading_timestamp'] = new_timestamp
 
@@ -234,6 +369,15 @@ def update_sensor_live_value(sensor):
         sensor.cached_reading_value = new_value
         sensor.cached_reading_timestamp = new_timestamp
         value_was_updated = True
+
+        # For SwitchBot devices, the live value check is also the data collection mechanism,
+        # so we write the newly fetched value to InfluxDB for historical logging.
+        # For all other sensor types, this function only reads and caches.
+        if sensor.device.is_switchbot:
+            write_sensor_reading_to_influx(sensor, new_value)
+    else:
+        # ic("LiveValue: No new value found or value is not fresher than cache. Not updating.")
+        pass
 
     sensor.last_checked_timestamp = update_kwargs['last_checked_timestamp']
     sensor.__class__.objects.filter(pk=sensor.pk).update(**update_kwargs)

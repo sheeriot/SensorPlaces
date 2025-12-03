@@ -140,13 +140,15 @@ const timeDisplay = {
 
 // Function to send timezone to backend
 async function sendTimezoneToServer() {
-    if (sessionStorage.getItem('timezoneSet')) {
-        if (timeDisplayConfig.debug) console.log('Timezone already set in this session.');
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const storedTimezone = localStorage.getItem('userTimezone');
+
+    if (userTimezone === storedTimezone) {
+        if (timeDisplayConfig.debug) console.log('Timezone has not changed:', userTimezone);
         return;
     }
 
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (timeDisplayConfig.debug) console.log('Detected timezone:', userTimezone);
+    if (timeDisplayConfig.debug) console.log('Timezone changed or not set. Stored:', storedTimezone, 'Current:', userTimezone);
 
     try {
         const data = await window.utils.fetchWithCSRF('/api/set-timezone/', {
@@ -155,8 +157,8 @@ async function sendTimezoneToServer() {
         });
 
         if (data.status === 'ok') {
-            sessionStorage.setItem('timezoneSet', 'true');
-            if (timeDisplayConfig.debug) console.log('Timezone successfully set on server.');
+            localStorage.setItem('userTimezone', userTimezone);
+            if (timeDisplayConfig.debug) console.log('Timezone successfully set on server and stored in localStorage.');
         } else {
             if (timeDisplayConfig.debug) console.error('Failed to set timezone on server:', data.message);
         }

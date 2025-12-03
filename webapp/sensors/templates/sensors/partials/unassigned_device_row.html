@@ -1,24 +1,55 @@
-<tr class="device-row" draggable="true" data-device-id="{{ device.pk }}">
-    <td>
-        <a href="{{ device.get_absolute_url }}" class="d-flex align-items-center text-decoration-none fw-bold">
-            <i class="bi bi-hdd-rack me-2"></i>
-            <span>{{ device.name }}</span>
-        </a>
-    </td>
-    <td>
-        {% if device.is_active %}
-            <span class="badge bg-success">Active</span>
-        {% else %}
-            <span class="badge bg-secondary">Inactive</span>
-        {% endif %}
-    </td>
-    <td>{{ device.device_type.name|default:"-" }}</td>
-    <td>{{ device.model|default:"-" }}</td>
-    <td>{{ device.manufacturer|default:"-" }}</td>
-    <td>{{ device.device_id|default:"-" }}</td>
-    <td class="text-end">
-        <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-warning" title="Edit">
-            <i class="bi bi-pencil-fill"></i>
-        </a>
-    </td>
-</tr>
+<!-- webapp/sensors/templates/sensors/partials/unassigned_device_row.html -->
+<div class="list-group-item device-row py-2"
+    data-device-active="{{ device.is_active|lower }}"
+    data-device-id="{{ device.pk }}"
+    data-location-active="true"
+    data-location-id="unassigned">
+    <div class="row g-0 align-items-center">
+        <!-- Name -->
+        <div class="col-6">
+            <div class="d-flex align-items-start">
+                <i class="bi bi-hdd-rack me-2 fs-5"></i>
+                <div>
+                    <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug pk=device.pk %}" class="text-decoration-none fw-bold">
+                        {{ device.name }}
+                    </a>
+                </div>
+            </div>
+        </div>
+        <!-- Model -->
+        <div class="col-3">
+            <small class="text-muted">
+                {{ device.model|default:"-" }}
+                {% if device.manufacturer %}
+                    <br>{{ device.manufacturer }}
+                {% endif %}
+            </small>
+        </div>
+        <!-- Actions -->
+        <div class="col-3 text-end">
+            <div class="btn-group btn-group-sm">
+                {% if device.location.slug == 'unassigned-devices' %}
+                <button type="button" class="btn btn-sm btn-outline-primary move-device"
+                        hx-get="{% url 'sensors:device_move_location' place_slug=device.location.place.slug pk=device.pk %}"
+                        hx-target="#modal-content"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal-container"
+                        title="Move Device">
+                    <i class="bi bi-box-arrow-in-up-right"></i>
+                </button>
+                {% endif %}
+                <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug pk=device.pk %}?next={{ absolute_url|urlencode }}" class="btn btn-sm border-dark btn-outline-warning">
+                    <i class="bi bi-pencil-fill"></i>
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-danger delete-device"
+                        hx-get="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}"
+                        hx-target="#modal-content"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal-container"
+                        title="Delete">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

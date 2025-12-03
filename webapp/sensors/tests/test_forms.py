@@ -537,7 +537,9 @@ class SensorFormTest(TestCase):
             'data_type': 'INFLUX',
             'graph_type': 'SCATTER',
             'influx_source': self.influx_source.pk,
-            'influx_measurement': 'test_measurement'
+            'influx_measurement': 'test_measurement',
+            'influx_field_name': 'test_field',
+            'influx_tag_key': 'test_tag',
         }
 
         form = SensorForm(data=form_data, device=self.device)
@@ -558,12 +560,14 @@ class SensorFormTest(TestCase):
 
         # Verify that key fields are in the form layout
         layout_fields = self._get_layout_field_names(form.helper.layout)
-        self.assertIn('name', layout_fields)
-        self.assertIn('device', layout_fields)
-        self.assertIn('is_active', layout_fields)
-        self.assertIn('sensor_type', layout_fields)
-        self.assertIn('unit', layout_fields)
-        self.assertIn('data_type', layout_fields)
+        form_html = form.as_p()
+
+        self.assertIn('name="name"', form_html)
+        self.assertIn(f'value="{self.device.pk}"', form_html) # device is hidden
+        self.assertIn('name="is_active"', form_html)
+        self.assertIn('name="sensor_type"', form_html)
+        self.assertIn('name="unit"', form_html)
+        self.assertIn('name="data_type"', form_html)
 
         # Check if the submit button is included
         has_submit = self._layout_has_submit(form.helper.layout)

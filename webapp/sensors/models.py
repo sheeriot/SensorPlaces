@@ -12,6 +12,17 @@ from typing import Any, Optional
 from datetime import datetime
 from decimal import Decimal
 
+GRAPH_TYPE_CHOICES = [
+    ('LINE', 'Line Graph'),
+    ('SCATTER', 'Scatter Plot'),
+    ('BAR', 'Bar Graph'),
+    ('STEP', 'Step Graph'),
+]
+
+
+class TimeStampedModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+
 def validate_image_size(image):
     filesize = image.size
     megabyte_limit = 5.0
@@ -51,8 +62,22 @@ class Place(models.Model):
         related_name='default_for_places',
         help_text="Default InfluxDB source for this place's sensors."
     )
+    switchbot_influx_source = models.ForeignKey(
+        'InfluxSource',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='switchbot_for_places',
+        help_text="InfluxDB source specifically for SwitchBot devices at this place."
+    )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
+
+    # SwitchBot Integration Fields
+    switchbot_enable: BooleanField = models.BooleanField(default=False, help_text="Enable SwitchBot integration for this place.")
+    switchbot_token: CharField = models.CharField(max_length=255, null=True, blank=True)
+    switchbot_secret: CharField = models.CharField(max_length=255, null=True, blank=True)
+    switchbot_user_id: CharField = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self) -> str:
         """Return the name of the place."""
@@ -308,7 +333,7 @@ class Device(models.Model):
     )
     is_lorawan: BooleanField = models.BooleanField(default=False, verbose_name="LoRaWAN Device")
     is_switchbot: BooleanField = models.BooleanField(default=False, help_text="Is this a SwitchBot device?")
-    switchbot_hub_device_id: CharField = models.CharField(max_length=100, null=True, blank=True)
+    hub_id: CharField = models.CharField(max_length=100, null=True, blank=True, help_text="Identifier for the hub or bridge device, if any.")
     is_active: BooleanField = models.BooleanField(
         default=True,
         help_text="inactive devices will be hidden by default"
@@ -368,38 +393,39 @@ class InfluxSource(models.Model):
 
 class Sensor(models.Model):
     """A sensor that can be attached to a device."""
-    SENSOR_TYPES = [
-        ('TEMPERATURE', 'Temperature'),
-        ('HUMIDITY', 'Humidity'),
-        ('PRESSURE', 'Pressure'),
-        ('LIGHT', 'Light'),
-        ('SOUND', 'Sound'),
-        ('MOTION', 'Motion'),
-        ('CO2', 'Carbon Dioxide'),
-        ('VOC', 'Volatile Organic Compounds'),
-        ('PM25', 'Particulate Matter 2.5'),
-        ('PM10', 'Particulate Matter 10'),
-        ('OTHER', 'Other'),
-    ]
+    # SENSOR_TYPES = [
+    #     ('TEMPERATURE', 'Temperature'),
+    #     ('HUMIDITY', 'Humidity'),
+    #     ('PRESSURE', 'Pressure'),
+    #     ('LIGHT', 'Light'),
+    #     ('SOUND', 'Sound'),
+    #     ('MOTION', 'Motion'),
+    #     ('CO2', 'Carbon Dioxide'),
+    #     ('VOC', 'Volatile Organic Compounds'),
+    #     ('PM25', 'Particulate Matter 2.5'),
+    #     ('PM10', 'Particulate Matter 10'),
+    #     ('OTHER', 'Other'),
+    # ]
     DATA_TYPES = [
         ('DIRECT', 'Direct'),
         ('INFLUX', 'InfluxDB (Gauge)'),
         ('INFLUX_CUMULATIVE_RESET', 'InfluxDB (Cumulative, Resets)'),
+        ('NONE', 'None'),
     ]
-    UNITS = [
-        ('C', '°C'),
-        ('F', '°F'),
-        ('K', 'K'),
-        ('RH', '%RH'),
-        ('PA', 'Pa'),
-        ('HPA', 'hPa'),
-        ('LUX', 'lux'),
-        ('DB', 'dB'),
-        ('PPM', 'ppm'),
-        ('PPB', 'ppb'),
-        ('UGM3', 'μg/m³'),
-        ('NONE', '(None)'),
-    ]
+    # UNITS = [
+    #     ('C', '°C'),
+    #     ('F', '°F'),
+    #     ('K', 'K'),
+    #     ('RH', '%RH'),
+    #     ('PA', 'Pa'),
+    #     ('HPA', 'hPa'),
+    #     ('LUX', 'lux'),
+    #     ('DB', 'dB'),
+    #     ('PPM', 'ppm'),
+    #     ('PPB', 'ppb'),
+    #     ('UGM3', 'μg/m³'),
+    #     ('NONE', '(None)'),
+    # ]
 
     name: CharField = models.CharField(max_length=100)
     device: ForeignKey = models.ForeignKey('Device', on_delete=models.CASCADE, related_name='sensors')
@@ -415,14 +441,7 @@ class Sensor(models.Model):
 
     graph_type: CharField = models.CharField(
         max_length=20,
-        choices=[
-            ('LINE', 'Line Graph'),
-            ('SCATTER', 'Scatter Plot'),
-            ('BAR', 'Bar Graph'),
-            ('STEP', 'Step Graph (Alarm)'),
-            ('ALARM_BAR', 'Alarm Bar Graph'),
-            ('OVERLAY', 'Overlay Graph (Alarm)')
-        ],
+        choices=GRAPH_TYPE_CHOICES,
         default=None,
         null=True,
         blank=True
@@ -435,45 +454,36 @@ class Sensor(models.Model):
     max_value_override = models.BooleanField(default=False)
 
     # For data source
-    influx_source: ForeignKey = models.ForeignKey('InfluxSource', on_delete=models.SET_NULL, null=True, blank=True, related_name='sensors')
-    influx_measurement: CharField = models.CharField(max_length=100, null=True, blank=True)
+    influx_source: ForeignKey = models.ForeignKey(InfluxSource, on_delete=models.SET_NULL, null=True, blank=True)
+    influx_measurement = models.CharField(max_length=200, blank=True, null=True)
+    influx_field_name = models.CharField(max_length=200, blank=True, null=True,
+                                         help_text='Influx field name')
+    influx_tag_key = models.CharField(max_length=100, blank=True, null=True, help_text="The InfluxDB tag key, e.g. host, device_id")
 
-    # Cached reading to reduce API calls
-    cached_reading_value = models.FloatField(null=True, blank=True)
-    cached_reading_timestamp = models.DateTimeField(null=True, blank=True)
-    last_checked_timestamp = models.DateTimeField(null=True, blank=True, help_text="The last time the application checked for a new value from the source.")
-    stale_threshold_override_seconds = models.PositiveIntegerField(
-        null=True,
-        blank=True,
-        help_text="Override the default stale time from the sensor type, in seconds."
+    # Cached value fields
+    cached_reading_value = models.FloatField(null=True, blank=True, editable=False)
+    cached_reading_timestamp = models.DateTimeField(null=True, blank=True, editable=False)
+    last_checked_timestamp = models.DateTimeField(null=True, blank=True, editable=False)
+    stale_threshold_seconds = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Override the default stale threshold for this sensor (in seconds)."
     )
 
-    created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: DateTimeField = models.DateTimeField(auto_now=True)
+    @property
+    def effective_stale_threshold(self):
+        """Returns the sensor-specific stale threshold or the system default."""
+        if self.stale_threshold_seconds is not None:
+            return self.stale_threshold_seconds
+        # Fallback to a global setting, with a hardcoded default of 5 minutes
+        return getattr(settings, 'DEFAULT_STALE_THRESHOLD_SECONDS', 300)
 
-    # --- Properties to get effective values ---
     @property
     def effective_unit(self):
         if self.unit_override and self.unit:
             return self.unit
-        if self.sensor_type and self.sensor_type.default_unit:
-            return self.sensor_type.default_unit
+        if self.sensor_type and self.sensor_type.unit:
+            return self.sensor_type.unit
         return None
-
-    @property
-    def effective_data_type(self):
-        if self.data_type:
-            return self.data_type
-        # Fallback to DIRECT if no data_type set (though default is DIRECT)
-        return 'DIRECT'
-
-    @property
-    def effective_graph_type(self):
-        if self.graph_type:
-            return self.graph_type
-        if self.sensor_type:
-            return self.sensor_type.default_graph_type
-        return 'SCATTER'
 
     @property
     def effective_min_value(self):
@@ -488,86 +498,21 @@ class Sensor(models.Model):
         return self.sensor_type.max_value if self.sensor_type else None
 
     @property
+    def effective_graph_type(self):
+        if self.graph_type:
+            return self.graph_type
+        if self.sensor_type and self.sensor_type.graph_type:
+            return self.sensor_type.graph_type
+        return 'LINE'  # Default fallback
+
+    @property
     def effective_decimal_places(self):
         if self.sensor_type and self.sensor_type.decimal_places is not None:
             return self.sensor_type.decimal_places
-        return 1
+        return 2
 
-    @property
-    def effective_stale_threshold(self):
-        """Get the stale threshold in seconds, using override if available."""
-        if self.stale_threshold_override_seconds is not None:
-            return self.stale_threshold_override_seconds
-        if self.sensor_type and self.sensor_type.default_stale_threshold_seconds is not None:
-            return self.sensor_type.default_stale_threshold_seconds
-        return 300  # Fallback to 5 minutes
-
-    @property
-    def get_effective_data_type_display(self):
-        val = self.effective_data_type
-        return dict(self.DATA_TYPES).get(val, val)
-    # --- End of properties ---
-
-    def clean(self):
-        super().clean()
-        # Ensure sensor can't be active if device is inactive
-        if self.is_active and not self.device.is_active:
-            raise ValidationError({
-                'is_active': 'Sensor cannot be active when its device is inactive.'
-            })
-
-        # Also check if the device's location is inactive
-        if self.is_active and self.device.location and not self.device.location.is_active:
-            raise ValidationError({
-                'is_active': 'Sensor cannot be active when its device\'s location is inactive.'
-            })
-
-        # Data Type validation
-        if self.data_type == 'DIRECT':
-             # DIRECT is the default, so it's always allowed.
-             pass
-        elif self.data_type == 'INFLUX':
-             # If setting to INFLUX, check if the sensor type allows override?
-             # Or just allow it if set. The user requested removing data_type_override logic.
-             # But wait, SensorType.allow_override still exists.
-             # "If the data_type_override on the Sensor model needs to be removed."
-             # Does that mean we ignore SensorType.allow_override too?
-             # Probably not, but we can't check data_type_override anymore.
-
-             # Let's check if SensorType allows override only if we are deviating from 'DIRECT' (the default)?
-             # But we removed default_data_type from SensorType too.
-             # So SensorType doesn't really have a say in data_type anymore, EXCEPT via allow_override flag?
-             # If allow_override is meant to control if *user* can change it?
-
-             # With data_type_override gone, data_type IS the source of truth.
-             # We should probably just respect allow_override if it's trying to be set to something fancy?
-
-             if self.sensor_type and not self.sensor_type.allow_override:
-                 # If allow_override is False, maybe we shouldn't allow changing from DIRECT?
-                 # But we don't know what the "default" is anymore since we removed it from SensorType.
-                 # So effectively, allow_override on SensorType might be vestigial or just for UI?
-                 pass
-
-
-    def save(self, *args, **kwargs):
-        # Run validation
-        self.full_clean()
-
-        # If device is inactive, sensor must be inactive
-        if not self.device.is_active:
-            self.is_active = False
-
-        # Also check if the device's location is inactive
-        if self.device.location and not self.device.location.is_active:
-            self.is_active = False
-
-        super().save(*args, **kwargs)
-
-    def __str__(self) -> str:
-        return f"{self.name} ({self.sensor_type})"
-
-    def get_sensor_type_display(self) -> str:
-        return self.sensor_type.name if self.sensor_type else 'Unknown'
+    def get_sensor_type_display(self):
+        return self.sensor_type.name if self.sensor_type else "Unknown"
 
     def get_absolute_url(self):
         """Returns the URL to the sensor's detail page."""
@@ -575,6 +520,8 @@ class Sensor(models.Model):
             'place_slug': self.device.location.place.slug,
             'pk': self.pk
         })
+
+    # objects = SensorManager()
 
     class Meta:
         verbose_name_plural = '4. Sensors'
@@ -588,31 +535,25 @@ class Sensor(models.Model):
 class SensorType(models.Model):
     name = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True)
-
-    # New fields for defaults
-    default_unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
-    # Removed default_data_type as per user request
+    # Default graph type for this sensor type
+    graph_type = models.CharField(
+        max_length=20,
+        choices=GRAPH_TYPE_CHOICES,
+        default='LINE',
+        null=True,
+        blank=True
+    )
+    unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
+    # How many decimal places to round to
+    decimal_places = models.PositiveIntegerField(default=2, null=True, blank=True)
     min_value = models.FloatField(null=True, blank=True)
     max_value = models.FloatField(null=True, blank=True)
     allow_override = models.BooleanField(default=False)
-    decimal_places = models.PositiveIntegerField(null=True, blank=True, help_text="Number of decimal places to display for sensor readings.")
     default_stale_threshold_seconds = models.PositiveIntegerField(
         default=300,
         null=True,
         blank=True,
         help_text="Default stale time for this sensor type, in seconds. Default is 5 minutes."
-    )
-    default_graph_type = models.CharField(
-        max_length=20,
-        choices=[
-            ('LINE', 'Line Graph'),
-            ('SCATTER', 'Scatter Plot'),
-            ('BAR', 'Bar Graph'),
-            ('STEP', 'Step Graph (Alarm)'),
-            ('ALARM_BAR', 'Alarm Bar Graph'),
-            ('OVERLAY', 'Overlay Graph (Alarm)')
-        ],
-        default='SCATTER'
     )
 
     def __str__(self):

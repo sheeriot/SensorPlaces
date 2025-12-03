@@ -22,7 +22,7 @@
             {% csrf_token %}
 
             {% for field in form %}
-            <div class="mb-3">
+            <div class="mb-2">
               {{ field.label_tag }}
               {% render_field field class="form-control" %}
               {% if field.help_text %}

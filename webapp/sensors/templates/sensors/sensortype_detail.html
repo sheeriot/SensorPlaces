@@ -15,7 +15,7 @@
             <hr>
             <div class="row">
                 <div class="col-md-6">
-                    <p><strong>Default Unit:</strong> {{ object.default_unit|default:"N/A" }}</p>
+                    <p><strong>Default Unit:</strong> {{ object.unit|default:"N/A" }}</p>
                     <p><strong>Min Value:</strong> {{ object.min_value|default_if_none:"N/A" }}</p>
                 </div>
                 <div class="col-md-6">

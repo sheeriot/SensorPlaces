@@ -68,7 +68,7 @@ class DeviceTypeAdmin(admin.ModelAdmin):
 
 @admin.register(SensorType)
 class SensorTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'default_unit', 'allow_override', 'min_value', 'max_value', 'decimal_places')
+    list_display = ('name', 'unit', 'graph_type', 'allow_override', 'min_value', 'max_value', 'decimal_places')
     search_fields = ('name', 'description')
     list_filter = ('allow_override',)
     ordering = ('name',)
@@ -77,7 +77,7 @@ class SensorTypeAdmin(admin.ModelAdmin):
             'fields': ('name', 'description')
         }),
         ('Defaults and Overrides', {
-            'fields': ('default_unit', 'allow_override')
+            'fields': ('unit', 'graph_type', 'allow_override')
         }),
         ('Value Configuration', {
             'fields': ('min_value', 'max_value', 'decimal_places')
@@ -92,10 +92,10 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(Sensor)
 class SensorAdmin(admin.ModelAdmin):
-    list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'effective_data_type_display', 'is_active')
+    list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'data_type_display', 'is_active')
     list_filter = ('sensor_type', 'is_active', 'device__location')
     search_fields = ('name', 'device__name')
-    readonly_fields = ('device', 'created_at', 'updated_at', 'cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_override_seconds')
+    readonly_fields = ()
     autocomplete_fields = ['device', 'sensor_type', 'influx_source']
 
     fieldsets = (
@@ -103,13 +103,13 @@ class SensorAdmin(admin.ModelAdmin):
             'fields': ('name', 'device', 'sensor_type', 'is_active')
         }),
         ('Live Data', {
-            'fields': ('cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_override_seconds')
+            'fields': ('cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_seconds')
         }),
         ('Display & Data Type Settings', {
             'fields': ('graph_type', ('unit', 'unit_override'), 'data_type')
         }),
         ('InfluxDB Settings', {
-            'fields': ('influx_source', 'influx_measurement'),
+            'fields': ('influx_source', 'influx_measurement', 'influx_field_name', 'influx_tag_key'),
             'classes': ('collapse',)
         }),
         ('Metadata', {
@@ -143,9 +143,9 @@ class SensorAdmin(admin.ModelAdmin):
         return "N/A"
     effective_unit_display.short_description = 'Unit'
 
-    def effective_data_type_display(self, obj):
-        return obj.get_effective_data_type_display
-    effective_data_type_display.short_description = 'Data Type'
+    def data_type_display(self, obj):
+        return obj.get_data_type_display
+    data_type_display.short_description = 'Data Type'
 
     class Meta:
         verbose_name_plural = '4. Sensors'

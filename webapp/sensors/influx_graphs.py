@@ -18,37 +18,40 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
     Can filter by a relative time_range or an absolute start/end time.
     Also updates the sensor's cached reading with the latest data point found.
     """
-    ic(f"Querying data for InfluxDB sensor: {sensor.name} (ID: {sensor.pk}) from {start_date} to {end_date}")
+    # ic(f"Querying data for InfluxDB sensor: {sensor.name} (ID: {sensor.pk}) from {start_date} to {end_date}")
 
     if not sensor.influx_source:
         ic("Sensor has no InfluxDB source configured.")
         return [], 0
 
-    # Determine the correct filter field based on sensor's device type.
-    # Logic matched with utils.get_latest_influx_reading
-    filter_field = "device_id" # Default
-    if sensor.influx_measurement and 'frmpayload' in sensor.influx_measurement:
-         filter_field = "dev_eui"
+    # Determine the correct filter field. Prioritize the specific one on the sensor.
+    if sensor.influx_tag_key:
+        filter_field = sensor.influx_tag_key
+    elif sensor.influx_measurement and 'frmpayload' in sensor.influx_measurement:
+        filter_field = "dev_eui"
     elif sensor.device.is_lorawan:
-         filter_field = "dev_eui"
+        filter_field = "dev_eui"
+    else:
+        filter_field = "device_id" # Default
 
     device_id_val = sensor.device.device_id
-    ic(f"Using filter field '{filter_field}' with value '{device_id_val}' for measurement '{sensor.influx_measurement}'")
+    # ic(f"Using filter field '{filter_field}' with value '{device_id_val}' for measurement '{sensor.influx_measurement}'")
 
     try:
         client = get_influxdb_client(sensor.influx_source)
         measurement = sensor.influx_measurement
+        field_name = sensor.influx_field_name or "value"
 
         time_filter = f"time >= '{start_date.isoformat()}' AND time <= '{end_date.isoformat()}'"
 
         if sensor.data_type == 'INFLUX_CUMULATIVE_RESET':
             query = f"""
                 WITH lagged_values AS (
-                    SELECT time, "value", LAG("value", 1) OVER (ORDER BY time) as prev_value
+                    SELECT time, "{field_name}", LAG("{field_name}", 1) OVER (ORDER BY time) as prev_value
                     FROM "{measurement}"
                     WHERE {time_filter} AND "{filter_field}" = '{device_id_val}'
                 ), differences AS (
-                    SELECT time, "value" - prev_value as diff
+                    SELECT time, "{field_name}" - prev_value as diff
                     FROM lagged_values
                     WHERE prev_value IS NOT NULL
                 )
@@ -56,19 +59,20 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
             """
         else:
             query = f"""
-                SELECT time, "value"
+                SELECT time, "{field_name}" as "value"
                 FROM "{measurement}"
                 WHERE {time_filter} AND "{filter_field}" = '{device_id_val}'
                 ORDER BY time ASC
             """
-        ic("Generated InfluxDB Query:", query)
+        # ic("Generated InfluxDB Query:", query)
 
         start_time = time.perf_counter()
         reader = client.query(query=query, language="sql")
         df = reader.to_pandas().reset_index()
         end_time = time.perf_counter()
-        query_time = (end_time - start_time) * 1000
-        ic(f"InfluxDB query completed in {query_time:.2f} ms, returned {len(df)} rows.")
+        query_time = int((end_time - start_time) * 1000)
+
+        # ic(f"Influx: {len(df)} rows in {query_time} ms")
 
         if df.empty:
             return [], query_time
@@ -80,7 +84,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
              df['time'] = df['time'].dt.tz_convert('UTC')
 
         results = []
-        decimal_places = sensor.sensor_type.decimal_places if sensor.sensor_type else 2
+        decimal_places = sensor.effective_decimal_places
         precision = Decimal('1e-' + str(decimal_places)) if decimal_places is not None else None
 
         for index, row in df.iterrows():
@@ -99,7 +103,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
 
                     results.append((py_time, float(value)))
                 except (ValueError, InvalidOperation, TypeError) as e:
-                    ic(f"Error converting value: {row['value']} - {e}")
+                    # ic(f"Error converting value: {row['value']} - {e}")
                     results.append((row['time'], None))
             else:
                 results.append((row['time'], None))
@@ -112,7 +116,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
 
                 # Check if this is newer than what we have
                 if latest_value is not None and (sensor.cached_reading_timestamp is None or latest_time > sensor.cached_reading_timestamp):
-                     ic(f"Updating cached reading for {sensor.name} to {latest_value} at {latest_time}")
+                     # ic(f"Updating cached reading for {sensor.name} to {latest_value} at {latest_time}")
                      sensor.cached_reading_value = latest_value
                      sensor.cached_reading_timestamp = latest_time
                      sensor.last_checked_timestamp = timezone.now()
@@ -138,8 +142,8 @@ def get_lorawan_sensor_data(sensor: Sensor, start_date: datetime, end_date: date
     Can filter by a relative time_range or an absolute start/end time.
     """
     if not isinstance(sensor, Sensor) or not sensor.device.is_lorawan:
-        ic("Attempted to query non-LoRaWAN sensor with get_lorawan_sensor_data")
+        # ic("Attempted to query non-LoRaWAN sensor with get_lorawan_sensor_data")
         # Ensure we still try to get data even if misclassified, falling back to generic
         # return [], 0
 
-    return get_influx_sensor_data(sensor, start_date, end_date)
+        return get_influx_sensor_data(sensor, start_date, end_date)

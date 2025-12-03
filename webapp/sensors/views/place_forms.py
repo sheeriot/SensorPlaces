@@ -4,7 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div  #, Submit, TemplateNameMixin
+from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Fieldset
 
 from ..models import Place, InfluxSource
 
@@ -29,7 +29,7 @@ class PlaceForm(forms.ModelForm):
 
     class Meta:
         model = Place
-        fields = ['name', 'address', 'is_active', 'latitude', 'longitude', 'slug', 'siteplan_image', 'default_influx_source']
+        fields = ['name', 'address', 'is_active', 'latitude', 'longitude', 'slug', 'siteplan_image', 'default_influx_source', 'switchbot_enable']
         widgets = {
             'address': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -228,6 +228,16 @@ class PlaceForm(forms.ModelForm):
                 css_class='mt-3'
             )
         )
+
+        if self.instance and self.instance.pk:
+            switchbot_fieldset = Fieldset(
+                '<legend class="float-none w-auto px-2 mb-0 fs-5 bg-secondary-subtle"><i class="bi bi-robot me-1"></i>SwitchBot Integration</legend>',
+                Div(
+                    Field('switchbot_enable', id="id_switchbot_enable"),
+                    css_class='form-check form-switch mb-3'
+                )
+            )
+            self.helper.layout.insert(-1, switchbot_fieldset)
 
     def clean(self):
         cleaned_data = super().clean()

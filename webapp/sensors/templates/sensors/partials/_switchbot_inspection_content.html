@@ -1,0 +1,107 @@
+<div class="modal-header">
+    <h5 class="modal-title" id="inspectModalLabel">
+        <i class="bi bi-binoculars me-2"></i>
+        Inspect Device: <strong>{% if device %}{{ device.name }}{% else %}{{ device_name }}{% endif %}</strong>
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+    {% if success %}
+        {# Case 1: Inspecting an existing, imported device #}
+        {% if device %}
+            <p>This device is already imported. Below is its current sensor configuration and any new sensors available from the API.</p>
+
+            {% if device.sensors.exists %}
+                <h6><i class="bi bi-check-circle-fill text-success me-1"></i>Existing Sensors</h6>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Sensor Name</th>
+                            <th>InfluxDB Measurement</th>
+                            <th>InfluxDB Field</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sensor in device.sensors.all %}
+                        <tr>
+                            <td>{{ sensor.name }}</td>
+                            <td><code>{{ sensor.influx_measurement|default:'Not Set' }}</code></td>
+                            <td><code>{{ sensor.influx_field_name|default:'Not Set' }}</code></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            {% if missing_switchbot_sensors %}
+                <h6 class="mt-4"><i class="bi bi-exclamation-diamond-fill text-info me-1"></i>New Available Sensors</h6>
+                <p>The following sensors can be added to this device:</p>
+                <ul class="list-group">
+                    {% for sensor in missing_switchbot_sensors %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                {{ sensor.display_name }}
+                                <small class="text-muted ms-2">(Current Value: {{ sensor.value }})</small>
+                            </span>
+                            <button hx-post="{% url 'sensors:add_switchbot_sensor' place_slug=place.slug device_pk=device.pk %}"
+                                    hx-vals='{"sensor_type_name": "{{ sensor.display_name }}"}'
+                                    hx-target="#inspectModalContent"
+                                    hx-swap="innerHTML"
+                                    class="btn btn-sm btn-success">
+                                <i class="bi bi-plus-lg me-1"></i> Add
+                            </button>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="alert alert-success mt-3"><i class="bi bi-check-all me-1"></i>No new sensors found. All available sensors from the SwitchBot API have been added.</div>
+            {% endif %}
+
+        {# Case 2: Inspecting a new, un-imported device from the management page #}
+        {% elif results %}
+            <p>This device has not been imported. If imported, the following sensors would be created with this configuration:</p>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Sensor Name</th>
+                        <th>Current Reading</th>
+                        <th>InfluxDB Measurement</th>
+                        <th>InfluxDB Field</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                        <tr>
+                            <td>{{ result.sensor_name }}</td>
+                            <td>{{ result.current_reading }}</td>
+                            <td><code>{{ result.influx_measurement }}</code></td>
+                            <td><code>{{ result.influx_field }}</code></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if raw_data %}
+            <div class="mt-3">
+                <a class="small" data-bs-toggle="collapse" href="#collapseRawData" role="button" aria-expanded="false" aria-controls="collapseRawData">
+                    Show Raw API Data
+                </a>
+                <div class="collapse" id="collapseRawData">
+                    <pre class="bg-light p-2 rounded small mt-2"><code>{{ raw_data }}</code></pre>
+                </div>
+            </div>
+        {% endif %}
+
+    {% else %}
+        <div class="alert alert-danger">
+            <h5 class="alert-heading">API Error</h5>
+            <p>{{ error_message }}</p>
+        </div>
+    {% endif %}
+</div>
+
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+</div>

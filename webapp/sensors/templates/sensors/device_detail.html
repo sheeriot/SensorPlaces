@@ -26,9 +26,21 @@
                 {% include 'sensors/includes/device_detail_card.html' %}
                 <!-- Sensors Card -->
                 {% include 'sensors/includes/sensor_list_card.html' %}
+                {% if device.is_switchbot %}
+                    {% include 'sensors/includes/switchbot_device_card.html' %}
+                {% endif %}
             </div>
         </div>
     </div>
+</div>
+
+<!-- Generic Modal for Inspection -->
+<div class="modal fade" id="inspectModal" tabindex="-1" aria-labelledby="inspectModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" id="inspectModalContent">
+      <!-- Content will be loaded here by HTMX -->
+    </div>
+  </div>
 </div>
 
 {% endblock %}

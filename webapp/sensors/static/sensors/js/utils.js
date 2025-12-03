@@ -30,6 +30,16 @@ window.utils = {
 
         try {
             const response = await fetch(url, options);
+            if (!response.ok) {
+                // For HTTP errors, log them and throw to be caught by the caller
+                console.error(`HTTP error! status: ${response.status}`, {response});
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            // Check if the response is JSON before trying to parse it.
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                return response.json();
+            }
             return response;
         } catch (error) {
             console.error('Fetch error:', error);

@@ -6,15 +6,12 @@ from django.conf import settings
 
 BASE = "https://api.switch-bot.com"
 
-def _headers():
+def _headers(token: str, secret: str):
     """Builds the required authentication headers for the SwitchBot API."""
-    token = getattr(settings, 'SWITCHBOT_TOKEN', None)
-    secret = getattr(settings, 'SWITCHBOT_SECRET', None)
 
     if not token or not secret:
         raise Exception(
-            "SWITCHBOT_TOKEN and SWITCHBOT_SECRET must be configured in your Django settings and cannot be empty. "
-            "Please check your environment variables (e.g., env/django.env)."
+            "SwitchBot token and secret must be provided."
         )
 
     t = str(int(time.time() * 1000))
@@ -31,14 +28,16 @@ def _headers():
         "nonce": nonce,
     }
 
-def list_devices():
+def list_devices(token: str, secret: str):
     """Fetches a list of all devices from the SwitchBot API."""
-    r = requests.get(f"{BASE}/v1.1/devices", headers=_headers(), timeout=15)
+    api_headers = _headers(token, secret)
+    r = requests.get(f"{BASE}/v1.1/devices", headers=api_headers, timeout=15)
     r.raise_for_status()
     return r.json()
 
-def get_status(device_id: str):
+def get_status(device_id: str, token: str, secret: str):
     """Fetches the status of a specific device from the SwitchBot API."""
-    r = requests.get(f"{BASE}/v1.1/devices/{device_id}/status", headers=_headers(), timeout=15)
+    api_headers = _headers(token, secret)
+    r = requests.get(f"{BASE}/v1.1/devices/{device_id}/status", headers=api_headers, timeout=15)
     r.raise_for_status()
     return r.json()

@@ -1,0 +1,95 @@
+{% extends "sensors/base.html" %}
+
+{% block title %}SwitchBot Management - {{ place.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    {% include 'sensors/includes/switchbot_settings_card.html' %}
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-robot me-2"></i>Device Sync
+            </h5>
+            <a href="{% url 'sensors:switchbot_management' place.slug %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </a>
+        </div>
+        <div class="card-body">
+            {% if api_status.success %}
+                <div class="alert alert-success" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i>Successfully connected to SwitchBot API.
+                </div>
+
+                {% if devices %}
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <!-- Name/Status Header: Changes at 'md' breakpoint -->
+                            <th class="d-none d-md-table-cell">Name</th>
+                            <th class="d-md-none" style="font-size: 0.8rem; line-height: 1.1;">Name<br><small class="fw-normal text-muted">Status</small></th>
+
+                            <th>Type</th>
+
+                            <!-- Device/Hub ID Header: Changes at 'lg' breakpoint -->
+                            <th class="d-none d-lg-table-cell">Device ID</th>
+                            <th class="d-none d-lg-table-cell">Hub ID</th>
+                            <th class="d-lg-none" style="font-size: 0.8rem; line-height: 1.1;">Device ID<br><small class="fw-normal text-muted">Hub ID</small></th>
+
+                            <!-- Status Header: Hidden below 'md' breakpoint -->
+                            <th class="d-none d-md-table-cell">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in devices %}
+                            {% include 'sensors/partials/switchbot_device_row.html' %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>No devices found in this SwitchBot account.</p>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-danger" role="alert">
+                    <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>API Connection Failed</h5>
+                    <p>There was an error connecting to the SwitchBot API. Please check your credentials and try again.</p>
+                    <hr>
+                    <p class="mb-0 font-monospace small">{{ api_status.error_message }}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Generic Modal for Config -->
+<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" id="configModalContent">
+      <!-- Form will be loaded here by HTMX -->
+    </div>
+  </div>
+</div>
+
+<!-- Generic Modal for Inspection -->
+<div class="modal fade" id="inspectModal" tabindex="-1" aria-labelledby="inspectModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" id="inspectModalContent">
+      <!-- Content will be loaded here by HTMX -->
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.body.addEventListener('closeModal', function(evt) {
+        // Find the modal and hide it using Bootstrap's JS API
+        var modal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
+        if (modal) {
+            modal.hide();
+        }
+    });
+</script>
+{% endblock %}

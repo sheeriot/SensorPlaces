@@ -1,6 +1,6 @@
 const sensorFormManager = {
     config: {
-        debug: false,
+        debug: true,
     },
 
     init() {
@@ -15,7 +15,6 @@ const sensorFormManager = {
 
         // --- Override toggles ---
         this.initOverride('unit');
-        // this.initOverride('data_type'); // Removed
         this.initOverride('min_value');
         this.initOverride('max_value');
 
@@ -29,6 +28,8 @@ const sensorFormManager = {
         const sensorTypeSelect = document.getElementById('id_sensor_type');
         if (sensorTypeSelect) {
             sensorTypeSelect.addEventListener('change', () => this.handleSensorTypeChange());
+            // Fire on initial load to set form state
+            this.handleSensorTypeChange();
         }
 
         // --- Data Type Change Handler ---
@@ -73,14 +74,26 @@ const sensorFormManager = {
         const sensorTypeSelect = document.getElementById('id_sensor_type');
         const selectedOption = sensorTypeSelect.options[sensorTypeSelect.selectedIndex];
         if (!selectedOption || !selectedOption.value) {
+            if (this.config.debug) console.log('[SensorForm] No sensor type selected.');
             return {};
         }
-        return {
-            unitId: selectedOption.dataset.defaultUnitId,
-            // dataType: selectedOption.dataset.defaultDataType, // Removed
+
+        const defaults = {
+            unitId: selectedOption.dataset.unitId,
+            graphType: selectedOption.dataset.graphType,
             minValue: selectedOption.dataset.minValue,
             maxValue: selectedOption.dataset.maxValue,
         };
+
+        if (this.config.debug) {
+            console.log('[SensorForm] Found defaults for selected sensor type:', {
+                unitId: defaults.unitId,
+                graphType: defaults.graphType,
+                minValue: defaults.minValue,
+                maxValue: defaults.maxValue
+            });
+        }
+        return defaults;
     },
 
     async handleAddInfluxSourceClick(e) {
@@ -141,39 +154,56 @@ const sensorFormManager = {
     handleSensorTypeChange() {
         const sensorTypeSelect = document.getElementById('id_sensor_type');
         const selectedOption = sensorTypeSelect.options[sensorTypeSelect.selectedIndex];
+        const dependentFields = document.getElementById('sensor-type-dependent-fields');
+        const graphTypeContainer = document.getElementById('graph_type_container');
 
         if (this.config.debug) console.log(`[SensorForm] Sensor Type changed to: ${selectedOption.value}`);
 
-        const data = this.getSensorTypeDefaults();
-        if (this.config.debug) console.log('[SensorForm] Read SensorType data from attributes:', data);
+        if (selectedOption && selectedOption.value) {
+            dependentFields.classList.remove('d-none');
+            graphTypeContainer.classList.remove('d-none');
+            const data = this.getSensorTypeDefaults();
+            if (this.config.debug) console.log('[SensorForm] Read SensorType data from attributes:', data);
 
-        this.updateFormFields(data);
-        // this.handleDataTypeSelection(); // Removed
+            this.updateFormFields(data);
+        } else {
+            dependentFields.classList.add('d-none');
+            graphTypeContainer.classList.add('d-none');
+        }
     },
 
     updateFormFields(data) {
         const fields = {
             unit: document.getElementById('id_unit'),
-            data_type: document.getElementById('id_data_type'),
+            graph_type: document.getElementById('id_graph_type'),
             min_value: document.getElementById('id_min_value'),
             max_value: document.getElementById('id_max_value')
         };
         const overrides = {
             unit: document.getElementById('id_unit_override'),
-            data_type: document.getElementById('id_data_type_override'),
+            min_value: document.getElementById('id_min_value_override'),
+            max_value: document.getElementById('id_max_value_override'),
         };
 
         if (fields.unit && !overrides.unit.checked) {
-            fields.unit.value = data.unitId || ''; // Corrected property name from defaults object
+            if (this.config.debug) console.log(`[SensorForm] Setting unit to default: ${data.unitId}`);
+            fields.unit.value = data.unitId || '';
         }
-        // if (fields.data_type && !overrides.data_type.checked) {
-        //     fields.data_type.value = data.default_data_type || '';
-        // }
-        if (fields.min_value) {
-            fields.min_value.placeholder = data.minValue !== undefined ? data.minValue : 'Not set'; // Corrected property name
+        if (fields.graph_type) {
+            if (this.config.debug) console.log(`[SensorForm] Setting graph type to default: ${data.graphType}`);
+            fields.graph_type.value = data.graphType || 'LINE';
         }
-        if (fields.max_value) {
-            fields.max_value.placeholder = data.maxValue !== undefined ? data.maxValue : 'Not set'; // Corrected property name
+        if (fields.min_value && !overrides.min_value.checked) {
+            const placeholder = data.minValue !== null && data.minValue !== undefined ? data.minValue : 'Not set';
+            if (this.config.debug) console.log(`[SensorForm] Setting min value placeholder to default: ${placeholder}`);
+            fields.min_value.placeholder = placeholder;
+            fields.min_value.value = '';
+        }
+        if (fields.max_value && !overrides.max_value.checked) {
+            const placeholder = data.maxValue !== null && data.maxValue !== undefined ? data.maxValue : 'Not set';
+            if (this.config.debug) console.log(`[SensorForm] Setting max value placeholder to default: ${placeholder}`);
+            fields.max_value.placeholder = placeholder;
+            fields.max_value.value = '';
         }
         if (this.config.debug) console.log('[SensorForm] Form fields updated with defaults.');
     },
@@ -187,7 +217,11 @@ const sensorFormManager = {
 
         if (dataTypeSelect && influxFields) {
             const isInflux = dataTypeSelect.value.startsWith('INFLUX');
-            influxFields.style.display = isInflux ? 'block' : 'none';
+            if (isInflux) {
+                influxFields.classList.remove('d-none');
+            } else {
+                influxFields.classList.add('d-none');
+            }
         }
     }
 };

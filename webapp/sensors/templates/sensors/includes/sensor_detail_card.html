@@ -87,7 +87,7 @@
             <div class="col-md-6">
                 <div class="mb-2">
                     <label class="form-label mb-0 small text-muted">Data Type</label>
-                    <div>{{ sensor.get_effective_data_type_display }}</div>
+                    <div>{{ sensor.get_data_type_display }}</div>
                 </div>
             </div>
         </div>
@@ -115,23 +115,16 @@
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </div>
-                    <div id="sensor-live-value-{{ sensor.pk }}">
+                    {% if sensor.is_active %}
+                    <div id="live-value-source-{{ sensor.pk }}" class="live-value-container" data-sensor-pk="{{ sensor.pk }}" data-active="{{ sensor.is_active|yesno:'true,false' }}">
                        {% include 'sensors/partials/sensor_live_value_htmx.html' with component_id_suffix="detail" sensor_pk=sensor.pk place_slug=place.slug %}
                     </div>
+                    {% else %}
+                    <div class="badge bg-secondary">Inactive</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
-        {% if sensor.data_type and 'INFLUX' in sensor.data_type %}
-        <hr class="my-2">
-        <p class="card-text mb-1">
-            <strong class="me-2">Influx Source:</strong>
-            <span>{{ sensor.influx_source.name|default:"N/A" }}</span>
-        </p>
-        <p class="card-text mb-1">
-            <strong class="me-2">Influx Measurement:</strong>
-            <code class="user-select-all">{{ sensor.influx_measurement|default:"N/A" }}</code>
-        </p>
-        {% endif %}
 
         <hr class="my-2">
         <div class="row small text-muted">

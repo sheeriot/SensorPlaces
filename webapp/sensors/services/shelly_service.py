@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from django.conf import settings
 from django.utils.text import slugify
 from sensors.models import Device, DeviceType, Place, InfluxSource, Unit
@@ -6,6 +7,7 @@ from sensors.services.sensor_service import process_sensor_reading
 from sensors.influx_client import write_to_influx
 from icecream import ic
 from sensors.utils import record_webhook_activity
+from sensors.services.measurement_utils import get_influx_details
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,7 @@ class ShellyService:
             # Auto-create
             unassigned_location = self.place.get_unassigned_location()
             display_id = parsed_id[-6:]
-            device_name = f"{model_name or 'Device'} {display_id}".strip()
+            device_name = f"{model_name or 'Shelly'} {display_id}".strip()
 
             device_type = None
             if model_name == "Flood":
@@ -96,11 +98,18 @@ class ShellyService:
 
     def _process_readings(self, device: Device, params: dict):
         key_map = {
-            'apower': 'power', 'voltage': 'voltage', 'current': 'current',
-            'temperature': 'temperature', 'temp': 'temperature', 'humidity': 'humidity',
-            'pm2.5': 'pm25', 'pm25': 'pm25', 'battery': 'battery',
+            'power': 'Power',
+            'apower': 'Power',
+            'current': 'Current',
+            'voltage': 'Voltage',
+            'temperature': 'Temperature', 'temp': 'Temperature', 'humidity': 'Humidity', 'hum': 'Humidity',
+            'pm2.5': 'PM2.5', 'pm25': 'PM2.5', 'battery': 'battery',
             'flood': 'Water Detector', 'batV': 'Battery Voltage'
         }
+
+        # Dict to hold readings grouped by target Influx measurement
+        grouped_readings = defaultdict(lambda: {'fields': {}, 'sensors': []})
+        processed_sensors = []
 
         for key, value in params.items():
             if key in ['id', 'device_id', 'src', 'device']:
@@ -130,80 +139,82 @@ class ShellyService:
                     else:
                         measurement_name = 'Battery Voltage'
 
-                # Check if we should skip local storage (if Influx source is available)
-                skip_local = False
-                if self.influx_source:
-                    skip_local = True
+                # If Influx is configured, we won't store locally.
+                skip_local = bool(self.influx_source)
 
                 sensor_obj = process_sensor_reading(device, measurement_name, val_float, skip_local_storage=skip_local)
+                processed_sensors.append({'sensor': sensor_obj, 'value': val_float, 'name': measurement_name})
+
+                if not sensor_obj:
+                    continue
 
                 # Special post-creation configuration for specific sensor types
-                if sensor_obj:
-                    # Flood -> Boolean Unit
-                    if measurement_name == 'Water Detector' and not sensor_obj.unit:
-                        bool_unit = Unit.objects.filter(name__iexact='Boolean').first()
-                        if bool_unit:
-                            sensor_obj.unit = bool_unit
-                            sensor_obj.save(update_fields=['unit'])
+                if measurement_name == 'Water Detector' and not sensor_obj.unit:
+                    bool_unit = Unit.objects.filter(name__iexact='Boolean').first()
+                    if bool_unit:
+                        sensor_obj.unit = bool_unit
+                        sensor_obj.save(update_fields=['unit'])
 
-                # Prepare for logging
-                storage_system = "Local"
-                storage_status = "Failed"
-                cached_status = ""
-
-                # Logic: If influx_source is present, we try to write.
+                # Group for InfluxDB if source is configured
                 if self.influx_source:
-                    storage_system = "Influx"
-                    if sensor_obj:
-                        # Write to Influx first to verify connectivity
-                        measurement = sensor_obj.influx_measurement or f"{slugify(device.name)}_{slugify(sensor_obj.name)}"
-                        fields = {'value': val_float}
-                        tags = {'device_id': device.device_id, 'sensor': sensor_obj.name}
+                    influx_details = get_influx_details(measurement_name)
+                    if influx_details:
+                        influx_measurement, influx_field = influx_details
+                        grouped_readings[influx_measurement]['fields'][influx_field] = val_float
+                        grouped_readings[influx_measurement]['sensors'].append(sensor_obj)
 
-                        try:
-                            write_to_influx(self.influx_source, measurement, fields, tags)
-                            storage_status = "Stored"
+        # Write grouped readings to InfluxDB
+        if self.influx_source:
+            for measurement_group, data in grouped_readings.items():
+                fields = data['fields']
+                sensors = data['sensors']
+                tags = {'device_id': device.device_id, 'device_name': slugify(device.name)}
 
-                            # Update Sensor Configuration on Success
-                            sensor_obj.influx_source = self.influx_source
-                            sensor_obj.influx_measurement = measurement
+                # Construct the full measurement name
+                measurement = f"{slugify(device.name)}_{measurement_group}"
 
-                            st = sensor_obj.sensor_type
-                            can_override = st.allow_override if st else True
+                try:
+                    write_to_influx(self.influx_source, measurement, fields, tags)
+                    storage_status = "Stored"
 
-                            if can_override:
-                                sensor_obj.data_type = 'INFLUX'
-                                sensor_obj.save()
-                            else:
-                                sensor_obj.save()
+                    # Update Sensor Configuration on Success
+                    for sensor in sensors:
+                        sensor.influx_source = self.influx_source
+                        sensor.influx_measurement = measurement
+                        sensor.influx_tag_key = 'device_id'  # Set the default tag key
+                        st = sensor.sensor_type
+                        can_override = st.allow_override if st else True
+                        if can_override:
+                            sensor.data_type = 'INFLUX'
+                        sensor.save()
 
-                        except Exception as e:
-                            storage_status = "Failed"
-                            logger.error(f"Influx Error: {e}")
+                except Exception as e:
+                    storage_status = "Failed"
+                    logger.error(f"Influx Error for measurement '{measurement}': {e}")
+                    # Ensure fallback to DIRECT on failure
+                    for sensor in sensors:
+                        if sensor.data_type == 'INFLUX':
+                             sensor.data_type = 'DIRECT'
+                             sensor.save()
 
-                            # Ensure fallback to DIRECT on failure
-                            if sensor_obj.data_type == 'INFLUX':
-                                 sensor_obj.data_type = 'DIRECT'
-                                 sensor_obj.save()
-                else:
-                    storage_system = "Local"
-                    if sensor_obj:
-                         storage_status = "Stored"
-
-                # Determine cache status for log
-                if sensor_obj:
-                    cached_status = ", cached"
-                else:
-                    # If sensor_obj is None, process_sensor_reading failed
-                    cached_status = ""
-
-                # Log final state to icecream
-                if sensor_obj:
-                     ic(sensor_obj.__dict__)
-
+                # Log the action for this group
                 if settings.WEBHOOK_SNIFFER:
-                    action_msg = f"{storage_system} {storage_status}{cached_status}."
-                    message = f"WEBHOOK: Reading | Place: {self.place.name} | Device: {device.name} | Sensor: {measurement_name} | Value: {val_float} | Action: {action_msg}"
+                    field_str = ", ".join([f"{k}={v}" for k, v in fields.items()])
+                    action_msg = f"Influx {storage_status}, cached."
+                    message = f"WEBHOOK: Reading | Place: {self.place.name} | Device: {device.name} | Measurement: {measurement} | Values: [{field_str}] | Action: {action_msg}"
                     record_webhook_activity(message)
-            else:
-                pass
+
+        # Log readings that were not sent to InfluxDB
+        for item in processed_sensors:
+            sensor_obj = item['sensor']
+            if not sensor_obj or (self.influx_source and get_influx_details(item['name'])):
+                continue # Skip if sensor creation failed or if it was handled by grouped Influx logging
+
+            storage_system = "Local"
+            storage_status = "Stored" if sensor_obj else "Failed"
+            cached_status = ", cached" if sensor_obj else ""
+
+            if settings.WEBHOOK_SNIFFER:
+                action_msg = f"{storage_system} {storage_status}{cached_status}."
+                message = f"WEBHOOK: Reading | Place: {self.place.name} | Device: {device.name} | Sensor: {item['name']} | Value: {item['value']} | Action: {action_msg}"
+                record_webhook_activity(message)
