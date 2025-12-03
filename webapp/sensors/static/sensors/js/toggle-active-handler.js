@@ -14,7 +14,7 @@
 
 // System Configuration
 const toggleActiveConfig = {
-    debug: true,
+    debug: false,
     logMarkerChanges: true,
     logMapEvents: true,
     logStatusChanges: true
@@ -188,7 +188,7 @@ const toggleActiveManager = {
         }
 
         try {
-            const response = await window.utils.fetchWithCSRF(
+            const data = await window.utils.fetchWithCSRF(
                 `/api/${placeSlug}/toggle-active/`,
                 {
                     method: 'POST',
@@ -198,12 +198,6 @@ const toggleActiveManager = {
                     })
                 }
             );
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
 
             if (toggleActiveConfig.debug) {
                 console.debug('Server Response:', data);

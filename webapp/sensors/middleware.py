@@ -4,6 +4,7 @@ from django.template.response import TemplateResponse
 from django.shortcuts import get_object_or_404
 from django.utils.deprecation import MiddlewareMixin
 from django.utils import timezone
+from django.conf import settings
 
 from .models import Place, ToastNotification
 
@@ -153,20 +154,22 @@ class ToastMiddleware:
             response.context_data = {}
         return response
 
-class TimezoneMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
-
+class TimezoneMiddleware(MiddlewareMixin):
     def __call__(self, request):
         user_timezone = request.session.get('user_timezone')
         if user_timezone:
-            timezone.activate(user_timezone)
+            try:
+                timezone.activate(user_timezone)
+            except Exception:
+                # ic(f"Invalid timezone '{user_timezone}' found in session. Deactivating.")
+                timezone.deactivate()
         else:
             timezone.deactivate()
 
         response = self.get_response(request)
 
-        # Deactivate the timezone after the response is processed
-        timezone.deactivate()
+        # After the view has been called, we can check for a new timezone to set
+        if hasattr(request, 'session') and hasattr(request, 'new_timezone'):
+            request.session['user_timezone'] = request.new_timezone
 
         return response

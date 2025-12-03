@@ -19,9 +19,6 @@
             <i class="bi bi-graph-up me-2"></i> Data Graph
         </h5>
         <div class="ms-auto d-flex align-items-center">
-            <span class="me-2 fw-bold">Latest:</span>
-            {% include 'sensors/partials/sensor_live_value_htmx.html' with component_id_suffix="header" sensor_pk=sensor.pk place_slug=place.slug %}
-
             {% if sensor.sensor_type.name == 'Temperature' %}
             <select id="temp-unit-select" class="form-select form-select-sm ms-3" style="width: auto;">
                 <option value="C" {% if 'C' in sensor.effective_unit.symbol %}selected{% endif %}>Celsius (°C)</option>

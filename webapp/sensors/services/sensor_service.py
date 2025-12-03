@@ -5,7 +5,7 @@ from sensors.models import Sensor, SensorReading, SensorType, Device
 
 logger = logging.getLogger(__name__)
 
-def process_sensor_reading(device: Device, measurement_type: str, value: float, skip_local_storage: bool = False):
+def process_sensor_reading(device: Device, measurement_type: str, value: float, skip_local_storage: bool = False, activate_sensor: bool = False):
     """
     Helper to store sensor reading in local DB. Finds or creates a sensor.
     Returns the sensor object on success, None otherwise.
@@ -27,6 +27,10 @@ def process_sensor_reading(device: Device, measurement_type: str, value: float, 
         created = False
         if not sensor:
             sensor_type = SensorType.objects.filter(name__iexact=measurement_type).first()
+            # Special case for SwitchBot battery readings
+            if measurement_type == 'battery':
+                sensor_type = SensorType.objects.filter(name__iexact='Battery Level').first()
+
             # Ensure name is human-readable (replace underscores with spaces)
             sensor_name = measurement_type.replace('_', ' ').title()
 
@@ -35,7 +39,7 @@ def process_sensor_reading(device: Device, measurement_type: str, value: float, 
                 device=device,
                 name=sensor_name,
                 sensor_type=sensor_type,
-                is_active=device.is_active,
+                is_active=activate_sensor,
             )
             created = True
 

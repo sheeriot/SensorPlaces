@@ -1,0 +1,25 @@
+<div class="card my-1">
+    <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0 d-flex align-items-center">
+            <i class="bi bi-robot me-2"></i>
+            SwitchBot Management
+        </h5>
+        <a href="{% url 'sensors:switchbot_management' place.slug %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-gear"></i> Manage
+        </a>
+    </div>
+    <div class="card-body py-2 px-3">
+        <div class="row">
+            <div class="col">
+                <i class="bi bi-robot me-1"></i>
+                <span class="fw-bold">{{ switchbot_devices_count }}</span>
+                <span class="text-muted small">Devices</span>
+            </div>
+            <div class="col">
+                <i class="bi bi-thermometer-half me-1"></i>
+                <span class="fw-bold">{{ switchbot_sensors_count }}</span>
+                <span class="text-muted small">Sensors</span>
+            </div>
+        </div>
+    </div>
+</div>

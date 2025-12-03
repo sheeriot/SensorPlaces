@@ -12,7 +12,7 @@ class SensorTypeForm(forms.ModelForm):
     class Meta:
         model = SensorType
         fields = [
-            'name', 'description', 'default_unit', 'default_graph_type',
+            'name', 'description', 'unit', 'graph_type',
             'min_value', 'max_value', 'allow_override', 'decimal_places'
         ]
 
@@ -26,8 +26,8 @@ class SensorTypeForm(forms.ModelForm):
             'name',
             'description',
             Row(
-                Column('default_unit', css_class='form-group col-md-6 mb-0'),
-                Column('default_graph_type', css_class='form-group col-md-6 mb-0'),
+                Column('unit', css_class='form-group col-md-6 mb-0'),
+                Column('graph_type', css_class='form-group col-md-6 mb-0'),
             ),
             Row(
                 Column('min_value', css_class='form-group col-md-4 mb-0'),

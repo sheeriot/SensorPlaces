@@ -1,0 +1,10 @@
+{% if device.status == 'new' %}
+<span class="badge bg-success">New</span>
+{% elif device.status == 'in_other_place' %}
+<span class="badge bg-warning text-dark">
+    In another place
+    {% if user.is_staff %}
+        ({{ device.other_place_name }})
+    {% endif %}
+</span>
+{% endif %}

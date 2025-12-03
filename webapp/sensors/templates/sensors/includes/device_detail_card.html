@@ -11,23 +11,16 @@
                 {% if not device.is_active %}
                     <span class="badge bg-secondary ms-2">inactive</span>
                 {% endif %}
+                {% if device.is_switchbot %}
+                    <span class="badge bg-info text-dark ms-2">SwitchBot</span>
+                {% endif %}
                 {% include "sensors/partials/lorawan_badge.html" with device=device %}
             </div>
         </h5>
         <div class="d-flex align-items-center">
             <!-- Full buttons for medium screens and up -->
             <div class="btn-group btn-group-sm d-none d-md-flex">
-                {% if device.is_switchbot and device.device_id %}
-                <a href="{% url 'sensors:fetch_switchbot_reading' place_slug=place.slug pk=device.pk %}" class="btn btn-outline-primary" title="Fetch Latest Reading">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </a>
-                <button type="button" class="btn btn-outline-secondary" title="Inspect Cloud Data"
-                        hx-get="{% url 'sensors:device_inspect' place_slug=place.slug pk=device.pk %}"
-                        hx-target="#modal-content">
-                    <i class="bi bi-terminal"></i>
-                </button>
-                {% endif %}
-                <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-outline-warning" title="Edit Device">
+                <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn border-dark btn-outline-warning" title="Edit Device">
                     <i class="bi bi-pencil"></i>
                 </a>
                 <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-outline-info" title="Duplicate Device">
@@ -39,24 +32,10 @@
             </div>
             <!-- Dropdown for small screens -->
             <div class="btn-group d-md-none">
-                {% if device.is_switchbot and device.device_id %}
-                <a href="{% url 'sensors:fetch_switchbot_reading' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-primary" title="Fetch Latest Reading">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </a>
-                {% endif %}
                 <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-three-dots-vertical"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    {% if device.is_switchbot and device.device_id %}
-                    <li>
-                        <button class="dropdown-item" type="button" title="Inspect Cloud Data"
-                                hx-get="{% url 'sensors:device_inspect' place_slug=place.slug pk=device.pk %}"
-                                hx-target="#modal-content">
-                            <i class="bi bi-terminal me-2"></i>Inspect
-                        </button>
-                    </li>
-                    {% endif %}
                     <li><a class="dropdown-item" href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
                     <li><a class="dropdown-item" href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}"><i class="bi bi-copy me-2"></i>Duplicate</a></li>
                     <li><hr class="dropdown-divider"></li>
@@ -84,9 +63,6 @@
                 <div class="text-muted small">Type</div>
                 <div>
                     {{ device.device_type.name }}
-                    {% if device.is_switchbot %}
-                        <span class="badge bg-info text-dark ms-2">SwitchBot</span>
-                    {% endif %}
                 </div>
             </div>
             <div class="col-md-6">
@@ -126,6 +102,7 @@
                 <div>{{ device.notes|linebreaksbr }}</div>
             </div>
             {% endif %}
+
         </div>
     </div>
 </div>

@@ -1,9 +1,11 @@
-from django.db.models import Count, Q, Prefetch
+from django.db.models import Count, Q, F, Prefetch
 from django.db.models.functions import Lower
 from decimal import Decimal
 from typing import Dict, Any
+from django.urls import reverse
+import json
 
-from ..models import Place, Location, Device, Sensor
+from ..models import Place, Location, Device, Sensor, SensorType, Unit, DeviceType
 
 from icecream import ic
 
@@ -150,3 +152,63 @@ def get_live_counts_context(place):
         'sensors_active': sensors_active,
         'sensors_inactive': sensors_inactive
     }
+
+
+def create_switchbot_device(device_item, location, sensor_types, stdout, style):
+    """Helper function to create a single device, returns 1 if created, 0 otherwise."""
+    device_id = device_item['deviceId']
+
+    device, created = Device.objects.get_or_create(
+        device_id=device_id,
+        defaults={
+            'name': device_item['deviceName'],
+            'model': device_item.get('deviceType', 'Unknown'),
+            'manufacturer': 'SwitchBot',
+            'is_switchbot': True,
+            'switchbot_hub_device_id': device_item.get('hubDeviceId'),
+            'location': location,
+            'is_active': not location.slug == 'unassigned-devices'
+        }
+    )
+
+    if created:
+        api_device_type_str = device.model
+
+        if 'Hub' in api_device_type_str:
+            device_type_name = "SwitchBot Hub"
+        else:
+            device_type_name = api_device_type_str
+
+        device_type, _ = DeviceType.objects.get_or_create(
+            name=device_type_name,
+            defaults={'description': f'A {device_type_name} from SwitchBot.'}
+        )
+        device.device_type = device_type
+        device.save()
+        stdout.write(style.SUCCESS(f"Imported new device: {device.name} ({device_id})"))
+
+    # Auto-create sensors for meter devices
+    api_device_type_str = device.model
+    meter_types = ["Meter", "Meter Plus", "Outdoor Meter", "Meter Pro", "WoSensorTH", "WoIOSensor"]
+    if any(meter_type in api_device_type_str for meter_type in meter_types):
+
+        s1, s1_created = Sensor.objects.get_or_create(
+            device=device,
+            sensor_type=sensor_types['temperature'],
+            defaults={'name': f'{device.name} Temperature', 'is_active': device.is_active}
+        )
+        s2, s2_created = Sensor.objects.get_or_create(
+            device=device,
+            sensor_type=sensor_types['humidity'],
+            defaults={'name': f'{device.name} Humidity', 'is_active': device.is_active}
+        )
+        s3, s3_created = Sensor.objects.get_or_create(
+            device=device,
+            sensor_type=sensor_types['battery'],
+            defaults={'name': f'{device.name} Battery', 'is_active': device.is_active}
+        )
+
+        if created or any([s1_created, s2_created, s3_created]):
+                stdout.write(style.SUCCESS(f"    - Ensured Temperature, Humidity, and Battery sensors for {device.name}."))
+
+    return 1 if created else 0

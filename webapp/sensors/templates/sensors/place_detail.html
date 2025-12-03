@@ -16,6 +16,10 @@
 
         {% include "sensors/includes/place_detail_card.html" with place=place place_map_html=place_map_html %}
 
+        {% if place.switchbot_enable %}
+            {% include "sensors/includes/switchbot_summary_card.html" %}
+        {% endif %}
+
         <!-- {% include 'sensors/includes/place_nav_card.html' %} -->
         <!-- Unassigned Devices Card -->
         {% include "sensors/includes/unassigned_devices_card.html" %}

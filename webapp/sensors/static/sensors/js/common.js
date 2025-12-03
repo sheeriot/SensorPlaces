@@ -91,8 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeCore();
 
     // Initialize all Bootstrap popovers
-    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverTriggerList.map(function (popoverTriggerEl) {
         return new bootstrap.Popover(popoverTriggerEl);
     });
 
@@ -111,6 +111,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 focusedElement.blur();
             }
         });
+    });
+
+    // HTMX Modal Handling
+    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+        const target = evt.detail.target;
+        if (target && target.id === 'modal-content') {
+            const modalContainer = document.getElementById('modal-container');
+            if (modalContainer) {
+                const modal = new bootstrap.Modal(modalContainer);
+                modal.show();
+            }
+        }
+    });
+
+    // Global listener to close Bootstrap modals based on a custom event
+    document.addEventListener('closeModal', function(event) {
+        if (commonConfig.debug) console.log('Received closeModal event:', event.detail);
+        const modalSelector = event.detail.value || event.detail; // Handle both object and string detail
+        if (modalSelector) {
+            const modalElement = document.querySelector(modalSelector);
+            if (modalElement) {
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    if (commonConfig.debug) console.log('Hiding modal:', modalSelector);
+                    modalInstance.hide();
+                } else {
+                    console.warn('Could not find a Bootstrap modal instance for selector:', modalSelector);
+                }
+            } else {
+                console.warn('Could not find modal element with selector:', modalSelector);
+            }
+        }
+    });
+
+    // Add HTMX CSRF token configuration
+    document.body.addEventListener('htmx:configRequest', function(evt) {
+        if (evt.detail.verb === 'post' || evt.detail.verb === 'put' || evt.detail.verb === 'delete') {
+            evt.detail.headers['X-CSRFToken'] = window.utils.getCookie('csrftoken');
+        }
+    });
+
+    // Diagnostic listener for HTMX responses
+    document.addEventListener('htmx:afterRequest', function(evt) {
+        if (commonConfig.debug) {
+            const xhr = evt.detail.xhr;
+            console.log('HTMX request completed to:', xhr.responseURL);
+            const triggerHeader = xhr.getResponseHeader('HX-Trigger-After-Settle');
+            if (triggerHeader) {
+                console.log('Server sent HX-Trigger-After-Settle:', triggerHeader);
+            }
+        }
     });
 });
 
@@ -139,9 +190,20 @@ class LiveValueFetcher {
 
     async fetch(force = false) {
         this.containers = document.querySelectorAll('.live-value-container');
-        const allPksOnPage = [...new Set([...this.containers].map(c => c.dataset.sensorPk).filter(Boolean))];
 
-        if (allPksOnPage.length === 0) return;
+        // Filter for containers that are visible and marked as active
+        const activeAndVisibleContainers = [...this.containers].filter(c => {
+            const isActive = c.dataset.active === 'true';
+            const isVisible = c.offsetParent !== null; // A simple visibility check
+            return isActive && isVisible;
+        });
+
+        const allPksOnPage = [...new Set(activeAndVisibleContainers.map(c => c.dataset.sensorPk).filter(Boolean))];
+
+        if (allPksOnPage.length === 0) {
+            if(commonConfig.debug) console.log('[LiveValueFetcher] No active and visible live value containers found on page.');
+            return;
+        }
 
         const pksToFetch = new Set();
         const now = new Date().getTime();
@@ -164,21 +226,30 @@ class LiveValueFetcher {
 
         try {
             const url = `/api/${this.placeSlug}/sensors/live-values/?pks=${[...pksToFetch].join(',')}`;
-            const response = await window.utils.fetchWithCSRF(url);
-            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+            const response = await fetch(url); // Assuming fetchWithCSRF is a wrapper around fetch
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
-            if (data.status !== 'success') throw new Error(data.message || 'API returned an error');
+            if(commonConfig.debug) console.log('[LiveValueFetcher] Received data from API:', data);
 
-            Object.entries(data.payload).forEach(([pk, sensorData]) => {
-                sessionStorage.setItem(`sensor-${pk}-lastcheck`, now.toString());
-                sessionStorage.setItem(`sensor-${pk}-data`, JSON.stringify(sensorData));
-            });
+            if (data.status === 'success' && data.payload) {
+                Object.entries(data.payload).forEach(([pk, sensorData]) => {
+                    sessionStorage.setItem(`sensor-${pk}-lastcheck`, now.toString());
+                    sessionStorage.setItem(`sensor-${pk}-data`, JSON.stringify(sensorData));
+                });
+            } else {
+                // Handle cases where the top-level status is not 'success'
+                throw new Error(data.message || 'API returned a non-success status');
+            }
 
             this.updateAllContainersFromCache();
 
         } catch (error) {
-            console.error('[LiveValueFetcher] Error fetching data:', error);
+            console.error('[LiveValueFetcher] Error fetching or processing data:', error);
+            // Only render error for the specific containers that were part of this failed fetch
             this.containers.forEach(container => {
                 if (pksToFetch.has(container.dataset.sensorPk)) {
                     this.renderErrorForContainer(container, error.message);
@@ -188,7 +259,8 @@ class LiveValueFetcher {
     }
 
     updateAllContainersFromCache() {
-        this.containers.forEach(container => {
+        const allContainers = document.querySelectorAll('.live-value-container');
+        allContainers.forEach(container => {
             const pk = container.dataset.sensorPk;
             const cachedDataStr = sessionStorage.getItem(`sensor-${pk}-data`);
             if (cachedDataStr) {
@@ -201,28 +273,30 @@ class LiveValueFetcher {
     updateSingleContainer(container, sensorData) {
         let html = '';
         if (sensorData && sensorData.status === 'success') {
-            let valueDisplay = parseFloat(sensorData.value).toFixed(sensorData.decimal_places || 2);
+            const value = parseFloat(sensorData.value);
             const unit = sensorData.unit_symbol || '';
+            const isBoolean = (sensorData.unit_name && sensorData.unit_name.toLowerCase() === 'boolean');
 
-            // Handle Boolean type
-            const isBoolean = (sensorData.unit_name && sensorData.unit_name.toLowerCase() === 'boolean') ||
-                              (sensorData.sensor_type && sensorData.sensor_type.toLowerCase() === 'boolean');
-
+            let valueDisplay;
             if (isBoolean) {
-                const val = parseFloat(sensorData.value);
-                valueDisplay = val > 0 ? 'True' : 'False';
+                valueDisplay = value > 0 ? 'True' : 'False';
+            } else if (!isNaN(value)) {
+                valueDisplay = value.toFixed(sensorData.decimal_places || 1);
+            } else {
+                valueDisplay = 'N/A'; // Handle case where value is not a number
             }
 
             const timestamp = sensorData.timestamp ? new Date(sensorData.timestamp) : null;
             const naturalTime = timestamp && window.utils ? window.utils.getNaturalTime(timestamp) : '';
+
             html = `
                 <span class="badge bg-success-subtle text-success-emphasis rounded-1">${valueDisplay}${unit ? ' ' + unit : ''}</span>
-                ${naturalTime ? `<small class="text-muted">(${naturalTime})</small>` : ''}
+                ${naturalTime ? `<small class="text-muted ms-1">(${naturalTime})</small>` : ''}
             `;
         } else if (sensorData && sensorData.status === 'no_reading') {
-            html = `<span class="badge bg-secondary-subtle text-secondary-emphasis rounded-1">No reading</span>`;
+            html = `<span class="badge bg-secondary-subtle text-secondary-emphasis rounded-1" title="No reading available from source.">No Reading</span>`;
         } else {
-            const errorMessage = sensorData ? sensorData.message : 'Data not found';
+            const errorMessage = sensorData ? sensorData.message : 'An error occurred';
             html = `<span class="badge bg-danger-subtle text-danger-emphasis rounded-1" title="${errorMessage}">Error</span>`;
         }
         container.innerHTML = html;
@@ -230,6 +304,41 @@ class LiveValueFetcher {
 
     renderErrorForContainer(container, errorMessage) {
         container.innerHTML = `<span class="badge bg-danger-subtle text-danger-emphasis rounded-1" title="${errorMessage}">Error</span>`;
+    }
+
+    updateSensorValueFromGraph(sensorId, latestData, unitSymbol, decimalPlaces) {
+        if (commonConfig.debug) console.log(`[LiveValueFetcher] Received update from graph for sensor ${sensorId}`, { latestData });
+        if (!latestData) return;
+
+        const [timestamp, value] = latestData;
+        const cacheKey = `sensor-${sensorId}-data`;
+        const cachedDataStr = sessionStorage.getItem(cacheKey);
+        let sensorData;
+
+        if (cachedDataStr) {
+            sensorData = JSON.parse(cachedDataStr);
+        } else {
+            // If no data exists, create a shell object from what the graph knows.
+            sensorData = {
+                status: 'success',
+                unit_symbol: unitSymbol,
+                decimal_places: decimalPlaces,
+            };
+        }
+
+        const newTimestamp = new Date(timestamp);
+        const currentTimestamp = sensorData.timestamp ? new Date(sensorData.timestamp) : new Date(0);
+
+        // Only update if the new data is newer
+        if (newTimestamp > currentTimestamp) {
+            if (commonConfig.debug) console.log(`[LiveValueFetcher] Graph data is newer. Updating cache and view for sensor ${sensorId}.`);
+            sensorData.value = value;
+            sensorData.timestamp = newTimestamp.toISOString();
+            sessionStorage.setItem(cacheKey, JSON.stringify(sensorData));
+            this.updateAllContainersFromCache();
+        } else {
+            if (commonConfig.debug) console.log(`[LiveValueFetcher] Graph data is not newer. Ignoring update for sensor ${sensorId}.`);
+        }
     }
 }
 
@@ -240,50 +349,3 @@ window.LiveValueFetcher = LiveValueFetcher;
 window.sensorPlaces.isInitialized = function(module) {
     return window.sensorPlaces.initialized[module] || false;
 };
-
-// Global event listeners (moved from base.html)
-document.addEventListener('DOMContentLoaded', () => {
-    // HTMX Modal Handling
-    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
-        var target = evt.detail.target;
-        if (target && target.id === 'modal-content') {
-            var modalContainer = document.getElementById('modal-container');
-            if (modalContainer) {
-                var modal = new bootstrap.Modal(modalContainer);
-                modal.show();
-            }
-        }
-    });
-
-    // Global listener to close Bootstrap modals based on a custom event
-    document.addEventListener('closeModal', function(event) {
-        if (commonConfig.debug) console.log('Received closeModal event:', event.detail);
-        const modalSelector = event.detail.value || event.detail; // Handle both object and string detail
-        if (modalSelector) {
-            const modalElement = document.querySelector(modalSelector);
-            if (modalElement) {
-                const modalInstance = bootstrap.Modal.getInstance(modalElement);
-                if (modalInstance) {
-                    if (commonConfig.debug) console.log('Hiding modal:', modalSelector);
-                    modalInstance.hide();
-                } else {
-                    console.warn('Could not find a Bootstrap modal instance for selector:', modalSelector);
-                }
-            } else {
-                console.warn('Could not find modal element with selector:', modalSelector);
-            }
-        }
-    });
-
-    // Diagnostic listener for HTMX responses
-    document.addEventListener('htmx:afterRequest', function(evt) {
-        if (commonConfig.debug) {
-            const xhr = evt.detail.xhr;
-            console.log('HTMX request completed to:', xhr.responseURL);
-            const triggerHeader = xhr.getResponseHeader('HX-Trigger-After-Settle');
-            if (triggerHeader) {
-                console.log('Server sent HX-Trigger-After-Settle:', triggerHeader);
-            }
-        }
-    });
-});

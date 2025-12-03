@@ -1,0 +1,41 @@
+{% extends "sensors/base_modal.html" %}
+
+{% block modal_id %}switchbotConfigModal{% endblock %}
+{% block modal_title %}
+    <i class="bi bi-robot me-2"></i>Edit SwitchBot Configuration <span class="text-muted small">- {{ place.name }}</span>
+{% endblock %}
+
+{% block modal_body %}
+    <form id="switchbot-config-form"
+          hx-post="{{ form_url }}"
+          hx-target="#switchbot-settings-card"
+          hx-swap="outerHTML"
+          >
+        {% csrf_token %}
+        <div class="mb-2">
+            <label for="{{ form.switchbot_user_id.id_for_label }}" class="form-label">{{ form.switchbot_user_id.label }}</label>
+            {{ form.switchbot_user_id }}
+            <small class="form-text text-muted">{{ form.switchbot_user_id.help_text }}</small>
+        </div>
+
+        <div class="mb-2">
+            <label for="{{ form.switchbot_token.id_for_label }}" class="form-label">{{ form.switchbot_token.label }}</label>
+            {{ form.switchbot_token }}
+        </div>
+
+        <div class="mb-2">
+            <label for="{{ form.switchbot_secret.id_for_label }}" class="form-label">{{ form.switchbot_secret.label }}</label>
+            {{ form.switchbot_secret }}
+        </div>
+
+        <div class="mb-2">
+            <label for="{{ form.switchbot_influx_source.id_for_label }}" class="form-label">{{ form.switchbot_influx_source.label }}</label>
+            {{ form.switchbot_influx_source }}
+        </div>
+    </form>
+{% endblock %}
+
+{% block modal_footer %}
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>Cancel</button>
+    <button type="submit" form="switchbot-config-form" class="btn btn-primary"><i class="bi bi-robot me-2"></i>Save</button>
+{% endblock %}

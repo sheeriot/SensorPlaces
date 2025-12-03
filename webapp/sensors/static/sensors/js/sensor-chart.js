@@ -1,6 +1,6 @@
 // Local debug flag - set to true during development, false in production
-const SENSOR_CHART_DEBUG = true;
-
+const SENSOR_CHART_DEBUG = false;
+if (SENSOR_CHART_DEBUG) console.log('sensor-chart.js');
 class SensorChart {
     constructor(graphCardId) {
         this.graphCard = document.getElementById(graphCardId);
@@ -108,10 +108,7 @@ class SensorChart {
             url.searchParams.set('timezone', userTimezone);
             if (this.debug) console.log('Fetching data from URL:', url.toString());
 
-            const response = await window.utils.fetchWithCSRF(url.toString());
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-            const responseData = await response.json();
+            const responseData = await window.utils.fetchWithCSRF(url.toString());
 
             if (responseData.status !== 'success') {
                 throw new Error(responseData.description || 'The server returned an error.');
@@ -122,7 +119,7 @@ class SensorChart {
             // --- Log Data ---
             if (this.debug) {
                 console.log("Sensor Chart Data Payload:");
-                if (data.data_points && data.data_points.length > 0) {
+                if (data && data.data_points && data.data_points.length > 0) {
                      // Show first and last few points
                      console.table(data.data_points.slice(0, 5).concat(data.data_points.slice(-5)));
                 } else {
@@ -167,6 +164,9 @@ class SensorChart {
 
             this.originalData = data.data_points.map(p => [new Date(p[0]), p[1]]);
 
+            // Call the summary and table update function with the correct data
+            this.updateDataPointsTable(this.originalData.map(item => ({ x: item[0], y: item[1] })), this.originalUnit, this.graphCard.dataset.decimalPlaces);
+
             const tempUnitSelect = document.getElementById('temp-unit-select');
             if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
                 tempUnitSelect.dispatchEvent(new Event('change'));
@@ -202,6 +202,19 @@ class SensorChart {
                          warningEl.classList.remove('d-none');
                     }
                 }
+            }
+
+            // Dispatch an event to notify other components that new data is available
+            if (this.originalData.length > 0) {
+                const event = new CustomEvent('graphDataUpdated', {
+                    detail: {
+                        sensorId: this.graphCard.dataset.sensorId,
+                        latestData: this.originalData[this.originalData.length - 1],
+                        unitSymbol: data.sensor.unit,
+                        decimalPlaces: data.sensor.decimal_places
+                    }
+                });
+                document.dispatchEvent(event);
             }
 
         } catch (error) {
@@ -295,7 +308,11 @@ class SensorChart {
         }
 
         const chartData = data.map(item => ({ x: item[0], y: item[1] }));
-        const typeUpper = type ? type.toUpperCase() : 'LINE';
+
+        let typeUpper = 'LINE';
+        if (type) {
+            typeUpper = type.toUpperCase();
+        }
 
         // Map sensor graph type to Chart.js type and options
         let chartType = 'line'; // default
@@ -551,34 +568,40 @@ class SensorChart {
                 if (statsMinEl) statsMinEl.textContent = min !== null ? `${min.toFixed(decimalPlaces)} ${displayUnit}` : '-';
                 if (statsMaxEl) statsMaxEl.textContent = max !== null ? `${max.toFixed(decimalPlaces)} ${displayUnit}` : '-';
 
-                if (this.debug) {
-                    console.log('Data Points Stats:', { count, min, max, displayUnit });
-                }
-
                 let rows = [];
                 const isBoolean = (this.originalUnit === '' && this.sensorType && this.sensorType.toLowerCase() === 'boolean');
 
                 chartData.slice().reverse().forEach(item => {
-                    let valueDisplay;
-                    if (item.y !== null && typeof item.y !== 'undefined') {
+                    const timestamp = item.x;
+                    const value = item.y;
+
+                    if (value !== null && typeof value !== 'undefined') {
+                        let valueDisplay;
                         if (isBoolean) {
-                            valueDisplay = item.y > 0 ? 'True' : 'False';
+                            valueDisplay = value > 0 ? 'True' : 'False';
                         } else {
-                            valueDisplay = item.y.toFixed(decimalPlaces);
+                            valueDisplay = value.toFixed(decimalPlaces);
                         }
-                    } else {
-                        valueDisplay = 'N/A';
+                        rows.push([window.utils.formatTimestamp(timestamp), valueDisplay]);
                     }
-                    rows.push([window.utils.formatTimestamp(item.x), valueDisplay]);
                 });
+
+                // Clear the table body before re-populating
+                dataPointsBody.innerHTML = '';
+                rows.forEach(rowData => {
+                    const tr = document.createElement('tr');
+                    rowData.forEach(cellData => {
+                        const td = document.createElement('td');
+                        td.textContent = cellData;
+                        tr.appendChild(td);
+                    });
+                    dataPointsBody.appendChild(tr);
+                });
+
 
                 // Using the new library
                 if (dataTableElement && window.simpleDatatables) {
                     this.dataTable = new simpleDatatables.DataTable(dataTableElement, {
-                        data: {
-                            headings: ["Timestamp", `Value (${displayUnit})`],
-                            data: rows
-                        },
                         searchable: false,
                         perPageSelect: false,
                         paging: true,

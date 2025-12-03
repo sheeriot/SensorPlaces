@@ -1,0 +1,42 @@
+<div class="card my-1">
+    <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0 d-flex align-items-center">
+            <i class="bi bi-robot me-2"></i>
+            SwitchBot Management
+        </h5>
+    </div>
+    <div class="card-body p-2">
+
+        <div class="row align-items-center">
+            <div class="col-md-auto">
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#inspectModal"
+                            hx-get="{% url 'sensors:inspect_switchbot_device' place_slug=place.slug pk=device.pk %}"
+                            hx-target="#inspectModalContent"
+                            hx-swap="innerHTML">
+                        <i class="bi bi-search"></i> Find Sensors
+                    </button>
+                    <a href="{% url 'sensors:switchbot_management' place.slug %}" class="btn btn-outline-secondary" title="Go to SwitchBot Integration Page">
+                        <i class="bi bi-gear"></i> Manage
+                    </a>
+                </div>
+            </div>
+            <div class="col-md">
+                {% if device.hub_id and device.hub_id != '000000000000' %}
+                <div class="text-muted small">
+                    Hub:
+                    {% if hub_device %}
+                        <a href="{{ hub_device.get_absolute_url }}">{{ hub_device.name }}</a>
+                        <span class="font-monospace">({{ device.hub_id }})</span>
+                    {% else %}
+                        <span class="font-monospace">{{ device.hub_id }}</span>
+                        <span class="text-warning small ms-1">(not found)</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

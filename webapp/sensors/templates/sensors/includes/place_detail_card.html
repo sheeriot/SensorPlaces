@@ -11,12 +11,17 @@
             {% endif %}
         </h5>
         <div class="btn-group btn-group-sm">
-            <a href="{% url 'sensors:place_update' place.slug %}?next={{ absolute_url|urlencode }}" class="btn btn-warning">
+            <a href="{% url 'sensors:place_update' place.slug %}" class="btn btn-warning">
                 <i class="bi bi-pencil"></i>
             </a>
             <a href="{% url 'sensors:place_delete' place.slug %}" class="btn btn-danger">
                 <i class="bi bi-trash"></i>
             </a>
+            {% if place.switchbot_enable %}
+            <a href="{% url 'sensors:switchbot_management' place.slug %}" class="btn btn-info" title="SwitchBot Management">
+                <i class="bi bi-robot"></i>
+            </a>
+            {% endif %}
         </div>
     </div>
     <div class="card-body px-2 pb-1 pt-2">

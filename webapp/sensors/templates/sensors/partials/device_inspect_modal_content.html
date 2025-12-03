@@ -22,7 +22,7 @@
         <div class="alert alert-danger">{{ error }}</div>
     {% else %}
         {% if missing_sensors %}
-        <div class="mb-3">
+        <div class="mb-2">
             <p>The following sensors are available in the cloud but not yet added to this device:</p>
             <ul class="list-group">
                 {% for sensor in missing_sensors %}

@@ -20,7 +20,7 @@ from .mixins import PlaceAnnotationMixin, ReferrerMixin
 from .sensor_forms import SensorForm, LoRaWANSensorForm
 from .views_fun import get_annotated_locations, get_live_counts_context
 from ..decorators import log_execution_time
-from ..utils import get_latest_influx_reading, update_sensor_live_value
+from ..utils import get_latest_influx_reading, update_sensor_live_value, get_influx_record_count
 
 from datetime import datetime, timedelta, timezone as dt_timezone
 
@@ -212,13 +212,6 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add device and location to context
         sensor = self.get_object()
 
-        # Ensure the live value is fresh before rendering the detail card
-        if sensor.data_type and sensor.data_type.startswith('INFLUX'):
-            update_sensor_live_value(sensor)
-        elif sensor.data_type == 'DIRECT':
-            update_sensor_live_value(sensor)
-
-
         device_qs = Device.objects.annotate(
             active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
             inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
@@ -270,6 +263,35 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['locations'] = get_annotated_locations(self._place)
 
         return context
+
+
+@login_required
+def test_influx_connection(request, place_slug, pk):
+    """
+    Tests the InfluxDB connection for a sensor, gets the latest reading,
+    and counts the total records.
+    """
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
+    context = {'sensor': sensor}
+
+    if not sensor.influx_source:
+        context['error'] = "This sensor does not have an InfluxDB source configured."
+        return render(request, 'sensors/partials/_influx_test_results.html', context, status=400)
+
+    try:
+        latest_reading = get_latest_influx_reading(sensor)
+        record_count = get_influx_record_count(sensor)
+
+        context['latest_reading'] = latest_reading
+        context['record_count'] = record_count
+        context['success'] = True
+
+    except Exception as e:
+        ic(f"Error during InfluxDB test for sensor {sensor.pk}: {e}")
+        context['error'] = f"An unexpected error occurred: {e}"
+        context['success'] = False
+
+    return render(request, 'sensors/partials/_influx_test_results.html', context)
 
 
 class SensorLiveValueView(LoginRequiredMixin, View):
@@ -465,7 +487,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             f"<small class='text-muted'>"
             f"Type: {sensor.sensor_type.name if sensor.sensor_type else 'N/A'}<br>"
             f"Unit: {sensor.effective_unit}<br>"
-            f"Data Type: {sensor.get_effective_data_type_display}<br>"
+            f"Data Type: {sensor.get_data_type_display}<br>"
             f"Status: {'Active' if sensor.is_active else 'inactive'}"
             f"</small>"
         )
@@ -531,7 +553,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             'device',
             'device__location',
             'sensor_type',
-            'sensor_type__default_unit',
+            'sensor_type__unit',
             'unit'
         )
 
@@ -687,8 +709,8 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
                 changes.append(f"device: {self._original_values['device'].name} → {sensor.device.name}")
             if self._original_values['sensor_type'] != sensor.sensor_type:
                 changes.append(f"type: {self._original_values['sensor_type']} → {sensor.sensor_type}")
-            if 'data_type' in self._original_values and self._original_values['data_type'] != sensor.effective_data_type:
-                changes.append(f"data type: {self._original_values['data_type']} → {sensor.get_effective_data_type_display}")
+            if 'data_type' in self._original_values and self._original_values['data_type'] != sensor.data_type:
+                changes.append(f"data type: {self._original_values['data_type']} → {sensor.get_data_type_display}")
             if 'unit_id' in self._original_values and self._original_values['unit_id'] != (sensor.effective_unit.id if sensor.effective_unit else None):
                 # Need to import Unit at the top
                 from ..models import Unit
@@ -1051,7 +1073,7 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
         )
 
         # If this is an InfluxDB sensor, use the InfluxDB data path.
-        if sensor.effective_data_type.startswith('INFLUX'):
+        if sensor.data_type.startswith('INFLUX'):
             return lorawan_sensor_data_api(request, place_slug, pk)
 
         # --- The rest of this function is for local DB sensors ---
@@ -1098,10 +1120,11 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
                 'sensor': {
                     'name': sensor.name,
                     'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                    'data_type': sensor.effective_data_type,
-                    'graph_type': sensor.graph_type,
+                    'data_type': sensor.data_type,
+                    'graph_type': sensor.effective_graph_type,
                     'min_value': sensor.effective_min_value,
-                    'max_value': sensor.effective_max_value
+                    'max_value': sensor.effective_max_value,
+                    'decimal_places': sensor.effective_decimal_places
                 },
                 'query_range': {
                     'start_date': start_date.isoformat() if start_date else None,
@@ -1155,6 +1178,14 @@ def lorawan_sensor_data_api(request, place_slug, pk):
                 serializable_val = float(val) if val is not None else None
                 serializable_data_points.append((ts.isoformat(), serializable_val))
 
+        # ic("Building response payload...")
+        # ic(f"Sensor Name: {sensor.name}")
+        # ic(f"Effective unit: {sensor.effective_unit.symbol if sensor.effective_unit else ''}")
+        # ic(f"Data type: {sensor.data_type}")
+        # ic(f"Effective min value: {sensor.effective_min_value}")
+        # ic(f"Effective max value: {sensor.effective_max_value}")
+        # ic(f"Effective graph type: {sensor.effective_graph_type}")
+
         response_data = {
             'status': 'success',
             'description': f'Successfully retrieved {len(serializable_data_points)} data points.',
@@ -1162,10 +1193,11 @@ def lorawan_sensor_data_api(request, place_slug, pk):
                 'sensor': {
                     'name': sensor.name,
                     'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                    'data_type': sensor.effective_data_type,
-                    'graph_type': sensor.graph_type,
+                    'data_type': sensor.data_type,
+                    'graph_type': sensor.effective_graph_type,
                     'min_value': sensor.effective_min_value,
                     'max_value': sensor.effective_max_value,
+                    'decimal_places': sensor.effective_decimal_places,
                 },
                 'query_range': {
                     'start_date': start_date.isoformat(),
@@ -1178,6 +1210,7 @@ def lorawan_sensor_data_api(request, place_slug, pk):
         return JsonResponse(response_data)
 
     except Exception as e:
+        # ic(f"ERROR in lorawan_sensor_data_api: {e}")
         return JsonResponse({
             'status': 'error',
             'description': str(e),
@@ -1312,7 +1345,7 @@ def sensor_live_values_api(request: HttpRequest, place_slug: str) -> JsonRespons
             else:
                 payload[sensor.pk] = {'status': 'no_reading'}
         except Exception as e:
-            ic(f"Error updating live value for sensor {sensor.pk}: {e}")
+            # ic(f"Error updating live value for sensor {sensor.pk}: {e}")
             payload[sensor.pk] = {'status': 'error', 'message': str(e)}
 
     # For any requested PKs that weren't found or didn't belong to the place

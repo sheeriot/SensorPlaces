@@ -1,10 +1,11 @@
 from django import forms
 from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, HTML, Div, Submit, Field
+from crispy_forms.layout import Layout, Row, Column, HTML, Div, Submit, Field, Fieldset
 from crispy_forms.bootstrap import FormActions
 
 from ..models import Sensor, SensorType
+from ..models import InfluxSource
 
 
 class SensorTypeSelect(forms.Select):
@@ -17,7 +18,7 @@ class SensorTypeSelect(forms.Select):
         if self.sensor_types_cache is None:
             try:
                 self.sensor_types_cache = {
-                    st.pk: st for st in SensorType.objects.select_related('default_unit').all()
+                    st.pk: st for st in SensorType.objects.select_related('unit').all()
                 }
             except Exception:
                 # If the database isn't ready (e.g., during migrations), fail gracefully
@@ -31,8 +32,8 @@ class SensorTypeSelect(forms.Select):
         option = super().create_option(name, value, label, selected, index, subindex, attrs)
         if value and self.sensor_types_cache and value in self.sensor_types_cache:
             sensor_type = self.sensor_types_cache[value]
-            option['attrs']['data-default-unit-id'] = sensor_type.default_unit.id if sensor_type.default_unit else ''
-            # option['attrs']['data-default-data-type'] = sensor_type.default_data_type or '' # Removed as default_data_type is no longer in SensorType
+            option['attrs']['data-unit-id'] = sensor_type.unit.id if sensor_type.unit else ''
+            option['attrs']['data-graph-type'] = sensor_type.graph_type or 'LINE'
             option['attrs']['data-min-value'] = str(sensor_type.min_value) if sensor_type.min_value is not None else ''
             option['attrs']['data-max-value'] = str(sensor_type.max_value) if sensor_type.max_value is not None else ''
         return option
@@ -50,7 +51,7 @@ class SensorForm(forms.ModelForm):
             'min_value', 'min_value_override',
             'max_value', 'max_value_override',
             'graph_type',
-            'influx_source', 'influx_measurement'
+            'influx_source', 'influx_measurement', 'influx_field_name', 'influx_tag_key'
         ]
         widgets = {
             'device': forms.Select(attrs={'class': 'form-select'}),
@@ -73,7 +74,9 @@ class SensorForm(forms.ModelForm):
             'max_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'max_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'influx_source': forms.Select(attrs={'class': 'form-select'}),
-            'influx_measurement': forms.TextInput(attrs={'class': 'form-control'})
+            'influx_measurement': forms.TextInput(attrs={'class': 'form-control'}),
+            'influx_field_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'influx_tag_key': forms.TextInput(attrs={'class': 'form-control'})
         }
 
     def __init__(self, *args, **kwargs):
@@ -121,14 +124,26 @@ class SensorForm(forms.ModelForm):
         else:
             self.fields['is_active'].label = 'Active'  # Set initial label
 
-        self.fields['name'].label = "Sensor Name"
+        self.fields['name'].label = False
         self.fields['sensor_type'].label = "Sensor Type"
         self.fields['graph_type'].label = "Graph Type"
-
-        self.fields['unit'].label = False
         self.fields['data_type'].label = False
+        self.fields['unit'].label = False
         self.fields['min_value'].label = False
         self.fields['max_value'].label = False
+        self.fields['influx_source'].label = False
+        self.fields['influx_measurement'].label = False
+        self.fields['influx_field_name'].label = False
+        self.fields['influx_tag_key'].label = False
+
+        self.fields['is_active'].label = False
+        self.fields['unit_override'].label = False
+        self.fields['min_value_override'].label = False
+        self.fields['max_value_override'].label = False
+        self.fields['influx_source'].label = False
+        self.fields['influx_measurement'].label = False
+        self.fields['influx_field_name'].label = False
+        self.fields['influx_tag_key'].label = False
 
         # Set the initial value for the unit field from the effective_unit
         if self.instance and self.instance.pk:
@@ -150,7 +165,7 @@ class SensorForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             if not self.instance.unit_override:
                 self.initial['unit'] = self.instance.effective_unit.pk if self.instance.effective_unit else None
-            self.initial['data_type'] = self.instance.effective_data_type
+            self.initial['data_type'] = self.instance.data_type
 
         # Set labels for the override fields and remove help text for cleaner layout
         self.fields['unit_override'].label = "Override"
@@ -183,16 +198,36 @@ class SensorForm(forms.ModelForm):
         # If we have data_type, update fields based on it
         if 'data_type' in self.data:
             data_type = self.data.get('data_type')
-            if data_type == 'INFLUX':
+            if data_type.startswith('INFLUX'):
                 self.fields['influx_source'].required = True
                 self.fields['influx_measurement'].required = True
+                self.fields['influx_field_name'].required = True
+                self.fields['influx_tag_key'].required = True
             else:
                 self.fields['influx_source'].required = False
                 self.fields['influx_measurement'].required = False
+                self.fields['influx_field_name'].required = False
+                self.fields['influx_tag_key'].required = False
+        elif self.instance.pk and self.instance.data_type:
+            if self.instance.data_type.startswith('INFLUX'):
+                self.fields['influx_source'].required = True
+                self.fields['influx_measurement'].required = True
+                self.fields['influx_field_name'].required = True
+                self.fields['influx_tag_key'].required = True
+            else:
+                self.fields['influx_source'].required = False
+                self.fields['influx_measurement'].required = False
+                self.fields['influx_field_name'].required = False
+                self.fields['influx_tag_key'].required = False
         else:
             # Set defaults for new instances
             self.fields['influx_source'].required = False
             self.fields['influx_measurement'].required = False
+            self.fields['influx_field_name'].required = False
+            self.fields['influx_tag_key'].required = False
+
+        if self.place:
+            self.fields['influx_source'].queryset = InfluxSource.objects.filter(place=self.place)
 
         # Add form helpers
         self.helper = FormHelper()
@@ -201,73 +236,112 @@ class SensorForm(forms.ModelForm):
         self.helper.layout = Layout(
             'referrer',
             'device',
+            HTML("""
+                <div class="row align-items-end mb-2">
+                    <div class="col-md-8">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label for="{{ form.name.id_for_label }}" class="form-label mb-0">Sensor Name*</label>
+                            <div class="form-check form-switch">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+                            </div>
+                        </div>
+                        {{ form.name }}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.data_type.id_for_label }}" class="form-label">Data Type</label>
+                        {{ form.data_type }}
+                    </div>
+                </div>
+            """),
             Row(
-                Column('name', css_class='form-group col-md-9 mb-0'),
-                Column(Field('is_active', wrapper_class='form-check form-switch mt-4'), css_class='form-group col-md-3 mb-0'),
-                css_class='form-row align-items-center'
-            ),
-            Row(
-                Column('sensor_type', css_class='form-group col-md-auto mb-0'),
-                Column('graph_type', css_class='form-group col-md-auto mb-0')
-            ),
-            HTML('<hr class="my-3">'),
-            Row(
+                Column(Field('sensor_type', css_class='w-auto'), css_class='form-group col-md-auto'),
                 Column(
-                    Div(
-                        HTML('<label for="id_unit" class="form-label mb-0">Unit</label>'),
-                        Field('unit_override', wrapper_class='form-check form-switch'),
-                        css_class='d-flex justify-content-between align-items-baseline'
-                    ),
-                    Div(Field('unit', id="id_unit"), css_class="mb-1"),
-                    css_class='form-group col-md-auto mb-0'
+                    Field('graph_type'),
+                    id="graph_type_container",
+                    css_class="form-group col-md-auto d-none"  # Initially hidden
                 ),
-                Column(
-                    Div(
-                        HTML('<label for="id_data_type" class="form-label mb-0">Data Type</label>'),
-                        # Removed data_type_override field
-                        css_class='d-flex justify-content-between align-items-baseline'
-                    ),
-                    Div(Field('data_type', id="id_data_type"), css_class="mb-1"),
-                    css_class='form-group col-md-auto mb-0'
-                ),
-                Column(
-                    Div(
-                        HTML('<label for="id_min_value" class="form-label mb-0">Min Value</label>'),
-                        Field('min_value_override', wrapper_class='form-check form-switch'),
-                        css_class='d-flex justify-content-between align-items-baseline'
-                    ),
-                    Div(Field('min_value', id="id_min_value"), css_class="mb-1"),
-                    css_class='form-group col-md-auto mb-0'
-                ),
-                Column(
-                    Div(
-                        HTML('<label for="id_max_value" class="form-label mb-0">Max Value</label>'),
-                        Field('max_value_override', wrapper_class='form-check form-switch'),
-                        css_class='d-flex justify-content-between align-items-baseline'
-                    ),
-                    Div(Field('max_value', id="id_max_value"), css_class="mb-1"),
-                    css_class='form-group col-md-auto mb-0'
-                )
+                css_class="align-items-end mb-2"
             ),
             Div(
-                HTML('<hr class="my-3">'),
-                css_class='w-100'
+                Fieldset(
+                    'Unit & Value Configuration',
+                    Row(
+                        Column(
+                            HTML("""
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label for="{{ form.unit.id_for_label }}" class="form-label mb-1">Unit</label>
+                                    <div class="form-check form-check-reverse">
+                                        {{ form.unit_override }}
+                                        <label for="{{ form.unit_override.id_for_label }}" class="form-check-label">Override</label>
+                                    </div>
+                                </div>
+                                {{ form.unit }}
+                            """),
+                            css_class='form-group col-md-4 mb-2'
+                        ),
+                        Column(
+                            HTML("""
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label for="{{ form.min_value.id_for_label }}" class="form-label mb-1">Min</label>
+                                    <div class="form-check form-check-reverse">
+                                        {{ form.min_value_override }}
+                                        <label for="{{ form.min_value_override.id_for_label }}" class="form-check-label">Override</label>
+                                    </div>
+                                </div>
+                                {{ form.min_value }}
+                            """),
+                            css_class='form-group col-md-4 mb-0'
+                        ),
+                        Column(
+                            HTML("""
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label for="{{ form.max_value.id_for_label }}" class="form-label mb-1">Max</label>
+                                    <div class="form-check form-check-reverse">
+                                        {{ form.max_value_override }}
+                                        <label for="{{ form.max_value_override.id_for_label }}" class="form-check-label">Override</label>
+                                    </div>
+                                </div>
+                                {{ form.max_value }}
+                            """),
+                            css_class='form-group col-md-4 mb-0'
+                        ),
+                    ),
+                    css_class="border rounded-3 p-3 mt-2"
+                ),
+                id="sensor-type-dependent-fields",
+                css_class="d-none"
             ),
             Div(
+                HTML("<h5>InfluxDB Settings</h5>"),
+                Div(
+                    HTML("""
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label for="id_influx_source" class="form-label mb-0">Influx source</label>
+                        {% if place %}
+                        <a href="{% url 'sensors:influxsource_create' place_slug=place.slug %}"
+                           class="btn btn-sm btn-outline-primary"
+                           id="add-influx-source-btn">
+                            <i class="bi bi-plus-circle"></i> Source
+                        </a>
+                        {% endif %}
+                    </div>
+                """),
+                    Field('influx_source'),
+                    css_class="mb-1"
+                ),
                 Row(
-                    Column(
-                        Field('influx_source'),
-                        css_class="form-group col-md-6 mb-0"
-                    ),
-                    Column('influx_measurement', css_class='form-group col-md-6 mb-0'),
+                    Column('influx_measurement', css_class='form-group col-md-8 mb-0'),
+                    Column('influx_field_name', css_class='form-group col-md-4 mb-0')
                 ),
-                id='influx-fields'
+                Field('influx_tag_key', css_class='form-group col-md-4 mb-0'),
+                id="influx-fields",
+                css_class="mt-2 d-none"
             ),
-            HTML('<hr class="my-3">'),
             Div(
                 FormActions(
                     HTML(f'<a role="button" href="{self.cancel_url}" class="btn btn-secondary me-2"><i class="bi bi-x-circle"></i> Cancel</a>'),
-                    HTML(f'<button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> {"Save" if self.instance.pk else "Create"}</button>')
+                    HTML(f'<button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Save</button>')
                 ),
                 css_class='d-flex justify-content-end'
             )
@@ -276,7 +350,7 @@ class SensorForm(forms.ModelForm):
         if not self.instance.pk:
             # Note: This might need adjustment if the layout changes significantly
             try:
-                self.helper.layout.fields[-1].fields[1].html = f'<button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Create</button>'
+                self.helper.layout.fields[-1].fields[0].fields[1].html = f'<button type="submit" class="btn btn-success"><i class="bi bi-thermometer"></i> Create Sensor</button>'
             except (AttributeError, IndexError):
                 pass # Fail silently if layout is not as expected
 
@@ -286,6 +360,8 @@ class SensorForm(forms.ModelForm):
         device = cleaned_data.get('device') or self.device
         influx_source = cleaned_data.get('influx_source')
         influx_measurement = cleaned_data.get('influx_measurement')
+        influx_field_name = cleaned_data.get('influx_field_name')
+        influx_tag_key = cleaned_data.get('influx_tag_key')
         unit_override = cleaned_data.get('unit_override')
         min_value_override = cleaned_data.get('min_value_override')
         max_value_override = cleaned_data.get('max_value_override')
@@ -293,34 +369,36 @@ class SensorForm(forms.ModelForm):
         # If a sensor type is selected, enforce override logic
         sensor_type = cleaned_data.get('sensor_type')
         if sensor_type:
-            # If unit override is selected but matches the default, clear it
-            if unit_override and cleaned_data.get('unit') == sensor_type.default_unit:
-                cleaned_data['unit'] = None
+            # If graph_type matches the default, clear it so it's not saved on the instance
+            if cleaned_data.get('graph_type') == sensor_type.graph_type:
+                cleaned_data['graph_type'] = None
+
+            # If unit is overridden but matches default, treat as not overridden
+            if unit_override and cleaned_data.get('unit') == sensor_type.unit:
                 cleaned_data['unit_override'] = False
+                unit_override = False
 
-            # If min value override is selected but matches the default, clear it
+            if not unit_override:
+                cleaned_data['unit'] = None
+
+            # Handle min_value
             if min_value_override and cleaned_data.get('min_value') == sensor_type.min_value:
+                 cleaned_data['min_value_override'] = False
+                 min_value_override = False
+
+            if not min_value_override:
                 cleaned_data['min_value'] = None
-                cleaned_data['min_value_override'] = False
 
-            # If max value override is selected but matches the default, clear it
+            # Handle max_value
             if max_value_override and cleaned_data.get('max_value') == sensor_type.max_value:
-                cleaned_data['max_value'] = None
                 cleaned_data['max_value_override'] = False
+                max_value_override = False
 
-        # --- New override logic ---
+            if not max_value_override:
+                cleaned_data['max_value'] = None
+
         if unit_override and not cleaned_data.get('unit'):
             self.add_error('unit', "Unit must be specified when overriding.")
-
-        # Clear values if not overriding to fall back to SensorType defaults
-        if not unit_override:
-            cleaned_data['unit'] = None
-
-        if not min_value_override:
-            cleaned_data['min_value'] = None
-        if not max_value_override:
-            cleaned_data['max_value'] = None
-        # --- End of new logic ---
 
         # Ensure device is set
         if not device and self.device:
@@ -347,6 +425,10 @@ class SensorForm(forms.ModelForm):
                 self.add_error('influx_source', "InfluxDB source is required when data type is InfluxDB")
             if not influx_measurement:
                 self.add_error('influx_measurement', "InfluxDB measurement is required when data type is InfluxDB")
+            if not influx_field_name:
+                self.add_error('influx_field_name', "InfluxDB field name is required when data type is InfluxDB")
+            if not influx_tag_key:
+                self.add_error('influx_tag_key', "InfluxDB tag key is required when data type is InfluxDB")
 
         return cleaned_data
 
@@ -387,7 +469,7 @@ class LoRaWANSensorForm(forms.ModelForm):
                     </div>
                 """),
                 Field('influx_source'),
-                css_class="mb-3"
+                css_class="mb-1"
             ),
             'influx_measurement',
             HTML('<hr>'),

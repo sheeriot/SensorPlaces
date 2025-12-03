@@ -2,7 +2,7 @@
 from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy, reverse
-from django.http import JsonResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
@@ -14,15 +14,20 @@ from django import forms
 from django.db import transaction
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
+from django.utils.text import slugify
 # from typing import Dict, Any, Optional, cast
 
 # App stuff
-from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxSource
+from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxSource, SensorType, Unit, DeviceType
 from .place_forms import PlaceForm, PlaceDeleteForm
+from .switchbot_forms import SwitchBotConfigForm
 from ..map_fun import place_map_create
+from ..switchbot_client import list_devices as switchbot_list_devices, get_status as switchbot_get_status
 from .mixins import PlaceAnnotationMixin, ReferrerMixin
-from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places, get_live_counts_context
+from .views_fun import get_place_data, get_place_counts, get_annotated_locations, get_annotated_places, get_live_counts_context, create_switchbot_device
 from ..decorators import log_execution_time
+from ..services.measurement_utils import get_influx_details
+from ..services.switchbot_service import SwitchBotService
 
 # utility
 import json
@@ -118,6 +123,16 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
             context['place_map_html'] = map_html
         except Exception as e:
             context['place_map_html'] = ""
+
+        # SwitchBot specific counts
+        context['switchbot_devices_count'] = Device.objects.filter(
+            location__place=self.object,
+            is_switchbot=True
+        ).count()
+        context['switchbot_sensors_count'] = Sensor.objects.filter(
+            device__location__place=self.object,
+            device__is_switchbot=True
+        ).count()
 
         context['editable'] = True  # Enable the edit button on the siteplan
 

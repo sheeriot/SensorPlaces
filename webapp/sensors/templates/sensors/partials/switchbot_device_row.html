@@ -1,0 +1,102 @@
+{% comment %}
+This partial renders a table row for a SwitchBot device.
+It's designed to be responsive based on Bootstrap breakpoints.
+
+- Below 'md' (<768px): Name/Status and Device/Hub IDs are combined and stacked.
+- 'md' to 'lg' (≥768px to <992px): Name and Status are separate, Device/Hub ID is combined.
+- 'lg' and up (≥992px): All columns are separate.
+{% endcomment %}
+<tr>
+    <td>
+        {% if device.status == 'new' %}
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#inspectModal"
+                    hx-get="{% url 'sensors:switchbot_inspect_api_device' place.slug device.id %}?name={{ device.name|urlencode }}"
+                    hx-target="#inspectModalContent"
+                    hx-swap="innerHTML">
+                <i class="bi bi-binoculars"></i> Inspect
+            </button>
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
+                    {% if not place.switchbot_influx_source %}disabled title="Please configure an InfluxDB source for SwitchBot first."{% endif %}>
+                    <i class="bi bi-hdd-rack"></i><i class="bi bi-plus-circle"></i> Import
+                </button>
+                <ul class="dropdown-menu dropdown-menu-scrollable">
+                    {% for location in place.locations.all %}
+                        {% if location.name != "Unassigned Devices" %}
+                        <li>
+                            <a class="dropdown-item" href="#"
+                               hx-post="{% url 'sensors:import_switchbot_device' place.slug %}"
+                               hx-vals='{"device_id": "{{ device.id }}", "location_id": "{{ location.id }}"}'
+                               hx-target="closest tr"
+                               hx-swap="outerHTML">
+                                To {{ location.name }} {% if not location.is_active %}<span class="text-muted small">(Inactive)</span>{% endif %}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item" href="#"
+                           hx-post="{% url 'sensors:import_switchbot_device' place.slug %}"
+                           hx-vals='{"device_id": "{{ device.id }}"}'
+                           hx-target="closest tr"
+                           hx-swap="outerHTML">
+                           To Unassigned
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        {% else %}
+            <button class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#inspectModal"
+                    hx-get="{% url 'sensors:switchbot_inspect_api_device' place.slug device.id %}?name={{ device.name|urlencode }}"
+                    hx-target="#inspectModalContent"
+                    hx-swap="innerHTML">
+                <i class="bi bi-search"></i> Inspect
+            </button>
+        {% endif %}
+    </td>
+
+    <!-- Name/Status Column: Changes at 'md' breakpoint -->
+    <td class="d-none d-md-table-cell">
+        {% if device.local_device %}
+            <a href="{{ device.local_device.get_absolute_url }}">{{ device.name }}</a>
+        {% else %}
+            {{ device.name }}
+        {% endif %}
+    </td>
+    <td class="d-md-none">
+        <div>
+            {% if device.local_device %}
+                <a href="{{ device.local_device.get_absolute_url }}">{{ device.name }}</a>
+            {% else %}
+                {{ device.name }}
+            {% endif %}
+        </div>
+        <div>
+            <small class="text-muted">
+                {% include 'sensors/partials/switchbot_status_badge.html' %}
+            </small>
+        </div>
+    </td>
+
+    <td>{{ device.type }}</td>
+
+    <!-- Device/Hub ID Column: Changes at 'lg' breakpoint -->
+    <td class="d-none d-lg-table-cell font-monospace">{{ device.id }}</td>
+    <td class="d-none d-lg-table-cell font-monospace">{{ device.hub_id|default:"N/A" }}</td>
+    <td class="d-lg-none">
+        <div class="font-monospace">{{ device.id }}</div>
+        <small class="text-muted">{{ device.hub_id|default:"N/A" }}</small>
+    </td>
+
+    <!-- Status Column: Hidden below 'md' breakpoint -->
+    <td class="d-none d-md-table-cell">
+        {% include 'sensors/partials/switchbot_status_badge.html' %}
+    </td>
+</tr>
