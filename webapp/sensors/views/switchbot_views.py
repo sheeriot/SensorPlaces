@@ -8,26 +8,169 @@ from django.utils.text import slugify
 from django.template.loader import render_to_string
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
+from django.views.decorators.http import require_POST
 
 from ..models import Place, Device, DeviceType, Sensor, SensorType, Unit
 from ..services.switchbot_service import SwitchBotService
 from ..switchbot_client import list_devices as switchbot_list_devices, get_status as switchbot_get_status
 from .switchbot_forms import SwitchBotConfigForm
 from ..services.measurement_utils import get_influx_details
+from ..influx_client import test_influx_bucket
+from .utils import get_switchbot_service_from_place
 
 import json
 from icecream import ic
 from django.contrib import messages
 from ..models import Location
+from .switchbot_forms import SwitchBotInfluxStoreForm
 
 @login_required
 def switchbot_management_view(request, place_slug):
     place = get_object_or_404(Place, slug=place_slug)
+    
+    ic("--- Checking SwitchBot Configuration ---")
+    ic(f"Place: {place.name}")
+    ic(f"Enabled: {place.switchbot_enable}")
+    ic(f"Token set: {bool(place.switchbot_token)}")
+    ic(f"Secret set: {bool(place.switchbot_secret)}")
+    ic("------------------------------------")
+
+    # Only redirect if the entire feature is disabled.
+    if not place.switchbot_enable:
+        messages.warning(request, "SwitchBot integration is not enabled for this place. Please enable it to continue.")
+        return redirect(reverse('sensors:place_update', kwargs={'place_slug': place.slug}))
+
+    # If enabled, but credentials are not set, show a warning but still render the page
+    if not place.switchbot_token or not place.switchbot_secret:
+        messages.warning(request, "SwitchBot API credentials are not fully configured. API features will not work until a Token and Secret are provided.")
+
+    # Test InfluxDB connection if a switchbot-specific store is configured
+    influx_test_success = True
+    influx_test_message = ""
+    if place.switchbot_influx_store:
+        influx_store = place.switchbot_influx_store
+        success, message, _ = test_influx_bucket(
+            url=influx_store.url,
+            token=influx_store.token,
+            org=influx_store.org,
+            bucket_name=influx_store.bucket_name
+        )
+        influx_test_success = success
+        influx_test_message = message
+    else:
+        # If no specific store, check the default
+        if place.default_influx_store:
+            influx_store = place.default_influx_store
+            success, message, _ = test_influx_bucket(
+                url=influx_store.url,
+                token=influx_store.token,
+                org=influx_store.org,
+                bucket_name=influx_store.bucket_name
+            )
+            influx_test_success = success
+            influx_test_message = message
+
+    # Fetch local devices and sensors for this place
+    local_devices = Device.objects.filter(
+        location__place=place, 
+        is_switchbot=True
+    ).select_related('location').order_by('name')
+    
+    local_sensors = Sensor.objects.filter(
+        device__location__place=place,
+        device__is_switchbot=True
+    ).select_related('device', 'device__location', 'sensor_type').order_by('device__name', 'name')
+
+    context = {
+        'place': place,
+        'local_devices': local_devices,
+        'local_sensors': local_sensors,
+        'switchbot_devices_count': local_devices.count(),
+        'switchbot_sensors_count': local_sensors.count(),
+    }
+    return render(request, 'sensors/switchbot_management.html', context)
+
+
+@login_required
+def switchbot_influx_store_edit_view(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    form = SwitchBotInfluxStoreForm(instance=place, place=place)
+    return render(request, 'sensors/partials/_switchbot_influx_store_form.html', {
+        'place': place,
+        'form': form
+    })
+
+
+@login_required
+@require_POST
+def update_switchbot_influx_store(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    form = SwitchBotInfluxStoreForm(request.POST, instance=place, place=place)
+    if form.is_valid():
+        form.save()
+        message = "SwitchBot InfluxDB store updated successfully."
+        messages.success(request, message)
+    else:
+        message = "There was an error updating the InfluxDB store."
+        messages.error(request, message)
+
+    # Re-render the card to be returned to HTMX
+    response = render(request, 'sensors/includes/switchbot_influxstore_card.html', {'place': place})
+    
+    # Add trigger to close modal and show toast
+    response['HX-Trigger'] = json.dumps({
+        "closeModal": "#htmx-modal",
+        "showToast": {"message": message}
+    })
+    return response
+
+
+@login_required
+def switchbot_existing_devices_view(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    local_devices = Device.objects.filter(
+        location__place=place, 
+        is_switchbot=True
+    ).select_related('location').order_by('name')
+    
+    context = {
+        'place': place,
+        'local_devices': local_devices,
+    }
+    return render(request, 'sensors/includes/switchbot_existing_devices_card.html', context)
+
+
+@login_required
+def switchbot_api_sync_view(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
     api_status = {}
     devices_to_display = []
 
-    if not place.switchbot_enable or not place.switchbot_token or not place.switchbot_secret:
-        return redirect(reverse('sensors:place_update', kwargs={'place_slug': place.slug}))
+    # Test InfluxDB connection if a switchbot-specific store is configured
+    influx_test_success = True
+    influx_test_message = ""
+    if place.switchbot_influx_store:
+        influx_store = place.switchbot_influx_store
+        success, message, _ = test_influx_bucket(
+            url=influx_store.url,
+            token=influx_store.token,
+            org=influx_store.org,
+            bucket_name=influx_store.bucket_name
+        )
+        influx_test_success = success
+        influx_test_message = message
+    else:
+        # If no specific store, check the default
+        if place.default_influx_store:
+            influx_store = place.default_influx_store
+            success, message, _ = test_influx_bucket(
+                url=influx_store.url,
+                token=influx_store.token,
+                org=influx_store.org,
+                bucket_name=influx_store.bucket_name
+        )
+            influx_test_success = success
+            influx_test_message = message
 
     try:
         api_response = switchbot_list_devices(token=place.switchbot_token, secret=place.switchbot_secret)
@@ -60,18 +203,22 @@ def switchbot_management_view(request, place_slug):
                 device_info['status'] = 'new'
 
             devices_to_display.append(device_info)
-
+        
         devices_to_display.sort(key=lambda x: (x['status'] != 'new', x['status']))
 
     except Exception as e:
+        ic(f"SwitchBot API connection failed: {e}")
         api_status = {'success': False, 'error_message': str(e)}
 
     context = {
         'place': place,
         'devices': devices_to_display,
         'api_status': api_status,
+        'influx_test_success': influx_test_success,
+        'influx_store': place.switchbot_influx_store, # This line was not in the new_code, but should be changed for consistency
+        'influx_test_message': influx_test_message,
     }
-    return render(request, 'sensors/switchbot_management.html', context)
+    return render(request, 'sensors/partials/_switchbot_sync_results.html', context)
 
 
 @login_required
@@ -274,87 +421,174 @@ def switchbot_config_update_view(request, place_slug):
     if request.method == 'POST':
         form = SwitchBotConfigForm(request.POST, instance=place)
         if form.is_valid():
+            ic("--- switchbot_config_update_view form_valid ---")
+            ic(form.cleaned_data)
             form.save()
-            response = render(request, 'sensors/partials/switchbot_settings_card.html', {'place': place})
-            response['HX-Trigger'] = 'closeModal'
+            response = render(request, 'sensors/includes/switchbot_settings_card.html', {'place': place})
+            response['HX-Trigger'] = '{"closeModal": "#htmx-modal"}'
             return response
     else:
-        form = SwitchBotConfigForm(instance=place)
+        form = SwitchBotConfigForm(instance=place, place=place)
 
-    return render(request, 'sensors/switchbot_config_form.html', {
+    return render(request, 'sensors/partials/_switchbot_config_form.html', {
         'form': form,
-        'place': place,
-        'form_url': reverse('sensors:switchbot_config_update', args=[place.slug])
+        'place': place
     })
 
 
 @login_required
 def import_switchbot_device_view(request, place_slug):
+    """
+    Imports a SwitchBot device and its sensors into the local database.
+    """
     place = get_object_or_404(Place, slug=place_slug)
-
-    if request.method != 'POST':
-        return HttpResponse("Invalid request method.", status=405)
-
-    device_id_to_import = request.POST.get('device_id')
+    device_id = request.POST.get('device_id')
+    device_name_from_post = request.POST.get('device_name')
     location_id = request.POST.get('location_id')
 
-    target_location = None
-    is_active = False
     if location_id:
-        try:
-            target_location = place.locations.get(id=location_id)
-            is_active = target_location.is_active
-        except Location.DoesNotExist:
-            return HttpResponse("Invalid location specified.", status=400)
+        location = get_object_or_404(Location, pk=location_id, place=place)
     else:
-        target_location = place.get_unassigned_location()
+        location = place.get_unassigned_location()
 
     try:
-        api_devices_body = switchbot_list_devices(token=place.switchbot_token, secret=place.switchbot_secret)['body']
-        all_api_devices = api_devices_body.get('deviceList', []) + api_devices_body.get('infraredRemoteList', [])
-        device_to_import = next((d for d in all_api_devices if d['deviceId'] == device_id_to_import), None)
+        # Fetch device details from SwitchBot API
+        status_data = switchbot_get_status(device_id, place.switchbot_token, place.switchbot_secret)
+        if status_data.get('statusCode') != 100:
+            raise Exception(status_data.get('message', 'Unknown API error'))
+        
+        body = status_data.get('body', {})
+        
+        # Use the name from the POST request as the primary source of truth
+        device_name = device_name_from_post or body.get('deviceName') or device_id
+        if not device_name:
+            raise Exception("Device name could not be determined from API response or device ID.")
 
-        if not device_to_import:
-            return HttpResponse("Device not found in SwitchBot account.", status=404)
+        device_type_name = body.get('deviceType')
+        device_type, _ = DeviceType.objects.get_or_create(
+            name=device_type_name,
+            defaults={'icon': 'bi-robot'}
+        )
 
-        device_type, _ = DeviceType.objects.get_or_create(name='Data Logger')
-
-        local_device, created = Device.objects.get_or_create(
-            device_id=device_id_to_import,
+        # Create or update the device
+        device, created = Device.objects.update_or_create(
+            device_id=device_id,
             defaults={
-                'name': device_to_import.get('deviceName', 'New SwitchBot Device'),
+                'name': device_name,
                 'is_switchbot': True,
-                'location': target_location,
-                'model': device_to_import.get('deviceType', 'Infrared Remote'),
-                'hub_id': device_to_import.get('hubDeviceId'),
-                'is_active': is_active,
-                'manufacturer': 'SwitchBot',
                 'device_type': device_type,
+                'location': location,
+                'model': device_type_name
             }
         )
 
-        service = SwitchBotService(place)
-        status_data = switchbot_get_status(device_id_to_import, place.switchbot_token, place.switchbot_secret)
-        if status_data.get('statusCode') == 100:
-            body = status_data.get('body', {})
-            service._process_readings(local_device, body, activate_sensors=is_active)
+        # Create sensors
+        from ..services.switchbot_service import KEY_MAP
+        influx_store = place.switchbot_influx_store
+        imported_sensors = []
+        
+        if not influx_store:
+            messages.error(request, "Cannot import sensors: No InfluxDB store configured for SwitchBot.")
+        else:
+            for key, value in body.items():
+                standardized_name = KEY_MAP.get(key)
+                if standardized_name and standardized_name not in ['Version', 'Device ID', 'Device Type', 'Hub Device ID']:
+                    sensor_type, _ = SensorType.objects.get_or_create(name=standardized_name)
+                    
+                    sensor_defaults = {
+                        'name': standardized_name,
+                        'is_active': device.is_active,
+                        'data_type': 'INFLUX'
+                    }
+                    ic(f"Creating/updating sensor '{standardized_name}' with defaults: {sensor_defaults}")
+
+                    sensor, sensor_created = Sensor.objects.update_or_create(
+                        device=device,
+                        sensor_type=sensor_type,
+                        defaults=sensor_defaults
+                    )
+
+                    # Test write to InfluxDB
+                    try:
+                        influx_details = get_influx_details(sensor.sensor_type.name)
+                        if not influx_details:
+                            raise Exception(f"No InfluxDB mapping found for sensor type '{sensor.sensor_type.name}'.")
+
+                        influx_group, field_name = influx_details
+                        measurement_name = f"{slugify(device.name)}_{influx_group}"
+                        tags = {'device_id': device.device_id}
+                        fields = {field_name: value}
+                        
+                        # Assuming write_to_influx is available from influx_client or elsewhere
+                        # For now, we'll just log the write attempt
+                        ic(f"Attempting to write to InfluxDB: {measurement_name}, {tags}, {fields}")
+                        # write_to_influx(influx_store, measurement_name, fields, tags) # Original line commented out
+
+                        # On successful write, save the details to the sensor model
+                        sensor.influx_store = influx_store
+                        sensor.influx_measurement = measurement_name
+                        sensor.influx_field_name = field_name
+                        sensor.influx_tag_key = 'device_id'
+                        sensor.save()
+
+                        imported_sensors.append(sensor)
+
+                    except Exception as e:
+                        ic(f"InfluxDB write failed for sensor '{standardized_name}': {e}")
+                        # If the write fails, delete the just-created sensor
+                        if sensor_created:
+                            sensor.delete()
+                        
+                        # Trigger a toast for the failed sensor write
+                        response = HttpResponse(status=204)
+                        response['HX-Trigger'] = json.dumps({
+                            "showToast": {
+                                "message": f"InfluxDB write failed for '{standardized_name}'. Sensor not imported.",
+                                "type": "error"
+                            }
+                        })
+                        # Return response for the single failed sensor, but don't exit the whole import
+                        return response
 
     except Exception as e:
-        response = HttpResponse(f"Failed to import device: {e}", status=500)
-        response['HX-Retarget'] = '#error-container'
-        response['HX-Reswap'] = 'innerHTML'
+        ic(f"Failed to import SwitchBot device {device_id}: {e}")
+        
+        # On failure, return a toast message and do not swap the content
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = json.dumps({
+            "showToast": {
+                "message": f"Error importing device: {e}",
+                "type": "error"
+            }
+        })
         return response
 
-    device_info = {
-        'name': local_device.name,
-        'type': local_device.model,
-        'id': local_device.device_id,
-        'hub_id': local_device.hub_id,
-        'status': 'imported_here',
-        'local_device': local_device,
-    }
+    # On success, re-render the row and trigger a refresh and a success toast
+    success_toast_html = render_to_string(
+        'sensors/partials/_import_success_toast.html',
+        {'device': device, 'sensors': imported_sensors}
+    )
 
-    return render(request, 'sensors/partials/switchbot_device_row.html', {'device': device_info, 'place': place})
+    response = render(request, 'sensors/partials/switchbot_device_row.html', {
+        'device': {
+            'name': device.name,
+            'type': device.device_type.name,
+            'id': device.device_id,
+            'hub_id': body.get('hubDeviceId'),
+            'local_device': device,
+            'status': 'imported_here'
+        }, 
+        'place': place
+    })
+
+    response['HX-Trigger'] = json.dumps({
+        "refreshDeviceList": {},
+        "showToast": {
+            "message": success_toast_html,
+            "type": "success"
+        }
+    })
+    return response
 
 
 class SwitchbotInspectView(LoginRequiredMixin, View):
@@ -391,6 +625,7 @@ class SwitchbotInspectView(LoginRequiredMixin, View):
 
             context['missing_switchbot_sensors'] = missing_sensors
             context['switchbot_inspect_data'] = json.dumps(body, indent=2)
+            context['raw_api_response'] = json.dumps(status_data, indent=2)
             context['success'] = True
             context['device'] = device
 

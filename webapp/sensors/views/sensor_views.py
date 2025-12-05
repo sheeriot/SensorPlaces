@@ -17,12 +17,21 @@ from django.utils.safestring import mark_safe
 
 from ..models import Device, Sensor, SensorReading, Place, Location
 from .mixins import PlaceAnnotationMixin, ReferrerMixin
-from .sensor_forms import SensorForm, LoRaWANSensorForm
+from .sensor_forms import SensorForm, LoRaWANSensorForm, SensorInfluxUpdateForm
 from .views_fun import get_annotated_locations, get_live_counts_context
 from ..decorators import log_execution_time
-from ..utils import get_latest_influx_reading, update_sensor_live_value, get_influx_record_count
-
-from datetime import datetime, timedelta, timezone as dt_timezone
+from ..utils import (
+    record_webhook_activity,
+    update_sensor_live_value,
+)
+from ..influx_client import (
+    test_influx_bucket,
+    test_influx_sensor_read,
+    get_latest_influx_reading,
+)
+from .utils import get_switchbot_service_from_place
+import time
+from datetime import datetime, timezone, timedelta
 
 from django.template.loader import render_to_string
 
@@ -31,6 +40,64 @@ import json
 from django.views import View
 
 from icecream import ic
+from django.conf import settings
+from django.db import models
+
+
+class SensorDetailCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
+    """
+    A view that renders only the sensor detail card, intended to be loaded asynchronously.
+    """
+    model = Sensor
+    template_name = 'sensors/includes/sensor_detail_card.html'
+    context_object_name = 'sensor'
+
+    def get(self, request, *args, **kwargs):
+        # Allow rendering specific sub-cards for HTMX refreshes
+        card_type = request.GET.get('card')
+        if card_type == 'influx':
+            self.template_name = 'sensors/partials/_sensor_influx_card_body.html'
+        else:
+            self.template_name = 'sensors/includes/sensor_detail_card.html'
+        
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'device', 'device__location', 'sensor_type', 'sensor_type__unit', 'unit'
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sensor = self.get_object()
+        context['device'] = sensor.device
+        context['location'] = sensor.device.location
+        context['global_stale_threshold'] = getattr(settings, 'DEFAULT_STALE_THRESHOLD_SECONDS', 300)
+        return context
+
+
+class SensorLiveDetailsView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
+    """
+    A view that renders only the sensor's live details partial.
+    """
+    model = Sensor
+    template_name = 'sensors/partials/sensor_live_details.html'
+    context_object_name = 'sensor'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'device', 'device__location', 'sensor_type', 'sensor_type__unit', 'unit'
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sensor = self.get_object()
+        # The live value should be up-to-date here because the JS fetcher just updated it
+        context['device'] = sensor.device
+        context['location'] = sensor.device.location
+        context['global_stale_threshold'] = getattr(settings, 'DEFAULT_STALE_THRESHOLD_SECONDS', 300)
+        return context
+
 
 def parse_date_to_local_tz(date_str):
     """
@@ -264,46 +331,161 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
 
         return context
 
-
 @login_required
 def test_influx_connection(request, place_slug, pk):
     """
-    Tests the InfluxDB connection for a sensor, gets the latest reading,
-    and counts the total records.
+    Tests the InfluxDB connection for a sensor in a two-stage process.
+    1. Tests the basic connection to the source.
+    2. If successful, tests the specific measurement for stats.
     """
     sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
-    context = {'sensor': sensor}
+    context = {
+        'sensor': sensor,
+        'test_name': 'Read Sensor Data'
+    }
 
-    if not sensor.influx_source:
-        context['error'] = "This sensor does not have an InfluxDB source configured."
+    if not sensor.influx_store:
+        context['error_message'] = "This sensor does not have an InfluxDB store configured."
         return render(request, 'sensors/partials/_influx_test_results.html', context, status=400)
 
     try:
-        latest_reading = get_latest_influx_reading(sensor)
-        record_count = get_influx_record_count(sensor)
-
-        context['latest_reading'] = latest_reading
-        context['record_count'] = record_count
-        context['success'] = True
+        from ..influx_client import get_influx_sensor_stats
+        
+        ic.enable()
+        start_time = time.perf_counter()
+        results = get_influx_sensor_stats(sensor)
+        ic(results)
+        end_time = time.perf_counter()
+        
+        context['query_time_ms'] = int((end_time - start_time) * 1000)
+        context['results'] = results
+        
+        if results.get('error'):
+            context['success'] = False
+            context['error_message'] = results.get('error')
+        elif results.get('latest_reading') is None:
+            context['success'] = True # The query succeeded, but found no data
+            context['message'] = "Query successful, but no records were found."
+        else:
+            context['success'] = True
+            context['message'] = "Successfully queried sensor statistics."
 
     except Exception as e:
         ic(f"Error during InfluxDB test for sensor {sensor.pk}: {e}")
-        context['error'] = f"An unexpected error occurred: {e}"
         context['success'] = False
+        context['error_message'] = f"An unexpected error occurred: {e}"
+    finally:
+        ic.disable()
 
     return render(request, 'sensors/partials/_influx_test_results.html', context)
 
 
+@login_required
+@require_POST
+def test_influx_write(request, place_slug, pk):
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
+    context = {}
+
+    if not sensor.device.is_switchbot:
+        context['success'] = False
+        context['message'] = "This write test is only applicable to SwitchBot sensors."
+        return render(request, 'sensors/partials/_influx_write_test_results.html', context)
+
+    try:
+        # 1. Get a live reading from the API. This function also writes it to InfluxDB.
+        service = get_switchbot_service_from_place(sensor.device.location.place)
+        live_value = service.get_live_reading_for_sensor(sensor, force_refresh=True)
+
+        if live_value is None:
+            raise Exception("Failed to retrieve a live value from the SwitchBot API.")
+
+        ic(f"WRITE_TEST: Got live value '{live_value}' from API, which should have been written to InfluxDB.")
+
+        # Give InfluxDB a moment to process the write
+        time.sleep(2)
+
+        # 2. Read the latest value back from InfluxDB to verify.
+        latest_reading = get_latest_influx_reading(sensor)
+
+        if not latest_reading:
+            raise Exception("Could not find any records in InfluxDB after write.")
+
+        read_value = latest_reading.get('value')
+        read_time = latest_reading.get('time')
+
+        # 3. Compare the values
+        # Using a small tolerance for float comparison
+        values_match = abs(read_value - live_value) < 1e-9
+
+        # Check if the reading is very recent (e.g., within the last 30 seconds)
+        time_is_recent = (datetime.now(timezone.utc) - read_time) < timedelta(seconds=30)
+
+        if values_match and time_is_recent:
+            context['success'] = True
+            context['message'] = f"Success! Wrote live value {live_value} and read it back from InfluxDB."
+        else:
+            error_msg = (
+                f"Verification failed. "
+                f"Wrote: {live_value}, Read: {read_value}. "
+                f"Timestamp: {read_time.strftime('%Y-%m-%d %H:%M:%S %Z')}."
+            )
+            raise Exception(error_msg)
+
+    except Exception as e:
+        ic(f"Error during InfluxDB write test for sensor {sensor.pk}: {e}")
+        context['success'] = False
+        context['message'] = f"An unexpected error occurred during the write test: {e}"
+
+    return render(request, 'sensors/partials/_influx_write_test_results.html', context)
+
+
 class SensorLiveValueView(LoginRequiredMixin, View):
     """
-    A view that fetches the live value for a sensor and returns it as JSON.
+    A view that fetches the live value for one or more sensors and returns it as JSON.
+    It can handle a single sensor via a URL kwarg or multiple sensors via a 'pks' query param.
     """
     def get(self, request, *args, **kwargs):
-        sensor_pk = self.kwargs.get('pk')
+        place_slug = kwargs.get('place_slug')
+        pks_str = request.GET.get('pks', '')
+        
+        if pks_str:
+            # Handle multiple PKs from query parameter
+            pks = [int(pk) for pk in pks_str.split(',') if pk.isdigit()]
+            sensors = Sensor.objects.filter(pk__in=pks, device__location__place__slug=place_slug)
+            
+            payload = {}
+            for sensor in sensors:
+                try:
+                    update_sensor_live_value(sensor)
+                    sensor.refresh_from_db(fields=['cached_reading_value', 'cached_reading_timestamp'])
+                    
+                    if sensor.cached_reading_timestamp:
+                        payload[sensor.pk] = {
+                            'status': 'success',
+                            'value': sensor.cached_reading_value,
+                            'timestamp': sensor.cached_reading_timestamp.isoformat(),
+                            'unit_symbol': sensor.effective_unit.symbol if sensor.effective_unit else '',
+                            'decimal_places': sensor.effective_decimal_places
+                        }
+                    else:
+                        payload[sensor.pk] = {'status': 'no_reading'}
+                except Exception as e:
+                    payload[sensor.pk] = {'status': 'error', 'message': str(e)}
+
+            # Note any PKs that were not found
+            found_pks = {s.pk for s in sensors}
+            for pk in pks:
+                if pk not in found_pks:
+                    payload[pk] = {'status': 'error', 'message': 'Sensor not found or access denied.'}
+            
+            return JsonResponse({'status': 'success', 'payload': payload})
+
+        else:
+            # Handle a single sensor from URL
+            sensor_pk = kwargs.get('pk')
         try:
             sensor = get_object_or_404(Sensor, pk=sensor_pk)
             update_sensor_live_value(sensor)
-            ic(f"SensorLiveValueView - Sensor: {sensor.name}, Cached Value: {sensor.cached_reading_value}")
 
             if sensor.cached_reading_value is not None:
                 response_data = {
@@ -335,11 +517,13 @@ class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context = super().get_context_data(**kwargs)
         sensor = self.get_object()
 
-        # Update the live value before rendering the card
-        if sensor.data_type and sensor.data_type.startswith('INFLUX'):
-            update_sensor_live_value(sensor)
-        elif sensor.data_type == 'DIRECT':
-             update_sensor_live_value(sensor)
+        # The live value is now exclusively handled by the frontend LiveValueFetcher,
+        # so we no longer need to update it here.
+        #
+        # if sensor.data_type and sensor.data_type.startswith('INFLUX'):
+        #     update_sensor_live_value(sensor)
+        # elif sensor.data_type == 'DIRECT':
+        #      update_sensor_live_value(sensor)
 
         # Add device and location to context
         context['device'] = sensor.device
@@ -636,6 +820,13 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             'place': self._place,
             'device': self._device,
         })
+        
+        # Explicitly set the initial data_type for the form
+        if self.object and hasattr(self.object, 'data_type'):
+            initial = kwargs.get('initial', {})
+            initial['data_type'] = self.object.data_type
+            kwargs['initial'] = initial
+
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -1080,8 +1271,6 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
 
         start_time = timezone.now()
         user_timezone_str = request.GET.get('timezone')
-        if user_timezone_str:
-            timezone.activate(user_timezone_str)
 
         # Use the new helper to parse date range from GET parameters
         start_date, end_date, start_date_iso, end_date_iso, _ = _parse_date_range_from_params(request.GET)
@@ -1153,8 +1342,6 @@ def lorawan_sensor_data_api(request, place_slug, pk):
     """
     try:
         user_timezone_str = request.GET.get('timezone')
-        if user_timezone_str:
-            timezone.activate(user_timezone_str)
 
         sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
     except Sensor.DoesNotExist:
@@ -1311,10 +1498,148 @@ def update_graph_type(request, place_slug, pk):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+# This function is now fully replaced by the logic in SensorLiveValueView
+# @login_required
+# def sensor_live_values_api(request: HttpRequest, place_slug: str) -> JsonResponse:
+#     """
+#     API endpoint to fetch the latest reading for multiple sensors at once.
+#     """
+#     pks_str = request.GET.get('pks', '')
+#     if not pks_str:
+#         return JsonResponse({'status': 'error', 'message': 'No sensor PKs provided.'}, status=400)
+#
+#     pks = [int(pk) for pk in pks_str.split(',') if pk.isdigit()]
+#
+#     # Ensure sensors belong to the place to prevent data leakage
+#     sensors = Sensor.objects.filter(pk__in=pks, device__location__place__slug=place_slug)
+#
+#     payload = {}
+#     for sensor in sensors:
+#         try:
+#             update_sensor_live_value(sensor)
+#             # Re-fetch sensor to get the updated values
+#             sensor.refresh_from_db()
+#
+#             if sensor.cached_reading_timestamp:
+#                 payload[sensor.pk] = {
+#                     'status': 'success',
+#                     'value': sensor.cached_reading_value,
+#                     'timestamp': sensor.cached_reading_timestamp.isoformat(),
+#                     'unit_symbol': sensor.effective_unit.symbol if sensor.effective_unit else '',
+#                     'unit_name': sensor.effective_unit.name if sensor.effective_unit else '',
+#                     'sensor_type': sensor.sensor_type.name if sensor.sensor_type else '',
+#                     'decimal_places': sensor.effective_decimal_places,
+#                     'stale_threshold': sensor.effective_stale_threshold
+#                 }
+#             else:
+#                 payload[sensor.pk] = {'status': 'no_reading'}
+#         except Exception as e:
+#             # ic(f"Error updating live value for sensor {sensor.pk}: {e}")
+#             payload[sensor.pk] = {'status': 'error', 'message': str(e)}
+#
+#     # For any requested PKs that weren't found or didn't belong to the place
+#
+#     found_pks = {s.pk for s in sensors}
+#     for pk in pks:
+#         if pk not in found_pks:
+#             payload[pk] = {'status': 'error', 'message': 'Sensor not found or access denied.'}
+#
+#     return JsonResponse({'status': 'success', 'payload': payload})
+
+
+class SensorInfluxUpdateView(LoginRequiredMixin, ReferrerMixin, PlaceAnnotationMixin, UpdateView):
+    model = Sensor
+    form_class = SensorInfluxUpdateForm
+    template_name = 'sensors/partials/_modal_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['place'] = self.object.device.location.place
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = f"Edit InfluxDB Config for {self.object.name}"
+        return context
+
+    def get_success_url(self):
+        return self.get_referrer_url() or reverse('sensors:sensor_detail', kwargs={'place_slug': self.kwargs['place_slug'], 'pk': self.kwargs['pk']})
+
+    def form_valid(self, form):
+        ic(f"Updating Influx config for sensor: {self.object.name} ({self.object.pk})")
+        
+        if not form.has_changed():
+            response = HttpResponse(status=204)
+            trigger_events = {
+                "closeModal": "#htmx-modal",
+                "showToast": {"message": "No changes were made.", "type": "info"}
+            }
+            response['HX-Trigger'] = json.dumps(trigger_events)
+            return response
+
+        changed_fields = form.changed_data
+        ic(f"Changed fields: {changed_fields}")
+
+        changes_list = []
+        for field_name in changed_fields:
+            old_value = getattr(self.object, field_name)
+            new_value = form.cleaned_data[field_name]
+            if isinstance(old_value, models.Model):
+                old_value = str(old_value)
+            if isinstance(new_value, models.Model):
+                new_value = str(new_value)
+            changes_list.append(f"<b>{field_name.replace('_', ' ').title()}</b>: '{old_value}' → '{new_value}'")
+        
+        toast_message = f"Updated Influx Config:<br><small>{'<br>'.join(changes_list)}</small>"
+
+        # Save only the changed fields
+        self.object = form.save(commit=False)
+        self.object.save(update_fields=changed_fields)
+
+        response = HttpResponse(status=204)
+        trigger_events = {
+            f"refresh-sensor-card-{self.object.pk}": True,
+            "closeModal": "#htmx-modal",
+            "showToast": {"message": toast_message, "type": "success"}
+        }
+        response['HX-Trigger'] = json.dumps(trigger_events)
+        return response
+
+    def form_invalid(self, form):
+        ic("Influx config update form is invalid")
+        ic(form.errors)
+        return super().form_invalid(form)
+
+
+@require_POST
 @login_required
-def sensor_live_values_api(request: HttpRequest, place_slug: str) -> JsonResponse:
+def test_influx_bucket_for_sensor(request, place_slug, pk):
     """
-    API endpoint to fetch the latest reading for multiple sensors at once.
+    Tests the basic connection to the bucket for a sensor's InfluxStore.
+    """
+    place = get_object_or_404(Place, slug=place_slug)
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place=place)
+
+    if not sensor.influx_store:
+        return render(request, 'sensors/partials/_influx_test_results.html', 
+                      {'error_message': 'Sensor has no InfluxDB Store configured.'})
+
+    store = sensor.influx_store
+    success, message, query_time_ms = test_influx_bucket(
+        url=store.url,
+        token=store.token,
+        org=store.org,
+        bucket_name=store.bucket_name
+    )
+
+    return render(request, 'sensors/partials/_influx_test_results.html', 
+                  {'success': success, 'message': message, 'query_time_ms': query_time_ms, 'test_name': 'Bucket Connection'})
+
+
+@login_required
+def get_sensor_live_values(request, place_slug):
+    """
+    API endpoint to get the latest sensor values for multiple sensors.
     """
     pks_str = request.GET.get('pks', '')
     if not pks_str:
@@ -1340,7 +1665,8 @@ def sensor_live_values_api(request: HttpRequest, place_slug: str) -> JsonRespons
                     'unit_symbol': sensor.effective_unit.symbol if sensor.effective_unit else '',
                     'unit_name': sensor.effective_unit.name if sensor.effective_unit else '',
                     'sensor_type': sensor.sensor_type.name if sensor.sensor_type else '',
-                    'decimal_places': sensor.effective_decimal_places
+                    'decimal_places': sensor.effective_decimal_places,
+                    'stale_threshold': sensor.effective_stale_threshold
                 }
             else:
                 payload[sensor.pk] = {'status': 'no_reading'}

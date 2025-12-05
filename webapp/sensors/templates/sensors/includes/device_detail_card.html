@@ -23,7 +23,7 @@
                 <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn border-dark btn-outline-warning" title="Edit Device">
                     <i class="bi bi-pencil"></i>
                 </a>
-                <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-outline-info" title="Duplicate Device">
+                <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-outline-info border-dark" title="Duplicate Device">
                     <i class="bi bi-copy"></i>
                 </a>
                 <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" class="btn btn-outline-danger" title="Delete Device">

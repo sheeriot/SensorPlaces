@@ -33,21 +33,37 @@ document.addEventListener('DOMContentLoaded', function() {
      * Initializes generic modal cleanup.
      * Clears the modal content when hidden to ensure fresh loading on next trigger.
      */
-    function initializeModalCleanup() {
-        const modalContainer = document.getElementById('modal-container');
+    function initializeModalLifecycleLogging() {
+        const modalContainer = document.getElementById('htmx-modal');
         if (modalContainer) {
+            if (scriptConfig.debug) console.log('[ModalLifecycle] Attached lifecycle listeners to #htmx-modal.');
+
+            modalContainer.addEventListener('show.bs.modal', function(event) {
+                if (scriptConfig.debug) console.log('[ModalLifecycle] #htmx-modal show.bs.modal event triggered.');
+            });
+
+            modalContainer.addEventListener('shown.bs.modal', function(event) {
+                if (scriptConfig.debug) console.log('[ModalLifecycle] #htmx-modal shown.bs.modal event triggered.');
+            });
+
+            modalContainer.addEventListener('hide.bs.modal', function() {
+                if (scriptConfig.debug) console.log('[ModalLifecycle] #htmx-modal hide.bs.modal event triggered.');
+            });
+
             modalContainer.addEventListener('hidden.bs.modal', function () {
-                const modalContent = modalContainer.querySelector('#modal-content');
+                if (scriptConfig.debug) console.log('[ModalLifecycle] #htmx-modal hidden.bs.modal event triggered. Cleaning up.');
+
+                const modalContent = modalContainer.querySelector('#htmx-modal-content');
                 if (modalContent) {
                     modalContent.innerHTML = '';
                     if (scriptConfig.debug) {
-                        console.log('[ModalCleanup] Cleared modal content');
+                        console.log('[ModalLifecycle] Cleared modal content from #htmx-modal-content');
                     }
+                } else {
+                    if (scriptConfig.debug) console.log('[ModalLifecycle] #htmx-modal-content not found.');
                 }
 
                 // Force cleanup of any lingering backdrops and body styles.
-                // This is a robust fix for the "frozen screen" issue that can happen
-                // when HTMX and Bootstrap modals interact.
                 const backdrops = document.querySelectorAll('.modal-backdrop');
                 backdrops.forEach(backdrop => backdrop.remove());
 
@@ -55,10 +71,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.style.overflow = '';
                 document.body.style.paddingRight = '';
             });
+        } else {
+            if (scriptConfig.debug) console.error('[ModalLifecycle] Could not find #htmx-modal to attach listener.');
         }
     }
 
     // Initialize all modal handlers
     initializeDeleteConfirmationInput();
-    initializeModalCleanup();
+    initializeModalLifecycleLogging();
 });

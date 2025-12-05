@@ -7,10 +7,10 @@ from django.views import View
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
-from sensors.models import Place, Device, InfluxSource
-from ..influx_client import write_to_influx
+from sensors.models import Place, Device, InfluxStore
 from sensors.services.sensor_service import process_sensor_reading
 from sensors.services.shelly_service import ShellyService
+from sensors.services.switchbot_service import SwitchBotService, KEY_MAP
 from sensors.utils import record_webhook_activity
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,9 @@ class WebhookReceiverView(View):
     def post(self, request: HttpRequest, place_slug: str, uuid: UUID) -> HttpResponse:
         try:
             place = Place.objects.get(slug=place_slug)
-            influx_source = InfluxSource.objects.filter(place=place).first()
+            # The service will handle its own InfluxStore logic.
+            # Do not pass influx_store here.
+            shelly_service = ShellyService(place=place)
         except Place.DoesNotExist:
             return HttpResponse(f"Place '{place_slug}' not found.", status=404)
 
@@ -45,16 +47,14 @@ class WebhookReceiverView(View):
             for measurement, value in data['sensors'].items():
                 try:
                     val_float = float(value)
+                    # The service will handle storage, including InfluxDB.
                     sensor_obj = process_sensor_reading(device, measurement, val_float)
 
-                    influx_action = "Skipped Influx"
+                    influx_action = "Skipped"
+                    # Log based on what the service likely did.
                     if sensor_obj and sensor_obj.data_type.startswith('INFLUX'):
-                        if influx_source:
-                            fields = {'value': val_float}
-                            tags = {'device_id': device.device_id}
-                            write_to_influx(influx_source, measurement, fields, tags)
                             influx_action = "Sent to Influx"
-                        else:
+                    elif not place.default_influx_store:
                             influx_action = "Influx Not Configured"
 
                     if settings.WEBHOOK_SNIFFER:
@@ -77,7 +77,9 @@ class SwitchBotWebhookReceiverView(View):
     def post(self, request: HttpRequest, place_slug: str) -> HttpResponse:
         try:
             place = Place.objects.get(slug=place_slug)
-            influx_source = InfluxSource.objects.filter(place=place).first()
+            # Initialize the SwitchBotService with the place.
+            # The service will determine which InfluxStore to use (default or SwitchBot-specific).
+            switchbot_service = SwitchBotService(place=place)
         except Place.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': f"Place '{place_slug}' not found."}, status=404)
 
@@ -104,15 +106,14 @@ class SwitchBotWebhookReceiverView(View):
             if key in context:
                 try:
                     value = float(context[key])
+                    # The service now handles its own InfluxStore, so we don't pass it here.
                     sensor_obj = process_sensor_reading(device, measurement, value)
 
                     influx_action = "Skipped Influx"
                     if sensor_obj and sensor_obj.data_type.startswith('INFLUX'):
-                        if influx_source:
+                        # The service's write method will handle the logic, so we just queue the fields.
                             influx_fields[measurement] = value
                             influx_action = "Queued for Influx"
-                        else:
-                            influx_action = "Influx Not Configured"
 
                     if settings.WEBHOOK_SNIFFER:
                         message = f"WEBHOOK: Reading | Place: {place.name} | Device: {device.name} | Sensor: {measurement} | Value: {value} | Action: Stored Local, {influx_action}"
@@ -121,10 +122,10 @@ class SwitchBotWebhookReceiverView(View):
                 except (ValueError, TypeError):
                     logger.warning(f"Could not convert value '{context[key]}' for '{key}' to float.")
 
-        if influx_fields and influx_source:
+        if influx_fields:
             try:
-                tags = {'device_id': device.device_id, 'device_name': device.name}
-                write_to_influx(influx_source, "switchbot_reading", influx_fields, tags)
+                # Let the service handle the writing. It already knows the correct store.
+                switchbot_service.write_webhook_data(device, influx_fields)
             except Exception as e:
                 logger.error(f"Failed to write SwitchBot data to InfluxDB for device '{device_id}': {e}")
 
@@ -160,7 +161,9 @@ class ShellyWebhookReceiverView(View):
                 ic(f"WEBHOOK: Shelly Request Missing ID | Place: {place_slug} | Params: {data}")
             return JsonResponse({'status': 'error', 'message': 'No device identifier found in GET request.'}, status=400)
 
-        service = ShellyService(place)
+        # Initialize the ShellyService with the place. The service will find the default InfluxStore.
+        shelly_service = ShellyService(place=place)
+        service = shelly_service
         service.process_data(device_id, data)
         return JsonResponse({'status': 'success'})
 
@@ -187,7 +190,9 @@ class ShellyWebhookReceiverView(View):
         # If 'params' key exists, use it. Otherwise, assume data is at the root.
         params = data.get('params', data)
 
-        service = ShellyService(place)
+        # Initialize the ShellyService with the place. The service will find the default InfluxStore.
+        shelly_service = ShellyService(place=place)
+        service = shelly_service
         service.process_data(device_id, params)
 
         return JsonResponse({'status': 'success'})

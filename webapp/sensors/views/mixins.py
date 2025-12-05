@@ -80,49 +80,34 @@ class ReferrerMixin:
         Provide a cancel URL. For create views, it's the list view.
         For update views, it's the object's detail view.
         """
-        # ic("ReferrerMixin.get_cancel_url called")
-
-        # For create views, return the list view
+        # For create views, try to return to the list view if it exists
         if isinstance(self, CreateView):
-            # Assumes the list view is named '<model_name>-list'
-            # E.g., for a 'Place' model, it would be 'place-list'
-            # But we can do better by looking at the model
             if hasattr(self, 'model') and self.model:
                 app_label = self.model._meta.app_label
                 model_name = self.model._meta.model_name
-
                 url_name = f'{app_label}:{model_name}_list'
                 url_kwargs = {}
 
-                # If 'place_slug' is in the view's kwargs, add it to the reverse call
                 if 'place_slug' in self.kwargs:
                     url_kwargs['place_slug'] = self.kwargs['place_slug']
 
                 try:
                     return reverse(url_name, kwargs=url_kwargs)
                 except NoReverseMatch:
-                    # Fallback for cases where the URL structure is unexpected
-                    pass
-
-            ic("CreateView without a model, falling back.")
+                    # If list view doesn't exist, fall back to place detail
+                    if 'place_slug' in self.kwargs:
+                        return reverse('sensors:place_detail', kwargs={'place_slug': self.kwargs['place_slug']})
 
         # For update views, try to get the object and return its detail page URL.
-        # ic(f"hasattr(self, 'get_object'): {hasattr(self, 'get_object')}")
         if hasattr(self, 'get_object'):
             try:
-                # ic("Attempting to call self.get_object()")
                 obj = self.get_object()
-                # ic(f"self.get_object() returned: {obj}")
                 if obj and hasattr(obj, 'get_absolute_url'):
-                    # ic("Object has get_absolute_url, returning it.")
                     return obj.get_absolute_url()
-                # ic("Object is None or does not have get_absolute_url")
-            except Exception as e:
-                # This will fail on a CreateView, which is expected.
-                # ic(f"Exception in get_cancel_url's try block: {e}")
+            except Exception:
                 pass
 
-        # ic("No cancel URL found, returning to root.")
+        # Default fallback to the main place list
         return reverse('sensors:place_list')
 
 

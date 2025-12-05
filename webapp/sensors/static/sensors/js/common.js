@@ -102,6 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
+    // Initialize all dropdowns
+    const dropdownTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
+    dropdownTriggerList.map(function (dropdownTriggerEl) {
+        return new bootstrap.Dropdown(dropdownTriggerEl);
+    });
+
     // Handle accessibility for modals: blur focus before hiding
     const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
@@ -152,6 +158,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Function to update natural time displays
+    function updateTimestamps() {
+        const elements = document.querySelectorAll('.updatable-naturaltime');
+        elements.forEach(el => {
+            const timestamp = el.dataset.timestamp;
+            if (timestamp && window.utils && typeof window.utils.getNaturalTime === 'function') {
+                el.textContent = window.utils.getNaturalTime(timestamp);
+            }
+        });
+    }
+
+    // Set an interval to update timestamps every 30 seconds
+    setInterval(updateTimestamps, 30000);
+
     // Diagnostic listener for HTMX responses
     document.addEventListener('htmx:afterRequest', function(evt) {
         if (commonConfig.debug) {
@@ -184,8 +204,8 @@ class LiveValueFetcher {
     }
 
     forceRefresh() {
-        if(commonConfig.debug) console.log('[LiveValueFetcher] Forcing refresh for all live values.');
-        this.fetch(true);
+        if(commonConfig.debug) console.log('[LiveValueFetcher] Forcing refresh for all live values on page.');
+        return this.fetch(true);
     }
 
     async fetch(force = false) {
@@ -210,7 +230,21 @@ class LiveValueFetcher {
 
         allPksOnPage.forEach(pk => {
             const lastCheck = sessionStorage.getItem(`sensor-${pk}-lastcheck`);
-            if (force || !lastCheck || (now - parseInt(lastCheck) > this.interval)) {
+            const cachedDataStr = sessionStorage.getItem(`sensor-${pk}-data`);
+            let staleThreshold = this.interval; // Default
+
+            if (cachedDataStr) {
+                try {
+                    const cachedData = JSON.parse(cachedDataStr);
+                    if (cachedData.stale_threshold) {
+                        staleThreshold = cachedData.stale_threshold * 1000; // Convert seconds to ms
+                    }
+                } catch (e) {
+                    // Ignore if parsing fails, will use default
+                }
+            }
+
+            if (force || !lastCheck || (now - parseInt(lastCheck) > staleThreshold)) {
                 pksToFetch.add(pk);
             }
         });
@@ -219,7 +253,7 @@ class LiveValueFetcher {
 
         if (pksToFetch.size === 0) {
             if(commonConfig.debug) console.log('[LiveValueFetcher] All values fresh in cache. Nothing to fetch.');
-            return;
+            return Promise.resolve();
         }
 
         if(commonConfig.debug) console.log('[LiveValueFetcher] Fetching stale/forced values for pks:', [...pksToFetch]);
@@ -239,14 +273,22 @@ class LiveValueFetcher {
                 Object.entries(data.payload).forEach(([pk, sensorData]) => {
                     sessionStorage.setItem(`sensor-${pk}-lastcheck`, now.toString());
                     sessionStorage.setItem(`sensor-${pk}-data`, JSON.stringify(sensorData));
+
+                    // If the fetch was successful, fire an event to tell the card to refresh itself via HTMX
+                    if (sensorData.status === 'success') {
+                        const event = new CustomEvent(`refresh-live-details-${pk}`);
+                        document.body.dispatchEvent(event);
+                        if(commonConfig.debug) console.log(`[LiveValueFetcher] Dispatched refresh-live-details-${pk} event.`);
+                    }
                 });
+
+                // We no longer need to manually update the containers from cache here,
+                // as the HTMX swap will handle the entire card update.
+                // this.updateAllContainersFromCache();
             } else {
                 // Handle cases where the top-level status is not 'success'
                 throw new Error(data.message || 'API returned a non-success status');
             }
-
-            this.updateAllContainersFromCache();
-
         } catch (error) {
             console.error('[LiveValueFetcher] Error fetching or processing data:', error);
             // Only render error for the specific containers that were part of this failed fetch

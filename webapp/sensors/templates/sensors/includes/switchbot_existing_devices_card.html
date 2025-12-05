@@ -1,0 +1,33 @@
+<div id="existing-devices-card" class="card mb-3" hx-trigger="refreshDeviceList from:body" hx-get="{% url 'sensors:switchbot_existing_devices' place.slug %}" hx-target="this" hx-swap="outerHTML">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-hdd-stack me-2"></i>Existing SwitchBot Devices
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if local_devices %}
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Device Name</th>
+                        <th>Location</th>
+                        <th>Model</th>
+                        <th>Sensors</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for device in local_devices %}
+                        <tr>
+                            <td><a href="{{ device.get_absolute_url }}">{{ device.name }}</a></td>
+                            <td>{{ device.location.name }}</td>
+                            <td>{{ device.model }}</td>
+                            <td>{{ device.sensors.count }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-muted">No SwitchBot devices have been imported into this place yet.</p>
+        {% endif %}
+    </div>
+</div>

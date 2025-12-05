@@ -742,5 +742,5 @@ class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         return HttpResponseRedirect(success_url)
 
     def get_success_url(self):
-        return reverse('sensors:place_detail',
+        return reverse('sensors:device_list',
                       kwargs={'place_slug': self._place.slug})

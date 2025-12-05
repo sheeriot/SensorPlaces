@@ -18,7 +18,7 @@ from django.utils.text import slugify
 # from typing import Dict, Any, Optional, cast
 
 # App stuff
-from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxSource, SensorType, Unit, DeviceType
+from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxStore, SensorType, Unit, DeviceType
 from .place_forms import PlaceForm, PlaceDeleteForm
 from .switchbot_forms import SwitchBotConfigForm
 from ..map_fun import place_map_create
@@ -28,6 +28,8 @@ from .views_fun import get_place_data, get_place_counts, get_annotated_locations
 from ..decorators import log_execution_time
 from ..services.measurement_utils import get_influx_details
 from ..services.switchbot_service import SwitchBotService
+
+from django.db.models import Case, When, BooleanField
 
 # utility
 import json
@@ -114,8 +116,20 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add device and sensor counts to context for the live counts card
         context.update(get_live_counts_context(self.object))
 
-        # Add InfluxDB sources to the context
-        context['influxsources'] = InfluxSource.objects.filter(place=self.object)
+        # Add InfluxDB stores to the context, sorted correctly
+        influxstores_qs = InfluxStore.objects.filter(place=self.object)
+        context['influxstores'] = influxstores_qs.annotate(
+            is_default=Case(
+                When(pk=self.object.default_influx_store_id, then=True),
+                default=False,
+                output_field=BooleanField()
+            ),
+            is_switchbot=Case(
+                When(pk=self.object.switchbot_influx_store_id, then=True),
+                default=False,
+                output_field=BooleanField()
+            )
+        ).order_by('-is_default', '-is_switchbot', 'name')
 
         # Add place_map_html to the context
         try:
@@ -269,6 +283,8 @@ class PlaceUpdateView(LoginRequiredMixin, ReferrerMixin, UpdateView):
         return context
 
     def form_valid(self, form: PlaceForm):
+        ic("--- PlaceUpdateView form_valid ---")
+        ic(form.cleaned_data)
         # Get the object before saving to compare values
         place = self._place
         original_values = {

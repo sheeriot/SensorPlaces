@@ -43,36 +43,37 @@ const deviceFormManager = {
 
     handleLocationCreated(event) {
         if (this.config.debug) {
-            console.log('[DeviceForm] handleLocationCreated triggered.');
+            console.log('[DeviceForm] handleLocationCreated triggered for new location.');
             console.table(event.detail);
         }
 
-        const { id, name } = event.detail;
+        const { id, name, slug } = event.detail;
         const locationSelect = document.getElementById('id_location');
 
         if (locationSelect) {
-            if (this.config.debug) console.log('[DeviceForm] Found location select. Updating options and disabling field.');
+            if (this.config.debug) console.log('[DeviceForm] Found location select. Adding new option.');
 
-            // Clear existing options
-            while (locationSelect.firstChild) {
-                locationSelect.removeChild(locationSelect.firstChild);
-            }
-
-            // Add the new option and assume it's active
+            // Add dataset attributes for the new option so that the UI updates correctly
+            // when the 'change' event is dispatched below.
             locationSelect.dataset[`isactive-${id}`] = 'true';
             locationSelect.dataset[`locationname-${id}`] = name;
+            locationSelect.dataset[`locationslug-${id}`] = slug;
+            
+            // Create a new option and add it to the top of the list
+            const option = new Option(`${name} (new)`, id, true, true);
+            locationSelect.add(option, locationSelect.options[0]);
 
-            const newOption = new Option(name, id, true, true);
-            locationSelect.add(newOption, null);
+            // Show a toast message to confirm
+            if (window.utils && window.utils.showToast) {
+                window.utils.showToast(`New location "${name}" has been created and selected.`, 'success');
+            }
 
-            // Disable the select field to "lock in" the new location
-            locationSelect.disabled = true;
-
-            // Manually trigger the change event to update UI state
+            // Manually trigger the change event to update UI state (e.g., breadcrumb)
             if (this.config.debug) console.log('[DeviceForm] Dispatching change event on location select.');
             locationSelect.dispatchEvent(new Event('change'));
+
         } else {
-            if (this.config.debug) console.error('[DeviceForm] Could not find location select to update.');
+            if (this.config.debug) console.error('[DeviceForm] Could not find #id_location select to update.');
         }
     },
 

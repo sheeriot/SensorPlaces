@@ -9,8 +9,17 @@ function initializeLiveValueFetcher() {
         if (placeSlug && window.LiveValueFetcher) {
             if(SCRIPT_DEBUG) console.log('sensor-detail.js: Initializing global LiveValueFetcher.');
             liveValueFetcher = new LiveValueFetcher(placeSlug, 90000);
+            // Don't start the timer here, but force an initial fetch.
+            // The timer will be started after the first forced fetch.
+            liveValueFetcher.forceRefresh().then(() => {
+                if(SCRIPT_DEBUG) console.log('sensor-detail.js: Initial forced refresh complete. Starting timer.');
             liveValueFetcher.start();
+            });
         }
+    } else {
+        // If it already exists, just force a refresh
+        if(SCRIPT_DEBUG) console.log('sensor-detail.js: LiveValueFetcher already exists. Forcing refresh.');
+        liveValueFetcher.forceRefresh();
     }
 }
 

@@ -1,0 +1,11 @@
+<div class="alert {% if success %}alert-success{% else %}alert-danger{% endif %} small p-2 mt-2" role="alert">
+    <h6 class="alert-heading mb-1">
+        {% if success %}
+            <i class="bi bi-check-circle-fill me-2"></i>Write Test Successful
+        {% else %}
+            <i class="bi bi-x-octagon-fill me-2"></i>Write Test Failed
+        {% endif %}
+    </h6>
+    <hr class="my-1">
+    <p class="mb-0" style="font-size: 0.8rem;">{{ message }}</p>
+</div>

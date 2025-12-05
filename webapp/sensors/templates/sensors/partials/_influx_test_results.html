@@ -1,25 +1,50 @@
 {% load humanize %}
-{% if success %}
-    <div class="alert alert-success py-2 px-3">
-        <div class="d-flex justify-content-between">
-            <span><strong>Connection:</strong> OK</span>
-            <span>
-                <strong>Total Records:</strong> {{ record_count|intcomma }}
-            </span>
-        </div>
-        {% if latest_reading %}
+{% load timezone_filters %}
+
+<div class="font-monospace p-3 rounded {% if success %}bg-success-subtle text-dark{% elif error_message or message %}bg-danger-subtle text-dark{% else %}bg-dark text-white{% endif %}">
+    <div class="d-flex justify-content-between align-items-center mb-1">
         <div>
-            <strong>Latest Reading:</strong>
-            {{ latest_reading.value|floatformat:2 }}
-            <span class="text-muted">at {{ latest_reading.time|naturaltime }}</span>
+            <i class="bi bi-terminal me-2"></i>
+            <strong>{{ test_name|default:"Test Results" }}</strong>
         </div>
-        {% else %}
-        <div class="text-muted">No readings found.</div>
+        {% if query_time_ms is not None %}
+            <div class="small text-muted">
+                <i class="bi bi-stopwatch"></i> {{ query_time_ms }}ms
+            </div>
         {% endif %}
     </div>
-{% else %}
-    <div class="alert alert-danger py-2 px-3">
-        <h6 class="alert-heading mb-1">Connection Test Failed</h6>
-        <p class="mb-0 small font-monospace">{{ error|default:"An unknown error occurred." }}</p>
+    <hr class="border-secondary my-1">
+    {% if success %}
+        <div class="text-success">
+            <i class="bi bi-check-circle-fill me-2"></i><strong>Success:</strong>
+            <pre class="d-inline mb-0">{{ message }}</pre>
+        </div>
+    {% elif error_message %}
+         <div class="text-danger">
+            <i class="bi bi-x-circle-fill me-2"></i><strong>Error:</strong>
+            <pre class="d-inline mb-0">{{ error_message }}</pre>
+        </div>
+    {% else %}
+        <div class="text-danger">
+            <i class="bi bi-x-circle-fill me-2"></i><strong>Failed:</strong>
+            <pre class="d-inline mb-0">{{ message }}</pre>
     </div>
-{% endif %}
+    {% endif %}
+
+    {% if results.query %}
+        <div class="mt-2 pt-2 border-top border-secondary small">
+            <div><strong>Query:</strong></div>
+            <pre class="text-dark bg-light p-2 rounded small"><code>{{ results.query|pretty_sql }}</code></pre>
+        </div>
+    {% endif %}
+
+    {% if success and results.latest_reading %}
+    <div class="mt-2 pt-2 border-top border-secondary small">
+        <strong>Latest:</strong>
+        {{ results.latest_reading.value|floatformat:sensor.effective_decimal_places }}
+        <span class="text-muted">({{ results.latest_reading.time|utc_to_local_time|naturaltime }})</span>
+        <div class="mt-1"><strong>Raw Result:</strong> <code class="text-dark">{{ results.latest_reading }}</code></div>
+    </div>
+    {% endif %}
+
+</div>

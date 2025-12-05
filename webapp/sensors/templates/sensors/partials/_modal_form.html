@@ -1,0 +1,23 @@
+{% load crispy_forms_tags %}
+
+<div class="modal-content">
+    <form hx-post="{{ request.path }}">
+        {% csrf_token %}
+        <div class="modal-header">
+            <h5 class="modal-title">{{ title|default:"Edit Details" }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            {{ form.media }}
+            {{ form|crispy }}
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                <i class="bi bi-x-lg me-1"></i>Cancel
+            </button>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg me-1"></i>Save Changes
+            </button>
+        </div>
+    </form>
+</div>

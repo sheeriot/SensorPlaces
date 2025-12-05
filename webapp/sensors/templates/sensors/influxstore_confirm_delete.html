@@ -27,7 +27,7 @@
         <button type="submit" class="btn btn-danger">
             <i class="bi bi-trash"></i> Confirm Delete
         </button>
-        <a href="{% url 'sensors:influxsource_detail' place_slug=object.place.slug pk=object.pk %}" class="btn btn-secondary">
+        <a href="{% url 'sensors:influxstore_detail' place_slug=object.place.slug pk=object.pk %}" class="btn btn-secondary">
             <i class="bi bi-x-circle"></i> Cancel
         </a>
     </form>

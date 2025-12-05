@@ -9,9 +9,9 @@
         </div>
     </div>
     <div id="sensor-list-table" class="list-group list-group-flush overflow-auto">
-        {% for location in object_list %}
+        {% for location in locations %}
             {% if location.slug != 'unassigned-devices' %}
-                <div class="list-group-item list-group-item-primary py-1 location-row {% if hide_inactive %}d-none{% endif %}" data-location-id="{{ location.id }}" data-location-active="{{ location.is_active|lower }}">
+                <div class="list-group-item list-group-item-primary py-1 location-row {% if hide_inactive and not location.is_active %}d-none{% endif %}" data-location-id="{{ location.id }}" data-location-active="{{ location.is_active|lower }}">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="{% if not location.is_active %}text-muted opacity-50{% endif %}">
                             <strong><i class="bi bi-geo-alt me-2"></i>{{ location.name }}</strong>

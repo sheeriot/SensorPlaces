@@ -20,8 +20,8 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
     """
     # ic(f"Querying data for InfluxDB sensor: {sensor.name} (ID: {sensor.pk}) from {start_date} to {end_date}")
 
-    if not sensor.influx_source:
-        ic("Sensor has no InfluxDB source configured.")
+    if not sensor.influx_store:
+        ic("Sensor has no InfluxDB store configured.")
         return [], 0
 
     # Determine the correct filter field. Prioritize the specific one on the sensor.
@@ -38,7 +38,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
     # ic(f"Using filter field '{filter_field}' with value '{device_id_val}' for measurement '{sensor.influx_measurement}'")
 
     try:
-        client = get_influxdb_client(sensor.influx_source)
+        client = get_influxdb_client(sensor.influx_store)
         measurement = sensor.influx_measurement
         field_name = sensor.influx_field_name or "value"
 

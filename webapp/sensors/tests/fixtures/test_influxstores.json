@@ -1,6 +1,6 @@
 [
   {
-    "model": "sensors.influxsource",
+    "model": "sensors.influxstore",
     "pk": 1,
     "fields": {
       "place": ["texaspinballfestival"],

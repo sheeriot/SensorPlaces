@@ -1,0 +1,11 @@
+{% extends "sensors/base.html" %}
+
+{% block title %}InfluxDB Sources for {{ place.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        {% include "sensors/includes/influxstore_list_card.html" %}
+    </div>
+</div>
+{% endblock %}

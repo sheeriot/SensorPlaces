@@ -1,0 +1,32 @@
+<div class="list-group-item" id="influx-store-{{ store.pk }}">
+    <div class="row align-items-center">
+        <div class="col-md-3">
+            {{ store.name }}
+            {% if store == place.default_influx_store %}
+                <span class="badge bg-primary">Default</span>
+            {% endif %}
+            {% if store == place.switchbot_influx_store %}
+                <span class="badge bg-secondary">Switchbot</span>
+            {% endif %}
+        </div>
+        <div class="col-md-3 text-truncate">{{ store.org }}</div>
+        <div class="col-md-3">{{ store.bucket_name }}</div>
+        <div class="col-md-3 text-end">
+            <div class="btn-group btn-group-sm" role="group">
+                <a href="{% url 'sensors:influxstore_detail' place_slug=place.slug pk=store.pk %}" class="btn btn-outline-info" title="View">
+                    <i class="bi bi-eye-fill"></i>
+                </a>
+                <a href="{% url 'sensors:influxstore_update' place_slug=place.slug pk=store.pk %}" class="btn btn-outline-warning" title="Edit">
+                    <i class="bi bi-pencil-fill"></i>
+                </a>
+                <button type="button" class="btn btn-outline-danger delete-influx-store"
+                        data-url="{% url 'sensors:influxstore_delete' place_slug=place.slug pk=store.pk %}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteInfluxStoreModal"
+                        title="Delete">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

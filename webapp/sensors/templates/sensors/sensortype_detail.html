@@ -8,20 +8,25 @@
             <i class="bi bi-pencil"></i> Edit
         </a>
     </div>
+
     <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Details</h5>
+        </div>
         <div class="card-body">
-            <h5 class="card-title">Details</h5>
             <p><strong>Description:</strong> {{ object.description|default:"N/A" }}</p>
             <hr>
             <div class="row">
                 <div class="col-md-6">
                     <p><strong>Default Unit:</strong> {{ object.unit|default:"N/A" }}</p>
                     <p><strong>Min Value:</strong> {{ object.min_value|default_if_none:"N/A" }}</p>
+                    <p><strong>Max Value:</strong> {{ object.max_value|default_if_none:"N/A" }}</p>
+                    <p><strong>Decimal Places:</strong> {{ object.decimal_places|default_if_none:"N/A" }}</p>
                 </div>
                 <div class="col-md-6">
-                    <p><strong>Max Value:</strong> {{ object.max_value|default_if_none:"N/A" }}</p>
-                    <p><strong>Decimal Places:</strong> {{ object.decimal_places|default:"N/A" }}</p>
-                    <p><strong>Allow Override:</strong>
+                    <p><strong>Default Graph Type:</strong> {{ object.get_graph_type_display|default:"N/A" }}</p>
+                    <p><strong>Default Stale Threshold:</strong> {{ object.default_stale_threshold_seconds|default_if_none:"N/A" }} seconds</p>
+                    <p><strong>Allow Sensor Override:</strong>
                         {% if object.allow_override %}
                             <i class="bi bi-check-circle-fill text-success"></i> Yes
                         {% else %}
@@ -32,6 +37,10 @@
             </div>
         </div>
     </div>
-    <a href="{% url 'sensors:sensortype_list' %}" class="btn btn-secondary mt-3"><i class="bi bi-list"> </i>Back to List</a>
+
+    <div class="mt-3">
+        <a href="{% url 'sensors:sensortype_list' %}" class="btn btn-secondary"><i class="bi bi-list"></i> Back to List</a>
+        <a href="{% url 'sensors:place_list' %}" class="btn btn-info"><i class="bi bi-geo-alt"></i> View Places</a>
+    </div>
 </div>
 {% endblock %}

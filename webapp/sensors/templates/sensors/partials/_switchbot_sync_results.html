@@ -1,0 +1,41 @@
+{% if error_message %}
+    <div class="alert alert-danger" role="alert">
+        {{ error_message }}
+    </div>
+{% endif %}
+
+{% if devices %}
+    <p>{{ devices|length }} devices found on your SwitchBot account.</p>
+    {% if not influx_test_success %}
+    <div class="alert alert-warning" role="alert">
+        <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>InfluxDB Connection Failed</h5>
+        <p>Could not connect to the InfluxDB store '{{ place.switchbot_influx_store.name }}'. Please check the configuration and test the connection again.</p>
+        <hr>
+        <p class="mb-0">{{ influx_test_message }}</p>
+    </div>
+{% endif %}
+
+    <table class="table table-sm table-striped">
+    <thead>
+        <tr>
+                <th scope="col">Actions</th>
+                <th scope="col" class="d-none d-md-table-cell">Name</th>
+                <th scope="col" class="d-md-none">Name / Status</th>
+                <th scope="col">Type</th>
+                <th scope="col" class="d-none d-lg-table-cell">Device ID</th>
+                <th scope="col" class="d-none d-lg-table-cell">Hub ID</th>
+                <th scope="col" class="d-lg-none">Device / Hub ID</th>
+                <th scope="col" class="d-none d-md-table-cell">Status</th>
+        </tr>
+    </thead>
+        <tbody id="switchbot-device-list-body">
+        {% for device in devices %}
+            {% include 'sensors/partials/switchbot_device_row.html' %}
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <div class="alert alert-info" role="alert">
+        No devices found on your SwitchBot account.
+    </div>
+{% endif %}

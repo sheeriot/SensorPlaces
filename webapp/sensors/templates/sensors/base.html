@@ -26,6 +26,9 @@
     {% endblock %}
 
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <!-- <script>
+        htmx.logAll();
+    </script> -->
 </head>
 <body data-toast-unread-count="{{ toast_unread_count|default:0 }}"
       data-place-slug="{{ place.slug|default:'none' }}"
@@ -166,10 +169,16 @@
     <!-- Include toast message container -->
     {% include "sensors/partials/toast_container.html" with toast_message=toast_message toast_messages=toast_messages %}
 
+    <!-- Toast Message Container -->
+<div id="toast-messages" class="d-none">
+    
+</div>
+
+
     <!-- Generic Modal for HTMX content -->
-    <div class="modal fade" id="modal-container" tabindex="-1" aria-labelledby="modal-title" aria-hidden="true">
+    <div class="modal fade" id="htmx-modal" tabindex="-1" aria-labelledby="htmx-modal-label" aria-hidden="true">
         <div class="modal-dialog modal-lg">
-            <div id="modal-content" class="modal-content">
+            <div id="htmx-modal-content" class="modal-content">
                 <!-- Content will be loaded here by HTMX -->
             </div>
         </div>
@@ -232,5 +241,50 @@
     {% block extra_js %}
     {% endblock %}
 
+    <script>
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        const triggerHeader = evt.detail.xhr.getResponseHeader('HX-Trigger');
+        if (triggerHeader) {
+            try {
+                const triggers = JSON.parse(triggerHeader);
+                console.log("[Global HX-Trigger] Parsed triggers:", triggers);
+
+                if (triggers.closeModal) {
+                    const modalElement = document.querySelector(triggers.closeModal);
+                    if (modalElement) {
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) {
+                            console.log(`[Global HX-Trigger] Closing modal: ${triggers.closeModal}`);
+                            modal.hide();
+                        }
+                    }
+                }
+
+                if (triggers.showToast) {
+                    console.log(`[Global HX-Trigger] Calling window.toastSystem.show with message:`, triggers.showToast);
+                    if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+                        window.toastSystem.show(triggers.showToast.message, triggers.showToast.type);
+                    } else {
+                        console.error('[Global HX-Trigger] window.toastSystem.show is not available.');
+                    }
+                }
+
+                // Handle simple string-based triggers for backward compatibility or other uses
+                Object.keys(triggers).forEach(key => {
+                    if (triggers[key] === true) {
+                        console.log(`[Global HX-Trigger] Triggering simple event: ${key}`);
+                        htmx.trigger('body', key, {});
+                    }
+                });
+
+            } catch (e) {
+                console.error("[Global HX-Trigger] Error parsing HX-Trigger header:", e);
+            }
+        }
+    });
+    </script>
+
+    {% block debug_js %}
+    {% endblock %}
 </body>
 </html>

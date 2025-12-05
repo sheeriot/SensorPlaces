@@ -22,6 +22,9 @@ from .views.sensor_views import (
     SensorDeleteView,
     SensorGraphCardView,
     SensorLiveValueView,
+    SensorDetailCardView,
+    SensorLiveDetailsView,
+    SensorInfluxUpdateView,
 )
 
 app_name = 'sensors'
@@ -61,7 +64,11 @@ urlpatterns = [
 
     # SwitchBot Integration
     path('<slug:place_slug>/switchbot/', switchbot_views.switchbot_management_view, name='switchbot_management'),
+    path('<slug:place_slug>/switchbot/existing-devices/', switchbot_views.switchbot_existing_devices_view, name='switchbot_existing_devices'),
+    path('<slug:place_slug>/switchbot/api-sync/', switchbot_views.switchbot_api_sync_view, name='switchbot_api_sync'),
     path('<slug:place_slug>/switchbot/config/', switchbot_views.switchbot_config_update_view, name='switchbot_config_update'),
+    path('<slug:place_slug>/switchbot/edit-influx-store/', switchbot_views.switchbot_influx_store_edit_view, name='switchbot_influx_store_edit'),
+    path('<slug:place_slug>/switchbot/update-influx-store/', switchbot_views.update_switchbot_influx_store, name='switchbot_influx_store_update'),
     path('<slug:place_slug>/switchbot/import-device/', switchbot_views.import_switchbot_device_view, name='import_switchbot_device'),
     path('<slug:place_slug>/switchbot/inspect-api-device/<str:device_id>/', switchbot_views.switchbot_inspect_api_device_view, name='switchbot_inspect_api_device'),
 
@@ -69,7 +76,7 @@ urlpatterns = [
     path('api/<slug:place_slug>/stats/', place_views.place_stats, name='place_stats_api'),
     path('api/<slug:place_slug>/toggle-active/', toggle_active.ToggleActiveView.as_view(), name='toggle_active'),
     path('api/<slug:place_slug>/toasts/', toast_views.ToastAPIView.as_view(), name='toast_api'),
-    path('api/<slug:place_slug>/sensors/live-values/', sensor_views.sensor_live_values_api, name='sensor_live_values_api'),
+    path('api/<slug:place_slug>/sensors/live-values/', sensor_views.SensorLiveValueView.as_view(), name='sensor_live_values_api'),
 
     # Location URLs
     path('<slug:place_slug>/location/', location_views.LocationListView.as_view(), name='location_list'),
@@ -104,24 +111,32 @@ urlpatterns = [
     path('<slug:place_slug>/location/<int:location_pk>/sensors/', SensorListView.as_view(), name='location_sensors'),
     path('<slug:place_slug>/device/<int:device_pk>/sensors/', SensorListView.as_view(), name='device_sensors'),
     path('<slug:place_slug>/sensor/<int:pk>/', SensorDetailView.as_view(), name='sensor_detail'),
+    path('<slug:place_slug>/sensor/<int:pk>/card/', SensorDetailCardView.as_view(), name='sensor_detail_card'),
+    path('<slug:place_slug>/sensor/<int:pk>/live-details/', SensorLiveDetailsView.as_view(), name='sensor_live_details'),
     path('<slug:place_slug>/sensor/<int:pk>/delta/<str:delta>/', SensorDetailView.as_view(), name='sensor_detail_delta'),
     path('<slug:place_slug>/sensor/<int:pk>/<str:start_date>/<str:end_date>/', SensorDetailView.as_view(), name='sensor_detail_daterange'),
     path('<slug:place_slug>/sensor/<int:pk>/graph-card/', SensorGraphCardView.as_view(), name='sensor_graph_card'),
     path('<slug:place_slug>/sensor/<int:pk>/live-value/', SensorLiveValueView.as_view(), name='sensor_live_value'),
     path('<slug:place_slug>/sensor/<int:pk>/update/', SensorUpdateView.as_view(), name='sensor_update'),
+    path('<slug:place_slug>/sensor/<int:pk>/update-influx/', SensorInfluxUpdateView.as_view(), name='sensor_influx_update'),
     path('<slug:place_slug>/sensor/<int:pk>/delete/', SensorDeleteView.as_view(), name='sensor_delete'),
     path('<slug:place_slug>/sensor/<int:sensor_pk>/readings/', sensor_views.SensorReadingListView.as_view(), name='sensor_reading_list'),
 
     # API endpoints for sensor readings
-    path('api/<slug:place_slug>/sensor/<int:pk>/test-influx/', sensor_views.test_influx_connection, name='test_influx_connection'),
+    path('api/<slug:place_slug>/sensor/<int:pk>/test-influx-read/', sensor_views.test_influx_connection, name='test_influx_read'),
+    path('api/<slug:place_slug>/sensor/<int:pk>/test-influx-bucket/', sensor_views.test_influx_bucket_for_sensor, name='test_influx_bucket_for_sensor'),
     path('api/<slug:place_slug>/sensor/<int:pk>/update-graph-type/', sensor_views.update_graph_type, name='update_graph_type'),
     path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_views.sensor_readings_api, name='sensor_readings_api'),
     path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_views.sensor_readings_table_api, name='sensor_readings_table_api'),
     path('api/<slug:place_slug>/sensor/<int:pk>/lorawan_data/', sensor_views.lorawan_sensor_data_api, name='lorawan_sensor_data_api'),
 
-    # InfluxSource URLs
-    path('<slug:place_slug>/influx-sources/new/', influx_views.InfluxSourceCreateView.as_view(), name='influxsource_create'),
-    path('<slug:place_slug>/influx-sources/<int:pk>/', influx_views.InfluxSourceDetailView.as_view(), name='influxsource_detail'),
-    path('<slug:place_slug>/influx-sources/<int:pk>/update/', influx_views.InfluxSourceUpdateView.as_view(), name='influxsource_update'),
-    path('<slug:place_slug>/influx-sources/<int:pk>/delete/', influx_views.InfluxSourceDeleteView.as_view(), name='influxsource_delete'),
+    # InfluxStore URLs
+    path('<slug:place_slug>/influxstores/create/', influx_views.InfluxStoreCreateView.as_view(), name='influxstore_create'),
+    path('<slug:place_slug>/influxstores/<int:pk>/', influx_views.InfluxStoreDetailView.as_view(), name='influxstore_detail'),
+    path('<slug:place_slug>/influxstores/<int:pk>/update/', influx_views.InfluxStoreUpdateView.as_view(), name='influxstore_update'),
+    path('<slug:place_slug>/influxstores/<int:pk>/delete/', influx_views.InfluxStoreDeleteView.as_view(), name='influxstore_delete'),
+    path('<slug:place_slug>/influxstores/<int:pk>/test/', influx_views.influxstore_test, name='influxstore_test'),
+    path('api/<slug:place_slug>/influx-stores/<int:pk>/test-bucket/', influx_views.test_influx_store_bucket, name='test_influx_store_bucket'),
+    path('api/<slug:place_slug>/influx-stores/<int:pk>/test-write/', influx_views.test_influx_store_write_read_view, name='test_influx_store_write'),
+    path('<slug:place_slug>/sensor/<int:pk>/test-influx-write/', sensor_views.test_influx_write, name='test_influx_write'),
 ]

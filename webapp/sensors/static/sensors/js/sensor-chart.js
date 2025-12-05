@@ -530,6 +530,8 @@ class SensorChart {
 
     updateDataPointsTable(chartData, displayUnit, decimalPlaces) {
         const sensorId = this.graphCard.dataset.sensorId;
+        const showNaToggle = document.getElementById(`show-na-toggle-${sensorId}`);
+
         const dataPointsBody = document.getElementById(`data-points-body-${sensorId}`);
         const dataPointsHeader = document.getElementById(`data-points-value-header-${sensorId}`);
         const dataPointsCard = document.getElementById(`graph-datapoints-${sensorId}`);
@@ -570,6 +572,7 @@ class SensorChart {
 
                 let rows = [];
                 const isBoolean = (this.originalUnit === '' && this.sensorType && this.sensorType.toLowerCase() === 'boolean');
+                const showNa = showNaToggle ? showNaToggle.checked : false;
 
                 chartData.slice().reverse().forEach(item => {
                     const timestamp = item.x;
@@ -583,6 +586,8 @@ class SensorChart {
                             valueDisplay = value.toFixed(decimalPlaces);
                         }
                         rows.push([window.utils.formatTimestamp(timestamp), valueDisplay]);
+                    } else if (showNa) {
+                        rows.push([window.utils.formatTimestamp(timestamp), 'N/A']);
                     }
                 });
 
@@ -698,6 +703,18 @@ class SensorChart {
                 apiUrl.searchParams.set('end_date', this.graphCard.dataset.endDate);
 
                 this.fetchData(apiUrl.toString());
+            });
+        }
+
+        const showNaToggle = document.getElementById(`show-na-toggle-${this.graphCard.dataset.sensorId}`);
+        if (showNaToggle) {
+            showNaToggle.addEventListener('change', () => {
+                const tempUnitSelect = document.getElementById('temp-unit-select');
+                if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
+                    tempUnitSelect.dispatchEvent(new Event('change'));
+                } else {
+                    this.renderChart(this.originalData, this.currentGraphType);
+                }
             });
         }
 

@@ -26,13 +26,34 @@
         {% include "sensors/includes/place_form_card.html" %}
     </div>
 </div>
+
+<!-- Deactivation Confirmation Modal -->
+<div class="modal fade" id="deactivationModal" tabindex="-1" aria-labelledby="deactivationModalLabel" aria-hidden="true" data-place-name="{{ object.name }}">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deactivationModalLabel">Confirm Deactivation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You are about to deactivate the place <strong>{{ object.name }}</strong>. This will also deactivate all associated locations, devices, and sensors.</p>
+                <p>To confirm, please type the name of the place below:</p>
+                <input type="text" id="deactivationConfirmationName" class="form-control">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeactivation">Deactivate</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
-<script src="{% static 'sensors/js/active-status-checkbox.js' %}"></script>
 <script src="{% static 'sensors/js/place-map-location-picker.js' %}"></script>
 <script src="{% static 'sensors/js/switchbot-form.js' %}"></script>
+<script src="{% static 'sensors/js/place-form-helpers.js' %}"></script>
 {% endblock %}

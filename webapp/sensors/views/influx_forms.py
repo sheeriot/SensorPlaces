@@ -1,23 +1,35 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.urls import reverse
-from ..models import InfluxSource, Place
+from ..models import InfluxStore, Place
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
+from crispy_forms.layout import Layout, Submit, HTML, Div
 from crispy_forms.bootstrap import FormActions
 
-class InfluxSourceForm(forms.ModelForm):
-    place = forms.ModelChoiceField(queryset=Place.objects.all(), widget=forms.HiddenInput())
-    referrer = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+class InfluxStoreForm(forms.ModelForm):
+    referrer = forms.CharField(widget=forms.HiddenInput, required=False)
+    cancel_url = forms.CharField(widget=forms.HiddenInput, required=False)
 
     class Meta:
-        model = InfluxSource
-        fields = ["name", "url", "org", "bucket_name", "token", "place"]
+        model = InfluxStore
+        fields = ['name', 'url', 'org', 'bucket_name', 'token', 'place']
+        widgets = {
+            'place': forms.HiddenInput(),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'url': forms.TextInput(attrs={'class': 'form-control'}),
+            'org': forms.TextInput(attrs={'class': 'form-control'}),
+            'bucket_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'token': forms.PasswordInput(render_value=True, attrs={'class': 'form-control'}),
+        }
 
     def __init__(self, *args, **kwargs):
-        cancel_url = kwargs.pop('cancel_url', None)
-        super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_method = 'post'
+        cancel_url = kwargs.pop('cancel_url', None)
+
+        super().__init__(*args, **kwargs)
+
         self.helper.layout = Layout(
             'name',
             'url',
@@ -25,26 +37,54 @@ class InfluxSourceForm(forms.ModelForm):
             'bucket_name',
             'token',
             'place',
-            'referrer',
-            HTML('<hr>'),
-            FormActions(
-                HTML(f'<a class="btn btn-secondary" href="{cancel_url}"><i class="bi bi-x-circle"></i> Cancel</a>'),
-                HTML('<button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>'),
-                css_class="d-flex justify-content-between"
+            Div(
+                HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary">Cancel</a>'),
+                Submit('submit', 'Save InfluxStore', css_class='btn btn-primary'),
+                css_class='mt-3 d-flex justify-content-end gap-2'
             )
         )
 
-    def clean(self):
-        cleaned_data = super().clean()
-        name = cleaned_data.get("name")
-        place = cleaned_data.get("place")
+        self.fields['name'].label = "Store Name"
+        self.fields['token'].label = "Access Token"
+        self.fields['token'].widget.attrs['placeholder'] = 'Leave blank to keep unchanged'
+        self.fields['token'].required = False
+        
+        if self.instance and self.instance.token:
+            self.initial['token'] = ''
+
+    def get_help_text(self, field_name):
+        help_texts = {
+            'name': 'A descriptive name for this InfluxDB connection.',
+            'url': 'The base URL of your InfluxDB instance (e.g., http://localhost:8086).',
+            'org': 'The name of your InfluxDB organization.',
+            'bucket_name': 'The name of the bucket to store data in.',
+            'token': 'Your InfluxDB API token with write permissions.',
+        }
+        return help_texts.get(field_name, '')
+
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        place = self.cleaned_data.get('place')
+        instance = self.instance
 
         if name and place:
-            queryset = InfluxSource.objects.filter(place=place, name__iexact=name)
-            if self.instance and self.instance.pk:
-                queryset = queryset.exclude(pk=self.instance.pk)
+            queryset = InfluxStore.objects.filter(place=place, name__iexact=name)
+            if instance and instance.pk:
+                queryset = queryset.exclude(pk=instance.pk)
             if queryset.exists():
-                raise forms.ValidationError(
-                    "An InfluxDB source with this name already exists for this place."
-                )
+                raise ValidationError("An InfluxDB store with this name already exists for this place.")
+        return name
+
+    def clean_token(self):
+        # If the token field is left blank, keep the existing one.
+        token = self.cleaned_data.get('token')
+        if not token and self.instance and self.instance.pk:
+            return self.instance.token
+        return token
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # If the token field is left blank, don't update it.
+        if not cleaned_data.get('token') and self.instance and self.instance.token:
+            cleaned_data['token'] = self.instance.token
         return cleaned_data

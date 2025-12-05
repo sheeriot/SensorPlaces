@@ -6,7 +6,7 @@ from django.utils.safestring import mark_safe
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field, HTML, Div, Fieldset
 
-from ..models import Place, InfluxSource
+from ..models import Place, InfluxStore
 
 
 class PlaceForm(forms.ModelForm):
@@ -29,7 +29,10 @@ class PlaceForm(forms.ModelForm):
 
     class Meta:
         model = Place
-        fields = ['name', 'address', 'is_active', 'latitude', 'longitude', 'slug', 'siteplan_image', 'default_influx_source', 'switchbot_enable']
+        fields = [
+            'name', 'address', 'is_active', 'latitude', 'longitude', 'slug', 
+            'siteplan_image', 'default_influx_store', 'switchbot_enable'
+        ]
         widgets = {
             'address': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -50,7 +53,7 @@ class PlaceForm(forms.ModelForm):
                 'style': 'width: 110px;',
                 'min': -90,
                 'max': 90,
-                'pattern': r'-?\d+\.\d{0,5}',
+                'pattern': r'-?\\d+\\.\\d{0,5}',
                 'maxlength': 10
             }),
             'longitude': forms.NumberInput(attrs={
@@ -59,9 +62,13 @@ class PlaceForm(forms.ModelForm):
                 'style': 'width: 110px;',
                 'min': -180,
                 'max': 180,
-                'pattern': r'-?\d+\.\d{0,5}',
+                'pattern': r'-?\\d+\\.\\d{0,5}',
                 'maxlength': 11
-            })
+            }),
+            'default_influx_store': forms.Select(attrs={'class': 'form-select'}),
+        }
+        labels = {
+            'default_influx_store': 'Default InfluxDB Source',
         }
 
     def __init__(self, *args, **kwargs):
@@ -89,9 +96,11 @@ class PlaceForm(forms.ModelForm):
         # If this is an existing Place, preserve its slug
         if self.instance and self.instance.pk:
             self.fields['slug'].initial = self.instance.slug
-            self.fields['default_influx_source'].queryset = InfluxSource.objects.filter(place=self.instance)
+            # Limit choices for influx source to the current place
+            self.fields['default_influx_store'].queryset = InfluxStore.objects.filter(place=self.instance)
         else:
-            self.fields['default_influx_source'].queryset = InfluxSource.objects.none()
+            # If creating a new place, no influx sources exist yet.
+            self.fields['default_influx_store'].queryset = InfluxStore.objects.none()
 
         # Configure field properties
         # Setup Active field with proper ID and label
@@ -173,12 +182,16 @@ class PlaceForm(forms.ModelForm):
                     css_class='row mb-3'
                 ),
                 Div(
-                    Div('default_influx_source', css_class='col-12'),
+                    Div('default_influx_store', css_class='col-12'),
                     css_class='row mb-3'
                 ),
                 Div(
                     Div('address', css_class='col-12'),
                     css_class='row mb-3'
+                ),
+                Div(
+                    Field('switchbot_enable', id="id_switchbot_enable"),
+                    css_class='form-check form-switch mb-3'
                 ),
                 css_class='form-group'
             ),
@@ -228,16 +241,6 @@ class PlaceForm(forms.ModelForm):
                 css_class='mt-3'
             )
         )
-
-        if self.instance and self.instance.pk:
-            switchbot_fieldset = Fieldset(
-                '<legend class="float-none w-auto px-2 mb-0 fs-5 bg-secondary-subtle"><i class="bi bi-robot me-1"></i>SwitchBot Integration</legend>',
-                Div(
-                    Field('switchbot_enable', id="id_switchbot_enable"),
-                    css_class='form-check form-switch mb-3'
-                )
-            )
-            self.helper.layout.insert(-1, switchbot_fieldset)
 
     def clean(self):
         cleaned_data = super().clean()

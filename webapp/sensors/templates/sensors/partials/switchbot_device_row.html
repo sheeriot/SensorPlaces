@@ -20,7 +20,7 @@ It's designed to be responsive based on Bootstrap breakpoints.
             </button>
             <div class="btn-group btn-group-sm" role="group">
                 <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
-                    {% if not place.switchbot_influx_source %}disabled title="Please configure an InfluxDB source for SwitchBot first."{% endif %}>
+                    {% if not influx_test_success %}disabled title="InfluxDB connection failed. Please resolve the connection issue before importing."{% endif %}>
                     <i class="bi bi-hdd-rack"></i><i class="bi bi-plus-circle"></i> Import
                 </button>
                 <ul class="dropdown-menu dropdown-menu-scrollable">
@@ -29,7 +29,7 @@ It's designed to be responsive based on Bootstrap breakpoints.
                         <li>
                             <a class="dropdown-item" href="#"
                                hx-post="{% url 'sensors:import_switchbot_device' place.slug %}"
-                               hx-vals='{"device_id": "{{ device.id }}", "location_id": "{{ location.id }}"}'
+                               hx-vals='{"device_id": "{{ device.id }}", "device_name": "{{ device.name|escapejs }}", "location_id": "{{ location.id }}"}'
                                hx-target="closest tr"
                                hx-swap="outerHTML">
                                 To {{ location.name }} {% if not location.is_active %}<span class="text-muted small">(Inactive)</span>{% endif %}
@@ -41,7 +41,7 @@ It's designed to be responsive based on Bootstrap breakpoints.
                     <li>
                         <a class="dropdown-item" href="#"
                            hx-post="{% url 'sensors:import_switchbot_device' place.slug %}"
-                           hx-vals='{"device_id": "{{ device.id }}"}'
+                           hx-vals='{"device_id": "{{ device.id }}", "device_name": "{{ device.name|escapejs }}"}'
                            hx-target="closest tr"
                            hx-swap="outerHTML">
                            To Unassigned
