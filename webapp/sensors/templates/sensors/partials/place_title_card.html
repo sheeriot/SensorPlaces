@@ -21,36 +21,17 @@
                     <i class="bi bi-geo-alt me-1"></i>{{ place.latitude }}, {{ place.longitude }}
                 </span>
                 <a href="#" class="btn btn-outline-primary rounded-circle p-1" id="openPlaceMap"
-                    data-place-map-popout="true"
-                    data-bs-toggle="modal"
-                    data-bs-target="#placeMapModal"
-                    data-place-lat="{{ place.latitude }}"
-                    data-place-lon="{{ place.longitude }}"
-                    data-place-name="{{ place.name }}"
-                    data-place-slug="{{ place.slug }}">
+                   data-bs-toggle="modal"
+                   data-bs-target="#mapplan-modal"
+                   data-bs-focus="false"
+                   hx-get="{% url 'sensors:place_map_modal' place_slug=place.slug %}"
+                   hx-target="#mapplan-modal-content"
+                   data-place-lat="{{ place.latitude }}"
+                   data-place-lon="{{ place.longitude }}"
+                   data-place-name="{{ place.name }}"
+                   data-place-slug="{{ place.slug }}">
                     <i class="bi bi-globe"></i>
                 </a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Place Map Modal -->
-<div class="modal fade" id="placeMapModal" data-map-type="popout">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-globe me-2"></i>{{ place.name }} Map
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div id="placeMapContainer" class="place-map-container"
-                     data-place-lat="{{ place.latitude }}"
-                     data-place-lon="{{ place.longitude }}"
-                     data-place-name="{{ place.name }}"
-                     data-place-slug="{{ place.slug }}"></div>
             </div>
         </div>
     </div>

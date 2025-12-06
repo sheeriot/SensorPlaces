@@ -34,72 +34,52 @@ const sitePlanSystem = {
         isDirty: false         // Whether there are unsaved changes
     },
 
-    // DOM Element Getters
-    get viewContainer() { return document.getElementById('siteplan-container'); },
-    get editorContainer() { return document.getElementById('siteplan-editor-map'); },
-    get modal() { return document.getElementById('siteplan-editor'); },
-    get editButton() { return document.getElementById('siteplan-edit'); },
-    get saveButton() { return document.getElementById('siteplan-save'); },
+    // DOM Element Getters (will be scoped to the modal content)
+    get saveButton() { return document.getElementById('save-siteplan-positions'); },
     get resetButton() { return document.getElementById('siteplan-editor-reset'); },
 
-    // Initialization Methods
-    initialize() {
-        if (!this.viewContainer || !this.editorContainer) {
-            this.logDebug('error', 'Required containers not found');
+    // The main initialize function is no longer needed as we trigger from the modal handler
+    // initialize() { ... } 
+
+    // NEW on-demand initializer for the modal
+    initializeEditor(modalBody) {
+        this.logDebug('initialization', 'Site plan editor initializing inside modal.');
+        
+        const container = modalBody.querySelector('#siteplan-editor-map');
+        const viewContainer = document.getElementById('siteplan-container'); 
+        
+        if (!container || !viewContainer) {
+            this.logDebug('error', 'Editor or view container not found');
             return;
         }
 
-        // Initialize the Bootstrap modal
-        const modal = this.modal;
-        if (!modal) {
-            this.logDebug('error', 'Modal element not found');
+        const imageUrl = viewContainer.dataset.imageUrl;
+        if (!imageUrl) {
+            this.logDebug('error', 'Image URL not found on view container');
             return;
         }
 
-        // Initialize edit button click handler
-        const editButton = this.editButton;
-        if (editButton) {
-            editButton.addEventListener('click', () => {
-                const bsModal = new bootstrap.Modal(modal);
-                bsModal.show();
-            });
-            this.logDebug('initialization', 'Edit button handler initialized');
-        }
-
-        // Set up modal event listeners
-        modal.addEventListener('show.bs.modal', () => this.setupEditor());
-        modal.addEventListener('shown.bs.modal', () => {
-            // Force a resize after modal is fully shown
-            if (this.state.editorMap) {
-                this.state.editorMap.invalidateSize();
-                this.fitMapPerfectly();
-            }
-        });
-        // Use hide.bs.modal to blur focus BEFORE it's hidden, preventing ARIA error
-        modal.addEventListener('hide.bs.modal', () => {
-            if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur();
-            }
-        });
-        modal.addEventListener('hidden.bs.modal', () => this.cleanupEditor());
-
-        // Initialize save button click handler
-        const saveButton = this.saveButton;
+        // Setup save/reset buttons inside the modal
+        const saveButton = modalBody.querySelector('#save-siteplan-positions');
         if (saveButton) {
-            saveButton.addEventListener('click', () => {
-                this.logDebug('saves', 'Save button clicked');
-                this.saveChanges();
-            });
-            this.logDebug('initialization', 'Save button handler initialized');
-        } else {
-            this.logDebug('error', 'Save button not found with ID: siteplan-save');
+            saveButton.addEventListener('click', () => this.saveChanges());
         }
 
-        if (this.resetButton) {
-            this.resetButton.addEventListener('click', () => this.resetView());
+        const resetButton = modalBody.querySelector('#siteplan-editor-reset');
+        if (resetButton) {
+            resetButton.addEventListener('click', () => this.resetView());
         }
 
-        this.logDebug('initialization', 'Site plan editor initialized');
+        // Get image dimensions and set up map
+        const img = new Image();
+        img.onload = () => {
+            this.state.imageBounds = [[0, 0], [img.height, img.width]];
+            this.initializeEditorMap(container, imageUrl);
+        };
+        img.src = imageUrl;
+
+        // Add a one-time listener for modal hidden to clean up
+        $('#mapplan-modal').one('hidden.bs.modal', () => this.cleanupEditor());
     },
 
     cleanupEditor() {
@@ -238,7 +218,7 @@ const sitePlanSystem = {
         try {
             // Instead of reading from the stale dataset, get the most up-to-date
             // locations directly from the sitePlanView's state.
-            const locations = Array.from(window.sitePlanView.state.locations.values())
+            const locations = Array.from(window.sitePlanEditor.state.locations.values())
                 .filter(loc => loc.slug !== 'unassigned-devices');
 
             if (!locations || locations.length === 0) {
@@ -252,10 +232,10 @@ const sitePlanSystem = {
                 const coords = this.percentToImageCoords(location.x_pos, location.y_pos);
 
                 // Get the existing icon type from the view
-                const viewMarker = window.sitePlanView.state.markers.get(location.slug);
-                const iconType = viewMarker ? viewMarker.iconType : window.sitePlanView.getRandomIcon(location.name);
+                const viewMarker = window.sitePlanEditor.state.markers.get(location.slug);
+                const iconType = viewMarker ? viewMarker.iconType : window.sitePlanEditor.getRandomIcon(location.name);
 
-                const icon = window.sitePlanView.createIcon(location.is_active, iconType, location.name);
+                const icon = this.createIcon(location.is_active, iconType, location.name);
 
                 const marker = L.marker(coords, {
                     icon: icon,
@@ -264,7 +244,7 @@ const sitePlanSystem = {
                 });
 
                 // Create informative popup
-                marker.bindPopup(window.sitePlanView.createMarkerPopup(location), {
+                marker.bindPopup(this.createMarkerPopup(location), {
                     offset: [0, -10],
                     closeButton: false,
                     className: 'location-popup',
@@ -449,7 +429,7 @@ const sitePlanSystem = {
                 // with the new position from the server response.
                 const updatedLocations = data.changes.locations.reduce((acc, change) => {
                     const slug = change.slug;
-                    const existingLocation = window.sitePlanView.state.locations.get(slug);
+                    const existingLocation = window.sitePlanEditor.state.locations.get(slug);
                     if (existingLocation) {
                         acc[slug] = {
                             ...existingLocation,
@@ -522,8 +502,8 @@ const sitePlanSystem = {
     }
 };
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => sitePlanSystem.initialize());
+// Remove the DOMContentLoaded listener, initialization is now on-demand
+// document.addEventListener('DOMContentLoaded', () => sitePlanSystem.initialize());
 
 // Export for use in other modules
 window.sitePlanSystem = sitePlanSystem;

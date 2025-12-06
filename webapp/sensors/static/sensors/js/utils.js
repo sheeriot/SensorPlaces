@@ -1,5 +1,5 @@
-window.utils = {
-    getCookie: function(name) {
+(function() {
+    function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
             const cookies = document.cookie.split(';');
@@ -12,10 +12,10 @@ window.utils = {
             }
         }
         return cookieValue;
-    },
+    }
 
-    fetchWithCSRF: async function(url, options = {}) {
-        const csrfToken = this.getCookie('csrftoken');
+    async function fetchWithCSRF(url, options = {}) {
+        const csrfToken = getCookie('csrftoken');
 
         const defaultHeaders = {
             'X-CSRFToken': csrfToken,
@@ -31,11 +31,9 @@ window.utils = {
         try {
             const response = await fetch(url, options);
             if (!response.ok) {
-                // For HTTP errors, log them and throw to be caught by the caller
                 console.error(`HTTP error! status: ${response.status}`, {response});
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            // Check if the response is JSON before trying to parse it.
             const contentType = response.headers.get("content-type");
             if (contentType && contentType.indexOf("application/json") !== -1) {
                 return response.json();
@@ -45,9 +43,9 @@ window.utils = {
             console.error('Fetch error:', error);
             throw error;
         }
-    },
+    }
 
-    formatTimestamp: function(date) {
+    function formatTimestamp(date) {
         const d = (date instanceof Date) ? date : new Date(date);
         if (isNaN(d)) {
             return 'Invalid Date';
@@ -75,31 +73,61 @@ window.utils = {
         const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
 
         return `${dateStr} ${timeStr} ${offsetString} (${shortTZ})`;
-    },
-
-    getNaturalTime: function(date) {
-        if (!date) return '';
-
-        const now = new Date();
-        const seconds = Math.round((now - date) / 1000);
-
-        if (seconds < 5) {
-            return "just now";
-        } else if (seconds < 60) {
-            return `${seconds} seconds ago`;
-        }
-
-        const minutes = Math.round(seconds / 60);
-        if (minutes < 60) {
-            return minutes === 1 ? "a minute ago" : `${minutes} minutes ago`;
-        }
-
-        const hours = Math.round(minutes / 60);
-        if (hours < 24) {
-            return hours === 1 ? "an hour ago" : `${hours} hours ago`;
-        }
-
-        const days = Math.round(hours / 24);
-        return days === 1 ? "yesterday" : `${days} days ago`;
     }
-};
+
+    function setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days*24*60*60*1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    }
+
+    function deleteCookie(name) {
+        document.cookie = name + '=; Max-Age=-99999999;';
+    }
+
+    function getNaturalTime(isoString) {
+        if (!isoString) {
+            return "Never";
+        }
+        const now = new Date();
+        const past = new Date(isoString);
+        const seconds = Math.floor((now - past) / 1000);
+
+        if (seconds < 5) return "just now";
+        if (seconds < 60) return `${seconds} seconds ago`;
+
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+
+        const days = Math.floor(hours / 24);
+        return `${days} day${days > 1 ? 's' : ''} ago`;
+    }
+
+    function showToast(message, type = 'info', delay = 5000) {
+        document.dispatchEvent(new CustomEvent('show-toast', {
+            detail: {
+                message: message,
+                type: type,
+                delay: delay
+            }
+        }));
+    }
+
+    // Public API
+    window.utils = {
+        getCookie: getCookie,
+        setCookie: setCookie,
+        deleteCookie: deleteCookie,
+        fetchWithCSRF: fetchWithCSRF,
+        formatTimestamp: formatTimestamp,
+        getNaturalTime: getNaturalTime,
+        showToast: showToast
+    };
+})();

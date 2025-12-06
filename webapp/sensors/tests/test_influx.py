@@ -4,7 +4,7 @@ import inspect
 from datetime import datetime, timezone
 from django.test import TestCase
 from django.conf import settings
-from sensors.models import InfluxSource, Place
+from sensors.models import InfluxStore, Place
 from sensors.influx_client import write_to_influx
 from influxdb_client_3 import InfluxDBClient3, Point
 
@@ -38,7 +38,7 @@ class InfluxIntegrationTests(TestCase):
             latitude=0.0,
             longitude=0.0
         )
-        self.influx_source = InfluxSource.objects.create(
+        self.influx_store = InfluxStore.objects.create(
             place=self.place,
             name=self.env_config.get('INFLUX_TEST_NAME', 'Test Source'),
             url=self.env_config.get('INFLUX_TEST_URL'),
@@ -49,12 +49,12 @@ class InfluxIntegrationTests(TestCase):
 
     def test_a_connection(self):
         """Test a) make sure we can connect"""
-        print(f"\nTesting connection to {self.influx_source.url}...")
+        print(f"\nTesting connection to {self.influx_store.url}...")
         client = InfluxDBClient3(
-            host=self.influx_source.url,
-            token=self.influx_source.token,
-            org=self.influx_source.org,
-            database=self.influx_source.bucket_name
+            host=self.influx_store.url,
+            token=self.influx_store.token,
+            org=self.influx_store.org,
+            database=self.influx_store.bucket_name
         )
         try:
             # A simple query to check for connectivity without relying on specific tables.
@@ -76,7 +76,7 @@ class InfluxIntegrationTests(TestCase):
         tags = {"location": "lab_b"}
 
         try:
-            write_to_influx(self.influx_source, self.measurement, fields, tags)
+            write_to_influx(self.influx_store, self.measurement, fields, tags)
             print("Write successful.")
             method = getattr(self, self._testMethodName)
             _, start_line = inspect.getsourcelines(method)
@@ -90,15 +90,15 @@ class InfluxIntegrationTests(TestCase):
         # Write some data first to ensure there's something to read
         fields = {"value": 100.0}
         tags = {"sensor": "sensor_c"}
-        write_to_influx(self.influx_source, self.measurement, fields, tags)
+        write_to_influx(self.influx_store, self.measurement, fields, tags)
 
         time.sleep(1) # Brief pause for data to be ingested and queryable
 
         client = InfluxDBClient3(
-            host=self.influx_source.url,
-            token=self.influx_source.token,
-            org=self.influx_source.org,
-            database=self.influx_source.bucket_name
+            host=self.influx_store.url,
+            token=self.influx_store.token,
+            org=self.influx_store.org,
+            database=self.influx_store.bucket_name
         )
 
         try:

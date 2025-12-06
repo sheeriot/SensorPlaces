@@ -1,0 +1,86 @@
+[
+{
+  "model": "sensors.influxstore",
+  "pk": 7,
+  "fields": {
+    "place": 2,
+    "name": "weatherDB",
+    "url": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "d9a70cb9b3760496",
+    "bucket_name": "weather",
+    "token": "XWlaaireoXHh95u4zLtpYQ60MLDtN6WLifK0CmGDunGTh0LxnK9O5o4Fctf2AYXbKpS_Lp-KBXPu8r1gw3YDaQ==",
+    "created_at": "2025-07-20T13:18:38.336Z",
+    "updated_at": "2025-07-20T23:32:31.193Z"
+  }
+},
+{
+  "model": "sensors.influxstore",
+  "pk": 9,
+  "fields": {
+    "place": 2,
+    "name": "KonaDB",
+    "url": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "d9a70cb9b3760496",
+    "bucket_name": "kona",
+    "token": "CCr2UKThDkfWARi4q_1udP6ZePsj6QihxP-kgXKj42IGI5HxfiqO9bBHCcMr_u--I9Dxnkm8J0uyDGDmMuSSRw==",
+    "created_at": "2025-08-07T10:39:48.983Z",
+    "updated_at": "2025-08-07T10:39:48.983Z"
+  }
+},
+{
+  "model": "sensors.influxstore",
+  "pk": 10,
+  "fields": {
+    "place": 2,
+    "name": "poohlevel",
+    "url": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "d9a70cb9b3760496",
+    "bucket_name": "poohlevel",
+    "token": "QT6NMSB8xV458TC9wfoutAcmKYEWi1oxL9ln1x8KUWkIMX0JGGCirxBd5bK87Wjikr4FgclcQ_O2dVUr8lTQUA==",
+    "created_at": "2025-08-10T10:58:28.714Z",
+    "updated_at": "2025-08-10T10:58:28.714Z"
+  }
+},
+{
+  "model": "sensors.influxstore",
+  "pk": 12,
+  "fields": {
+    "place": 2,
+    "name": "5702HB",
+    "url": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "9d35aecc462bfe92",
+    "bucket_name": "5702hb-dev",
+    "token": "4bLdUJdWbLC0FCIuTnMU1hpzmHdNnohjonYZhMVJaGDrKkxVK9UqFYiJ2mYEmbaQ4sa3IS8__hPt_uaw_SYodg==",
+    "created_at": "2025-11-27T15:35:44.414Z",
+    "updated_at": "2025-11-27T15:35:44.430Z"
+  }
+},
+{
+  "model": "sensors.influxstore",
+  "pk": 13,
+  "fields": {
+    "place": 6,
+    "name": "15601cl-dev",
+    "url": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "9d35aecc462bfe92",
+    "bucket_name": "15601cl-dev",
+    "token": "I2bbEe4OmxMpEAlBYlcjPYysm0GhrM91E7g4dy-f4yxiiXcOlfmrtUf8tqR4Sb86Fi6WLQFk62vSk2NOxmu2jg==",
+    "created_at": "2025-12-01T02:13:39.883Z",
+    "updated_at": "2025-12-01T02:13:39.897Z"
+  }
+},
+{
+  "model": "sensors.influxstore",
+  "pk": 14,
+  "fields": {
+    "place": 2,
+    "name": "5702hb-switchbot",
+    "url": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "9d35aecc462bfe92",
+    "bucket_name": "5702hb-switchbot-dev",
+    "token": "Sf9k7HuRBsv_-WtlUu5hiGHUQe9hlIHlGUaVYoCUQbEy6G9B0qhBRs_zYDRCmCzhlvBucLiipWxWTpKZrnmi6w==",
+    "created_at": "2025-12-02T12:42:54.310Z",
+    "updated_at": "2025-12-02T12:42:54.325Z"
+  }
+}
+]

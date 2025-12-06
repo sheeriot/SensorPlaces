@@ -17,6 +17,7 @@ fi
 # Apply database migrations
 echo "Apply database migrations"
 python manage.py migrate --verbosity 1
+# echo "Skipping database migrations"
 
 # Collect static files
 echo "Collect static files"

@@ -15,7 +15,7 @@ class SensorsViewTestCase(TestCase):
         'sensors/tests/fixtures/test_users.json',
         'sensors/tests/fixtures/test_places.json',
         'sensors/tests/fixtures/test_locations.json',
-        # 'sensors/tests/fixtures/test_influxsources.json',
+        # 'sensors/tests/fixtures/test_influxstores.json',
         'sensors/tests/fixtures/test_units.json',
         'sensors/tests/fixtures/test_sensor_types.json',
         'sensors/tests/fixtures/test_devicetypes.json',

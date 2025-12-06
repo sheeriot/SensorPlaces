@@ -1,0 +1,23 @@
+{% extends "sensors/base_modal.html" %}
+
+{% block modal_title %}
+    <i class="bi bi-globe me-2"></i>{{ place.name }} Map
+{% endblock %}
+
+{% block modal_body %}
+    <div class="p-0">
+        <div id="placeMapContainer" class="place-map-container"
+             style="height: 60vh;"
+             data-map-type="popout"
+             data-place-lat="{{ place.latitude }}"
+             data-place-lon="{{ place.longitude }}"
+             data-place-name="{{ place.name }}"
+             data-place-slug="{{ place.slug }}"></div>
+    </div>
+{% endblock %}
+
+{% block modal_footer %}
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+        <i class="bi bi-x-circle me-1"></i>Close
+    </button>
+{% endblock %}

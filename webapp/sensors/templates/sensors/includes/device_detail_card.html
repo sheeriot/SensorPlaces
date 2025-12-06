@@ -23,10 +23,16 @@
                 <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn border-dark btn-outline-warning" title="Edit Device">
                     <i class="bi bi-pencil"></i>
                 </a>
-                <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-outline-info" title="Duplicate Device">
+                <a href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}" class="btn btn-outline-info border-dark" title="Duplicate Device">
                     <i class="bi bi-copy"></i>
                 </a>
-                <a href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}" class="btn btn-outline-danger" title="Delete Device">
+                <a href="#"
+                   class="btn btn-outline-danger"
+                   title="Delete Device"
+                   data-bs-toggle="modal"
+                   data-bs-target="#htmx-modal"
+                   hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
+                   hx-target="#htmx-modal-content">
                     <i class="bi bi-trash"></i>
                 </a>
             </div>
@@ -39,7 +45,16 @@
                     <li><a class="dropdown-item" href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
                     <li><a class="dropdown-item" href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}"><i class="bi bi-copy me-2"></i>Duplicate</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                    <li>
+                        <a class="dropdown-item text-danger"
+                           href="#"
+                           data-bs-toggle="modal"
+                           data-bs-target="#htmx-modal"
+                           hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
+                           hx-target="#htmx-modal-content">
+                            <i class="bi bi-trash me-2"></i>Delete
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>

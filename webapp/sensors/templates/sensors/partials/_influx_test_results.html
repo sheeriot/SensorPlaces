@@ -1,25 +1,80 @@
 {% load humanize %}
-{% if success %}
-    <div class="alert alert-success py-2 px-3">
-        <div class="d-flex justify-content-between">
-            <span><strong>Connection:</strong> OK</span>
-            <span>
-                <strong>Total Records:</strong> {{ record_count|intcomma }}
-            </span>
-        </div>
-        {% if latest_reading %}
-        <div>
-            <strong>Latest Reading:</strong>
-            {{ latest_reading.value|floatformat:2 }}
-            <span class="text-muted">at {{ latest_reading.time|naturaltime }}</span>
-        </div>
-        {% else %}
-        <div class="text-muted">No readings found.</div>
+{% load timezone_filters %}
+
+<div class="font-monospace p-3 rounded {% if success %}bg-success-subtle text-dark{% elif error_message or message %}bg-danger-subtle text-dark{% else %}bg-dark text-white{% endif %}">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h6 class="mb-0">
+            <i class="bi bi-play-circle"></i> 
+            {{ test_name }}
+            {% if test_name == 'Write/Read Test' and record.field_value %}
+                : <span class="fw-bold">Random {{ record.field_value }}</span>
+            {% endif %}
+        </h6>
+        {% if query_time_ms %}
+            <small class="text-muted"><i class="bi bi-clock"></i> {{ query_time_ms }}ms</small>
         {% endif %}
     </div>
-{% else %}
-    <div class="alert alert-danger py-2 px-3">
-        <h6 class="alert-heading mb-1">Connection Test Failed</h6>
-        <p class="mb-0 small font-monospace">{{ error|default:"An unknown error occurred." }}</p>
-    </div>
-{% endif %}
+    
+    <hr class="border-secondary my-1">
+
+    {% if test_name == 'Write/Read Test' %}
+        {% if success %}
+            <p class="text-success mb-2">
+                <i class="bi bi-check-circle-fill"></i> 
+                <strong>Success:</strong> Write in {{ write_time_ms }}ms, Read in {{ read_time_ms }}ms.
+            </p>
+            {% if record %}
+            <div class="mt-2 p-2 rounded" style="background-color: #f5f5dc;">
+                <pre class="mb-0 small"><code><strong>[Record]</strong> Bucket: {{ record.bucket }}, Measurement: {{ record.measurement }}, Tag: {{ record.tag_key }}={{ record.tag_value }}, Field: {{ record.field_name }}={{ record.field_value }}</code></pre>
+            </div>
+            {% endif %}
+        {% else %}
+            <p class="text-danger mb-2">
+                <i class="bi bi-x-circle-fill"></i> 
+                <strong>Error:</strong> {{ message }}
+            </p>
+        {% endif %}
+    {% elif test_name == 'Read Sensor Data' %}
+        {% if success %}
+            <p class="text-success mb-2">
+                <i class="bi bi-check-circle-fill"></i> 
+                <strong>Success:</strong> Read in {{ query_time_ms }}ms.
+            </p>
+            {% if results.latest_reading %}
+            <div class="small mb-2">
+                <strong>Latest:</strong>
+                {{ results.latest_reading.value|floatformat:sensor.effective_decimal_places }}
+                <span class="text-muted">({{ results.latest_reading.time|utc_to_local_time|naturaltime }})</span>
+                <div class="mt-1"><strong>Raw Result:</strong> <code class="text-dark">{{ results.latest_reading }}</code></div>
+            </div>
+            {% else %}
+            <p class="mb-2">No reading found in the selected time range.</p>
+            {% endif %}
+            
+            {% if results.latest_reading.query %}
+            <div class="mt-2 pt-2 border-top border-secondary small">
+                <div><strong>Query:</strong></div>
+                <pre class="text-dark bg-light p-2 rounded small"><code>{{ results.latest_reading.query|pretty_sql }}</code></pre>
+            </div>
+            {% endif %}
+        {% else %}
+            <p class="text-danger mb-2">
+                <i class="bi bi-x-circle-fill"></i> 
+                <strong>Error:</strong> {{ message }}
+            </p>
+        {% endif %}
+    {% elif test_name == 'Bucket Read Test' %}
+        {% if success %}
+            <p class="text-success mb-2">
+                <i class="bi bi-check-circle-fill"></i> 
+                <strong>Connection Successful</strong>
+            </p>
+        {% else %}
+             <p class="text-danger mb-2">
+                <i class="bi bi-x-circle-fill"></i> 
+                <strong>Connection Failed</strong>
+            </p>
+        {% endif %}
+        <pre class="small bg-light p-2 rounded mb-0"><code>{{ message }}</code></pre>
+    {% endif %}
+</div>

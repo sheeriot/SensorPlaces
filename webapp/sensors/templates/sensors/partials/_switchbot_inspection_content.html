@@ -83,6 +83,17 @@
             </table>
         {% endif %}
 
+        {% if raw_api_response %}
+            <div class="mt-3">
+                <a class="small" data-bs-toggle="collapse" href="#collapseRawApiResponse" role="button" aria-expanded="false" aria-controls="collapseRawApiResponse">
+                    Show Raw API Response
+                </a>
+                <div class="collapse" id="collapseRawApiResponse">
+                    <pre class="bg-light p-2 rounded small mt-2"><code>{{ raw_api_response }}</code></pre>
+                </div>
+            </div>
+        {% endif %}
+
         {% if raw_data %}
             <div class="mt-3">
                 <a class="small" data-bs-toggle="collapse" href="#collapseRawData" role="button" aria-expanded="false" aria-controls="collapseRawData">

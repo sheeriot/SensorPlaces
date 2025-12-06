@@ -1,0 +1,9 @@
+{% extends "sensors/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    {% with card_title="InfluxDB Store Details" store=influxstore place=place edit_url=edit_url htmx_modal=False show_details=True results_id="influx-results-detail" %}
+        {% include 'sensors/includes/influxstore_details_card.html' %}
+    {% endwith %}
+</div>
+{% endblock %}

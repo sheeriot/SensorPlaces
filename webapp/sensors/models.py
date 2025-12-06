@@ -1,4 +1,5 @@
 from django.db import models, transaction
+from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.db.models.functions import Lower
@@ -41,6 +42,134 @@ class LocationManager(models.Manager):
     def get_by_natural_key(self, place_slug, slug):
         return self.get(place__slug=place_slug, slug=slug)
 
+class Unit(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    symbol = models.CharField(max_length=10)
+
+    def __str__(self):
+        return f"{self.name} ({self.symbol})"
+
+    objects = NameManager()
+
+    def natural_key(self):
+        return (self.name,)
+
+    class Meta:
+        verbose_name_plural = 'Units'
+        ordering = ['name']
+
+class DeviceType(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True)
+    icon = models.CharField(
+        max_length=50,
+        default='bi-hdd',
+        help_text="Bootstrap icon class (e.g., bi-hdd, bi-router)"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('sensors:devicetype_detail', kwargs={'pk': self.pk})
+
+    objects = NameManager()
+
+    def natural_key(self):
+        return (self.name,)
+
+    class Meta:
+        verbose_name_plural = '6. Device Types'
+        ordering = ['name']
+
+class Device(models.Model):
+    name: CharField = models.CharField(max_length=100)
+    model: CharField = models.CharField(max_length=100, null=True, blank=True)
+    manufacturer: CharField = models.CharField(max_length=100, null=True, blank=True)
+    device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    notes: TextField = models.TextField(blank=True, null=True, help_text="Internal notes for this device.")
+    location: ForeignKey = models.ForeignKey(
+        'Location',
+        on_delete=models.CASCADE,
+        related_name='devices',
+    )
+    device_type = models.ForeignKey(
+        'DeviceType',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='devices',
+    )
+    is_lorawan: BooleanField = models.BooleanField(default=False, verbose_name="LoRaWAN Device")
+    is_switchbot: BooleanField = models.BooleanField(default=False, help_text="Is this a SwitchBot device?")
+    hub_id: CharField = models.CharField(max_length=100, null=True, blank=True, help_text="Identifier for the hub or bridge device, if any.")
+    is_active: BooleanField = models.BooleanField(
+        default=True,
+        help_text="inactive devices will be hidden by default"
+    )
+    created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: DateTimeField = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        super().clean()
+        # Ensure device can't be active if location is inactive
+        if self.is_active and self.location and not self.location.is_active:
+            raise ValidationError({
+                'is_active': 'Device cannot be active when its location is inactive.'
+            })
+
+    def save(self, *args, **kwargs):
+        # Run full validation first
+        self.full_clean()
+
+        # If location is inactive, device must be inactive
+        if self.location and not self.location.is_active:
+            self.is_active = False
+
+        # Check if this is an existing device being deactivated
+        if self.pk and not self.is_active:
+            # Deactivate all associated sensors
+            Sensor = apps.get_model('sensors', 'Sensor')
+            Sensor.objects.filter(device=self).update(is_active=False)
+
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        """Returns the URL to the device's detail page."""
+        return reverse('sensors:device_detail', kwargs={'place_slug': self.location.place.slug, 'pk': self.pk})
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.model})"
+
+    class Meta:
+        verbose_name_plural = '3. Devices'
+        ordering = ['location__place', 'location', '-is_active', Lower('name')]
+
+class InfluxStore(models.Model):
+    place = models.ForeignKey('Place', on_delete=models.CASCADE, related_name='influx_stores')
+    name = models.CharField(max_length=100)
+    url = models.CharField(max_length=255)
+    org = models.CharField(max_length=100)
+    bucket_name = models.CharField(max_length=100)
+    token = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def token_display(self):
+        if self.token and len(self.token) > 8:
+            return f"{self.token[:4]}...{self.token[-4:]}"
+        return "Token not set"
+
+    def get_absolute_url(self):
+        return reverse('sensors:influxstore_detail', kwargs={'place_slug': self.place.slug, 'pk': self.pk})
+
 class Place(models.Model):
     name: CharField = models.CharField(max_length=100)
     slug: CharField = models.SlugField(unique=True, null=True, blank=True)
@@ -54,21 +183,21 @@ class Place(models.Model):
         blank=True,
         validators=[validate_image_size]
     )
-    default_influx_source = models.ForeignKey(
-        'InfluxSource',
+    default_influx_store = models.ForeignKey(
+        'InfluxStore',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='default_for_places',
-        help_text="Default InfluxDB source for this place's sensors."
+        help_text="Default InfluxDB store for this place's sensors."
     )
-    switchbot_influx_source = models.ForeignKey(
-        'InfluxSource',
+    switchbot_influx_store = models.ForeignKey(
+        'InfluxStore',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='switchbot_for_places',
-        help_text="InfluxDB source specifically for SwitchBot devices at this place."
+        help_text="InfluxDB store specifically for SwitchBot devices at this place."
     )
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
@@ -78,6 +207,22 @@ class Place(models.Model):
     switchbot_token: CharField = models.CharField(max_length=255, null=True, blank=True)
     switchbot_secret: CharField = models.CharField(max_length=255, null=True, blank=True)
     switchbot_user_id: CharField = models.CharField(max_length=255, null=True, blank=True)
+
+    @property
+    def switchbot_token_display(self):
+        if not self.switchbot_token:
+            return "Not set"
+        if len(self.switchbot_token) <= 8:
+            return self.switchbot_token
+        return f"{self.switchbot_token[:4]}....{self.switchbot_token[-4:]}"
+
+    @property
+    def switchbot_secret_display(self):
+        if not self.switchbot_secret:
+            return "Not set"
+        if len(self.switchbot_secret) <= 8:
+            return self.switchbot_secret
+        return f"{self.switchbot_secret[:4]}....{self.switchbot_secret[-4:]}"
 
     def __str__(self) -> str:
         """Return the name of the place."""
@@ -106,6 +251,7 @@ class Place(models.Model):
             # On deactivation, deactivate all devices within this place.
             # Use on_commit to ensure this only runs if the place save is successful.
             def deactivate_devices():
+                Device = apps.get_model('sensors', 'Device')
                 Device.objects.filter(location__place=self).update(is_active=False)
             transaction.on_commit(deactivate_devices)
 
@@ -157,6 +303,7 @@ class Place(models.Model):
         Retrieves or creates the default 'Unassigned Devices' location for this place.
         This location is used to stage devices that belong to the place but are not yet physically installed.
         """
+        Location = apps.get_model('sensors', 'Location')
         location, created = Location.objects.get_or_create(
             place=self,
             slug='unassigned-devices',
@@ -244,6 +391,7 @@ class Location(models.Model):
 
         # If location is being deactivated, deactivate all its devices
         if not self.is_active and self.pk:  # Only for existing locations
+            Device = apps.get_model('sensors', 'Device')
             Device.objects.filter(location=self).update(is_active=False)
 
         super().save(*args, **kwargs)
@@ -269,127 +417,6 @@ class Location(models.Model):
         verbose_name_plural = '2. Locations'
         ordering = ['-is_active', 'name']
         unique_together = ('place', 'slug')
-
-class Unit(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    symbol = models.CharField(max_length=10)
-
-    def __str__(self):
-        return f"{self.name} ({self.symbol})"
-
-    objects = NameManager()
-
-    def natural_key(self):
-        return (self.name,)
-
-    class Meta:
-        verbose_name_plural = 'Units'
-        ordering = ['name']
-
-class DeviceType(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    description = models.TextField(blank=True)
-    icon = models.CharField(
-        max_length=50,
-        default='bi-hdd',
-        help_text="Bootstrap icon class (e.g., bi-hdd, bi-router)"
-    )
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        return reverse('sensors:devicetype_detail', kwargs={'pk': self.pk})
-
-    objects = NameManager()
-
-    def natural_key(self):
-        return (self.name,)
-
-    class Meta:
-        verbose_name_plural = '6. Device Types'
-        ordering = ['name']
-
-class Device(models.Model):
-    name: CharField = models.CharField(max_length=100)
-    model: CharField = models.CharField(max_length=100, null=True, blank=True)
-    manufacturer: CharField = models.CharField(max_length=100, null=True, blank=True)
-    device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    notes: TextField = models.TextField(blank=True, null=True, help_text="Internal notes for this device.")
-    location: ForeignKey = models.ForeignKey(
-        Location,
-        on_delete=models.CASCADE,
-        related_name='devices',
-    )
-    device_type = models.ForeignKey(
-        DeviceType,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='devices',
-    )
-    is_lorawan: BooleanField = models.BooleanField(default=False, verbose_name="LoRaWAN Device")
-    is_switchbot: BooleanField = models.BooleanField(default=False, help_text="Is this a SwitchBot device?")
-    hub_id: CharField = models.CharField(max_length=100, null=True, blank=True, help_text="Identifier for the hub or bridge device, if any.")
-    is_active: BooleanField = models.BooleanField(
-        default=True,
-        help_text="inactive devices will be hidden by default"
-    )
-    created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: DateTimeField = models.DateTimeField(auto_now=True)
-
-    def clean(self):
-        super().clean()
-        # Ensure device can't be active if location is inactive
-        if self.is_active and self.location and not self.location.is_active:
-            raise ValidationError({
-                'is_active': 'Device cannot be active when its location is inactive.'
-            })
-
-    def save(self, *args, **kwargs):
-        # Run full validation first
-        self.full_clean()
-
-        # If location is inactive, device must be inactive
-        if self.location and not self.location.is_active:
-            self.is_active = False
-
-        # Check if this is an existing device being deactivated
-        if self.pk and not self.is_active:
-            # Deactivate all associated sensors
-            Sensor.objects.filter(device=self).update(is_active=False)
-
-        super().save(*args, **kwargs)
-
-    def get_absolute_url(self):
-        """Returns the URL to the device's detail page."""
-        return reverse('sensors:device_detail', kwargs={'place_slug': self.location.place.slug, 'pk': self.pk})
-
-    def __str__(self) -> str:
-        return f"{self.name} ({self.model})"
-
-    class Meta:
-        verbose_name_plural = '3. Devices'
-        ordering = ['location__place', 'location', '-is_active', Lower('name')]
-
-class InfluxSource(models.Model):
-    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='influx_sources')
-    name = models.CharField(max_length=100)
-    url = models.CharField(max_length=255)
-    org = models.CharField(max_length=100)
-    bucket_name = models.CharField(max_length=100)
-    token = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.name} ({self.url})"
-
-    class Meta:
-        verbose_name_plural = 'InfluxDB Sources'
 
 class Sensor(models.Model):
     """A sensor that can be attached to a device."""
@@ -454,7 +481,7 @@ class Sensor(models.Model):
     max_value_override = models.BooleanField(default=False)
 
     # For data source
-    influx_source: ForeignKey = models.ForeignKey(InfluxSource, on_delete=models.SET_NULL, null=True, blank=True)
+    influx_store: ForeignKey = models.ForeignKey('InfluxStore', on_delete=models.SET_NULL, null=True, blank=True)
     influx_measurement = models.CharField(max_length=200, blank=True, null=True)
     influx_field_name = models.CharField(max_length=200, blank=True, null=True,
                                          help_text='Influx field name')
@@ -468,12 +495,22 @@ class Sensor(models.Model):
         null=True, blank=True,
         help_text="Override the default stale threshold for this sensor (in seconds)."
     )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     @property
     def effective_stale_threshold(self):
-        """Returns the sensor-specific stale threshold or the system default."""
+        """
+        Returns the effective stale threshold in seconds, following this hierarchy:
+        1. Sensor-specific override (stale_threshold_seconds)
+        2. SensorType default (sensor_type.default_stale_threshold_seconds)
+        3. Global Django setting (DEFAULT_STALE_THRESHOLD_SECONDS)
+        4. Hardcoded default (300 seconds)
+        """
         if self.stale_threshold_seconds is not None:
             return self.stale_threshold_seconds
+        if self.sensor_type and self.sensor_type.default_stale_threshold_seconds is not None:
+            return self.sensor_type.default_stale_threshold_seconds
         # Fallback to a global setting, with a hardcoded default of 5 minutes
         return getattr(settings, 'DEFAULT_STALE_THRESHOLD_SECONDS', 300)
 

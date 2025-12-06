@@ -2,8 +2,49 @@ from django import template
 from django.utils import timezone
 import datetime
 from datetime import timezone as dt_timezone
+import pytz
 
 register = template.Library()
+
+@register.filter
+def utc_to_local_time(utc_dt, tz_name=None):
+    """
+    Converts a UTC datetime object to a local timezone.
+    If tz_name is provided, it uses that timezone.
+    Otherwise, it uses Django's current timezone.
+    """
+    if not utc_dt:
+        return None
+
+    if isinstance(utc_dt, str):
+        try:
+            utc_dt = datetime.datetime.fromisoformat(utc_dt.replace('Z', '+00:00'))
+        except ValueError:
+            return utc_dt
+
+    if timezone.is_naive(utc_dt):
+        utc_dt = timezone.make_aware(utc_dt, dt_timezone.utc)
+    else:
+        utc_dt = utc_dt.astimezone(dt_timezone.utc)
+
+    if tz_name:
+        try:
+            local_tz = pytz.timezone(tz_name)
+            return utc_dt.astimezone(local_tz)
+        except pytz.UnknownTimeZoneError:
+            return timezone.localtime(utc_dt)
+    
+    return timezone.localtime(utc_dt)
+
+@register.filter
+def pretty_sql(value):
+    """
+    A simple SQL pretty-printer.
+    """
+    if not isinstance(value, str):
+        return value
+    
+    return value.replace(' FROM ', '\nFROM ').replace(' WHERE ', '\nWHERE ').replace(' ORDER BY ', '\nORDER BY ').replace(' LIMIT ', '\nLIMIT ')
 
 @register.filter
 def format_timestamp_with_timezone(timestamp):

@@ -5,7 +5,9 @@ from crispy_forms.layout import Layout, Row, Column, HTML, Div, Submit, Field, F
 from crispy_forms.bootstrap import FormActions
 
 from ..models import Sensor, SensorType
-from ..models import InfluxSource
+from ..models import InfluxStore
+from django.urls import reverse
+from django.core.exceptions import ValidationError
 
 
 class SensorTypeSelect(forms.Select):
@@ -51,7 +53,11 @@ class SensorForm(forms.ModelForm):
             'min_value', 'min_value_override',
             'max_value', 'max_value_override',
             'graph_type',
-            'influx_source', 'influx_measurement', 'influx_field_name', 'influx_tag_key'
+            'influx_store',
+            'influx_measurement',
+            'influx_field_name',
+            'influx_tag_key',
+            'stale_threshold_seconds',
         ]
         widgets = {
             'device': forms.Select(attrs={'class': 'form-select'}),
@@ -73,7 +79,7 @@ class SensorForm(forms.ModelForm):
             'min_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'max_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'max_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'influx_source': forms.Select(attrs={'class': 'form-select'}),
+            'influx_store': forms.Select(attrs={'class': 'form-select'}),
             'influx_measurement': forms.TextInput(attrs={'class': 'form-control'}),
             'influx_field_name': forms.TextInput(attrs={'class': 'form-control'}),
             'influx_tag_key': forms.TextInput(attrs={'class': 'form-control'})
@@ -90,6 +96,10 @@ class SensorForm(forms.ModelForm):
         kwargs.pop('devices_active', None)
 
         super().__init__(*args, **kwargs)
+
+        # Set the initial value for data_type right away
+        if self.instance and self.instance.pk:
+            self.initial['data_type'] = self.instance.data_type
 
         # Set default device if provided
         if self.device:
@@ -131,7 +141,7 @@ class SensorForm(forms.ModelForm):
         self.fields['unit'].label = False
         self.fields['min_value'].label = False
         self.fields['max_value'].label = False
-        self.fields['influx_source'].label = False
+        self.fields['influx_store'].label = False
         self.fields['influx_measurement'].label = False
         self.fields['influx_field_name'].label = False
         self.fields['influx_tag_key'].label = False
@@ -140,7 +150,7 @@ class SensorForm(forms.ModelForm):
         self.fields['unit_override'].label = False
         self.fields['min_value_override'].label = False
         self.fields['max_value_override'].label = False
-        self.fields['influx_source'].label = False
+        self.fields['influx_store'].label = False
         self.fields['influx_measurement'].label = False
         self.fields['influx_field_name'].label = False
         self.fields['influx_tag_key'].label = False
@@ -199,35 +209,35 @@ class SensorForm(forms.ModelForm):
         if 'data_type' in self.data:
             data_type = self.data.get('data_type')
             if data_type.startswith('INFLUX'):
-                self.fields['influx_source'].required = True
+                self.fields['influx_store'].required = True
                 self.fields['influx_measurement'].required = True
                 self.fields['influx_field_name'].required = True
                 self.fields['influx_tag_key'].required = True
             else:
-                self.fields['influx_source'].required = False
+                self.fields['influx_store'].required = False
                 self.fields['influx_measurement'].required = False
                 self.fields['influx_field_name'].required = False
                 self.fields['influx_tag_key'].required = False
         elif self.instance.pk and self.instance.data_type:
             if self.instance.data_type.startswith('INFLUX'):
-                self.fields['influx_source'].required = True
+                self.fields['influx_store'].required = True
                 self.fields['influx_measurement'].required = True
                 self.fields['influx_field_name'].required = True
                 self.fields['influx_tag_key'].required = True
             else:
-                self.fields['influx_source'].required = False
+                self.fields['influx_store'].required = False
                 self.fields['influx_measurement'].required = False
                 self.fields['influx_field_name'].required = False
                 self.fields['influx_tag_key'].required = False
         else:
             # Set defaults for new instances
-            self.fields['influx_source'].required = False
+            self.fields['influx_store'].required = False
             self.fields['influx_measurement'].required = False
             self.fields['influx_field_name'].required = False
             self.fields['influx_tag_key'].required = False
 
         if self.place:
-            self.fields['influx_source'].queryset = InfluxSource.objects.filter(place=self.place)
+            self.fields['influx_store'].queryset = InfluxStore.objects.filter(place=self.place)
 
         # Add form helpers
         self.helper = FormHelper()
@@ -317,9 +327,9 @@ class SensorForm(forms.ModelForm):
                 Div(
                     HTML("""
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label for="id_influx_source" class="form-label mb-0">Influx source</label>
+                        <label for="id_influx_store" class="form-label mb-0">Influx source</label>
                         {% if place %}
-                        <a href="{% url 'sensors:influxsource_create' place_slug=place.slug %}"
+                        <a href="{% url 'sensors:influxstore_create' place_slug=place.slug %}"
                            class="btn btn-sm btn-outline-primary"
                            id="add-influx-source-btn">
                             <i class="bi bi-plus-circle"></i> Source
@@ -327,7 +337,7 @@ class SensorForm(forms.ModelForm):
                         {% endif %}
                     </div>
                 """),
-                    Field('influx_source'),
+                    Field('influx_store'),
                     css_class="mb-1"
                 ),
                 Row(
@@ -358,7 +368,7 @@ class SensorForm(forms.ModelForm):
         cleaned_data = super().clean()
         data_type = cleaned_data.get('data_type')
         device = cleaned_data.get('device') or self.device
-        influx_source = cleaned_data.get('influx_source')
+        influx_store = cleaned_data.get('influx_store')
         influx_measurement = cleaned_data.get('influx_measurement')
         influx_field_name = cleaned_data.get('influx_field_name')
         influx_tag_key = cleaned_data.get('influx_tag_key')
@@ -421,8 +431,8 @@ class SensorForm(forms.ModelForm):
 
         # Validate InfluxDB fields if data type is INFLUX
         if data_type == 'INFLUX':
-            if not influx_source:
-                self.add_error('influx_source', "InfluxDB source is required when data type is InfluxDB")
+            if not influx_store:
+                self.add_error('influx_store', "InfluxDB source is required when data type is InfluxDB")
             if not influx_measurement:
                 self.add_error('influx_measurement', "InfluxDB measurement is required when data type is InfluxDB")
             if not influx_field_name:
@@ -439,17 +449,48 @@ class SensorForm(forms.ModelForm):
         return super().is_valid()
 
 
+class SensorInfluxUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Sensor
+        fields = ['influx_store', 'influx_measurement', 'influx_field_name', 'influx_tag_key']
+
+    def __init__(self, *args, **kwargs):
+        self.place = kwargs.pop('place', None)
+        kwargs.pop('cancel_url', None)  # Pop cancel_url to prevent passing to super
+        super().__init__(*args, **kwargs)
+
+        if self.place:
+            self.fields['influx_store'].queryset = InfluxStore.objects.filter(place=self.place)
+        
+        # Use standard labels and add help text
+        self.fields['influx_store'].label = "InfluxDB Store"
+        self.fields['influx_measurement'].label = "Measurement Name"
+        self.fields['influx_field_name'].label = "Field Name"
+        self.fields['influx_tag_key'].label = "Tag Key"
+
+        self.fields['influx_tag_key'].help_text = "e.g., host, device_id"
+
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'influx_store',
+            'influx_measurement',
+            'influx_field_name',
+            'influx_tag_key',
+        )
+
+
 class LoRaWANSensorForm(forms.ModelForm):
     class Meta:
         model = Sensor
-        fields = ['name', 'is_active', 'sensor_type', 'influx_source', 'influx_measurement']
+        fields = ['name', 'is_active', 'sensor_type', 'influx_store', 'influx_measurement']
 
     def __init__(self, *args, **kwargs):
         place = kwargs.pop('place', None)
         cancel_url = kwargs.pop('cancel_url', None)
         super().__init__(*args, **kwargs)
         self.fields['is_active'].label = "Active"
-        self.fields['influx_source'].label = False
+        self.fields['influx_store'].label = False
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
@@ -460,15 +501,15 @@ class LoRaWANSensorForm(forms.ModelForm):
             Div(
                 HTML("""
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label for="id_influx_source" class="form-label mb-0">Influx source</label>
-                        <a href="{% url 'sensors:influxsource_create' place_slug=view.place.slug %}"
+                        <label for="id_influx_store" class="form-label mb-0">Influx Store</label>
+                        <a href="{% url 'sensors:influxstore_create' place_slug=view.place.slug %}"
                            class="btn btn-sm btn-outline-primary"
-                           id="add-influx-source-btn">
-                            <i class="bi bi-plus-circle"></i> Source
+                           id="add-influx-store-btn">
+                            <i class="bi bi-plus-circle"></i> Store
                         </a>
                     </div>
                 """),
-                Field('influx_source'),
+                Field('influx_store'),
                 css_class="mb-1"
             ),
             'influx_measurement',
@@ -476,3 +517,41 @@ class LoRaWANSensorForm(forms.ModelForm):
             HTML('<button type="submit" class="btn btn-primary">Save</button>'),
             HTML(f'<a class="btn btn-secondary" href="{cancel_url}">Cancel</a>')
         )
+
+
+class DeviceDeleteForm(forms.Form):
+    name_confirm = forms.CharField(
+        label="Confirm device name",
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.device_name = kwargs.pop('device_name', None)
+        super().__init__(*args, **kwargs)
+
+    def clean_name_confirm(self):
+        entered_name = self.cleaned_data.get('name_confirm')
+        if entered_name.lower() != self.device_name.lower():
+            raise ValidationError("The entered name does not match the device name.")
+        return entered_name
+
+
+class InfluxStoreDeleteForm(forms.Form):
+    name_confirm = forms.CharField(
+        label="Confirm InfluxDB Store name",
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.store_name = kwargs.pop('store_name', None)
+        super().__init__(*args, **kwargs)
+
+    def clean_name_confirm(self):
+        entered_name = self.cleaned_data.get('name_confirm')
+        if entered_name.lower() != self.store_name.lower():
+            raise ValidationError("The entered name does not match the store name.")
+        return entered_name

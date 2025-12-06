@@ -10,7 +10,7 @@ from sensors.services.measurement_utils import get_influx_details
 from icecream import ic
 
 from .. import switchbot_client
-from ..utils import write_sensor_reading_to_influx
+from ..utils import write_sensor_reading_to_influx, record_webhook_activity
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +31,14 @@ class SwitchBotService:
     """
     def __init__(self, place: Place):
         self.place = place
-        if not place.switchbot_token:
-            raise ValueError("SwitchBot token is not configured for this place.")
         self.token = place.switchbot_token
         self.secret = place.switchbot_secret
-        # Use the dedicated influx source for switchbot, or fall back to the place's default, or None
-        self.influx_source = place.switchbot_influx_source or place.default_influx_source
+        
+        # Prioritize the SwitchBot-specific store, then fall back to the place's default
+        self.influx_store = place.switchbot_influx_store or place.default_influx_store
+
+        if not self.token or not self.secret:
+            logger.warning(f"SwitchBot service for place {place.name} is missing API credentials.")
 
     def fetch_and_process_single_device_reading(self, device: Device):
         """
@@ -111,13 +113,75 @@ class SwitchBotService:
                 ic(f"Service: Mapped sensor type '{sensor.sensor_type.name}' to API key '{sensor_api_key}'")
 
                 if sensor_api_key and sensor_api_key in live_body:
-                    return live_body[sensor_api_key]
+                    value = live_body[sensor_api_key]
+                    ic(f"Service: Got value '{value}' for key '{sensor_api_key}'")
+
+                    # For humidity, ensure the value is numeric before returning
+                    is_valid = False
+                    if sensor_api_key == 'humidity':
+                        try:
+                            float(value)
+                            is_valid = True
+                        except (ValueError, TypeError):
+                            ic(f"Service: Ignored non-numeric humidity value for sensor '{sensor.name}': {value}")
+                            return None
+                    else:
+                        is_valid = True
+
+                    if is_valid:
+                        ic(f"Service: Live reading for '{sensor.name}' is valid. Persisting value: {value}")
+                        # Persist the reading since we went to the trouble of fetching it
+                        from sensors.models import SensorReading
+                        from django.utils import timezone
+                        
+                        # Update cache
+                        sensor.cached_reading_value = value
+                        sensor.cached_reading_timestamp = timezone.now()
+                        sensor.save(update_fields=['cached_reading_value', 'cached_reading_timestamp'])
+
+                        # Create historical reading
+                        SensorReading.objects.create(sensor=sensor, value=value)
+
+                        # Write to InfluxDB (the function handles the `is_active` check)
+                        write_sensor_reading_to_influx(sensor, value)
+
+                        # Record the activity
+                        log_message = (
+                            f"WEBHOOK: Reading | Place: {sensor.device.location.place.name} | "
+                            f"Device: {sensor.device.name} | Sensor: {sensor.name} | "
+                            f"Value: {value} | Action: Live-API Stored, cached."
+                        )
+                        record_webhook_activity(log_message)
+
+                    return value
             else:
                 ic(f"Service: Live reading API returned status {status_data.get('statusCode')}: {status_data.get('message')}")
         except Exception as e:
             ic(f"Service: Error getting SwitchBot status for live reading: {e}")
 
         return None
+
+    def write_webhook_data(self, device: Device, fields: dict):
+        """
+        Writes a dictionary of sensor fields from a webhook to InfluxDB.
+        """
+        if not self.influx_store:
+            ic(f"SwitchBot service for place {self.place.name} has no InfluxDB store configured for writing.")
+            return
+
+        if not fields:
+            return
+
+        tags = {'device_id': device.device_id, 'device_name': slugify(device.name)}
+        measurement = f"{slugify(device.name)}_switchbot"
+
+        try:
+            write_to_influx(self.influx_store, measurement, fields, tags)
+            ic(f"Successfully wrote webhook data for {device.name} to InfluxDB measurement {measurement}.")
+        except Exception as e:
+            logger.error(f"Failed to write SwitchBot webhook data to InfluxDB for device '{device.device_id}': {e}")
+            # Optionally re-raise or handle the exception as needed
+            raise e
 
 
     def sync_devices_status(self):
@@ -167,9 +231,6 @@ class SwitchBotService:
         Processes the status data and creates sensor readings.
         Example data: {'temperature': 25.0, 'humidity': 50, ...}
         """
-        # ic(f"Processing SwitchBot readings for {device.name}: {data}")
-        # ic(f"Influx source for this run: {self.influx_source.name if self.influx_source else 'None'}")
-
         grouped_readings = defaultdict(lambda: {'fields': {}, 'sensors': []})
         processed_sensors = []
 
@@ -180,7 +241,7 @@ class SwitchBotService:
                     val_float = float(value)
 
                     # If Influx is configured, we won't store locally.
-                    skip_local = bool(self.influx_source)
+                    skip_local = bool(self.influx_store)
 
                     sensor_obj = process_sensor_reading(
                         device=device,
@@ -189,17 +250,14 @@ class SwitchBotService:
                         skip_local_storage=skip_local,
                         activate_sensor=activate_sensors
                     )
-                    # ic(f"Processed sensor object for '{measurement_name}': {sensor_obj}")
                     processed_sensors.append({'sensor': sensor_obj, 'value': val_float, 'name': measurement_name})
 
                     if not sensor_obj:
                         continue
 
                     # Group for InfluxDB if source is configured
-                    if self.influx_source:
-                        # ic(f"Influx source is configured, preparing to group '{measurement_name}' for InfluxDB.")
+                    if self.influx_store:
                         influx_details = get_influx_details(measurement_name)
-                        # ic(f"Influx details for '{measurement_name}': {influx_details}")
 
                         # Custom logic for battery
                         if influx_details:
@@ -207,8 +265,6 @@ class SwitchBotService:
                         else:
                             influx_group, influx_field = 'reading', 'value'
 
-                        # ic(f"Grouping for Influx: measurement_group='{influx_group}', field='{influx_field}', value='{val_float}'")
-                        # Use influx_group for the measurement name part
                         grouped_readings[influx_group]['fields'][influx_field] = val_float
                         grouped_readings[influx_group]['sensors'].append({'sensor': sensor_obj, 'field': influx_field})
 
@@ -216,10 +272,8 @@ class SwitchBotService:
                 except (ValueError, TypeError):
                     logger.warning(f"Could not convert SwitchBot value '{value}' for '{key}' to float.")
 
-        # ic(f"Grouped Influx readings to be written: {grouped_readings}")
         # Write grouped readings to InfluxDB
-        if self.influx_source:
-            # ic("Attempting to write grouped readings to InfluxDB...")
+        if self.influx_store:
             for measurement_group, influx_data in grouped_readings.items():
                 fields = influx_data['fields']
                 sensor_field_map = influx_data['sensors']
@@ -229,13 +283,13 @@ class SwitchBotService:
                 measurement = f"{slugify(device.name)}_{measurement_group}"
 
                 try:
-                    write_to_influx(self.influx_source, measurement, fields, tags)
+                    write_to_influx(self.influx_store, measurement, fields, tags)
 
                     # Update Sensor Configuration on Success
                     for item in sensor_field_map:
                         sensor = item['sensor']
                         field = item['field']
-                        sensor.influx_source = self.influx_source
+                        sensor.influx_store = self.influx_store
                         sensor.influx_measurement = measurement
                         sensor.influx_field_name = field
                         sensor.influx_tag_key = 'device_id'  # Set the default tag key
@@ -244,10 +298,8 @@ class SwitchBotService:
                         if can_override:
                             sensor.data_type = 'INFLUX'
                         sensor.save()
-                        # ic(f"Successfully configured sensor '{sensor.name}' for InfluxDB.")
 
                 except Exception as e:
-                    # ic(f"Influx write ERROR for measurement '{measurement}': {e}")
                     logger.error(f"Influx Error for measurement '{measurement}': {e}")
                     # Ensure fallback to DIRECT on failure
                     for item in sensor_field_map:
@@ -259,7 +311,7 @@ class SwitchBotService:
         # Log readings that were not sent to InfluxDB
         for item in processed_sensors:
             sensor_obj = item['sensor']
-            if not sensor_obj or (self.influx_source and get_influx_details(item['name'])):
+            if not sensor_obj or (self.influx_store and get_influx_details(item['name'])):
                 continue # Skip if sensor creation failed or if it was handled by grouped Influx logging
 
             # This block will now only be hit for non-influx data or if there's no influx source

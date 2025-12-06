@@ -1,5 +1,5 @@
 {% load crispy_forms_tags %}
-<form method="post" action="{% url 'sensors:influxsource_create' %}">
+<form method="post" action="{% url 'sensors:influxstore_create' %}">
     {% csrf_token %}
     {{ form|crispy }}
     <div class="d-flex justify-content-end">

@@ -1,28 +1,32 @@
 {% load widget_tweaks %}
 {% load timezone_filters %}
+{% load humanize %}
 
 <div class="card my-1 {% if not sensor.is_active or not sensor.device.is_active %}opacity-50 text-muted{% endif %}" id="sensor-card-{{ sensor.pk }}" data-sensor-id="{{ sensor.pk }}">
 
     <div class="card-header d-flex justify-content-between align-items-center py-1">
-        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
-            <i class="bi bi-thermometer me-2"></i>
+        <h5 class="card-title mb-0 d-flex align-items-center">
+            <i class="bi bi-{{ sensor.sensor_type.icon|default:'thermometer' }} me-2"></i>
             {{ sensor.name }}
         </h5>
-        <div class="btn-group">
-            {% if model_name == 'sensor' %}
-                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}"
-                   class="btn btn-warning btn-sm">
-                    <i class="bi bi-pencil"></i>
-                </a>
-                <button type="button" class="btn btn-danger btn-sm delete-sensor"
-                        hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
-                        hx-target="#modal-content"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modal-container"
-                        title="Delete">
-                    <i class="bi bi-trash"></i>
-                </button>
-            {% endif %}
+        <div class="d-flex align-items-center">
+            <button class="btn btn-sm me-2 live-value-refresh" title="Force refresh of all live values on page">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}"
+               class="btn btn-sm btn-warning"
+               title="Edit Sensor">
+                <i class="bi bi-pencil-fill"></i> Edit
+            </a>
+            <a href="#"
+               class="btn btn-sm btn-danger"
+               title="Delete Sensor"
+               data-bs-toggle="modal"
+               data-bs-target="#htmx-modal"
+               hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+               hx-target="#htmx-modal-content">
+                <i class="bi bi-trash-fill"></i> Delete
+            </a>
         </div>
     </div>
     <div class="card-body p-2">
@@ -105,34 +109,32 @@
                 </div>
             </div>
         </div>
+
         <hr class="my-2">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                    <label class="form-label mb-0 small text-muted">Current Reading</label>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-1 live-value-refresh" title="Force refresh">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                    </div>
-                    {% if sensor.is_active %}
-                    <div id="live-value-source-{{ sensor.pk }}" class="live-value-container" data-sensor-pk="{{ sensor.pk }}" data-active="{{ sensor.is_active|yesno:'true,false' }}">
-                       {% include 'sensors/partials/sensor_live_value_htmx.html' with component_id_suffix="detail" sensor_pk=sensor.pk place_slug=place.slug %}
-                    </div>
-                    {% else %}
-                    <div class="badge bg-secondary">Inactive</div>
-                    {% endif %}
-                </div>
+        <div class="row small">
+            <div class="col-12">
+                <strong>Effective Stale:</strong>
+                <span class="text-monospace">{{ sensor.effective_stale_threshold }}s</span>
+                <span class="text-muted ms-2">(Sensor: </span><span class="text-monospace">{{ sensor.stale_threshold_seconds|default:"None" }}</span>
+                <span class="text-muted"> &lt; SensorType: </span><span class="text-monospace">{{ sensor.sensor_type.default_stale_threshold_seconds|default:"None" }}</span>
+                <span class="text-muted"> &lt; Global: </span><span class="text-monospace">{{ global_stale_threshold }}</span><span class="text-muted">)</span>
             </div>
+        </div>
+
+        <div id="sensor-live-details-wrapper-{{ sensor.pk }}"
+             hx-get="{% url 'sensors:sensor_live_details' place_slug=place.slug pk=sensor.pk %}"
+             hx-swap="innerHTML"
+             hx-trigger="refresh-live-details-{{ sensor.pk }} from:body">
+            {% include "sensors/partials/sensor_live_details.html" %}
         </div>
 
         <hr class="my-2">
         <div class="row small text-muted">
             <div class="col">
-                Created: {{ sensor.created_at|date:"Y-m-d H:i" }}
+                Created: {{ sensor.created_at|date:"Y-m-d" }}
             </div>
             <div class="col text-end">
-                Updated: {{ sensor.updated_at|date:"Y-m-d H:i" }}
+                Updated: {{ sensor.updated_at|date:"Y-m-d" }}
             </div>
         </div>
     </div>

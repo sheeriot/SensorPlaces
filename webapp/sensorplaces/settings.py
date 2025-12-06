@@ -103,7 +103,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    # 'django.middleware.security.SecurityMiddleware',
+    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -191,7 +191,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = '/opt/app/static_files'
+STATIC_ROOT = os.path.join(BASE_DIR.parent, 'static_files')
 STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, 'static'), This directory does not exist and causes a warning.
 ]
@@ -203,7 +203,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Media files (Uploaded files)
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Maximum upload size (5MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
@@ -263,11 +263,18 @@ SOCIALACCOUNT_PROVIDERS = {
 ACCOUNT_LOGOUT_ON_GET = True  # Add this to allow logout without confirmation
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True  # Add this to auto-login after email confirmation
 
-# Security settings for HTTP
-SESSION_COOKIE_SECURE = False  # Set to False for HTTP
-CSRF_COOKIE_SECURE = False    # Set to False for HTTP
-SECURE_SSL_REDIRECT = False   # Don't redirect to HTTPS
-SECURE_PROXY_SSL_HEADER = None
+# Security settings
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+else:
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = None
+
 
 # If you're using frames (like for map embedding)
 X_FRAME_OPTIONS = 'SAMEORIGIN'

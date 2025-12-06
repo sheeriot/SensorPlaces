@@ -1,6 +1,7 @@
 import logging
 import os
 from django.conf import settings
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
 import matplotlib
-from datetime import datetime, timezone as dt_timezone
+from datetime import timezone as dt_timezone
 from typing import List, Optional
 import numpy as np
 from influxdb_client_3 import InfluxDBClient3
@@ -39,19 +40,19 @@ matplotlib.use('Agg')
 DISABLE_STALE_CHECK = False
 
 
-def get_influxdb_client(influx_source):
+def get_influxdb_client(influx_store):
     return InfluxDBClient3(
-        host=influx_source.url,
-        token=influx_source.token,
-        org=influx_source.org,
-        database=influx_source.bucket_name
+        host=influx_store.url,
+        token=influx_store.token,
+        org=influx_store.org,
+        database=influx_store.bucket_name
     )
 
 def get_sensor_readings(sensor, start=None, stop=None, limit=100):
-    if not sensor.influx_source or sensor.data_type != 'INFLUX':
+    if not sensor.influx_store or sensor.data_type != 'INFLUX':
         return []
 
-    client = get_influxdb_client(sensor.influx_source)
+    client = get_influxdb_client(sensor.influx_store)
 
     query = f'''
     SELECT *
@@ -82,10 +83,10 @@ def get_latest_influx_reading(sensor):
     """
     Fetches the single most recent reading for a sensor from InfluxDB.
     """
-    if not sensor.influx_source or not sensor.influx_measurement:
+    if not sensor.influx_store or not sensor.influx_measurement:
         return None
 
-    client = get_influxdb_client(sensor.influx_source)
+    client = get_influxdb_client(sensor.influx_store)
 
     # Use the specific field name if available, otherwise default to 'value'
     field_to_select = sensor.influx_field_name or 'value'
@@ -110,20 +111,15 @@ def get_latest_influx_reading(sensor):
     LIMIT 1
     '''
 
-    # ic(f"Querying InfluxDB for latest reading for sensor '{sensor.name}' (pk={sensor.pk}) with query: {query}")
-
     try:
         reader = client.query(query, language="sql")
         df = reader.to_pandas()
-        # ic("Raw response from InfluxDB:", df)
 
         # This is the robust way to check for an empty DataFrame.
         if df.empty:
-            # ic("InfluxDB query returned no data.")
             return None
 
         latest = df.iloc[0]
-        # ic("Latest row from DataFrame:", latest)
 
         # Check for pandas NaT (Not a Time) and NaN (Not a Number)
         # Use the dynamically selected field name here
@@ -144,7 +140,6 @@ def get_latest_influx_reading(sensor):
                 'value': float(latest[field_to_select])
             }
         else:
-            # ic("InfluxDB returned a row with null time or value.")
             return None
 
     except Exception as e:
@@ -157,10 +152,10 @@ def get_influx_record_count(sensor):
     """
     Counts the total number of records for a sensor in InfluxDB.
     """
-    if not sensor.influx_source or not sensor.influx_measurement:
+    if not sensor.influx_store or not sensor.influx_measurement:
         return 0
 
-    client = get_influxdb_client(sensor.influx_source)
+    client = get_influxdb_client(sensor.influx_store)
     field_to_count = sensor.influx_field_name or 'value'
 
     # Determine the correct filter field for the WHERE clause
@@ -195,32 +190,27 @@ def get_influx_record_count(sensor):
 
 def write_sensor_reading_to_influx(sensor, value):
     """
-    Writes a sensor reading to the appropriate InfluxDB source if the sensor is active
+    Writes a sensor reading to the appropriate InfluxDB store if the sensor is active
     and the source is configured.
     """
     from django.utils import timezone
-    # ic(f"InfluxWrite: Attempting write for sensor '{sensor.name}' (active: {sensor.is_active})")
     if not sensor.is_active:
-        # ic("InfluxWrite: Sensor is not active, skipping.")
         return
 
     place = sensor.device.location.place
-    influx_source = None
+    influx_store = None
 
     if sensor.device.is_switchbot:
-        influx_source = place.switchbot_influx_source
-        # ic(f"InfluxWrite: Sensor is SwitchBot. Using place's SwitchBot Influx source: {influx_source}")
+        influx_store = place.switchbot_influx_store
     else:
         # This logic might need refinement for non-switchbot sensors
-        influx_source = sensor.influx_source or place.default_influx_source
-        # ic(f"InfluxWrite: Sensor is not SwitchBot. Using sensor's source or place's default: {influx_source}")
+        influx_store = sensor.influx_store or place.default_influx_store
 
-    if not influx_source:
-        # ic("InfluxWrite: No InfluxDB source found. Skipping write.")
+    if not influx_store:
         return
 
     try:
-        client = get_influxdb_client(influx_source)
+        client = get_influxdb_client(influx_store)
 
         measurement_name = sensor.influx_measurement
         if not measurement_name:
@@ -228,9 +218,17 @@ def write_sensor_reading_to_influx(sensor, value):
                 measurement_name = 'switchbot_readings'
             else:
                 measurement_name = 'sensor_readings' # A sensible default
-        # ic(f"InfluxWrite: Using measurement: {measurement_name}")
 
         field_name = sensor.influx_field_name or 'value'
+
+        field_value = float(value)
+        # Handle case where InfluxDB expects an integer (e.g., battery percentage or humidity)
+        if sensor.sensor_type and sensor.sensor_type.name in ['Battery Level', 'Humidity']:
+            try:
+                field_value = int(float(value))
+            except (ValueError, TypeError):
+                # If conversion fails, just use the float value and let Influx handle it
+                pass
 
         point = {
             "measurement": measurement_name,
@@ -242,19 +240,21 @@ def write_sensor_reading_to_influx(sensor, value):
                 "place_name": place.name,
                 "location_name": sensor.device.location.name,
             },
-            "fields": {field_name: float(value)},
+            "fields": {field_name: field_value},
             "time": timezone.now()
         }
 
-        # ic("InfluxWrite: Writing point:", point)
         client.write(record=point)
-        # ic("InfluxWrite: Successfully wrote point to InfluxDB.")
         client.close()
 
         # _verify_influx_write(sensor)
 
     except Exception as e:
         ic(f"InfluxWrite: Error writing to InfluxDB for sensor '{sensor.name}': {e}")
+        error_str = str(e)
+        if "table schema conflict" in error_str and "float" in error_str and "integer" in error_str:
+            log_message = f"InfluxWrite Error for {sensor.name}: Data type mismatch, expected integer, received float."
+            record_webhook_activity(log_message)
 
 
 def _verify_influx_write(sensor):
@@ -263,8 +263,6 @@ def _verify_influx_write(sensor):
     """
     latest_reading = get_latest_influx_reading(sensor)
     record_count = get_influx_record_count(sensor)
-    # ic(f"InfluxWrite Verify: Latest reading after write: {latest_reading}")
-    # ic(f"InfluxWrite Verify: Record count after write: {record_count}")
 
 
 def update_sensor_live_value(sensor):
@@ -277,20 +275,13 @@ def update_sensor_live_value(sensor):
     from django.utils import timezone
     from datetime import timedelta
 
-    # ic(f"LiveValue: Checking sensor '{sensor.name}' (pk={sensor.pk})")
-
     # Decide if it's time to check based on the stale threshold.
     if 'DISABLE_STALE_CHECK' in globals() and globals()['DISABLE_STALE_CHECK']:
-        # ic("LiveValue: DISABLE_STALE_CHECK is True, proceeding with check.")
         pass # Skip the check if the debug flag is set
     elif sensor.last_checked_timestamp:
         time_since_last_check = timezone.now() - sensor.last_checked_timestamp
-        # ic(f"LiveValue: Stale check values: last_checked={sensor.last_checked_timestamp}, threshold={sensor.effective_stale_threshold}s, since_last_check={time_since_last_check.total_seconds():.0f}s")
         if time_since_last_check < timedelta(seconds=sensor.effective_stale_threshold):
-            # ic(f"LiveValue: Not time to check yet. Last checked {time_since_last_check.total_seconds():.0f}s ago. Threshold is {sensor.effective_stale_threshold}s.")
             return False  # Not time to check yet.
-
-    # ic("LiveValue: Stale check passed. Fetching new data...")
 
     # Proceed with the check.
     from .switchbot_client import get_status
@@ -299,7 +290,6 @@ def update_sensor_live_value(sensor):
     new_timestamp = None
 
     if sensor.device.is_switchbot:
-        # ic("LiveValue: Sensor is SwitchBot type. Querying API via Service.")
         place = sensor.device.location.place
         if place.switchbot_token and place.switchbot_secret:
             try:
@@ -310,23 +300,18 @@ def update_sensor_live_value(sensor):
                 if live_value is not None:
                     new_value = live_value
                     new_timestamp = timezone.now()
-                    # ic(f"LiveValue: Found new value for '{sensor.name}' from SwitchBot Service: {new_value}")
 
             except Exception as e:
-                # ic(f"LiveValue: Error calling SwitchBot service: {e}")
                 pass
         else:
-            # ic("LiveValue: Missing SwitchBot credentials on place. Cannot query API.")
             pass
     elif sensor.data_type and sensor.data_type.startswith('INFLUX'):
-        # ic("LiveValue: Sensor is INFLUX type. Getting latest from InfluxDB.")
         try:
             latest_reading = get_latest_influx_reading(sensor)
             if latest_reading and latest_reading.get('value') is not None:
                 new_value = latest_reading['value']
                 new_timestamp = latest_reading['time']
         except Exception as e:
-            # ic(f"LiveValue: Error getting Influx reading: {e}")
             pass  # Errors are logged in get_latest_influx_reading
 
     else:
@@ -336,14 +321,11 @@ def update_sensor_live_value(sensor):
             from .models import SensorReading
             latest_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
             if latest_reading:
-                # ic(f"Found local reading for sensor {sensor.name}: {latest_reading.value} at {latest_reading.timestamp}")
                 new_value = latest_reading.value
                 new_timestamp = latest_reading.timestamp
             else:
-                # ic(f"No local reading found for sensor {sensor.name}")
                 pass
         except Exception as e:
-            # ic(f"Error getting local reading for sensor {sensor.name}: {e}")
             pass
 
 
@@ -361,7 +343,6 @@ def update_sensor_live_value(sensor):
     value_was_updated = False
     # Only update the cached value if the new reading is actually newer
     if new_timestamp and (sensor.cached_reading_timestamp is None or new_timestamp > sensor.cached_reading_timestamp):
-        # ic(f"LiveValue: New value '{new_value}' is fresher than cached value. Updating cache.")
         update_kwargs['cached_reading_value'] = new_value
         update_kwargs['cached_reading_timestamp'] = new_timestamp
 
@@ -376,7 +357,6 @@ def update_sensor_live_value(sensor):
         if sensor.device.is_switchbot:
             write_sensor_reading_to_influx(sensor, new_value)
     else:
-        # ic("LiveValue: No new value found or value is not fresher than cache. Not updating.")
         pass
 
     sensor.last_checked_timestamp = update_kwargs['last_checked_timestamp']

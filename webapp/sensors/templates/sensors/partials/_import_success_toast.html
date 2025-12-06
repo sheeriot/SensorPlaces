@@ -1,0 +1,22 @@
+<div class="p-2">
+    <h5 class="alert-heading">Import Successful!</h5>
+    <p class="mb-2">Imported <strong>{{ device.name }}</strong> ({{ device.device_type.name }}) and {{ sensors|length }} sensor(s):</p>
+    <table class="table table-sm table-bordered bg-white mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>Sensor</th>
+                <th>Type</th>
+                <th>Data Type</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sensor in sensors %}
+            <tr>
+                <td>{{ sensor.name }}</td>
+                <td>{{ sensor.sensor_type.name }}</td>
+                <td>{{ sensor.get_data_type_display }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -1,11 +1,11 @@
-<form id="deleteInfluxSourceForm" method="post" action="{% url 'sensors:influxsource_delete' place_slug=place.slug pk=influxsource.pk %}">
+<form id="deleteInfluxStoreForm" method="post" action="{% url 'sensors:influxstore_delete' place_slug=place.slug pk=influxstore.pk %}">
     {% csrf_token %}
     <div class="modal-header">
         <h5 class="modal-title">Confirm Deletion</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
     <div class="modal-body">
-        <p>Are you sure you want to delete <strong>{{ influxsource.name }}</strong>?</p>
+        <p>Are you sure you want to delete <strong>{{ influxstore.name }}</strong>?</p>
         <p class="text-danger">This action cannot be undone.</p>
     </div>
     <div class="modal-footer">

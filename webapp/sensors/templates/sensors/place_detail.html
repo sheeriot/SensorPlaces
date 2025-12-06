@@ -21,8 +21,6 @@
         {% endif %}
 
         <!-- {% include 'sensors/includes/place_nav_card.html' %} -->
-        <!-- Unassigned Devices Card -->
-        {% include "sensors/includes/unassigned_devices_card.html" %}
         {% if place.is_active %}
 
             {% include 'sensors/includes/live_counts_card.html' %}
@@ -32,9 +30,6 @@
 
     <!-- Right Column: Locations and Site Plan/Map -->
     <div class="col-md-8 {% if not place.is_active %}opacity-50{% endif %}">
-        <!-- Device List Card -->
-        {% include "sensors/includes/location_list_card.html" with object_list=locations %}
-
         <!-- Site Plan Card -->
         {% if place.siteplan_image %}
             {% include "sensors/includes/siteplan_card.html" with editable=True place=place %}
@@ -49,12 +44,13 @@
                 </div>
             </div>
         {% endif %}
-
         <!-- Device List Card -->
         {% include "sensors/includes/device_list_card.html" with object_list=locations %}
+        <!-- Unassigned Devices Card -->
+        {% include "sensors/includes/unassigned_devices_card.html" %}
 
-        <!-- InfluxDB Sources Card -->
-        {% include "sensors/influxsource_list.html" %}
+        <!-- InfluxDB Store Card -->
+        {% include "sensors/includes/influxstore_list_card.html" %}
     </div>
 </div>
 {% endblock %}

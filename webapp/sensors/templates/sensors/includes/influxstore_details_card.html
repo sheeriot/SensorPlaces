@@ -1,0 +1,81 @@
+{% comment %}
+    Generic, reusable card for displaying InfluxDB store details and test controls.
+
+    Expects the following context variables:
+    - card_title: The title to display in the card header.
+    - store: The InfluxStore object to display and test.
+    - place: The Place object associated with the store.
+    - edit_url: The URL for the "Edit" button.
+    - htmx_modal: (Optional) Boolean. If true, the Edit button will trigger an HTMX modal.
+    - show_details: (Optional) Boolean. If true, displays the full store details (URL, Org, etc.).
+    - results_id: A unique ID for the test results container.
+{% endcomment %}
+
+<div class="card bg-light-subtle my-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-database me-2"></i>{{ card_title }}
+            {% if store and place.default_influx_store == store %}
+                <span class="badge bg-primary ms-2">Default</span>
+            {% endif %}
+            {% if store and place.switchbot_influx_store == store %}
+                <span class="badge bg-info ms-2"><i class="bi bi-robot me-1"></i>SwitchBot</span>
+            {% endif %}
+        </h5>
+        <div class="btn-group" role="group">
+            {% if htmx_modal %}
+                <button class="btn btn-warning btn-sm"
+                        hx-get="{{ edit_url }}"
+                        hx-target="#htmx-modal-content"
+                        data-bs-toggle="modal" 
+                        data-bs-target="#htmx-modal">
+                    <i class="bi bi-pencil"></i> Edit
+                </button>
+            {% else %}
+                <a href="{{ edit_url }}" class="btn btn-sm btn-warning">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+            {% endif %}
+
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" 
+                        data-bs-toggle="dropdown" aria-expanded="false"
+                        {% if not store %}disabled{% endif %}>
+                    <i class="bi bi-activity"></i> Test
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item" href="#"
+                           hx-post="{% if store %}{% url 'sensors:influxstore_test' place.slug store.pk %}?test_type=bucket_read{% endif %}"
+                           hx-target="#{{ results_id }}"
+                           hx-swap="innerHTML">
+                            <i class="bi bi-box-seam me-2"></i>Bucket Read Test
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#"
+                           hx-post="{% if store %}{% url 'sensors:influxstore_test' place.slug store.pk %}?test_type=write{% endif %}"
+                           hx-target="#{{ results_id }}"
+                           hx-swap="innerHTML">
+                            <i class="bi bi-pencil-square me-2"></i>Write/Read Test
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if show_details %}
+            <p><strong><i class="bi bi-database me-2"></i>Store Name:</strong> {{ store.name }}</p>
+            <p><strong><i class="bi bi-bucket me-2"></i>Bucket Name:</strong> {{ store.bucket_name }}</p>
+            <p><strong><i class="bi bi-person-fill me-2"></i>Organization ID:</strong> {{ store.org }}</p>
+            <p><strong><i class="bi bi-globe me-2"></i>InfluxDB URL:</strong> {{ store.url }}</p>
+            <p><strong><i class="bi bi-key me-2"></i>InfluxDB API Token:</strong> <code>{{ store.token_display }}</code></p>
+        {% else %}
+            <p><strong>Selected Store:</strong> {{ store.name|default:"Not Set" }}</p>
+        {% endif %}
+        <hr class="border-secondary my-1 mx-4">
+        <div id="{{ results_id }}" class="mt-3">
+        </div>
+    </div>
+</div>

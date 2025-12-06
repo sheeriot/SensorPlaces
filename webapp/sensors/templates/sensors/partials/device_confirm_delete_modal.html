@@ -1,0 +1,47 @@
+{% extends "sensors/base_modal.html" %}
+
+{% block modal_title %}
+    Delete Device: {{ object.name }}
+{% endblock %}
+
+{% block modal_body %}
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>Warning:</strong> This action cannot be undone.
+    </div>
+
+    <p>
+        You are about to delete the device <strong>{{ object.name }}</strong>.
+        All of its associated sensors and their historical data will be permanently removed.
+    </p>
+
+    <form id="delete-device-form"
+          hx-post="{% url 'sensors:device_delete' place_slug=place.slug pk=object.pk %}"
+          hx-target="#htmx-modal-content"
+          hx-swap="innerHTML">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="name_confirm" class="form-label">
+                To confirm deletion, please type the device name: <strong>{{ object.name }}</strong>
+            </label>
+            <input type="text"
+                   class="form-control {% if form.name_confirm.errors %}is-invalid{% endif %}"
+                   id="name_confirm"
+                   name="name_confirm"
+                   autocomplete="off"
+                   required>
+            {% if form.name_confirm.errors %}
+                <div class="invalid-feedback">
+                    {{ form.name_confirm.errors|first }}
+                </div>
+            {% endif %}
+        </div>
+    </form>
+{% endblock %}
+
+{% block modal_footer %}
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button id="confirm-delete-btn" type="submit" form="delete-device-form" class="btn btn-danger">
+        Delete Device
+    </button>
+{% endblock %}

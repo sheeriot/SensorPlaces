@@ -18,7 +18,7 @@ from django.utils.text import slugify
 # from typing import Dict, Any, Optional, cast
 
 # App stuff
-from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxSource, SensorType, Unit, DeviceType
+from ..models import Place, Location, Device, Sensor, ToastNotification, InfluxStore, SensorType, Unit, DeviceType
 from .place_forms import PlaceForm, PlaceDeleteForm
 from .switchbot_forms import SwitchBotConfigForm
 from ..map_fun import place_map_create
@@ -29,10 +29,70 @@ from ..decorators import log_execution_time
 from ..services.measurement_utils import get_influx_details
 from ..services.switchbot_service import SwitchBotService
 
+from django.db.models import Case, When, BooleanField
+
 # utility
 import json
 from decimal import Decimal
 from icecream import ic
+
+
+@login_required
+def place_map_modal_view(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    context = {'place': place}
+    return render(request, 'sensors/partials/place_map_modal.html', context)
+
+
+@login_required
+def siteplan_view_modal(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    locations = Location.objects.filter(place=place).exclude(slug='unassigned-devices')
+    locations_data = [
+        {
+            "name": loc.name,
+            "slug": loc.slug,
+            "description": loc.description or "",
+            "is_active": loc.is_active,
+            "devices_active_count": loc.devices.filter(is_active=True).count(),
+            "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+            "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+            "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
+        }
+        for loc in locations
+    ]
+    context = {
+        'place': place,
+        'locations_json': locations_data,
+    }
+    return render(request, 'sensors/partials/siteplan_view_modal.html', context)
+
+
+@login_required
+def siteplan_editor_modal(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    locations = Location.objects.filter(place=place).exclude(slug='unassigned-devices')
+    locations_data = [
+        {
+            "name": loc.name,
+            "slug": loc.slug,
+            "description": loc.description or "",
+            "is_active": loc.is_active,
+            "devices_active_count": loc.devices.filter(is_active=True).count(),
+            "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+            "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+            "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
+        }
+        for loc in locations
+    ]
+    context = {
+        'place': place,
+        'locations': locations,
+        'locations_json': locations_data,
+        'editable': True
+    }
+    return render(request, 'sensors/partials/siteplan_editor_modal.html', context)
+
 
 # Place Views
 class PlaceListView(LoginRequiredMixin, ListView):
@@ -66,26 +126,24 @@ def siteplan_view(request, place_slug):
         devices_inactive_count=Count('device', filter=Q(device__is_active=False))
     ).exclude(slug='unassigned-devices')
 
-    locations_json = json.dumps(
-        [
-            {
-                "name": loc.name,
-                "slug": loc.slug,
-                "description": loc.description or "",
-                "is_active": loc.is_active,
-                "devices_active_count": loc.devices_active_count,
-                "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
-                "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
-                "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
-            }
-            for loc in locations
-        ]
-    )
+    locations_data = [
+        {
+            "name": loc.name,
+            "slug": loc.slug,
+            "description": loc.description or "",
+            "is_active": loc.is_active,
+            "devices_active_count": loc.devices_active_count,
+            "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+            "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+            "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
+        }
+        for loc in locations
+    ]
 
     return render(request, 'sensors/siteplan.html', {
         'place': place,
         'locations': locations, # Pass the queryset for the list card
-        'locations_json': locations_json,
+        'locations_json': locations_data,
         'editable': True
     })
 
@@ -114,8 +172,20 @@ class PlaceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add device and sensor counts to context for the live counts card
         context.update(get_live_counts_context(self.object))
 
-        # Add InfluxDB sources to the context
-        context['influxsources'] = InfluxSource.objects.filter(place=self.object)
+        # Add InfluxDB stores to the context, sorted correctly
+        influxstores_qs = InfluxStore.objects.filter(place=self.object)
+        context['influxstores'] = influxstores_qs.annotate(
+            is_default=Case(
+                When(pk=self.object.default_influx_store_id, then=True),
+                default=False,
+                output_field=BooleanField()
+            ),
+            is_switchbot=Case(
+                When(pk=self.object.switchbot_influx_store_id, then=True),
+                default=False,
+                output_field=BooleanField()
+            )
+        ).order_by('-is_default', '-is_switchbot', 'name')
 
         # Add place_map_html to the context
         try:
@@ -269,6 +339,8 @@ class PlaceUpdateView(LoginRequiredMixin, ReferrerMixin, UpdateView):
         return context
 
     def form_valid(self, form: PlaceForm):
+        ic("--- PlaceUpdateView form_valid ---")
+        ic(form.cleaned_data)
         # Get the object before saving to compare values
         place = self._place
         original_values = {

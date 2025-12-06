@@ -10,8 +10,9 @@ from .models import (
     SensorType,
     Unit,
     SensorReading,
-    InfluxSource,
+    InfluxStore,
     ToastNotification,
+    ToastReadStatus,
 )
 from .utils import update_sensor_live_value
 
@@ -96,7 +97,7 @@ class SensorAdmin(admin.ModelAdmin):
     list_filter = ('sensor_type', 'is_active', 'device__location')
     search_fields = ('name', 'device__name')
     readonly_fields = ()
-    autocomplete_fields = ['device', 'sensor_type', 'influx_source']
+    autocomplete_fields = ['device', 'sensor_type', 'influx_store']
 
     fieldsets = (
         (None, {
@@ -108,9 +109,9 @@ class SensorAdmin(admin.ModelAdmin):
         ('Display & Data Type Settings', {
             'fields': ('graph_type', ('unit', 'unit_override'), 'data_type')
         }),
-        ('InfluxDB Settings', {
-            'fields': ('influx_source', 'influx_measurement', 'influx_field_name', 'influx_tag_key'),
-            'classes': ('collapse',)
+        ('InfluxDB Configuration', {
+            'classes': ('collapse',),
+            'fields': ('influx_store', 'influx_measurement', 'influx_field_name', 'influx_tag_key'),
         }),
         ('Metadata', {
             'fields': (('created_at', 'updated_at'),),
@@ -161,21 +162,11 @@ class SensorReadingAdmin(admin.ModelAdmin):
         verbose_name_plural = '5. Sensor Readings'
 
 
-@admin.register(InfluxSource)
-class InfluxSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'place', 'url', 'bucket_name', 'org')
-    search_fields = ('name', 'url', 'bucket_name', 'place__name')
-    readonly_fields = ('created_at', 'updated_at')
-    fieldsets = (
-        (None, {
-            'fields': ('place', 'name', 'url', 'bucket_name', 'org', 'token')
-        }),
-    )
-
-    def get_readonly_fields(self, request, obj=None):
-        if obj:  # editing an existing object
-            return tuple(self.readonly_fields) + ('read_token',)
-        return self.readonly_fields
+@admin.register(InfluxStore)
+class InfluxStoreAdmin(admin.ModelAdmin):
+    list_display = ('name', 'place', 'url', 'org', 'bucket_name')
+    list_filter = ('place',)
+    search_fields = ('name', 'url', 'org', 'bucket_name')
 
 @admin.register(ToastNotification)
 class ToastNotificationAdmin(admin.ModelAdmin):

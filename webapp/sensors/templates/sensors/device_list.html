@@ -11,20 +11,19 @@
     {% else %}
         {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
     {% endif %}
-    <!-- Unassigned Devices Card -->
-    {% include "sensors/includes/unassigned_devices_card.html" %}
+
     {% include "sensors/includes/live_counts_card.html" %}
 
     </div>
     <!-- right column -->
     <div class="col-md-8">
         {% include "sensors/includes/device_list_card.html" %}
-
+        <!-- Unassigned Devices Card -->
+        {% include "sensors/includes/unassigned_devices_card.html" %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-
-<script src="{% static 'sensors/js/device-move.js' %}"></script>
+<script src="{% static 'sensors/js/device-move.js' %}?v={{ APP_VERSION }}"></script>
 {% endblock %}

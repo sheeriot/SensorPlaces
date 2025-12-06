@@ -1,6 +1,6 @@
 const sensorFormManager = {
     config: {
-        debug: true,
+        debug: false,
     },
 
     init() {
@@ -21,7 +21,7 @@ const sensorFormManager = {
         // --- Add Influx Source Modal ---
         const addSourceBtn = document.getElementById('add-influx-source-btn');
         if (addSourceBtn) {
-            addSourceBtn.addEventListener('click', (e) => this.handleAddInfluxSourceClick(e));
+            addSourceBtn.addEventListener('click', (e) => this.handleAddInfluxStoreClick(e));
         }
 
         // --- Sensor Type Change Handler ---
@@ -96,7 +96,7 @@ const sensorFormManager = {
         return defaults;
     },
 
-    async handleAddInfluxSourceClick(e) {
+    async handleAddInfluxStoreClick(e) {
         e.preventDefault();
         const url = e.currentTarget.href;
         const modalElement = document.getElementById('add-influx-source-modal');
@@ -134,7 +134,7 @@ const sensorFormManager = {
                 const data = await response.json();
 
                 if (data.success) {
-                    const influxSourceSelect = document.getElementById('id_influx_source');
+                    const influxSourceSelect = document.getElementById('id_influx_store');
                     if (influxSourceSelect) {
                         const newOption = new Option(data.name, data.pk, true, true);
                         influxSourceSelect.appendChild(newOption);

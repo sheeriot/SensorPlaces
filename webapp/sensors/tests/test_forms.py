@@ -4,7 +4,8 @@ from sensors.views.place_forms import PlaceForm, PlaceDeleteForm
 from sensors.views.location_forms import LocationForm
 from sensors.views.device_forms import DeviceForm
 from sensors.views.sensor_forms import SensorForm
-from sensors.models import Place, Location, Device, Sensor, DeviceType, InfluxSource, SensorType, Unit
+from sensors.views.influx_store_forms import InfluxStoreForm
+from sensors.models import Place, Location, Device, Sensor, DeviceType, InfluxStore, SensorType, Unit
 from django.test import Client
 from django.urls import reverse
 import json
@@ -435,7 +436,7 @@ class SensorFormTest(TestCase):
         )
 
         # Create an influx source
-        self.influx_source = InfluxSource.objects.create(
+        self.influx_store = InfluxStore.objects.create(
             name='Test Influx',
             url='http://localhost:8086',
             bucket_name='test_bucket',
@@ -511,7 +512,7 @@ class SensorFormTest(TestCase):
         st, _ = SensorType.objects.get_or_create(pk=1, defaults={'name': 'Temperature'})
         u, _ = Unit.objects.get_or_create(pk=1, defaults={'name': 'Celsius', 'symbol': 'C'})
 
-        # Form with data_type=INFLUX but missing influx_source and influx_measurement should be invalid
+        # Form with data_type=INFLUX but missing influx_store and influx_measurement should be invalid
         form_data = {
             'name': 'New Test Sensor',
             'device': self.device.pk,
@@ -524,7 +525,7 @@ class SensorFormTest(TestCase):
 
         form = SensorForm(data=form_data, device=self.device)
         self.assertFalse(form.is_valid())
-        self.assertIn('influx_source', form.errors)
+        self.assertIn('influx_store', form.errors)
         self.assertIn('influx_measurement', form.errors)
 
         # Form with data_type=INFLUX and all required fields should be valid
@@ -536,7 +537,7 @@ class SensorFormTest(TestCase):
             'unit': u.pk,
             'data_type': 'INFLUX',
             'graph_type': 'SCATTER',
-            'influx_source': self.influx_source.pk,
+            'influx_store': self.influx_store.pk,
             'influx_measurement': 'test_measurement',
             'influx_field_name': 'test_field',
             'influx_tag_key': 'test_tag',
@@ -606,6 +607,44 @@ class SensorFormTest(TestCase):
                     if 'submit' in content or 'type="submit"' in content:
                         return True
         return False
+
+
+class InfluxStoreFormTest(TestCase):
+    def setUp(self):
+        self.place = Place.objects.create(name='Test Place', latitude=0, longitude=0)
+
+    def test_form_valid(self):
+        form_data = {
+            'place': self.place.id,
+            'name': 'Test Influx Store',
+            'url': 'http://influx:8086',
+            'org': 'test-org',
+            'bucket_name': 'test-bucket',
+            'token': 'test-token',
+        }
+        form = InfluxStoreForm(data=form_data)
+        self.assertTrue(form.is_valid())
+
+    def test_duplicate_name_invalid(self):
+        InfluxStore.objects.create(
+            place=self.place,
+            name='Test Influx Store',
+            url='http://influx:8086',
+            org='test-org',
+            bucket_name='test-bucket',
+            token='test-token'
+        )
+        form_data = {
+            'place': self.place.id,
+            'name': 'Test Influx Store',
+            'url': 'http://influx2:8086',
+            'org': 'test-org2',
+            'bucket_name': 'test-bucket2',
+            'token': 'test-token2',
+        }
+        form = InfluxStoreForm(data=form_data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('name', form.errors)
 
 
 class ToastMessageTestCase(TestCase):
