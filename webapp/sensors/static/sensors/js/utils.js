@@ -110,6 +110,16 @@
         return `${days} day${days > 1 ? 's' : ''} ago`;
     }
 
+    function showToast(message, type = 'info', delay = 5000) {
+        document.dispatchEvent(new CustomEvent('show-toast', {
+            detail: {
+                message: message,
+                type: type,
+                delay: delay
+            }
+        }));
+    }
+
     // Public API
     window.utils = {
         getCookie: getCookie,
@@ -117,6 +127,7 @@
         deleteCookie: deleteCookie,
         fetchWithCSRF: fetchWithCSRF,
         formatTimestamp: formatTimestamp,
-        getNaturalTime: getNaturalTime
+        getNaturalTime: getNaturalTime,
+        showToast: showToast
     };
 })();

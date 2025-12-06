@@ -127,7 +127,7 @@ def get_place_data(place, request=None, include_json=True):
     # Add JSON data if requested
     if include_json:
         locations_data = [get_location_data(loc) for loc in locations]
-        result['locations_json'] = json.dumps(locations_data)
+        result['locations_json'] = locations_data
 
     # Add statistics
     locations_active, locations_inactive, devices_active, devices_inactive, sensors_active, sensors_inactive = get_place_counts(place)

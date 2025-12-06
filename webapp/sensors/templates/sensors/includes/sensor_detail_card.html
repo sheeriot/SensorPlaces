@@ -13,15 +13,19 @@
             <button class="btn btn-sm me-2 live-value-refresh" title="Force refresh of all live values on page">
                 <i class="bi bi-arrow-clockwise"></i>
             </button>
-            <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-sm btn-outline-warning" title="Edit Sensor"><i class="bi bi-pencil"></i></a>
-            <a href="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
-                class="btn btn-sm btn-outline-danger ms-1"
-                hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
-                hx-target="#modal-content"
-                data-bs-toggle="modal"
-                data-bs-target="#modal-container"
-                title="Delete">
-                <i class="bi bi-trash"></i>
+            <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}"
+               class="btn btn-sm btn-warning"
+               title="Edit Sensor">
+                <i class="bi bi-pencil-fill"></i> Edit
+            </a>
+            <a href="#"
+               class="btn btn-sm btn-danger"
+               title="Delete Sensor"
+               data-bs-toggle="modal"
+               data-bs-target="#htmx-modal"
+               hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+               hx-target="#htmx-modal-content">
+                <i class="bi bi-trash-fill"></i> Delete
             </a>
         </div>
     </div>

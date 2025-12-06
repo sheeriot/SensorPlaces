@@ -29,10 +29,10 @@ const placeMapPopout = {
         center_all: null
     },
 
-    initialize() {
+    initialize(modalContent) {
         if (mapPopoutConfig.debug) {
             console.group('Place Map Popout System');
-            console.log("Initializing popout map system");
+            console.log("Initializing popout map system inside modal content:", modalContent);
         }
 
         // Fix for Leaflet default marker icons
@@ -45,21 +45,11 @@ const placeMapPopout = {
             });
         }
 
-        // First check if we should initialize on this page
-        const mapTrigger = document.getElementById('openPlaceMap');
-        if (!mapTrigger || !mapTrigger.hasAttribute('data-place-map-popout')) {
-            if (mapPopoutConfig.debug) {
-                console.log("No popout map to initialize on this page");
-                console.groupEnd();
-            }
-            return;
-        }
-
-        // Get map element
-        const mapContainer = document.getElementById('placeMapContainer');
+        // Get map element from within the modal content
+        const mapContainer = modalContent.querySelector('#placeMapContainer');
         if (!mapContainer) {
             if (mapPopoutConfig.debug) {
-                console.log("No popout map container found");
+                console.log("No popout map container found in the loaded content");
                 console.groupEnd();
             }
             return;
@@ -70,7 +60,7 @@ const placeMapPopout = {
         }
 
         this.setupMap(mapContainer);
-        this.setupEventListeners(mapTrigger);
+        this.setupEventListeners();
 
         if (mapPopoutConfig.debug) {
             console.groupEnd();
@@ -158,13 +148,14 @@ const placeMapPopout = {
         }
     },
 
-    setupEventListeners(trigger) {
+    setupEventListeners() {
         // Handle modal events to resize map
-        const modal = document.getElementById('placeMapModal');
+        const modal = document.getElementById('mapplan-modal');
         if (!modal) return;
 
         modal.addEventListener('shown.bs.modal', () => {
             if (this.map) {
+                if (mapPopoutConfig.debug) console.log('[PlaceMapPopout] Invalidating map size on modal shown.');
                 this.map.invalidateSize();
                 if (this.metadata.center_active && this.metadata.zoom_active) {
                     this.map.setView(this.metadata.center_active, this.metadata.zoom_active);
@@ -183,36 +174,8 @@ const placeMapPopout = {
     }
 };
 
-// Initialize place map popout system when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    if (mapPopoutConfig.debug) {
-        console.group('Place Map Popout Initialization');
-    }
+// Explicitly attach to the window object to ensure global availability
+window.placeMapPopout = placeMapPopout;
 
-    const openMapBtn = document.getElementById('openPlaceMap');
-    if (!openMapBtn) {
-        if (mapPopoutConfig.debug) {
-            console.log('No map trigger button found on this page');
-            console.groupEnd();
-        }
-        return;
-    }
-
-    if (!openMapBtn.hasAttribute('data-place-map-popout')) {
-        if (mapPopoutConfig.debug) {
-            console.log('Popout map initialization not requested on this page');
-            console.groupEnd();
-        }
-        return;
-    }
-
-    if (mapPopoutConfig.debug) {
-        console.log('Found map trigger button with initialization flag');
-    }
-
-    placeMapPopout.initialize();
-
-    if (mapPopoutConfig.debug) {
-        console.groupEnd();
-    }
-});
+// We no longer initialize on DOMContentLoaded.
+// Initialization will be triggered by the modal handler after content is loaded.

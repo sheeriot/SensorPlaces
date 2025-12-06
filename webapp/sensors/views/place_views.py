@@ -36,6 +36,64 @@ import json
 from decimal import Decimal
 from icecream import ic
 
+
+@login_required
+def place_map_modal_view(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    context = {'place': place}
+    return render(request, 'sensors/partials/place_map_modal.html', context)
+
+
+@login_required
+def siteplan_view_modal(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    locations = Location.objects.filter(place=place).exclude(slug='unassigned-devices')
+    locations_data = [
+        {
+            "name": loc.name,
+            "slug": loc.slug,
+            "description": loc.description or "",
+            "is_active": loc.is_active,
+            "devices_active_count": loc.devices.filter(is_active=True).count(),
+            "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+            "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+            "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
+        }
+        for loc in locations
+    ]
+    context = {
+        'place': place,
+        'locations_json': locations_data,
+    }
+    return render(request, 'sensors/partials/siteplan_view_modal.html', context)
+
+
+@login_required
+def siteplan_editor_modal(request, place_slug):
+    place = get_object_or_404(Place, slug=place_slug)
+    locations = Location.objects.filter(place=place).exclude(slug='unassigned-devices')
+    locations_data = [
+        {
+            "name": loc.name,
+            "slug": loc.slug,
+            "description": loc.description or "",
+            "is_active": loc.is_active,
+            "devices_active_count": loc.devices.filter(is_active=True).count(),
+            "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+            "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+            "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
+        }
+        for loc in locations
+    ]
+    context = {
+        'place': place,
+        'locations': locations,
+        'locations_json': locations_data,
+        'editable': True
+    }
+    return render(request, 'sensors/partials/siteplan_editor_modal.html', context)
+
+
 # Place Views
 class PlaceListView(LoginRequiredMixin, ListView):
     model = Place
@@ -68,26 +126,24 @@ def siteplan_view(request, place_slug):
         devices_inactive_count=Count('device', filter=Q(device__is_active=False))
     ).exclude(slug='unassigned-devices')
 
-    locations_json = json.dumps(
-        [
-            {
-                "name": loc.name,
-                "slug": loc.slug,
-                "description": loc.description or "",
-                "is_active": loc.is_active,
-                "devices_active_count": loc.devices_active_count,
-                "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
-                "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
-                "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
-            }
-            for loc in locations
-        ]
-    )
+    locations_data = [
+        {
+            "name": loc.name,
+            "slug": loc.slug,
+            "description": loc.description or "",
+            "is_active": loc.is_active,
+            "devices_active_count": loc.devices_active_count,
+            "x_pos": float(loc.x_pos) if loc.x_pos is not None else None,
+            "y_pos": float(loc.y_pos) if loc.y_pos is not None else None,
+            "url": reverse('sensors:location_detail', args=[place.slug, loc.slug])
+        }
+        for loc in locations
+    ]
 
     return render(request, 'sensors/siteplan.html', {
         'place': place,
         'locations': locations, # Pass the queryset for the list card
-        'locations_json': locations_json,
+        'locations_json': locations_data,
         'editable': True
     })
 

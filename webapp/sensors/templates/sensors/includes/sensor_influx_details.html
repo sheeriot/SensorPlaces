@@ -15,31 +15,30 @@
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
-                        <a class="dropdown-item" href="#" 
-                           hx-post="{% url 'sensors:test_influx_bucket_for_sensor' place_slug=place.slug pk=sensor.pk %}"
+                        <a class="dropdown-item" href="#"
+                           hx-post="{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=bucket_read"
                            hx-target="#influx-test-results-{{ sensor.pk }}"
                            hx-swap="innerHTML">
-                           <i class="bi bi-box-seam me-2"></i>Bucket Connection
+                           <i class="bi bi-box-seam me-2"></i>Bucket Read Test
                         </a>
                     </li>
                     <li>
                         <a class="dropdown-item" href="#"
-                           hx-post="{% url 'sensors:test_influx_read' place_slug=place.slug pk=sensor.pk %}"
+                           hx-post="{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=sensor_read&sensor_pk={{ sensor.pk }}"
                            hx-target="#influx-test-results-{{ sensor.pk }}"
                            hx-swap="innerHTML">
-                           <i class="bi bi-shield-check me-2"></i>Read Sensor Data
+                           <i class="bi bi-graph-up me-2"></i>Read Sensor Data
                         </a>
                     </li>
-                    {% if sensor.device.is_switchbot %}
+                    <li><hr class="dropdown-divider"></li>
                     <li>
                         <a class="dropdown-item" href="#"
-                           hx-post="{% url 'sensors:test_influx_write' place_slug=place.slug pk=sensor.pk %}"
+                           hx-post="{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=write"
                            hx-target="#influx-test-results-{{ sensor.pk }}"
                            hx-swap="innerHTML">
-                           <i class="bi bi-pencil-square me-2"></i>API Write Test
+                           <i class="bi bi-pencil-square me-2"></i>Write/Read Perms
                         </a>
                     </li>
-                    {% endif %}
                 </ul>
             </div>
         </div>

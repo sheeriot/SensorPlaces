@@ -3,10 +3,6 @@
 
 {% block title %}Site Plan - {{ place.name }}{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-{% endblock %}
-
 {% block content %}
 <div class="row gx-2 my-1">
     <div class="col-md-4">
@@ -19,8 +15,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
+<script src="{% static 'sensors/js/siteplan-view.js' %}?v={{ APP_VERSION }}"></script>
 <script src="{% static 'sensors/js/hide-inactive-handler.js' %}"></script>
 <script src="{% static 'sensors/js/toggle-active-handler.js' %}"></script>
 {% endblock %}

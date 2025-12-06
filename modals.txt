@@ -1,9 +1,0 @@
-Are Other Modals "Weird" Now?
-This is the important follow-up. I did a quick search of the codebase, and I found several other modals with different IDs, such as:
-#deleteInfluxStoreModal in influxstore_list_card.html
-#inspectModal in device_detail.html
-#siteplan-view-modal in siteplan_card.html
-#placeMapModal in place_title_card.html
-The good news is that our new global event handler will not break these. They are mostly standard Bootstrap modals that are not triggered by an HX-Trigger from a form submission in the same way our InfluxDB edit form is.
-However, if any of those other modals should be closed by a server event, they can now take advantage of our new global handler. For example, a view could now easily return HX-Trigger: {"closeModal": "#inspectModal"} and it would just work.
-So, in short: we've improved the system without breaking existing functionality, and we've established a solid, reusable pattern for the future.

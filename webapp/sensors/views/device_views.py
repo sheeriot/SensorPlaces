@@ -1,4 +1,4 @@
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View, FormView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
@@ -21,7 +21,7 @@ from ..models import Place, Location, Device, Sensor, SensorReading, SensorType,
 from .device_forms import DeviceForm
 from .mixins import PlaceAnnotationMixin, ReferrerMixin
 from .views_fun import get_place_counts, get_annotated_locations, get_live_counts_context
-from .sensor_forms import SensorForm, LoRaWANSensorForm
+from .sensor_forms import SensorForm, LoRaWANSensorForm, DeviceDeleteForm
 from ..utils import get_sensor_readings, generate_sparkline, get_latest_influx_reading, update_sensor_live_value
 from ..decorators import log_execution_time
 from ..services.switchbot_service import SwitchBotService
@@ -628,119 +628,31 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
-class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
-    model = Device
-    template_name = 'sensors/device_confirm_delete.html'
-    object: Device
 
-    def get_queryset(self) -> QuerySet[Device]:
-        if not hasattr(self, '_queryset'):
-            place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-            base_queryset = super().get_queryset()
-            self._queryset = base_queryset.filter(location__place=place)
-        return self._queryset
+class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, FormView):
+    template_name = 'sensors/partials/device_confirm_delete_modal.html'
+    form_class = DeviceDeleteForm
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        # Get and cache place
-        self._place = self.get_place()
+        self.object = get_object_or_404(Device, pk=self.kwargs['pk'], location__place__slug=self.kwargs['place_slug'])
 
-        # Create inactive help text to be used in form and toast messages
-        try:
-            device = self.get_object()
-        except Http404:
-            device = None
-            # ic(f"Error in DeviceDeleteView.setup: {str(e)}")
-
-        if device and device.location and not device.location.is_active:
-            self._inactive_help_text = mark_safe(
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
-                    f'This device is inactive because Location "{device.location.name}" is inactive.'
-                )
-        else:
-            self._inactive_help_text = None
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['device_name'] = self.object.name
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Add place to context for template
+        context['object'] = self.object
         context['place'] = self._place
-
-        # Get the device's location
-        device = self.get_object()
-        if device and hasattr(device, 'location'):
-            context['location'] = device.location
-
         return context
 
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if request.headers.get('HX-Request'):
-            context = self.get_context_data(object=self.object)
-            # Pass the referrer to the modal context so we can return after delete
-            context['referrer_url'] = request.META.get('HTTP_REFERER')
-            return render(request, 'sensors/device_confirm_delete_modal.html', context)
-        return super().get(request, *args, **kwargs)
+    def form_valid(self, form):
+        device_name = self.object.name
+        self.object.delete()
+        messages.success(self.request, f"Device '{device_name}' and all its sensors have been deleted.")
 
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        device = self.object
-        place = self._place
-        location = device.location
-
-        # Before we delete the device, store its data
-        device_data = {
-            'name': device.name,
-            'is_active': device.is_active,
-            'device_type': device.device_type.name if device.device_type else '',
-            'icon': device.device_type.icon if device.device_type else 'bi-hdd',
-            'model': device.model or '',
-            'manufacturer': device.manufacturer or '',
-            'device_id': device.device_id or ''
-        }
-
-        # Get active sensors before deletion
-        active_sensors = device.sensors.filter(is_active=True)
-        sensors_info = [sensor.name for sensor in active_sensors]
-
-        message = (
-            f"Deleted device <strong>{device_data['name']}</strong> from "
-            f"<i class='bi bi-diagram-3'></i> {location.name}<br>"
-            f"<small class='text-muted'>"
-            f"Type: {device_data['device_type']}<br>"
-            f"Model: {device_data['model']}<br>"
-            f"Manufacturer: {device_data['manufacturer']}<br>"
-            f"ID: {device_data['device_id']}<br>"
-            f"Active: {'Yes' if device.is_active else 'No'}"
-        )
-
-        if sensors_info:
-            message += "<br>Affected active sensors:<ul class='mb-0'>"
-            for sensor_name in sensors_info:
-                message += f"<li>{sensor_name}</li>"
-            message += "</ul>"
-
-        message += "</small>"
-
-        # Create toast message with device data
-        request.toast_message = {
-            'message': message,
-            'type': 'warning'
-        }
-
-        # Delete the device
-        device.delete()
-
-        # Get the success URL from the form or fall back to the default
-        success_url = request.POST.get('referrer_url', self.get_success_url())
-
-        # Handle HTMX request
-        if request.headers.get('HX-Request'):
-            response = HttpResponse(status=200)
-            response['HX-Redirect'] = success_url
-            return response
-
-        return HttpResponseRedirect(success_url)
-
-    def get_success_url(self):
-        return reverse('sensors:device_list',
-                      kwargs={'place_slug': self._place.slug})
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('sensors:device_list', kwargs={'place_slug': self.kwargs['place_slug']})
+        return response

@@ -27,12 +27,15 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),  # This should be before your other URLs
     path('', include('sensors.urls')),  # Your app URLs
     # path('', HomeView.as_view(), name='home'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
 
 if getattr(settings, 'DEBUG_TOOLBAR', False):
     import debug_toolbar
     urlpatterns = [
         path('__debug__/', include(debug_toolbar.urls)),
     ] + urlpatterns
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 handler404 = error_views.custom_404

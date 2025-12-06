@@ -74,9 +74,97 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             if (scriptConfig.debug) console.error('[ModalLifecycle] Could not find #htmx-modal to attach listener.');
         }
+
+        const mapplanModalContainer = document.getElementById('mapplan-modal');
+        if (mapplanModalContainer) {
+            document.body.addEventListener('htmx:afterOnLoad', function(event) {
+                if (scriptConfig.debug) console.log('[HTMX afterOnLoad] Event triggered. Detail Target ID:', event.detail.target.id, 'Target Element:', event.detail.target);
+
+                const modalContent = event.detail.target;
+                if (modalContent.id === 'mapplan-modal-content') {
+                    if (scriptConfig.debug) console.log('[MapplanModal] HTMX content loaded into mapplan-modal.');
+
+                    const mapContainer = modalContent.querySelector('#placeMapContainer');
+                    const siteplanViewContainer = modalContent.querySelector('#siteplan-container-modal');
+                    const siteplanEditorContainer = modalContent.querySelector('#siteplan-editor-map');
+
+                    if (mapContainer) {
+                        if (scriptConfig.debug) console.log('[MapplanModal] Found #placeMapContainer, initializing map popout.');
+                        if (window.placeMapPopout && typeof window.placeMapPopout.initialize === 'function') {
+                            window.placeMapPopout.initialize(modalContent);
+                        } else {
+                            console.error('[MapplanModal] placeMapPopout.initialize is not available.');
+                        }
+                    } else if (siteplanViewContainer) {
+                        if (scriptConfig.debug) console.log('[MapplanModal] Found #siteplan-container-modal, initializing site plan view.');
+                        if (window.sitePlanView && typeof window.sitePlanView.initializeModal === 'function') {
+                            window.sitePlanView.initializeModal(modalContent);
+                        } else {
+                            console.error('[MapplanModal] sitePlanView.initializeModal is not available.');
+                        }
+                    } else if (siteplanEditorContainer) {
+                        if (scriptConfig.debug) console.log('[MapplanModal] Found #siteplan-editor-map, initializing site plan editor.');
+                        if (window.sitePlanSystem && typeof window.sitePlanSystem.initializeEditor === 'function') {
+                            window.sitePlanSystem.initializeEditor(modalContent);
+                        } else {
+                            console.error('[MapplanModal] sitePlanSystem.initializeEditor is not available.');
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Initializes the draggable and resizable functionality for the mapplan modal.
+     */
+    function initializeMapplanModal() {
+        const modal = $('#mapplan-modal');
+        if (modal.length) {
+            // Make mapplan modals draggable by their header.
+            modal.draggable({
+                handle: ".modal-header",
+                containment: "window"
+            });
+
+            // Make mapplan modals resizable.
+            modal.find('.modal-content').resizable({
+                minHeight: 200,
+                minWidth: 300,
+                handles: "n, e, s, w, ne, se, sw, nw"
+            });
+
+            // When the modal is shown, ensure it's brought to the front and focused.
+            modal.on('shown.bs.modal', function() {
+                if (scriptConfig.debug) console.log('[MapplanModal] #mapplan-modal shown.bs.modal event triggered.');
+                
+                const zIndex = 1050;
+                $(this).css('z-index', zIndex);
+
+                // Find the backdrop and adjust its z-index to be below the modal
+                const backdrop = $('.modal-backdrop');
+                if (backdrop.length) {
+                    const backdropZIndex = zIndex - 1;
+                    backdrop.css('z-index', backdropZIndex);
+                }
+
+                $(this).trigger('focus');
+            });
+
+            // Add cleanup for when modal is hidden
+            modal.on('hidden.bs.modal', function () {
+                const modalContent = modal.find('#mapplan-modal-content');
+                if (modalContent.length) {
+                    modalContent.html('');
+                }
+                // Also remove the backdrop manually to prevent lingering muted effect
+                $('.modal-backdrop').remove();
+            });
+        }
     }
 
     // Initialize all modal handlers
     initializeDeleteConfirmationInput();
     initializeModalLifecycleLogging();
+    initializeMapplanModal();
 });

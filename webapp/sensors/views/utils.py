@@ -8,4 +8,4 @@ def get_switchbot_service_from_place(place: Place) -> SwitchBotService:
     if not place.switchbot_enable or not place.switchbot_token or not place.switchbot_secret:
         raise Exception("SwitchBot integration is not fully configured for this place.")
     
-    return SwitchBotService(token=place.switchbot_token, secret=place.switchbot_secret)
+    return SwitchBotService(place=place)

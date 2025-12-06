@@ -26,7 +26,12 @@ timeout = 30
 # Logging settings
 errorlog = '-'
 accesslog = '-'
+access_log_format = '%({x-forwarded-for}i)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 loglevel = 'info'
+
+forwarded_allow_ips = os.getenv("FORWARDED_ALLOW_IPS")
+if not forwarded_allow_ips:
+    forwarded_allow_ips = "127.0.0.1"
 
 # Keep the workers alive for so many seconds
 keepalive = 2

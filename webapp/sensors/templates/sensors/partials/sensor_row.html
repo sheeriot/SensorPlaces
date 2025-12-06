@@ -56,11 +56,13 @@
                 <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-warning" title="Edit Sensor">
                     <i class="bi bi-pencil"></i>
                 </a>
-                <a href="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+                <a href="#"
                    class="btn btn-danger"
                    title="Delete Sensor"
+                   data-bs-toggle="modal"
+                   data-bs-target="#htmx-modal"
                    hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
-                   hx-target="#modal-content">
+                   hx-target="#htmx-modal-content">
                     <i class="bi bi-trash"></i>
                 </a>
             </div>

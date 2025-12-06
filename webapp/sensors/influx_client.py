@@ -134,28 +134,28 @@ def test_influx_bucket(url: str, token: str, org: str, bucket_name:str):
             client.close()
 
 
-# A basic connection test function
-def test_influx_bucket_connection(url, token, org, bucket_name):
-    """
-    Tests the connection to an InfluxDB store by performing a simple query.
-    This is a generic test and does not check for specific measurements.
-    Returns a tuple: (bool: success, str: message).
-    """
-    ic(f"Testing InfluxDB store connection with URL: {url}, Org: {org}, Bucket: {bucket_name}")
-    try:
-        with get_influxdb_client_v2_compat(url=url, token=token, org=org) as client:
-            query_api = client.query_api()
-            # A simple query to check if the connection and credentials are valid
-            # and the bucket exists.
-            query = f'from(bucket: "{bucket_name}") |> range(start: -1m) |> limit(n: 1)'
-            ic("Test source query:", query)
-            result = query_api.query(query)
-            ic("Test source query result:", result)
-            # If the query executes without error, the connection is considered successful.
-            return True, "Connection successful."
-    except Exception as e:
-        ic(f"InfluxDB store connection test failed: {e}")
-        return False, f"Connection failed: {e}"
+# This function is deprecated and uses a v2 client pattern. It is not used anywhere.
+# def test_influx_bucket_connection(url, token, org, bucket_name):
+#     """
+#     Tests the connection to an InfluxDB store by performing a simple query.
+#     This is a generic test and does not check for specific measurements.
+#     Returns a tuple: (bool: success, str: message).
+#     """
+#     ic(f"Testing InfluxDB store connection with URL: {url}, Org: {org}, Bucket: {bucket_name}")
+#     try:
+#         with get_influxdb_client_v2_compat(url=url, token=token, org=org) as client:
+#             query_api = client.query_api()
+#             # A simple query to check if the connection and credentials are valid
+#             # and the bucket exists.
+#             query = f'from(bucket: "{bucket_name}") |> range(start: -1m) |> limit(n: 1)'
+#             ic("Test source query:", query)
+#             result = query_api.query(query)
+#             ic("Test source query result:", result)
+#             # If the query executes without error, the connection is considered successful.
+#             return True, "Connection successful."
+#     except Exception as e:
+#         ic(f"InfluxDB store connection test failed: {e}")
+#         return False, f"Connection failed: {e}"
 
 
 def get_influx_sensor_stats(sensor):
@@ -251,7 +251,7 @@ def get_earliest_influx_reading(sensor):
             client.close()
 
 
-def get_latest_influx_reading(sensor):
+def get_latest_influx_reading(sensor: 'Sensor'):
     """
     Fetches the single most recent reading for a sensor from InfluxDB using SQL.
     Returns a dictionary with the reading and the query string.
@@ -279,7 +279,7 @@ def get_latest_influx_reading(sensor):
             time_val = table.column(0)[0].as_py()
             value = table.column(1)[0].as_py()
             # Construct a record-like object for template compatibility
-            latest = {'value': value, 'time': time_val}
+            latest = {'time': time_val, field_to_select: value}
             ic("Latest source query result:", latest)
             return {'reading': latest, 'query': query}
             
@@ -293,54 +293,72 @@ def get_latest_influx_reading(sensor):
         if client:
             client.close()
 
-def test_influx_write_read(influx_store: InfluxStore):
+
+def test_influx_write_read(store: InfluxStore):
     """
     Tests write and read functionality for an InfluxDB store.
-    Writes a random value to a test measurement and reads it back.
+    Writes a random value to a test measurement, reads it back immediately, and verifies.
     """
-    client = get_influxdb_client(influx_store)
+    test_measurement = "test_write"
+    test_field = "random"
+    test_tag_key = "tester"
+    test_tag_value = "sensors_tester"
+    test_value = round(random.uniform(0, 100), 1)
+
+    record_details = {
+        "bucket": store.bucket_name,
+        "measurement": test_measurement,
+        "tag_key": test_tag_key,
+        "tag_value": test_tag_value,
+        "field_name": test_field,
+        "field_value": test_value
+    }
     
-    measurement = 'test-write'
-    tags = {'host': 'test-button'}
-    field_name = 'pseudo'
-    test_value = round(random.uniform(0, 10), 1)
-    query = None  # Define query here to ensure it's available in the except block
-    
+    client = None
     try:
-        # Write the point
-        point = Point(measurement)
-        for key, value in tags.items():
-            point.tag(key, value)
-        point.field(field_name, test_value)
-        ic(f"InfluxDB Test: Writing point: {point.to_line_protocol()}")
-        client.write(database=influx_store.bucket_name, record=point)
+        client = InfluxDBClient3(host=store.url, token=store.token, org=store.org, database=store.bucket_name)
+        
+        # --- Write Test ---
+        start_write = time.time()
+        point = Point(test_measurement).tag(test_tag_key, test_tag_value).field(test_field, test_value)
+        client.write(record=point)
+        end_write = time.time()
+        write_time_ms = int((end_write - start_write) * 1000)
 
-        # Give it a moment and try to read it back
-        time.sleep(1) 
+        # --- Read Test (immediately after) ---
+        start_read = time.time()
+        query = f'SELECT * FROM "{test_measurement}" WHERE "{test_tag_key}" = \'{test_tag_value}\' ORDER BY time DESC LIMIT 1'
+        ic(f"Performing read test with query: {query}")
+        table = client.query(query=query, language='sql')
+        end_read = time.time()
+        read_time_ms = int((end_read - start_read) * 1000)
 
-        query = f"SELECT \"{field_name}\" FROM \"{measurement}\" WHERE \"host\" = '{tags['host']}' ORDER BY time DESC LIMIT 1"
-        ic(f"InfluxDB Test: Reading point with query: {query}")
-        table = client.query(query, language='sql')
+        # --- Verification ---
+        if table.num_rows == 0:
+            return {"success": False, "message": "Write succeeded, but no data was returned on read.", "record": record_details}
 
-        if table.num_rows > 0:
-            read_value = table.column(0)[0].as_py()
-            ic(f"InfluxDB Test: Read back value: {read_value}")
-            if abs(read_value - test_value) < 0.01:
-                return {
-                    'success': True,
-                    'message': f"Successfully wrote {test_value} and read it back.",
-                    'query': query,
-                    'written_value': test_value,
-                    'read_value': read_value
-                }
-            else:
-                raise Exception(f"Read value ({read_value}) does not match written value ({test_value}).")
+        read_value = table.to_pydict()[test_field][0]
+
+        if read_value == test_value:
+            return {
+                "success": True,
+                "message": f"Successfully wrote {test_value} and read it back.",
+                "record": record_details,
+                "write_time_ms": write_time_ms,
+                "read_time_ms": read_time_ms
+            }
         else:
-            raise Exception("Wrote a value but could not read it back.")
+            return {
+                "success": False,
+                "message": f"Value mismatch. Wrote {test_value}, but read back {read_value}.",
+                "record": record_details,
+                "write_time_ms": write_time_ms,
+                "read_time_ms": read_time_ms
+            }
 
     except Exception as e:
-        ic(f"InfluxDB write/read test failed: {e}")
-        return {'success': False, 'error_message': str(e), 'query': query}
+        ic(f"Error during write/read test for store {store.name}: {e}")
+        return {"success": False, "message": str(e)}
     finally:
         if client:
             client.close()
@@ -355,12 +373,13 @@ def get_influxdb_client(influx_store: InfluxStore):
         database=influx_store.bucket_name
     )
 
-def get_influxdb_client_v2_compat(url, token, org):
-    """
-    This is a compatibility function. The V3 client can't be used for the generic
-    bucket connection test which uses Flux. For that, we need the V2 client.
-    However, since the project uses influxdb3-python, we can't have both.
-    This function needs to be removed or adapted once the test strategy is confirmed.
-    For now, it will raise an error if called.
-    """
-    raise NotImplementedError("The InfluxDB v2 compatibility client is not available with the influxdb3-python library.")
+# This function raises a NotImplementedError and is not used.
+# def get_influxdb_client_v2_compat(url, token, org):
+#     """
+#     This is a compatibility function. The V3 client can't be used for the generic
+#     bucket connection test which uses Flux. For that, we need the V2 client.
+#     However, since the project uses influxdb3-python, we can't have both.
+#     This function needs to be removed or adapted once the test strategy is confirmed.
+#     For now, it will raise an error if called.
+#     """
+#     raise NotImplementedError("The InfluxDB v2 compatibility client is not available with the influxdb3-python library.")

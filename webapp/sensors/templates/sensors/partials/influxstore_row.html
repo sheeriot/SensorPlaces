@@ -20,9 +20,10 @@
                     <i class="bi bi-pencil-fill"></i>
                 </a>
                 <button type="button" class="btn btn-outline-danger delete-influx-store"
-                        data-url="{% url 'sensors:influxstore_delete' place_slug=place.slug pk=store.pk %}"
+                        hx-get="{% url 'sensors:influxstore_delete' place_slug=place.slug pk=store.pk %}"
+                        hx-target="#htmx-modal-content"
                         data-bs-toggle="modal"
-                        data-bs-target="#deleteInfluxStoreModal"
+                        data-bs-target="#htmx-modal"
                         title="Delete">
                     <i class="bi bi-trash-fill"></i>
                 </button>

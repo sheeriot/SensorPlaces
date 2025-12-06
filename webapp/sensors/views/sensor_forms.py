@@ -7,6 +7,7 @@ from crispy_forms.bootstrap import FormActions
 from ..models import Sensor, SensorType
 from ..models import InfluxStore
 from django.urls import reverse
+from django.core.exceptions import ValidationError
 
 
 class SensorTypeSelect(forms.Select):
@@ -516,3 +517,41 @@ class LoRaWANSensorForm(forms.ModelForm):
             HTML('<button type="submit" class="btn btn-primary">Save</button>'),
             HTML(f'<a class="btn btn-secondary" href="{cancel_url}">Cancel</a>')
         )
+
+
+class DeviceDeleteForm(forms.Form):
+    name_confirm = forms.CharField(
+        label="Confirm device name",
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.device_name = kwargs.pop('device_name', None)
+        super().__init__(*args, **kwargs)
+
+    def clean_name_confirm(self):
+        entered_name = self.cleaned_data.get('name_confirm')
+        if entered_name.lower() != self.device_name.lower():
+            raise ValidationError("The entered name does not match the device name.")
+        return entered_name
+
+
+class InfluxStoreDeleteForm(forms.Form):
+    name_confirm = forms.CharField(
+        label="Confirm InfluxDB Store name",
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.store_name = kwargs.pop('store_name', None)
+        super().__init__(*args, **kwargs)
+
+    def clean_name_confirm(self):
+        entered_name = self.cleaned_data.get('name_confirm')
+        if entered_name.lower() != self.store_name.lower():
+            raise ValidationError("The entered name does not match the store name.")
+        return entered_name

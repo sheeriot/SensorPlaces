@@ -59,7 +59,10 @@ urlpatterns = [
     path('<slug:place_slug>/', place_views.PlaceDetailView.as_view(), name='place_detail'),
     path('<slug:place_slug>/update/', place_views.PlaceUpdateView.as_view(), name='place_update'),
     path('<slug:place_slug>/delete/', place_views.PlaceDeleteView.as_view(), name='place_delete'),
+    path('<slug:place_slug>/map/', place_views.place_map_modal_view, name='place_map_modal'),
     path('<slug:place_slug>/siteplan/', place_views.siteplan_view, name='siteplan'),
+    path('<slug:place_slug>/siteplan/view-modal/', place_views.siteplan_view_modal, name='siteplan_view_modal'),
+    path('<slug:place_slug>/siteplan/edit-modal/', place_views.siteplan_editor_modal, name='siteplan_editor_modal'),
     path('<slug:place_slug>/siteplan/update/', place_views.siteplan_update, name='siteplan_update'),
 
     # SwitchBot Integration
@@ -123,7 +126,6 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:sensor_pk>/readings/', sensor_views.SensorReadingListView.as_view(), name='sensor_reading_list'),
 
     # API endpoints for sensor readings
-    path('api/<slug:place_slug>/sensor/<int:pk>/test-influx-read/', sensor_views.test_influx_connection, name='test_influx_read'),
     path('api/<slug:place_slug>/sensor/<int:pk>/test-influx-bucket/', sensor_views.test_influx_bucket_for_sensor, name='test_influx_bucket_for_sensor'),
     path('api/<slug:place_slug>/sensor/<int:pk>/update-graph-type/', sensor_views.update_graph_type, name='update_graph_type'),
     path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_views.sensor_readings_api, name='sensor_readings_api'),

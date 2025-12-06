@@ -28,12 +28,12 @@ from .switchbot_forms import SwitchBotInfluxStoreForm
 def switchbot_management_view(request, place_slug):
     place = get_object_or_404(Place, slug=place_slug)
     
-    ic("--- Checking SwitchBot Configuration ---")
-    ic(f"Place: {place.name}")
-    ic(f"Enabled: {place.switchbot_enable}")
-    ic(f"Token set: {bool(place.switchbot_token)}")
-    ic(f"Secret set: {bool(place.switchbot_secret)}")
-    ic("------------------------------------")
+    # ic("--- Checking SwitchBot Configuration ---")
+    # ic(f"Place: {place.name}")
+    # ic(f"Enabled: {place.switchbot_enable}")
+    # ic(f"Token set: {bool(place.switchbot_token)}")
+    # ic(f"Secret set: {bool(place.switchbot_secret)}")
+    # ic("------------------------------------")
 
     # Only redirect if the entire feature is disabled.
     if not place.switchbot_enable:

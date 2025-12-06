@@ -9,7 +9,9 @@
     {% include 'sensors/includes/switchbot_settings_card.html' %}
 
     {# Card 2: SwitchBot InfluxDB Store #}
-    {% include 'sensors/includes/switchbot_influxstore_card.html' %}
+    <div id="switchbot-influx-card">
+        {% include 'sensors/includes/switchbot_influxstore_card.html' %}
+    </div>
 
     {# Card 3: Device Sync #}
     <div class="card mb-3">

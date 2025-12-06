@@ -17,6 +17,12 @@
     <!-- Simple-DataTables CSS -->
     <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" type="text/css">
 
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- jQuery UI CSS (for draggable/resizable modals) -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+
     <!-- Flatpickr CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
@@ -177,9 +183,18 @@
 
     <!-- Generic Modal for HTMX content -->
     <div class="modal fade" id="htmx-modal" tabindex="-1" aria-labelledby="htmx-modal-label" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div id="htmx-modal-content" class="modal-content">
                 <!-- Content will be loaded here by HTMX -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Mapplan Draggable/Resizable Modal -->
+    <div class="modal fade" id="mapplan-modal" tabindex="-1" aria-labelledby="mapplan-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div id="mapplan-modal-content" class="modal-content">
+                <!-- Content will be loaded here -->
             </div>
         </div>
     </div>
@@ -215,6 +230,10 @@
 
     <!-- Core JavaScript Dependencies -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Third-party Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -233,56 +252,15 @@
     <script src="{% static 'sensors/js/time-display.js' %}?v={{ APP_VERSION }}"></script>
 
     <!-- Application Feature JavaScript -->
+    <script src="{% static 'sensors/js/place-map-popout.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/hide-inactive-handler.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/toggle-active-handler.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/modal-handlers.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/live-counts-updater.js' %}?v={{ APP_VERSION }}"></script>
+    <script src="{% static 'sensors/js/htmx-event-handler.js' %}?v={{ APP_VERSION }}"></script>
 
     {% block extra_js %}
     {% endblock %}
-
-    <script>
-    document.body.addEventListener('htmx:afterRequest', function(evt) {
-        const triggerHeader = evt.detail.xhr.getResponseHeader('HX-Trigger');
-        if (triggerHeader) {
-            try {
-                const triggers = JSON.parse(triggerHeader);
-                console.log("[Global HX-Trigger] Parsed triggers:", triggers);
-
-                if (triggers.closeModal) {
-                    const modalElement = document.querySelector(triggers.closeModal);
-                    if (modalElement) {
-                        const modal = bootstrap.Modal.getInstance(modalElement);
-                        if (modal) {
-                            console.log(`[Global HX-Trigger] Closing modal: ${triggers.closeModal}`);
-                            modal.hide();
-                        }
-                    }
-                }
-
-                if (triggers.showToast) {
-                    console.log(`[Global HX-Trigger] Calling window.toastSystem.show with message:`, triggers.showToast);
-                    if (window.toastSystem && typeof window.toastSystem.show === 'function') {
-                        window.toastSystem.show(triggers.showToast.message, triggers.showToast.type);
-                    } else {
-                        console.error('[Global HX-Trigger] window.toastSystem.show is not available.');
-                    }
-                }
-
-                // Handle simple string-based triggers for backward compatibility or other uses
-                Object.keys(triggers).forEach(key => {
-                    if (triggers[key] === true) {
-                        console.log(`[Global HX-Trigger] Triggering simple event: ${key}`);
-                        htmx.trigger('body', key, {});
-                    }
-                });
-
-            } catch (e) {
-                console.error("[Global HX-Trigger] Error parsing HX-Trigger header:", e);
-            }
-        }
-    });
-    </script>
 
     {% block debug_js %}
     {% endblock %}

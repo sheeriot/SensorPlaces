@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
+from django.views.generic import FormView
 
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.utils.decorators import method_decorator
@@ -11,6 +12,7 @@ from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseRedirect, HttpRequest, HttpResponse
+from django.contrib import messages
 
 from django.utils import timezone
 from django.utils.safestring import mark_safe
@@ -331,112 +333,24 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
 
         return context
 
-@login_required
-def test_influx_connection(request, place_slug, pk):
-    """
-    Tests the InfluxDB connection for a sensor in a two-stage process.
-    1. Tests the basic connection to the source.
-    2. If successful, tests the specific measurement for stats.
-    """
-    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
-    context = {
-        'sensor': sensor,
-        'test_name': 'Read Sensor Data'
-    }
-
-    if not sensor.influx_store:
-        context['error_message'] = "This sensor does not have an InfluxDB store configured."
-        return render(request, 'sensors/partials/_influx_test_results.html', context, status=400)
-
-    try:
-        from ..influx_client import get_influx_sensor_stats
-        
-        ic.enable()
-        start_time = time.perf_counter()
-        results = get_influx_sensor_stats(sensor)
-        ic(results)
-        end_time = time.perf_counter()
-        
-        context['query_time_ms'] = int((end_time - start_time) * 1000)
-        context['results'] = results
-        
-        if results.get('error'):
-            context['success'] = False
-            context['error_message'] = results.get('error')
-        elif results.get('latest_reading') is None:
-            context['success'] = True # The query succeeded, but found no data
-            context['message'] = "Query successful, but no records were found."
-        else:
-            context['success'] = True
-            context['message'] = "Successfully queried sensor statistics."
-
-    except Exception as e:
-        ic(f"Error during InfluxDB test for sensor {sensor.pk}: {e}")
-        context['success'] = False
-        context['error_message'] = f"An unexpected error occurred: {e}"
-    finally:
-        ic.disable()
-
-    return render(request, 'sensors/partials/_influx_test_results.html', context)
-
 
 @login_required
 @require_POST
 def test_influx_write(request, place_slug, pk):
+    """
+    This test is designed to verify write permissions on the InfluxDB bucket
+    associated with a sensor's InfluxStore.
+    """
     sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
-    context = {}
+    
+    if not sensor.influx_store:
+        return render(request, 'sensors/partials/_influx_test_results.html', {
+            'success': False,
+            'test_name': 'Write/Read Test',
+            'message': "This sensor does not have an InfluxDB store configured."
+        })
 
-    if not sensor.device.is_switchbot:
-        context['success'] = False
-        context['message'] = "This write test is only applicable to SwitchBot sensors."
-        return render(request, 'sensors/partials/_influx_write_test_results.html', context)
-
-    try:
-        # 1. Get a live reading from the API. This function also writes it to InfluxDB.
-        service = get_switchbot_service_from_place(sensor.device.location.place)
-        live_value = service.get_live_reading_for_sensor(sensor, force_refresh=True)
-
-        if live_value is None:
-            raise Exception("Failed to retrieve a live value from the SwitchBot API.")
-
-        ic(f"WRITE_TEST: Got live value '{live_value}' from API, which should have been written to InfluxDB.")
-
-        # Give InfluxDB a moment to process the write
-        time.sleep(2)
-
-        # 2. Read the latest value back from InfluxDB to verify.
-        latest_reading = get_latest_influx_reading(sensor)
-
-        if not latest_reading:
-            raise Exception("Could not find any records in InfluxDB after write.")
-
-        read_value = latest_reading.get('value')
-        read_time = latest_reading.get('time')
-
-        # 3. Compare the values
-        # Using a small tolerance for float comparison
-        values_match = abs(read_value - live_value) < 1e-9
-
-        # Check if the reading is very recent (e.g., within the last 30 seconds)
-        time_is_recent = (datetime.now(timezone.utc) - read_time) < timedelta(seconds=30)
-
-        if values_match and time_is_recent:
-            context['success'] = True
-            context['message'] = f"Success! Wrote live value {live_value} and read it back from InfluxDB."
-        else:
-            error_msg = (
-                f"Verification failed. "
-                f"Wrote: {live_value}, Read: {read_value}. "
-                f"Timestamp: {read_time.strftime('%Y-%m-%d %H:%M:%S %Z')}."
-            )
-            raise Exception(error_msg)
-
-    except Exception as e:
-        ic(f"Error during InfluxDB write test for sensor {sensor.pk}: {e}")
-        context['success'] = False
-        context['message'] = f"An unexpected error occurred during the write test: {e}"
-
-    return render(request, 'sensors/partials/_influx_write_test_results.html', context)
+    return influx_views.influxstore_test(request, place_slug=place_slug, pk=sensor.influx_store.pk, test_type_override='write')
 
 
 class SensorLiveValueView(LoginRequiredMixin, View):
@@ -1021,6 +935,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
             'place_slug': self._place.slug,
             'pk': device.pk
         })
+
 
 class SensorReadingListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
     model = SensorReading
@@ -1633,7 +1548,7 @@ def test_influx_bucket_for_sensor(request, place_slug, pk):
     )
 
     return render(request, 'sensors/partials/_influx_test_results.html', 
-                  {'success': success, 'message': message, 'query_time_ms': query_time_ms, 'test_name': 'Bucket Connection'})
+                  {'success': success, 'message': message, 'query_time_ms': query_time_ms, 'test_name': 'Bucket Read Test'})
 
 
 @login_required

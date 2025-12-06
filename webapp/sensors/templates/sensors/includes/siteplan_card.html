@@ -10,11 +10,22 @@
         </h5>
         <div class="ms-auto d-flex align-items-center">
             {% if editable %}
-            <button id="siteplan-edit" class="btn btn-sm btn-outline-primary me-2">
+            <button id="siteplan-edit"
+                    class="btn btn-sm btn-outline-primary me-2"
+                    data-bs-toggle="modal"
+                    data-bs-target="#mapplan-modal"
+                    hx-get="{% url 'sensors:siteplan_editor_modal' place.slug %}"
+                    hx-target="#mapplan-modal-content">
                 <i class="bi bi-grid"></i> Edit
             </button>
             {% endif %}
-            <a href="#" class="btn btn-sm btn-outline-secondary p-1" data-bs-toggle="modal" data-bs-target="#siteplan-view-modal" title="View Fullscreen">
+            <a href="#"
+               class="btn btn-sm btn-outline-secondary p-1"
+               data-bs-toggle="modal"
+               data-bs-target="#mapplan-modal"
+               hx-get="{% url 'sensors:siteplan_view_modal' place.slug %}"
+               hx-target="#mapplan-modal-content"
+               title="View Fullscreen">
                 <i class="bi bi-arrows-fullscreen"></i>
             </a>
         </div>
@@ -22,11 +33,11 @@
     {% if place.siteplan_image %}
     <div class="card-body p-0">
         <div class="siteplan-wrapper bg-light border-top">
-            <div id="siteplan-container"
+            <div id="siteplan-container-main"
                  data-place-slug="{{ place.slug }}"
-                 data-image-url="{{ place.get_siteplan_url }}"
-                 data-locations="{{ locations_json|escapejs }}">
+                 data-image-url="{{ place.get_siteplan_url }}">
             </div>
+            {{ locations_json|json_script:"locations-data-main" }}
         </div>
     </div>
     {% else %}
@@ -34,27 +45,4 @@
         <p class="mb-0">No site plan image available</p>
     </div>
     {% endif %}
-</div>
-
-<!-- Siteplan View Modal -->
-<div class="modal fade" id="siteplan-view-modal" tabindex="-1" aria-labelledby="siteplan-view-modal-label" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="siteplan-view-modal-label">{{ place.name }} Site Plan</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0">
-                <!-- The map container will be moved here by JavaScript -->
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Siteplan Editor Modal -->
-<div class="modal fade" id="siteplan-editor" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
-            {% include "sensors/includes/siteplan_editor.html" %}
-        </div>
-    </div>
 </div>
