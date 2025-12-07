@@ -342,6 +342,21 @@ class LiveValueFetcher {
             html = `<span class="badge bg-danger-subtle text-danger-emphasis rounded-1" title="${errorMessage}">Error</span>`;
         }
         container.innerHTML = html;
+
+        if (sensorData && sensorData.status === 'success') {
+            const pk = container.dataset.sensorPk;
+            const wrapper = document.getElementById(`sensor-live-details-wrapper-${pk}`);
+
+            if (wrapper) {
+                const timeElements = wrapper.querySelectorAll('.updatable-naturaltime');
+                if (timeElements.length > 0 && sensorData.timestamp) {
+                    timeElements[0].dataset.timestamp = sensorData.timestamp;
+                }
+                if (timeElements.length > 1 && sensorData.last_checked_timestamp) {
+                    timeElements[1].dataset.timestamp = sensorData.last_checked_timestamp;
+                }
+            }
+        }
     }
 
     renderErrorForContainer(container, errorMessage) {

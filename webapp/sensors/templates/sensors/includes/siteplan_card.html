@@ -1,48 +1,56 @@
 {% load static %}
 
-<!-- Siteplan Card -->
-<div id="siteplan-card"
-     class="card my-1 {% if not place.is_active %}opacity-50 text-muted{% endif %}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0 text-nowrap">
-            <i class="bi bi-map me-2"></i>
-            Site Plan
-        </h5>
-        <div class="ms-auto d-flex align-items-center">
-            {% if editable %}
-            <button id="siteplan-edit"
-                    class="btn btn-sm btn-outline-primary me-2"
-                    data-bs-toggle="modal"
-                    data-bs-target="#mapplan-modal"
-                    hx-get="{% url 'sensors:siteplan_editor_modal' place.slug %}"
-                    hx-target="#mapplan-modal-content">
-                <i class="bi bi-grid"></i> Edit
-            </button>
-            {% endif %}
-            <a href="#"
-               class="btn btn-sm btn-outline-secondary p-1"
-               data-bs-toggle="modal"
-               data-bs-target="#mapplan-modal"
-               hx-get="{% url 'sensors:siteplan_view_modal' place.slug %}"
-               hx-target="#mapplan-modal-content"
-               title="View Fullscreen">
-                <i class="bi bi-arrows-fullscreen"></i>
+{% if place.siteplan_image %}
+    <!-- Siteplan Card -->
+    <div id="siteplan-card"
+        class="card my-1 {% if not place.is_active %}opacity-50 text-muted{% endif %}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 text-nowrap">
+                <i class="bi bi-map me-2"></i>
+                Site Plan
+            </h5>
+            <div class="ms-auto d-flex align-items-center">
+                {% if editable %}
+                <button id="siteplan-edit"
+                        class="btn btn-sm btn-outline-primary me-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#mapplan-modal"
+                        hx-get="{% url 'sensors:siteplan_editor_modal' place.slug %}"
+                        hx-target="#mapplan-modal-content">
+                    <i class="bi bi-grid"></i> Edit
+                </button>
+                {% endif %}
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary p-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#mapplan-modal"
+                        hx-get="{% url 'sensors:siteplan_view_modal' place.slug %}"
+                        hx-target="#mapplan-modal-content"
+                        title="View Fullscreen"
+                        aria-label="View Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="siteplan-wrapper bg-light border-top">
+                <div id="siteplan-container-main"
+                    data-place-slug="{{ place.slug }}"
+                    data-image-url="{{ place.get_siteplan_url }}">
+                </div>
+                {{ locations_json|json_script:"locations-data-main" }}
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="card my-1">
+        <div class="card-body text-center">
+            <h5 class="card-title">No Site Plan Available</h5>
+            <p class="card-text">Upload a site plan to visualize your sensor locations.</p>
+            <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-primary">
+                <i class="bi bi-upload"></i> Upload Site Plan
             </a>
         </div>
     </div>
-    {% if place.siteplan_image %}
-    <div class="card-body p-0">
-        <div class="siteplan-wrapper bg-light border-top">
-            <div id="siteplan-container-main"
-                 data-place-slug="{{ place.slug }}"
-                 data-image-url="{{ place.get_siteplan_url }}">
-            </div>
-            {{ locations_json|json_script:"locations-data-main" }}
-        </div>
-    </div>
-    {% else %}
-    <div class="card-body text-center text-muted">
-        <p class="mb-0">No site plan image available</p>
-    </div>
-    {% endif %}
-</div>
+{% endif %}

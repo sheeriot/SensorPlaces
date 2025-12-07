@@ -28,24 +28,15 @@
         <!-- Actions -->
         <div class="col-3 text-end">
             <div class="btn-group btn-group-sm">
-                {% if device.location.slug == 'unassigned-devices' %}
-                <button type="button" class="btn btn-sm btn-outline-primary move-device"
-                        hx-get="{% url 'sensors:device_move_location' place_slug=device.location.place.slug pk=device.pk %}"
-                        hx-target="#modal-content"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modal-container"
-                        title="Move Device">
-                    <i class="bi bi-box-arrow-in-up-right"></i>
-                </button>
-                {% endif %}
+                {% include 'sensors/partials/move_device_button.html' with device=device %}
                 <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug pk=device.pk %}?next={{ absolute_url|urlencode }}" class="btn btn-sm border-dark btn-outline-warning">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-device"
                         hx-get="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}"
-                        hx-target="#modal-content"
+                        hx-target="#htmx-modal-content"
                         data-bs-toggle="modal"
-                        data-bs-target="#modal-container"
+                        data-bs-target="#htmx-modal"
                         title="Delete">
                     <i class="bi bi-trash-fill"></i>
                 </button>

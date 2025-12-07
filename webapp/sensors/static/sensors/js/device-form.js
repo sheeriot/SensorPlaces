@@ -29,6 +29,17 @@ const deviceFormManager = {
                     label.textContent = isChecked ? 'Active' : 'inactive';
                     if (this.config.debug) console.log(`[DeviceForm] Label updated to "${label.textContent}"`);
                 }
+
+                // If the user manually changes the checkbox, they are in control.
+                // Clear any dynamic help text that was added and set the interaction flag.
+                const helpTextContainer = deviceForm.querySelector('[data-help-text-container]');
+                if (helpTextContainer) {
+                    helpTextContainer.innerHTML = '';
+                    helpTextContainer.classList.add('d-none');
+                    if (this.config.debug) console.log('[DeviceForm] User manually changed active state. Hiding dynamic help text.');
+                }
+                event.currentTarget.dataset.userInteracted = 'true';
+                if (this.config.debug) console.log('[DeviceForm] Setting userInteracted flag.');
             });
         }
 
@@ -58,7 +69,7 @@ const deviceFormManager = {
             locationSelect.dataset[`isactive-${id}`] = 'true';
             locationSelect.dataset[`locationname-${id}`] = name;
             locationSelect.dataset[`locationslug-${id}`] = slug;
-            
+
             // Create a new option and add it to the top of the list
             const option = new Option(`${name} (new)`, id, true, true);
             locationSelect.add(option, locationSelect.options[0]);
@@ -109,20 +120,50 @@ const deviceFormManager = {
             if (locationIsActive) {
                 if (this.config.debug) console.log('[DeviceForm] UI UPDATE: Location is ACTIVE. Enabling checkbox.');
                 activeCheckbox.disabled = false;
-                activeCheckbox.checked = true;
-                if (activeCheckboxLabel) activeCheckboxLabel.textContent = 'Active';
-                container.classList.remove('opacity-50');
-                helpTextContainer.classList.add('d-none');
-                helpTextContainer.innerHTML = '';
+                if (container) container.classList.remove('opacity-50');
+
+                const userHasInteracted = activeCheckbox.dataset.userInteracted === 'true';
+
+                if (userHasInteracted) {
+                    if (this.config.debug) console.log('[DeviceForm] User has manually interacted, preserving checkbox state.');
+                    if (helpTextContainer) {
+                        helpTextContainer.innerHTML = '';
+                        helpTextContainer.classList.add('d-none');
+                    }
+                } else {
+                    // If device was inactive and user hasn't intervened, auto-activate it.
+                    if (!activeCheckbox.checked) {
+                        activeCheckbox.checked = true;
+                         if (helpTextContainer) {
+                            const reason = `<div class="form-text text-success-emphasis"><i class="bi bi-info-circle me-2"></i>This device will be set to <strong>Active</strong> to match the location.</div>`;
+                            helpTextContainer.innerHTML = reason;
+                            helpTextContainer.classList.remove('d-none');
+                        }
+                    } else {
+                         if (helpTextContainer) {
+                            helpTextContainer.classList.add('d-none');
+                            helpTextContainer.innerHTML = '';
+                        }
+                    }
+                }
             } else {
                 if (this.config.debug) console.log('[DeviceForm] UI UPDATE: Location is INACTIVE. Disabling checkbox.');
                 activeCheckbox.disabled = true;
                 activeCheckbox.checked = false;
-                if (activeCheckboxLabel) activeCheckboxLabel.textContent = 'inactive';
-                container.classList.add('opacity-50');
+                if (container) container.classList.add('opacity-50');
                 const reason = `<div class="form-text text-warning-emphasis"><i class="bi bi-exclamation-triangle me-2"></i>This device will be inactive because Location "${locationName}" is inactive.</div>`;
-                helpTextContainer.innerHTML = reason;
-                helpTextContainer.classList.remove('d-none');
+                if (helpTextContainer) {
+                    helpTextContainer.innerHTML = reason;
+                    helpTextContainer.classList.remove('d-none');
+                }
+                // Reset the interaction flag since the user's choice is being overridden.
+                delete activeCheckbox.dataset.userInteracted;
+                if (this.config.debug) console.log('[DeviceForm] Location is inactive, removing userInteracted flag.');
+            }
+
+            // Sync label with the final state of the checkbox
+            if (activeCheckboxLabel) {
+                activeCheckboxLabel.textContent = activeCheckbox.checked ? 'Active' : 'inactive';
             }
 
             // Update Breadcrumb

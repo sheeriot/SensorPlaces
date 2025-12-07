@@ -12,7 +12,7 @@ class DeviceForm(forms.ModelForm):
 
     class Meta:
         model = Device
-        fields = ['name', 'is_active', 'is_lorawan', 'location', 'device_type', 'manufacturer', 'model', 'device_id', 'notes']
+        fields = ['name', 'is_active', 'scrape_data', 'is_lorawan', 'location', 'device_type', 'manufacturer', 'model', 'device_id', 'notes']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter device name'}),
             'manufacturer': forms.TextInput(attrs={'placeholder': 'Enter manufacturer'}),
@@ -24,8 +24,16 @@ class DeviceForm(forms.ModelForm):
                 'data-active-label': 'Active',
                 'data-inactive-label': 'inactive',
                 'style': 'margin-top: 0.1rem;'
-            })
+            }),
+            'scrape_data': forms.CheckboxInput(attrs={'class': 'form-check-input'})
         }
+        labels = {
+            'scrape_data': 'Scrape on next contact'
+        }
+        help_texts = {
+            'scrape_data': 'If checked, the next full data payload received from this device will be stored in Extra Data.'
+        }
+
 
     def __init__(self, *args, **kwargs):
         # Pop parameters from FormDataMixin that we don't use
@@ -138,7 +146,9 @@ class DeviceForm(forms.ModelForm):
                         Field('is_active'),
                         css_class='is-active-container form-check form-switch pt-4'
                     ),
-                    css_class='col-md-4 d-flex align-items-center'
+                    # This empty div is the target for our JS to inject help text
+                    Div(css_class="form-text", data_help_text_container=""),
+                    css_class='col-md-4 d-flex flex-column align-items-start'
                 ),
                 css_class='mb-3'
             ),
@@ -174,6 +184,13 @@ class DeviceForm(forms.ModelForm):
                 css_class='mb-3'
             ),
             'notes',
+            Row(
+                Column(
+                    Field('scrape_data', wrapper_class='form-check form-switch'),
+                    css_class='col-md-12'
+                ),
+                css_class='mb-3'
+            ),
             HTML('<hr>'),
             Div(
                 HTML(f"""

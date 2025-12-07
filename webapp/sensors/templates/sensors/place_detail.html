@@ -30,20 +30,8 @@
 
     <!-- Right Column: Locations and Site Plan/Map -->
     <div class="col-md-8 {% if not place.is_active %}opacity-50{% endif %}">
-        <!-- Site Plan Card -->
-        {% if place.siteplan_image %}
-            {% include "sensors/includes/siteplan_card.html" with editable=True place=place %}
-        {% else %}
-            <div class="card my-1">
-                <div class="card-body text-center">
-                    <h5 class="card-title">No Site Plan Available</h5>
-                    <p class="card-text">Upload a site plan to visualize your sensor locations.</p>
-                    <a href="{% url 'sensors:place_update' place_slug=place.slug %}" class="btn btn-primary">
-                        <i class="bi bi-upload"></i> Upload Site Plan
-                    </a>
-                </div>
-            </div>
-        {% endif %}
+        {# include "sensors/includes/siteplan_card.html" with editable=True #}
+
         <!-- Device List Card -->
         {% include "sensors/includes/device_list_card.html" with object_list=locations %}
         <!-- Unassigned Devices Card -->
@@ -57,7 +45,7 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="{% static 'sensors/js/siteplan-view.js' %}?v={{ APP_VERSION }}"></script>
-<script src="{% static 'sensors/js/siteplan-editor.js' %}?v={{ APP_VERSION }}"></script>
+<!-- <script src="{% static 'sensors/js/siteplan-view.js' %}?v={{ APP_VERSION }}"></script> -->
+<!-- <script src="{% static 'sensors/js/siteplan-editor.js' %}?v={{ APP_VERSION }}"></script> -->
 <script src="{% static 'sensors/js/device-move.js' %}?v={{ APP_VERSION }}"></script>
 {% endblock %}

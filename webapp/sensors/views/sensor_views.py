@@ -33,7 +33,7 @@ from ..influx_client import (
 )
 from .utils import get_switchbot_service_from_place
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 
 from django.template.loader import render_to_string
 
@@ -61,7 +61,7 @@ class SensorDetailCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView)
             self.template_name = 'sensors/partials/_sensor_influx_card_body.html'
         else:
             self.template_name = 'sensors/includes/sensor_detail_card.html'
-        
+
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -342,7 +342,7 @@ def test_influx_write(request, place_slug, pk):
     associated with a sensor's InfluxStore.
     """
     sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
-    
+
     if not sensor.influx_store:
         return render(request, 'sensors/partials/_influx_test_results.html', {
             'success': False,
@@ -361,18 +361,18 @@ class SensorLiveValueView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         place_slug = kwargs.get('place_slug')
         pks_str = request.GET.get('pks', '')
-        
+
         if pks_str:
             # Handle multiple PKs from query parameter
             pks = [int(pk) for pk in pks_str.split(',') if pk.isdigit()]
             sensors = Sensor.objects.filter(pk__in=pks, device__location__place__slug=place_slug)
-            
+
             payload = {}
             for sensor in sensors:
                 try:
                     update_sensor_live_value(sensor)
                     sensor.refresh_from_db(fields=['cached_reading_value', 'cached_reading_timestamp'])
-                    
+
                     if sensor.cached_reading_timestamp:
                         payload[sensor.pk] = {
                             'status': 'success',
@@ -391,7 +391,7 @@ class SensorLiveValueView(LoginRequiredMixin, View):
             for pk in pks:
                 if pk not in found_pks:
                     payload[pk] = {'status': 'error', 'message': 'Sensor not found or access denied.'}
-            
+
             return JsonResponse({'status': 'success', 'payload': payload})
 
         else:
@@ -734,7 +734,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             'place': self._place,
             'device': self._device,
         })
-        
+
         # Explicitly set the initial data_type for the form
         if self.object and hasattr(self.object, 'data_type'):
             initial = kwargs.get('initial', {})
@@ -1482,7 +1482,7 @@ class SensorInfluxUpdateView(LoginRequiredMixin, ReferrerMixin, PlaceAnnotationM
 
     def form_valid(self, form):
         ic(f"Updating Influx config for sensor: {self.object.name} ({self.object.pk})")
-        
+
         if not form.has_changed():
             response = HttpResponse(status=204)
             trigger_events = {
@@ -1504,7 +1504,7 @@ class SensorInfluxUpdateView(LoginRequiredMixin, ReferrerMixin, PlaceAnnotationM
             if isinstance(new_value, models.Model):
                 new_value = str(new_value)
             changes_list.append(f"<b>{field_name.replace('_', ' ').title()}</b>: '{old_value}' → '{new_value}'")
-        
+
         toast_message = f"Updated Influx Config:<br><small>{'<br>'.join(changes_list)}</small>"
 
         # Save only the changed fields
@@ -1536,7 +1536,7 @@ def test_influx_bucket_for_sensor(request, place_slug, pk):
     sensor = get_object_or_404(Sensor, pk=pk, device__location__place=place)
 
     if not sensor.influx_store:
-        return render(request, 'sensors/partials/_influx_test_results.html', 
+        return render(request, 'sensors/partials/_influx_test_results.html',
                       {'error_message': 'Sensor has no InfluxDB Store configured.'})
 
     store = sensor.influx_store
@@ -1547,7 +1547,7 @@ def test_influx_bucket_for_sensor(request, place_slug, pk):
         bucket_name=store.bucket_name
     )
 
-    return render(request, 'sensors/partials/_influx_test_results.html', 
+    return render(request, 'sensors/partials/_influx_test_results.html',
                   {'success': success, 'message': message, 'query_time_ms': query_time_ms, 'test_name': 'Bucket Read Test'})
 
 

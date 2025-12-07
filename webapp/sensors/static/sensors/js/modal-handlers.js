@@ -64,12 +64,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Force cleanup of any lingering backdrops and body styles.
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                backdrops.forEach(backdrop => backdrop.remove());
-
-                document.body.classList.remove('modal-open');
-                document.body.style.overflow = '';
-                document.body.style.paddingRight = '';
+                // This is often too aggressive and can cause issues if another modal
+                // is still active or being animated. Bootstrap should handle this.
+                // const backdrops = document.querySelectorAll('.modal-backdrop');
+                // backdrops.forEach(backdrop => backdrop.remove());
+                //
+                // document.body.classList.remove('modal-open');
+                // document.body.style.overflow = '';
+                // document.body.style.paddingRight = '';
             });
         } else {
             if (scriptConfig.debug) console.error('[ModalLifecycle] Could not find #htmx-modal to attach listener.');
@@ -137,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // When the modal is shown, ensure it's brought to the front and focused.
             modal.on('shown.bs.modal', function() {
                 if (scriptConfig.debug) console.log('[MapplanModal] #mapplan-modal shown.bs.modal event triggered.');
-                
+
                 const zIndex = 1050;
                 $(this).css('z-index', zIndex);
 

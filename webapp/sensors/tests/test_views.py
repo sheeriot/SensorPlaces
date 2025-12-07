@@ -2,11 +2,19 @@ from django.test import TestCase, Client
 import inspect
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from sensors.models import Place, Location, Device, Sensor, DeviceType, SensorType, Unit
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+
+from sensors.models import Place, Location, Device, Sensor, DeviceType, SensorType, Unit, InfluxStore
 # from django.core.files.uploadedfile import SimpleUploadedFile
 import json
 import os
 from .test_utils import skip_unless_beta
+from sensors.views.device_forms import DeviceForm
+from sensors.views.location_forms import LocationForm
+from sensors.views.sensor_forms import SensorForm
+from sensors.views.place_forms import PlaceForm
 
 
 class SensorsViewTestCase(TestCase):
@@ -394,16 +402,42 @@ class SensorsViewTestCase(TestCase):
         print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_device_delete_view(self):
-        """Test DeviceDeleteView displays correctly"""
-        response = self.client.get(
-            reverse('sensors:device_delete', kwargs={
-                'place_slug': self.place.slug,
-                'pk': self.device.pk
-            })
+        """Test DeviceDeleteView displays correctly for both standard and HTMX requests."""
+        device = Device.objects.create(name="Device to Delete", location=self.location, device_type=self.device_type)
+
+        # Test standard GET request
+        response_std = self.client.get(reverse('sensors:device_delete', kwargs={'place_slug': self.place.slug, 'pk': device.pk}))
+        self.assertEqual(response_std.status_code, 200)
+        self.assertTemplateUsed(response_std, 'sensors/device_confirm_delete.html')
+
+        # Test HTMX GET request
+        response_htmx = self.client.get(reverse('sensors:device_delete', kwargs={'place_slug': self.place.slug, 'pk': device.pk}), HTTP_HX_REQUEST='true')
+        self.assertEqual(response_htmx.status_code, 200)
+        # Check that the main modal partial is in the list of templates used
+        self.assertIn('sensors/partials/device_confirm_delete_modal.html', [t.name for t in response_htmx.templates])
+
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
+
+    def test_device_delete_post(self):
+        """Test DeviceDeleteView handles POST correctly"""
+        device = Device.objects.create(name="Device to Delete", location=self.location, device_type=self.device_type)
+        device_count_before = Device.objects.count()
+
+        # Simulate a standard form POST (no HTMX header)
+        response = self.client.post(
+            reverse('sensors:device_delete', kwargs={'place_slug': self.place.slug, 'pk': device.pk}),
+            {'confirmation_name': device.name}  # Add confirmation name to make form valid
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'sensors/device_confirm_delete.html')
-        self.assertContains(response, 'Delete Device')
+
+        self.assertEqual(response.status_code, 302)  # Redirect after successful deletion
+        self.assertEqual(Device.objects.count(), device_count_before - 1)
+        with self.assertRaises(Device.DoesNotExist):
+            Device.objects.get(pk=device.pk)
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     # Sensor View Tests
     def test_sensor_create_view(self):
