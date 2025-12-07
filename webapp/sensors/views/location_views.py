@@ -104,6 +104,7 @@ class LocationDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
             Lower('name')
         )
 
+        context['locations'] = [detailed_location]
         context['object_list'] = [detailed_location]
         context['unassigned_devices'] = [] # No unassigned devices in this context
 

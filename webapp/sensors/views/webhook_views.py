@@ -145,26 +145,21 @@ class ShellyWebhookReceiverView(View):
 
         data = request.GET
 
+        # The device_id from the URL has priority, but the service will still need the one from the payload.
         if not device_id:
             device_id = data.get('id')
-            if device_id and settings.WEBHOOK_SNIFFER:
-                from icecream import ic
-                ic(f"WEBHOOK: Shelly Gen1 Request | Place: {place_slug} | Device: {device_id}")
 
-        if not device_id:
-            if not data:
-                # Silently ignore empty requests (heartbeats/probes)
-                return HttpResponse("No data received", status=200)
-
+        # Initialize the ShellyService.
+        shelly_service = ShellyService(place=place)
+        try:
+            shelly_service.process_data(device_id, data, request)
+        except ValueError as e:
+            # This will catch the case where no ID is found at all.
             if settings.WEBHOOK_SNIFFER:
                 from icecream import ic
                 ic(f"WEBHOOK: Shelly Request Missing ID | Place: {place_slug} | Params: {data}")
-            return JsonResponse({'status': 'error', 'message': 'No device identifier found in GET request.'}, status=400)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-        # Initialize the ShellyService with the place. The service will find the default InfluxStore.
-        shelly_service = ShellyService(place=place)
-        service = shelly_service
-        service.process_data(device_id, data)
         return JsonResponse({'status': 'success'})
 
     def post(self, request: HttpRequest, place_slug: str, device_id: str = None) -> HttpResponse:
@@ -190,9 +185,11 @@ class ShellyWebhookReceiverView(View):
         # If 'params' key exists, use it. Otherwise, assume data is at the root.
         params = data.get('params', data)
 
-        # Initialize the ShellyService with the place. The service will find the default InfluxStore.
+        # Initialize the ShellyService.
         shelly_service = ShellyService(place=place)
-        service = shelly_service
-        service.process_data(device_id, params)
+        try:
+            shelly_service.process_data(device_id, params, request)
+        except ValueError as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
         return JsonResponse({'status': 'success'})

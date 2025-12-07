@@ -4,7 +4,7 @@ from sensors.views.place_forms import PlaceForm, PlaceDeleteForm
 from sensors.views.location_forms import LocationForm
 from sensors.views.device_forms import DeviceForm
 from sensors.views.sensor_forms import SensorForm
-from sensors.views.influx_store_forms import InfluxStoreForm
+from sensors.views.influx_forms import InfluxStoreForm
 from sensors.models import Place, Location, Device, Sensor, DeviceType, InfluxStore, SensorType, Unit
 from django.test import Client
 from django.urls import reverse
@@ -507,12 +507,13 @@ class SensorFormTest(TestCase):
         print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_influx_fields_required(self):
-        """Test that InfluxDB fields are required when data_type is INFLUX"""
+        """Test that InfluxDB fields are NOT required on the main sensor form."""
         # Ensure standard types exist
         st, _ = SensorType.objects.get_or_create(pk=1, defaults={'name': 'Temperature'})
         u, _ = Unit.objects.get_or_create(pk=1, defaults={'name': 'Celsius', 'symbol': 'C'})
 
-        # Form with data_type=INFLUX but missing influx_store and influx_measurement should be invalid
+        # Form with data_type=INFLUX but missing influx_store and influx_measurement should STILL be valid
+        # as these are handled in a separate form.
         form_data = {
             'name': 'New Test Sensor',
             'device': self.device.pk,
@@ -524,11 +525,11 @@ class SensorFormTest(TestCase):
         }
 
         form = SensorForm(data=form_data, device=self.device)
-        self.assertFalse(form.is_valid())
-        self.assertIn('influx_store', form.errors)
-        self.assertIn('influx_measurement', form.errors)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertNotIn('influx_store', form.errors)
+        self.assertNotIn('influx_measurement', form.errors)
 
-        # Form with data_type=INFLUX and all required fields should be valid
+        # Form with data_type=INFLUX and all required fields should also be valid
         form_data = {
             'name': 'New Test Sensor',
             'device': self.device.pk,
@@ -617,19 +618,22 @@ class InfluxStoreFormTest(TestCase):
         form_data = {
             'place': self.place.id,
             'name': 'Test Influx Store',
-            'url': 'http://influx:8086',
+            'url': 'http://influx.example.com:8086',
             'org': 'test-org',
             'bucket_name': 'test-bucket',
             'token': 'test-token',
         }
         form = InfluxStoreForm(data=form_data)
-        self.assertTrue(form.is_valid())
+        self.assertTrue(form.is_valid(), form.errors)
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
     def test_duplicate_name_invalid(self):
         InfluxStore.objects.create(
             place=self.place,
             name='Test Influx Store',
-            url='http://influx:8086',
+            url='http://influx.example.com:8086',
             org='test-org',
             bucket_name='test-bucket',
             token='test-token'
@@ -637,14 +641,17 @@ class InfluxStoreFormTest(TestCase):
         form_data = {
             'place': self.place.id,
             'name': 'Test Influx Store',
-            'url': 'http://influx2:8086',
+            'url': 'http://influx2.example.com:8086',
             'org': 'test-org2',
             'bucket_name': 'test-bucket2',
             'token': 'test-token2',
         }
         form = InfluxStoreForm(data=form_data)
         self.assertFalse(form.is_valid())
-        self.assertIn('name', form.errors)
+        self.assertIn('__all__', form.errors)
+        method = getattr(self, self._testMethodName)
+        _, start_line = inspect.getsourcelines(method)
+        print(f"==>> {self.__class__.__name__}: {self._testMethodName} (line {start_line}) -> PASS")
 
 
 class ToastMessageTestCase(TestCase):

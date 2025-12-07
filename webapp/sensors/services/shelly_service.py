@@ -1,4 +1,5 @@
 import logging
+import re
 from collections import defaultdict
 from django.conf import settings
 from django.utils.text import slugify
@@ -8,95 +9,296 @@ from sensors.influx_client import write_to_influx
 from icecream import ic
 from sensors.utils import record_webhook_activity
 from sensors.services.measurement_utils import get_influx_details
+from django.http import HttpRequest
+from django.utils import timezone
+from django.db import transaction
+
 
 logger = logging.getLogger(__name__)
 
+
+# Map of known Shelly model identifiers to a canonical name and device type hint.
+# Keys can be model names from User-Agent or prefixes from webhook URLs.
+# All keys should be lowercase.
+SHELLY_PRODUCT_MAP = {
+    # Official Model IDs (from User-Agent)
+    'shht-1': {'model': 'H&T G1', 'device_type': 'Data Logger'},
+    'shwt-1': {'model': 'Flood G1', 'device_type': 'Water Detector'},
+    'htg3': {'model': 'H&T G3', 'device_type': 'Data Logger'},
+    'mini1pmg4': {'model': '1PM Mini G4', 'device_type': 'Power Control'},
+
+
+    # # Common URL prefixes
+    # 'shellyht': {'model': 'H&T G1', 'device_type': 'Data Logger'},
+    # 'shellyflood': {'model': 'Flood G1', 'device_type': 'Water Detector'},
+
+    # # Fallbacks or other observed values
+    # 'shelly-plus-ht': {'model': 'Shelly H&T G3 (HTG3)', 'device_type': 'Data Logger'},
+}
+
+
+def _is_mac_address(s: str) -> bool:
+    """Checks if a string is a 6 or 12-character hex string."""
+    if not isinstance(s, str):
+        return False
+    return len(s) in (6, 12) and all(c in '0123456789abcdefABCDEF' for c in s)
+
+
 class ShellyService:
-    def __init__(self, place: Place, influx_store: InfluxStore = None):
+    def __init__(self, place: Place, influx_store: InfluxStore = None, request: HttpRequest = None):
         self.place = place
         # Use provided influx_store or fall back to the place's default
         self.influx_store = influx_store or place.default_influx_store
+        self.request = request
 
         if not self.influx_store:
              ic(f"No default InfluxDB store configured for Place: {place.name}")
 
-    def process_data(self, device_id: str, data: dict):
+    def _extract_scrape_metadata(self, request: HttpRequest, params: dict) -> dict:
+        """
+        Extracts and returns a clean dictionary of metadata from the request
+        and data payload, excluding sensor readings.
+        """
+        metadata = {}
+        if not request:
+            return metadata
+
+        # Capture the full request URL and headers
+        metadata['request_url'] = request.build_absolute_uri()
+        metadata['request_headers'] = {k: v for k, v in request.headers.items()}
+
+        # Get client IP from X-Forwarded-For header, fallback to REMOTE_ADDR
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            metadata['client_ip'] = x_forwarded_for.split(',')[0].strip()
+        else:
+            metadata['client_ip'] = request.META.get('REMOTE_ADDR')
+
+        # Parse User-Agent for model and firmware
+        metadata['model_name'] = None
+        metadata['firmware_version'] = None
+        user_agent = request.headers.get('User-Agent')
+        if user_agent:
+            if user_agent.startswith('Shelly/'):
+                # Gen1 format: 'Shelly/20231107-162243/v1.14.1-rc1-g0617c15 (SHHT-1)'
+                match = re.search(r'Shelly/([^ ]+) \(([^)]+)\)', user_agent)
+                if match:
+                    metadata['firmware_version'] = match.group(1)
+                    metadata['model_name'] = match.group(2)
+            elif '(ShellyOS)' in user_agent:
+                # Gen2 format: 'HTG3/1.7.1 (ShellyOS)'
+                match = re.search(r'([^/]+)/([^\s]+)\s+\(ShellyOS\)', user_agent)
+                if match:
+                    metadata['model_name'] = match.group(1).strip()
+                    version = match.group(2).strip()
+                    metadata['firmware_version'] = f"ShellyOS {version}"
+
+        # Get full device ID from payload
+        full_device_id = params.get('id') or params.get('device_id') or params.get('src')
+        if full_device_id:
+            metadata['full_device_id'] = full_device_id
+
+        return metadata
+
+    def process_data(self, device_id: str, data: dict, request: HttpRequest = None):
         """
         Process Shelly data.
         """
-        device = self._get_device_or_create(device_id, data)
-        self._process_readings(device, data)
+        if not device_id:
+            raise ValueError("Device identifier is missing from the request.")
+
+        device = self._get_device_or_create(device_id, data, request)
+        self._process_readings(device, data, request)
         return True
 
-    def _get_device_or_create(self, device_id_str: str, data: dict = None) -> Device:
+    @transaction.atomic
+    def _get_device_or_create(self, device_id_str: str, data: dict = None, request: HttpRequest = None) -> Device:
         """
-        Helper to find a device by ID or suffix, or create it if not found.
-        Parses Shelly IDs like 'shellyflood-FCF5C4B110A1'.
-        Checks data for hints about device type (e.g. battery_voltage reading).
+        Retrieves a device by its MAC address or creates it.
+
+        This function performs the following steps:
+        1. Parses a MAC address from the provided `device_id_str`.
+        2. Attempts to find an existing device with that MAC address.
+        3. If found, updates its `last_seen` time and returns it.
+        4. If not found, creates a new device, determining its model and type
+           from the request headers and URL using a standardized product map.
         """
-        parsed_id = device_id_str
-        model_name = None
-        manufacturer = "Shelly"
+        ic("--- Shelly Service: Get or Create Device ---")
+        ic(f"Incoming device_id_str: '{device_id_str}'")
 
-        if '-' in device_id_str:
-            parts = device_id_str.split('-')
-            parsed_id = parts[-1]
-            prefix = parts[0].lower()
-            if 'flood' in prefix:
-                model_name = "Flood"
-            elif 'shelly1' in prefix:
-                model_name = "1"
-            elif 'plus' in prefix:
-                model_name = "Plus"
+        # --- Step 1: Determine the canonical unique ID (the MAC address) ---
+        parsed_id = None
+        if _is_mac_address(device_id_str):
+            parsed_id = device_id_str.lower()
+        else:
+            if '-' in device_id_str:
+                potential_mac = device_id_str.split('-')[-1]
+                if _is_mac_address(potential_mac):
+                    parsed_id = potential_mac.lower()
 
-        # Try to find device
-        device = Device.objects.filter(
-            location__place=self.place,
-            device_id__iexact=device_id_str
-        ).first()
-
-        if not device and parsed_id != device_id_str:
-             device = Device.objects.filter(
-                location__place=self.place,
-                device_id__iexact=parsed_id
-            ).first()
-
-        if not device:
-            # Auto-create
-            unassigned_location = self.place.get_unassigned_location()
-            display_id = parsed_id[-6:]
-            device_name = f"{model_name or 'Shelly'} {display_id}".strip()
-
-            device_type = None
-            if model_name == "Flood":
-                 device_type = DeviceType.objects.filter(name__iexact="Water Detector").first()
-
-            # Check data for hints if device_type not yet determined
-            # If reading is called battery_voltage, we might infer a generic Battery-related device type
-            # if we had one, but the user requested "Shelly-TBD" if unknown.
-            if not device_type:
-                device_type = DeviceType.objects.filter(name__iexact="Shelly-TBD").first()
-                if not device_type:
-                    # Optional: Create it if it doesn't exist, or fallback to something else
-                    pass
-
-            device = Device.objects.create(
-                device_id=parsed_id,
-                name=device_name,
-                location=unassigned_location,
-                manufacturer=manufacturer,
-                model=model_name,
-                device_type=device_type,
-                is_active=False
+        if not parsed_id:
+            parsed_id = device_id_str.lower()
+            logger.warning(
+                f"Could not parse a MAC address from '{device_id_str}'. "
+                f"Using the full string as the unique device_id."
             )
-            # if settings.WEBHOOK_SNIFFER:
-            #     ic(f"WEBHOOK: Created new device | Place: {self.place.name} | Device: {device.name} | ID: {parsed_id}")
-            message = f"WEBHOOK: New Device | Place: {self.place.name} | Device: {device.name} | ID: {parsed_id}"
-            record_webhook_activity(message)
+        ic(f"Parsed device MAC: {parsed_id}")
+
+        # --- Step 2: Attempt to find and update existing device ---
+        device = Device.objects.select_for_update().filter(device_id=parsed_id).first()
+
+        if device:
+            ic("Found existing device:", device.name, f"(ID: {device.id})")
+
+            # Always update last_seen timestamp
+            device.last_seen = timezone.now()
+
+            # If a data scrape is requested, update device details
+            if device.scrape_data and request:
+                ic("scrape_data flag is True. Refreshing device metadata.")
+
+                # Get new metadata. This will fully replace the old scraped_data.
+                new_scraped_data = self._extract_scrape_metadata(request, data)
+                raw_model_from_ua = new_scraped_data.pop('model_name', None)
+
+                # Add timestamp and raw model name to the new metadata
+                new_scraped_data['scraped_at'] = timezone.now().isoformat(timespec='seconds').replace('+00:00', 'Z')
+                if raw_model_from_ua:
+                    new_scraped_data['scraped_model_name'] = raw_model_from_ua
+
+                # Directly replace the scraped_data
+                device.scraped_data = new_scraped_data
+                device.scrape_data = False  # Reset the flag
+
+                # If we got a raw model, try to update the main device.model with the mapped "pretty" name
+                if raw_model_from_ua:
+                    lookup_key = raw_model_from_ua.lower().strip()
+                    if lookup_key in SHELLY_PRODUCT_MAP:
+                        product_info = SHELLY_PRODUCT_MAP[lookup_key]
+                        device.model = product_info['model']
+                        ic(f"Updated device model to mapped value '{device.model}'.")
+                    else:
+                        # Fallback to storing raw value if no map is found
+                        device.model = raw_model_from_ua
+                        ic(f"Could not map '{lookup_key}', updated device model to raw value '{device.model}'.")
+
+            device.save()
+            return device
+
+        # --- Step 3: Device not found, proceed with creation ---
+        ic("Device not found. Creating a new one.")
+
+        scrape_metadata = self._extract_scrape_metadata(request, data)
+        raw_model_from_ua = scrape_metadata.pop('model_name', None)
+
+        # Prepare scraped_data, including the raw scraped model name
+        scraped_data = scrape_metadata
+        scraped_data['scraped_at'] = timezone.now().isoformat(timespec='seconds').replace('+00:00', 'Z')
+        if raw_model_from_ua:
+            scraped_data['scraped_model_name'] = raw_model_from_ua
+
+        ic(f"Info from headers (User-Agent): model='{raw_model_from_ua}', firmware='{scraped_data.get('firmware_version')}'")
+
+        # Determine model and type from our map
+        # final_model_name is the "pretty" name for display and for generating the device_name
+        final_model_name = "Shelly Device"  # Generic fallback
+        device_type_name = "Shelly-TBD"    # Generic fallback
+
+        # Prioritize User-Agent model name for lookup
+        lookup_key = None
+        if raw_model_from_ua:
+            lookup_key = raw_model_from_ua.lower().strip()
+
+        # If not found via User-Agent, try using the URL prefix
+        if not lookup_key or lookup_key not in SHELLY_PRODUCT_MAP:
+             if '-' in device_id_str:
+                url_prefix = device_id_str.split('-')[0].lower()
+                ic(f"User-Agent model not in map or not provided, trying URL prefix: '{url_prefix}'")
+                if url_prefix in SHELLY_PRODUCT_MAP:
+                    lookup_key = url_prefix
+
+        if lookup_key and lookup_key in SHELLY_PRODUCT_MAP:
+            product_info = SHELLY_PRODUCT_MAP[lookup_key]
+            final_model_name = product_info['model']
+            device_type_name = product_info['device_type']
+            ic(f"Matched product using key '{lookup_key}': Mapped Model='{final_model_name}', Type='{device_type_name}'")
+        else:
+            ic(f"Could not map '{lookup_key or device_id_str}' to a known product. Using fallbacks.")
+
+        device_type = DeviceType.objects.filter(name__iexact=device_type_name).first()
+        if not device_type:
+            # Fallback to the TBD type if the specific one doesn't exist
+            device_type = DeviceType.objects.filter(name__iexact="Shelly-TBD").first()
+
+        # Construct a standardized device name
+        mac_suffix = parsed_id[-6:]
+        if final_model_name != "Shelly Device":
+            # Use the non-bracketed part of the model name for the device's name
+            base_model_name = final_model_name.split('(')[0].strip()
+            # e.g. "shelly-h-t-g1-abcdef"
+            base_name = slugify(base_model_name.replace("Shelly", "")).strip("-")
+            device_name = f"shelly-{base_name}-{mac_suffix}"
+        else:
+            # e.g. "shelly-abcdef"
+            device_name = f"shelly-{mac_suffix}"
+        ic(f"Constructed device name: {device_name}")
+
+        unassigned_location = self.place.get_unassigned_location()
+
+        defaults = {
+            'name': device_name,
+            'location': unassigned_location,
+            'manufacturer': "Shelly",
+            'model': final_model_name, # Store the mapped, "pretty" model name
+            'device_type': device_type,
+            'is_active': False,  # Require manual activation for new devices
+            'scraped_data': scraped_data,
+            'last_seen': timezone.now()
+        }
+
+        # Create the device
+        device = Device.objects.create(device_id=parsed_id, **defaults)
+
+        client_ip = scraped_data.get('client_ip', 'N/A')
+        message = (
+            f"WEBHOOK: New Device | Place: {self.place.name} | "
+            f"Device: {device.name} | ID: {parsed_id} | IP: {client_ip} | Model: {final_model_name}"
+        )
+        record_webhook_activity(message)
+        ic(f"CREATED new device: {device.name} ({device.id})")
 
         return device
 
-    def _process_readings(self, device: Device, params: dict):
+    def _process_readings(self, device: Device, params: dict, request: HttpRequest = None):
+        # Always update the client_ip if it has changed.
+        client_ip = device.scraped_data.get('client_ip')
+        needs_save = False
+        if request:
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                current_ip = x_forwarded_for.split(',')[0].strip()
+            else:
+                current_ip = request.META.get('REMOTE_ADDR')
+
+            if current_ip and current_ip != client_ip:
+                device.scraped_data['client_ip'] = current_ip
+                client_ip = current_ip # Use the new IP immediately for logging
+                needs_save = True
+
+        # The logic for scrape_data is now handled in _get_device_or_create
+        if needs_save:
+            device.save(update_fields=['scraped_data'])
+
+        # Create a mutable copy of the parameters to allow modification.
+        processed_params = params.copy()
+
+        # Handle boolean values for Switch type
+        if 'switch' in processed_params:
+            if processed_params['switch'].lower() == 'on':
+                processed_params['switch'] = True
+            elif processed_params['switch'].lower() == 'off':
+                processed_params['switch'] = False
+
         key_map = {
             'power': 'Power',
             'apower': 'Power',
@@ -104,37 +306,42 @@ class ShellyService:
             'voltage': 'Voltage',
             'temperature': 'Temperature', 'temp': 'Temperature', 'humidity': 'Humidity', 'hum': 'Humidity',
             'pm2.5': 'PM2.5', 'pm25': 'PM2.5', 'battery': 'battery',
-            'flood': 'Water Detector', 'batV': 'Battery Voltage'
+            'flood': 'Water Detector', 'batV': 'Battery Voltage',
+            'switch': 'Switch'
         }
 
+        client_ip_for_log = client_ip or 'N/A'
         # Dict to hold readings grouped by target Influx measurement
         grouped_readings = defaultdict(lambda: {'fields': {}, 'sensors': []})
         processed_sensors = []
 
-        for key, value in params.items():
+        for key, value in processed_params.items():
             if key in ['id', 'device_id', 'src', 'device']:
                 continue
 
             if key in key_map:
-                try:
-                    if isinstance(value, str):
-                        if value.lower() == 'true':
-                            val_float = 1.0
-                        elif value.lower() == 'false':
-                            val_float = 0.0
-                        else:
-                            val_float = float(value)
-                    else:
-                        val_float = float(value)
-                except (ValueError, TypeError):
-                    logger.warning(f"Could not convert Shelly value '{value}' for '{key}' to float.")
-                    continue
-
                 measurement_name = key_map[key]
+                value_to_store = value
 
-                # Special Battery Logic
-                if measurement_name == 'battery':
-                    if val_float > 25:
+                # If not a boolean, process as a float
+                if not isinstance(value_to_store, bool):
+                    try:
+                        if isinstance(value, str):
+                            if value.lower() == 'true':
+                                value_to_store = 1.0
+                            elif value.lower() == 'false':
+                                value_to_store = 0.0
+                            else:
+                                value_to_store = float(value)
+                        else:
+                            value_to_store = float(value)
+                    except (ValueError, TypeError):
+                        logger.warning(f"Could not convert Shelly value '{value}' for '{key}' to float.")
+                        continue
+
+                # Remap battery based on value
+                if measurement_name == 'battery' and isinstance(value_to_store, float):
+                    if value_to_store > 25:
                         measurement_name = 'Battery Level'
                     else:
                         measurement_name = 'Battery Voltage'
@@ -142,14 +349,14 @@ class ShellyService:
                 # If Influx is configured, we won't store locally.
                 skip_local = bool(self.influx_store)
 
-                sensor_obj = process_sensor_reading(device, measurement_name, val_float, skip_local_storage=skip_local)
-                processed_sensors.append({'sensor': sensor_obj, 'value': val_float, 'name': measurement_name})
+                sensor_obj = process_sensor_reading(device, measurement_name, value_to_store, skip_local_storage=skip_local)
+                processed_sensors.append({'sensor': sensor_obj, 'value': value_to_store, 'name': measurement_name})
 
                 if not sensor_obj:
                     continue
 
                 # Special post-creation configuration for specific sensor types
-                if measurement_name == 'Water Detector' and not sensor_obj.unit:
+                if measurement_name in ('Water Detector', 'Switch') and not sensor_obj.unit:
                     bool_unit = Unit.objects.filter(name__iexact='Boolean').first()
                     if bool_unit:
                         sensor_obj.unit = bool_unit
@@ -168,8 +375,8 @@ class ShellyService:
                         else:
                             # Skip if no mapping is found for this sensor type
                             continue
-                    
-                    grouped_readings[influx_measurement]['fields'][influx_field] = val_float
+
+                    grouped_readings[influx_measurement]['fields'][influx_field] = value_to_store
                     # Store the sensor and its intended influx field for potential update
                     grouped_readings[influx_measurement]['sensors'].append({'sensor': sensor_obj, 'field': influx_field, 'measurement': influx_measurement})
 
@@ -187,7 +394,7 @@ class ShellyService:
                     # Update Sensor Configuration on Success, but only if not already set
                     for info in sensors_info:
                         sensor = info['sensor']
-                        
+
                         # Only set these if they are not already configured.
                         if not sensor.influx_store:
                             sensor.influx_store = self.influx_store
@@ -197,13 +404,13 @@ class ShellyService:
                             sensor.influx_field_name = info['field']
                         if not sensor.influx_tag_key:
                             sensor.influx_tag_key = 'device_id'
-                        
+
                         # Data type can still be overridden
                         st = sensor.sensor_type
                         can_override = st.allow_override if st else True
                         if can_override and sensor.data_type != 'INFLUX':
                             sensor.data_type = 'INFLUX'
-                        
+
                         sensor.save()
 
                 except Exception as e:
@@ -220,7 +427,7 @@ class ShellyService:
                 if settings.WEBHOOK_SNIFFER:
                     field_str = ", ".join([f"{k}={v}" for k, v in fields.items()])
                     action_msg = f"Influx {storage_status}, cached."
-                    message = f"WEBHOOK: Reading | Place: {self.place.name} | Device: {device.name} | Measurement: {measurement_group} | Values: [{field_str}] | Action: {action_msg}"
+                    message = f"WEBHOOK: Reading | Place: {self.place.name} | Device: {device.name} | IP: {client_ip_for_log} | Measurement: {measurement_group} | Values: [{field_str}] | Action: {action_msg}"
                     record_webhook_activity(message)
 
         # Log readings that were not sent to InfluxDB
@@ -235,5 +442,5 @@ class ShellyService:
 
             if settings.WEBHOOK_SNIFFER:
                 action_msg = f"{storage_system} {storage_status}{cached_status}."
-                message = f"WEBHOOK: Reading | Place: {self.place.name} | Device: {device.name} | Sensor: {item['name']} | Value: {item['value']} | Action: {action_msg}"
+                message = f"WEBHOOK: Reading | Place: {self.place.name} | Device: {device.name} | IP: {client_ip_for_log} | Sensor: {item['name']} | Value: {item['value']} | Action: {action_msg}"
                 record_webhook_activity(message)

@@ -1,0 +1,10 @@
+{% load json_tags %}
+
+{% if device.scraped_data %}
+<div class="col-12 collapse" id="collapseExtraData-{{ device.pk }}">
+    <div class="text-muted small">Scraped Data</div>
+    <div class="card card-body bg-light p-2">
+        {{ device|format_scraped_data|safe }}
+    </div>
+</div>
+{% endif %}

@@ -31,8 +31,3 @@
     </div>
 </div>
 {% endblock %}
-
-{% block extra_js %}
-    {# This script is included for the location selector functionality #}
-    <script src="{% static 'sensors/js/device-form.js' %}?v={{ astra_utils.get_version_id }}"></script>
-{% endblock %}

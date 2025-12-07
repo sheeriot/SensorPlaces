@@ -579,7 +579,6 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
                 location__place__slug=place_slug
             )
 
-            # HTMX with hx-vals sends data as form-encoded, in request.POST
             new_location_id = request.POST.get('location_id')
             make_active = request.POST.get('make_active')
 
@@ -588,71 +587,68 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
 
             new_location = get_object_or_404(Location, pk=new_location_id, place__slug=place_slug)
 
-            old_location = device.location
-
             device.location = new_location
-            device.save(update_fields=['location']) # Save location change first
 
-            # If the 'make_active' checkbox was checked, update the active status
             if make_active:
                 device.is_active = True
-                device.save(update_fields=['is_active'])
-                # Also activate all sensors associated with this device
                 device.sensors.all().update(is_active=True)
 
-            place = get_object_or_404(Place, slug=place_slug)
-            place_counts = get_place_counts(place)
+            device.save()
 
-            # Recalculate counts AFTER all changes are saved
-            old_location_active_count = old_location.devices.filter(is_active=True).count()
-            new_location_active_count = new_location.devices.filter(is_active=True).count()
+            messages.success(request, f"Moved '{device.name}' to '{new_location.name}'.")
 
-            # Render the device row HTML to be sent to the client
-            device_row_html = render_to_string(
-                'sensors/partials/device_row.html',
-                {'device': device, 'request': request}
-            )
+            # Redirect to the page that initiated the request to force a full reload.
+            # Fallback to the main device list for the place if the header is not present.
+            redirect_url = request.headers.get('HX-Current-URL', reverse('sensors:device_list', kwargs={'place_slug': place_slug}))
 
-            response_data = {
-                'success': True,
-                'message': f"Moved '{device.name}' to '{new_location.name}'.",
-                'old_location_id': old_location.id,
-                'new_location_id': new_location.id,
-                'old_location_active_count': old_location_active_count,
-                'new_location_active_count': new_location_active_count,
-                'place_counts': place_counts,
-                'device_row_html': device_row_html
-            }
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = redirect_url
+            return response
 
-            return JsonResponse(response_data)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
 
-class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, FormView):
-    template_name = 'sensors/partials/device_confirm_delete_modal.html'
-    form_class = DeviceDeleteForm
+class DeviceDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
+    model = Device
+    template_name = 'sensors/device_confirm_delete.html'
+    context_object_name = 'object'
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-        self.object = get_object_or_404(Device, pk=self.kwargs['pk'], location__place__slug=self.kwargs['place_slug'])
+    def get_queryset(self):
+        # Ensure we are only touching devices within the specified place
+        return Device.objects.filter(location__place__slug=self.kwargs['place_slug'])
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['device_name'] = self.object.name
-        return kwargs
+    def get_object(self, queryset=None):
+        # Use pk from URL to fetch the specific device
+        return get_object_or_404(self.get_queryset(), pk=self.kwargs['pk'])
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['object'] = self.object
         context['place'] = self._place
+        # The form is needed for confirmation, but DeleteView can handle it.
+        # We can add a simple form if needed, or rely on a POST request.
+        # For now, let's keep it simple.
         return context
 
-    def form_valid(self, form):
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        context = self.get_context_data(object=self.object)
+        if request.htmx:
+            return render(request, 'sensors/partials/device_confirm_delete_modal.html', context)
+        return self.render_to_response(context)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
         device_name = self.object.name
+        success_url = self.get_success_url()
         self.object.delete()
         messages.success(self.request, f"Device '{device_name}' and all its sensors have been deleted.")
 
-        response = HttpResponse(status=204)
-        response['HX-Redirect'] = reverse('sensors:device_list', kwargs={'place_slug': self.kwargs['place_slug']})
-        return response
+        if self.request.htmx:
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = success_url
+            return response
+        return redirect(success_url)
+
+    def get_success_url(self):
+        return reverse('sensors:device_list', kwargs={'place_slug': self.kwargs['place_slug']})

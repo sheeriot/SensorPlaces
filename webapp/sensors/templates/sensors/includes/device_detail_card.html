@@ -20,6 +20,14 @@
         <div class="d-flex align-items-center">
             <!-- Full buttons for medium screens and up -->
             <div class="btn-group btn-group-sm d-none d-md-flex">
+                {% if device.scraped_data %}
+                <a class="btn btn-outline-secondary border-dark" data-bs-toggle="collapse" href="#collapseExtraData-{{ device.pk }}" role="button" aria-expanded="false" aria-controls="collapseExtraData-{{ device.pk }}" title="Show Extra Data">
+                    <i class="bi bi-ticket-detailed"></i>
+                    {% if device.scrape_data %}
+                        <i class="bi bi-asterisk text-success" title="Scraping enabled for next contact"></i>
+                    {% endif %}
+                </a>
+                {% endif %}
                 <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn border-dark btn-outline-warning" title="Edit Device">
                     <i class="bi bi-pencil"></i>
                 </a>
@@ -42,6 +50,16 @@
                     <i class="bi bi-three-dots-vertical"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
+                    {% if device.scraped_data %}
+                    <li>
+                        <a class="dropdown-item" data-bs-toggle="collapse" href="#collapseExtraData-{{ device.pk }}" role="button" aria-expanded="false" aria-controls="collapseExtraData-{{ device.pk }}">
+                            <i class="bi bi-ticket-detailed me-2"></i>Show Extra Data
+                            {% if device.scrape_data %}
+                                <i class="bi bi-asterisk text-success" title="Scraping enabled for next contact"></i>
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% endif %}
                     <li><a class="dropdown-item" href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
                     <li><a class="dropdown-item" href="{% url 'sensors:device_create' place_slug=place.slug %}?duplicate={{ device.pk }}"><i class="bi bi-copy me-2"></i>Duplicate</a></li>
                     <li><hr class="dropdown-divider"></li>
@@ -62,7 +80,10 @@
     <div class="card-body p-2">
         <div class="row g-3">
             <div class="col-md-6">
-                <div class="text-muted small">Location</div>
+                <div class="text-muted small d-flex align-items-center">
+                    <span class="me-2">Location</span>
+                    {% include 'sensors/partials/move_device_button.html' with device=device %}
+                </div>
                 <div><i class="bi bi-geo-alt me-2"></i>{{ device.location.name }}</div>
             </div>
             <div class="col-md-6">
@@ -117,6 +138,8 @@
                 <div>{{ device.notes|linebreaksbr }}</div>
             </div>
             {% endif %}
+
+            {% include "sensors/partials/device_extra_data_display.html" with device=device %}
 
         </div>
     </div>

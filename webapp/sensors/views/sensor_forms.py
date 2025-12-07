@@ -53,11 +53,6 @@ class SensorForm(forms.ModelForm):
             'min_value', 'min_value_override',
             'max_value', 'max_value_override',
             'graph_type',
-            'influx_store',
-            'influx_measurement',
-            'influx_field_name',
-            'influx_tag_key',
-            'stale_threshold_seconds',
         ]
         widgets = {
             'device': forms.Select(attrs={'class': 'form-select'}),
@@ -79,10 +74,6 @@ class SensorForm(forms.ModelForm):
             'min_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'max_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'max_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'influx_store': forms.Select(attrs={'class': 'form-select'}),
-            'influx_measurement': forms.TextInput(attrs={'class': 'form-control'}),
-            'influx_field_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'influx_tag_key': forms.TextInput(attrs={'class': 'form-control'})
         }
 
     def __init__(self, *args, **kwargs):
@@ -141,19 +132,11 @@ class SensorForm(forms.ModelForm):
         self.fields['unit'].label = False
         self.fields['min_value'].label = False
         self.fields['max_value'].label = False
-        self.fields['influx_store'].label = False
-        self.fields['influx_measurement'].label = False
-        self.fields['influx_field_name'].label = False
-        self.fields['influx_tag_key'].label = False
 
         self.fields['is_active'].label = False
         self.fields['unit_override'].label = False
         self.fields['min_value_override'].label = False
         self.fields['max_value_override'].label = False
-        self.fields['influx_store'].label = False
-        self.fields['influx_measurement'].label = False
-        self.fields['influx_field_name'].label = False
-        self.fields['influx_tag_key'].label = False
 
         # Set the initial value for the unit field from the effective_unit
         if self.instance and self.instance.pk:
@@ -204,40 +187,6 @@ class SensorForm(forms.ModelForm):
         else:
             pass
         # --- End of new logic ---
-
-        # If we have data_type, update fields based on it
-        if 'data_type' in self.data:
-            data_type = self.data.get('data_type')
-            if data_type.startswith('INFLUX'):
-                self.fields['influx_store'].required = True
-                self.fields['influx_measurement'].required = True
-                self.fields['influx_field_name'].required = True
-                self.fields['influx_tag_key'].required = True
-            else:
-                self.fields['influx_store'].required = False
-                self.fields['influx_measurement'].required = False
-                self.fields['influx_field_name'].required = False
-                self.fields['influx_tag_key'].required = False
-        elif self.instance.pk and self.instance.data_type:
-            if self.instance.data_type.startswith('INFLUX'):
-                self.fields['influx_store'].required = True
-                self.fields['influx_measurement'].required = True
-                self.fields['influx_field_name'].required = True
-                self.fields['influx_tag_key'].required = True
-            else:
-                self.fields['influx_store'].required = False
-                self.fields['influx_measurement'].required = False
-                self.fields['influx_field_name'].required = False
-                self.fields['influx_tag_key'].required = False
-        else:
-            # Set defaults for new instances
-            self.fields['influx_store'].required = False
-            self.fields['influx_measurement'].required = False
-            self.fields['influx_field_name'].required = False
-            self.fields['influx_tag_key'].required = False
-
-        if self.place:
-            self.fields['influx_store'].queryset = InfluxStore.objects.filter(place=self.place)
 
         # Add form helpers
         self.helper = FormHelper()
@@ -323,32 +272,6 @@ class SensorForm(forms.ModelForm):
                 css_class="d-none"
             ),
             Div(
-                HTML("<h5>InfluxDB Settings</h5>"),
-                Div(
-                    HTML("""
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label for="id_influx_store" class="form-label mb-0">Influx source</label>
-                        {% if place %}
-                        <a href="{% url 'sensors:influxstore_create' place_slug=place.slug %}"
-                           class="btn btn-sm btn-outline-primary"
-                           id="add-influx-source-btn">
-                            <i class="bi bi-plus-circle"></i> Source
-                        </a>
-                        {% endif %}
-                    </div>
-                """),
-                    Field('influx_store'),
-                    css_class="mb-1"
-                ),
-                Row(
-                    Column('influx_measurement', css_class='form-group col-md-8 mb-0'),
-                    Column('influx_field_name', css_class='form-group col-md-4 mb-0')
-                ),
-                Field('influx_tag_key', css_class='form-group col-md-4 mb-0'),
-                id="influx-fields",
-                css_class="mt-2 d-none"
-            ),
-            Div(
                 FormActions(
                     HTML(f'<a role="button" href="{self.cancel_url}" class="btn btn-secondary me-2"><i class="bi bi-x-circle"></i> Cancel</a>'),
                     HTML(f'<button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Save</button>')
@@ -368,10 +291,6 @@ class SensorForm(forms.ModelForm):
         cleaned_data = super().clean()
         data_type = cleaned_data.get('data_type')
         device = cleaned_data.get('device') or self.device
-        influx_store = cleaned_data.get('influx_store')
-        influx_measurement = cleaned_data.get('influx_measurement')
-        influx_field_name = cleaned_data.get('influx_field_name')
-        influx_tag_key = cleaned_data.get('influx_tag_key')
         unit_override = cleaned_data.get('unit_override')
         min_value_override = cleaned_data.get('min_value_override')
         max_value_override = cleaned_data.get('max_value_override')
@@ -429,16 +348,11 @@ class SensorForm(forms.ModelForm):
             cleaned_data['is_active'] = False
             self.add_error('is_active', "Sensor cannot be active when its device's location is inactive.")
 
-        # Validate InfluxDB fields if data type is INFLUX
+        # If data_type is INFLUX, validate that influx fields are present
         if data_type == 'INFLUX':
-            if not influx_store:
-                self.add_error('influx_store', "InfluxDB source is required when data type is InfluxDB")
-            if not influx_measurement:
-                self.add_error('influx_measurement', "InfluxDB measurement is required when data type is InfluxDB")
-            if not influx_field_name:
-                self.add_error('influx_field_name', "InfluxDB field name is required when data type is InfluxDB")
-            if not influx_tag_key:
-                self.add_error('influx_tag_key', "InfluxDB tag key is required when data type is InfluxDB")
+            # These fields are not on the form, so we can't add errors to them.
+            # The validation should happen on the model or a different form.
+            pass
 
         return cleaned_data
 
@@ -461,7 +375,7 @@ class SensorInfluxUpdateForm(forms.ModelForm):
 
         if self.place:
             self.fields['influx_store'].queryset = InfluxStore.objects.filter(place=self.place)
-        
+
         # Use standard labels and add help text
         self.fields['influx_store'].label = "InfluxDB Store"
         self.fields['influx_measurement'].label = "Measurement Name"

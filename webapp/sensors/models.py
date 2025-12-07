@@ -3,7 +3,7 @@ from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.db.models.functions import Lower
-from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey, PositiveIntegerField
+from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey, PositiveIntegerField, JSONField
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -91,6 +91,7 @@ class Device(models.Model):
     manufacturer: CharField = models.CharField(max_length=100, null=True, blank=True)
     device_id: CharField = models.CharField(max_length=100, unique=True, null=True, blank=True)
     notes: TextField = models.TextField(blank=True, null=True, help_text="Internal notes for this device.")
+    scraped_data: JSONField = models.JSONField(default=dict, blank=True, help_text="Additional device-specific data collected from webhooks or APIs.")
     location: ForeignKey = models.ForeignKey(
         'Location',
         on_delete=models.CASCADE,
@@ -110,6 +111,8 @@ class Device(models.Model):
         default=True,
         help_text="inactive devices will be hidden by default"
     )
+    scrape_data: BooleanField = models.BooleanField(default=False, help_text="Set to true to capture the next full data payload from the device.")
+    last_seen = models.DateTimeField(null=True, blank=True, help_text="Last time a webhook was received from this device.")
     created_at: DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -149,17 +152,22 @@ class Device(models.Model):
         ordering = ['location__place', 'location', '-is_active', Lower('name')]
 
 class InfluxStore(models.Model):
+    """
+    Represents a connection to an InfluxDB instance.
+    A Place can have multiple InfluxDB connections.
+    """
     place = models.ForeignKey('Place', on_delete=models.CASCADE, related_name='influx_stores')
     name = models.CharField(max_length=100)
-    url = models.CharField(max_length=255)
-    org = models.CharField(max_length=100)
+    url = models.URLField(max_length=200, help_text='URL to InfluxDB instance')
+    org = models.CharField(max_length=100, help_text='InfluxDB organization')
     bucket_name = models.CharField(max_length=100)
-    token = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    token = models.CharField(max_length=200, help_text='InfluxDB API token')
+
+    class Meta:
+        unique_together = ('place', 'name')
 
     def __str__(self):
-        return self.name
+        return f'{self.name} ({self.place.name})'
 
     @property
     def token_display(self):
@@ -481,11 +489,10 @@ class Sensor(models.Model):
     max_value_override = models.BooleanField(default=False)
 
     # For data source
-    influx_store: ForeignKey = models.ForeignKey('InfluxStore', on_delete=models.SET_NULL, null=True, blank=True)
-    influx_measurement = models.CharField(max_length=200, blank=True, null=True)
-    influx_field_name = models.CharField(max_length=200, blank=True, null=True,
-                                         help_text='Influx field name')
-    influx_tag_key = models.CharField(max_length=100, blank=True, null=True, help_text="The InfluxDB tag key, e.g. host, device_id")
+    influx_store = models.ForeignKey(InfluxStore, on_delete=models.SET_NULL, null=True, blank=True, related_name='sensors')
+    influx_measurement = models.CharField(max_length=100, blank=True, null=True)
+    influx_field_name = models.CharField(max_length=100, blank=True, null=True, help_text="The field name in InfluxDB, e.g., 'value' or 'temperature'")
+    influx_tag_key = models.CharField(max_length=100, blank=True, null=True, help_text="The key of the tag used to identify this sensor's data, e.g., 'sensor_id'")
 
     # Cached value fields
     cached_reading_value = models.FloatField(null=True, blank=True, editable=False)
