@@ -10,9 +10,6 @@
             {{ sensor.name }}
         </h5>
         <div class="d-flex align-items-center">
-            <button class="btn btn-sm me-2 live-value-refresh" title="Force refresh of all live values on page">
-                <i class="bi bi-arrow-clockwise"></i>
-            </button>
             <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}"
                class="btn btn-sm btn-warning"
                title="Edit Sensor">
@@ -32,9 +29,8 @@
     <div class="card-body p-2">
         <div class="d-flex align-items-center text-muted mb-2">
             <div class="me-3">
-                <i class="bi bi-hdd-rack me-1"></i>
-                <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
-                    {{ device.name }}
+                <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none d-flex align-items-center">
+                    {% include 'sensors/partials/device_label.html' with device=device %}
                 </a>
             </div>
             <div>
@@ -90,11 +86,12 @@
             </div>
             <div class="col-md-6">
                 <div class="mb-2">
-                    <label class="form-label mb-0 small text-muted">Data Type</label>
-                    <div>{{ sensor.get_data_type_display }}</div>
+                    <label class="form-label mb-0 small text-muted">Data Store</label>
+                    <div>{{ sensor.get_data_store_display }}</div>
                 </div>
             </div>
         </div>
+        {% if sensor.effective_unit and sensor.effective_unit.name != 'Boolean' %}
         <div class="row">
             <div class="col-md-6">
                 <div class="mb-2">
@@ -109,24 +106,22 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <hr class="my-2">
-        <div class="row small">
-            <div class="col-12">
-                <strong>Effective Stale:</strong>
-                <span class="text-monospace">{{ sensor.effective_stale_threshold }}s</span>
-                <span class="text-muted ms-2">(Sensor: </span><span class="text-monospace">{{ sensor.stale_threshold_seconds|default:"None" }}</span>
-                <span class="text-muted"> &lt; SensorType: </span><span class="text-monospace">{{ sensor.sensor_type.default_stale_threshold_seconds|default:"None" }}</span>
-                <span class="text-muted"> &lt; Global: </span><span class="text-monospace">{{ global_stale_threshold }}</span><span class="text-muted">)</span>
+
+        {% if sensor.is_active %}
+        <div id="sensor-live-details-wrapper-{{ sensor.pk }}"
+             hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card"
+             hx-swap="innerHTML"
+             hx-trigger="load, every 30s">
+            <div class="text-center">
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading live details...</span>
+                </div>
             </div>
         </div>
-
-        <div id="sensor-live-details-wrapper-{{ sensor.pk }}"
-             hx-get="{% url 'sensors:sensor_live_details' place_slug=place.slug pk=sensor.pk %}"
-             hx-swap="innerHTML"
-             hx-trigger="refresh-live-details-{{ sensor.pk }} from:body">
-            {% include "sensors/partials/sensor_live_details.html" %}
-        </div>
+        {% endif %}
 
         <hr class="my-2">
         <div class="row small text-muted">

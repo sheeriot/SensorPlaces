@@ -161,6 +161,11 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         context['locations'] = get_annotated_locations(self._place)
         context['absolute_url'] = self.request.build_absolute_uri()
 
+        # Update live values for all sensors being displayed
+        if context['sensors']:
+            for sensor in context['sensors']:
+                update_sensor_live_value(sensor, force_update=False)
+
         # --- Hub Device for SwitchBot ---
         if device.is_switchbot and device.hub_id:
             try:
@@ -170,7 +175,8 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
                 context['hub_device'] = None
 
         # --- Smart Data Fetching for Sensors ---
-        self.fetch_live_data_for_sensors(context['sensors'])
+        # This is now handled above before context is returned
+        # self.fetch_live_data_for_sensors(context['sensors'])
 
         # --- SwitchBot Missing Sensor Detection ---
         # This is now handled by an HTMX call triggered by the user
@@ -238,16 +244,13 @@ class DeviceDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         """
         Iterate through sensors and fetch live data if it's stale.
         This is now a simple wrapper around the utility function.
+        DEPRECATED: Logic moved directly into get_context_data.
         """
         # The logic to group SwitchBot calls is now handled inside the util,
         # or accepted as a trade-off for simplicity in the live-value-per-sensor context.
         # For a full device page refresh, this is still efficient enough.
         for sensor in sensors:
             update_sensor_live_value(sensor)
-
-        # Attach the (potentially updated) cached value to live_value for the template
-        for sensor in sensors:
-            sensor.live_value = sensor.cached_reading_value
 
 class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, CreateView):
     model = Device

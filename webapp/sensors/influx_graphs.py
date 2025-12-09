@@ -44,7 +44,7 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
 
         time_filter = f"time >= '{start_date.isoformat()}' AND time <= '{end_date.isoformat()}'"
 
-        if sensor.data_type == 'INFLUX_CUMULATIVE_RESET':
+        if sensor.data_store == 'INFLUX_CUMULATIVE_RESET':
             query = f"""
                 WITH lagged_values AS (
                     SELECT time, "{field_name}", LAG("{field_name}", 1) OVER (ORDER BY time) as prev_value
@@ -119,12 +119,12 @@ def get_influx_sensor_data(sensor: Sensor, start_date: datetime, end_date: datet
                      # ic(f"Updating cached reading for {sensor.name} to {latest_value} at {latest_time}")
                      sensor.cached_reading_value = latest_value
                      sensor.cached_reading_timestamp = latest_time
-                     sensor.last_checked_timestamp = timezone.now()
+                     sensor.last_cached_timestamp = timezone.now()
                      # Use update to avoid side effects
                      Sensor.objects.filter(pk=sensor.pk).update(
                          cached_reading_value=latest_value,
                          cached_reading_timestamp=latest_time,
-                         last_checked_timestamp=timezone.now()
+                         last_cached_timestamp=timezone.now()
                      )
             except Exception as e:
                 ic(f"Failed to update sensor cache from graph query: {e}")

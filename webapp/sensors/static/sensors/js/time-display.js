@@ -143,6 +143,9 @@ async function sendTimezoneToServer() {
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const storedTimezone = localStorage.getItem('userTimezone');
 
+    // Also set a cookie that middleware can read
+    document.cookie = `user_timezone=${userTimezone};path=/;max-age=31536000;SameSite=Lax`;
+
     if (userTimezone === storedTimezone) {
         if (timeDisplayConfig.debug) console.log('Timezone has not changed:', userTimezone);
         return;

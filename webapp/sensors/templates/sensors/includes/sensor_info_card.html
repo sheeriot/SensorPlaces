@@ -21,7 +21,7 @@
         <p class="card-text">
             <strong>Type:</strong> {{ sensor.get_sensor_type_display }}<br>
             <strong>Unit:</strong> {{ sensor.effective_unit.symbol|default:"N/A" }}<br>
-            <strong>Data Type:</strong> {{ sensor.get_data_type_display }}
+            <strong>Data Store:</strong> {{ sensor.get_data_store_display }}
         </p>
         <p class="card-text">
             <small class="text-muted">Last updated: {{ sensor.updated_at|date:"Y-m-d H:i" }}</small>

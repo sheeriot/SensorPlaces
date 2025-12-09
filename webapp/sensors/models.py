@@ -2,6 +2,10 @@ from django.db import models, transaction
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from icecream import ic
+
 from django.db.models.functions import Lower
 from django.db.models import CharField, TextField, DecimalField, BooleanField, DateTimeField, ImageField, FloatField, ForeignKey, PositiveIntegerField, JSONField
 from django.db.models.signals import post_save
@@ -44,10 +48,12 @@ class LocationManager(models.Manager):
 
 class Unit(models.Model):
     name = models.CharField(max_length=50, unique=True)
-    symbol = models.CharField(max_length=10)
+    symbol = models.CharField(max_length=10, blank=True)
 
     def __str__(self):
-        return f"{self.name} ({self.symbol})"
+        if self.symbol:
+            return f"{self.name} ({self.symbol})"
+        return self.name
 
     objects = NameManager()
 
@@ -358,6 +364,13 @@ class Location(models.Model):
         null=True,
         blank=True
     )
+    z_pos: DecimalField = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        null=True,
+        blank=True
+    )
     is_active: BooleanField = models.BooleanField(
         default=True,
         # help_text="inactive locations will be hidden by default"
@@ -428,39 +441,13 @@ class Location(models.Model):
 
 class Sensor(models.Model):
     """A sensor that can be attached to a device."""
-    # SENSOR_TYPES = [
-    #     ('TEMPERATURE', 'Temperature'),
-    #     ('HUMIDITY', 'Humidity'),
-    #     ('PRESSURE', 'Pressure'),
-    #     ('LIGHT', 'Light'),
-    #     ('SOUND', 'Sound'),
-    #     ('MOTION', 'Motion'),
-    #     ('CO2', 'Carbon Dioxide'),
-    #     ('VOC', 'Volatile Organic Compounds'),
-    #     ('PM25', 'Particulate Matter 2.5'),
-    #     ('PM10', 'Particulate Matter 10'),
-    #     ('OTHER', 'Other'),
-    # ]
-    DATA_TYPES = [
+
+    DATA_STORES = [
         ('DIRECT', 'Direct'),
         ('INFLUX', 'InfluxDB (Gauge)'),
         ('INFLUX_CUMULATIVE_RESET', 'InfluxDB (Cumulative, Resets)'),
         ('NONE', 'None'),
     ]
-    # UNITS = [
-    #     ('C', '°C'),
-    #     ('F', '°F'),
-    #     ('K', 'K'),
-    #     ('RH', '%RH'),
-    #     ('PA', 'Pa'),
-    #     ('HPA', 'hPa'),
-    #     ('LUX', 'lux'),
-    #     ('DB', 'dB'),
-    #     ('PPM', 'ppm'),
-    #     ('PPB', 'ppb'),
-    #     ('UGM3', 'μg/m³'),
-    #     ('NONE', '(None)'),
-    # ]
 
     name: CharField = models.CharField(max_length=100)
     device: ForeignKey = models.ForeignKey('Device', on_delete=models.CASCADE, related_name='sensors')
@@ -471,7 +458,7 @@ class Sensor(models.Model):
     unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
     unit_override = models.BooleanField(default=False)
 
-    data_type: CharField = models.CharField(max_length=30, choices=DATA_TYPES, default='DIRECT', null=True, blank=True)
+    data_store: CharField = models.CharField(max_length=30, choices=DATA_STORES, default='DIRECT', null=True, blank=True, verbose_name="Data Store")
     # Removed data_type_override as per user request
 
     graph_type: CharField = models.CharField(
@@ -497,7 +484,8 @@ class Sensor(models.Model):
     # Cached value fields
     cached_reading_value = models.FloatField(null=True, blank=True, editable=False)
     cached_reading_timestamp = models.DateTimeField(null=True, blank=True, editable=False)
-    last_checked_timestamp = models.DateTimeField(null=True, blank=True, editable=False)
+    last_cached_timestamp = models.DateTimeField(null=True, blank=True, editable=False)
+    cached_reading_source = models.CharField(max_length=50, null=True, blank=True, editable=False)
     stale_threshold_seconds = models.PositiveIntegerField(
         null=True, blank=True,
         help_text="Override the default stale threshold for this sensor (in seconds)."
@@ -527,6 +515,9 @@ class Sensor(models.Model):
             return self.unit
         if self.sensor_type and self.sensor_type.unit:
             return self.sensor_type.unit
+        # Fallback to the sensor's own unit if it's set but not marked as an override
+        if self.unit:
+            return self.unit
         return None
 
     @property
@@ -555,8 +546,49 @@ class Sensor(models.Model):
             return self.sensor_type.decimal_places
         return 2
 
-    def get_sensor_type_display(self):
-        return self.sensor_type.name if self.sensor_type else "Unknown"
+    def get_reading_class(self):
+        """
+        Determines the Bootstrap background class for a sensor reading badge.
+        - bg-success-subtle: Normal, within range.
+        - bg-warning-subtle: Out of min/max range.
+        - bg-danger-subtle: Error or no reading.
+        """
+        if self.cached_reading_value is None:
+            return 'bg-secondary-subtle text-secondary-emphasis'
+
+        value = self.cached_reading_value
+        min_val = self.effective_min_value
+        max_val = self.effective_max_value
+
+        if min_val is not None and value < min_val:
+            return 'bg-warning-subtle text-warning-emphasis'
+        if max_val is not None and value > max_val:
+            return 'bg-warning-subtle text-warning-emphasis'
+
+        return 'bg-success-subtle text-success-emphasis'
+
+    @property
+    def reading_age(self):
+        if self.cached_reading_timestamp:
+            return timezone.now() - self.cached_reading_timestamp
+        return None
+
+    @property
+    def reading_age_str(self):
+        age = self.reading_age
+        if age is None:
+            return ""
+
+        seconds = age.total_seconds()
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        elif seconds < 3600:
+            return f"{int(seconds // 60)}m"
+        else:
+            return f"{int(seconds // 3600)}h"
+
+    def __str__(self):
+        return self.name
 
     def get_absolute_url(self):
         """Returns the URL to the sensor's detail page."""
@@ -599,6 +631,11 @@ class SensorType(models.Model):
         blank=True,
         help_text="Default stale time for this sensor type, in seconds. Default is 5 minutes."
     )
+
+    @property
+    def is_boolean(self):
+        """Returns True if the sensor type's unit is Boolean."""
+        return self.unit and self.unit.name == 'Boolean'
 
     def __str__(self):
         return self.name

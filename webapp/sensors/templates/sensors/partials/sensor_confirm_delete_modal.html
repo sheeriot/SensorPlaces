@@ -18,7 +18,7 @@
                 <i class="bi bi-chevron-right"></i>
                 <a href="{{ device.location.get_absolute_url }}" class="link-dark"><i class="bi bi-geo-alt me-1"></i>{{ device.location.name }}</a>
                 <i class="bi bi-chevron-right"></i>
-                <a href="{{ device.get_absolute_url }}" class="link-dark"><i class="bi bi-hdd-rack me-1"></i>{{ device.name }}</a>
+                <a href="{{ device.get_absolute_url }}" class="link-dark">{% include "sensors/partials/device_label.html" with device=device icon_margin="me-1" %}</a>
             </small>
         </div>
         <p>Are you sure you want to delete the sensor: <strong>{{ object.name }}</strong>?</p>

@@ -26,7 +26,7 @@
                 {% include 'sensors/includes/sensor_detail_card.html' %}
             </div>
 
-            {% if sensor.data_type and 'INFLUX' in sensor.data_type %}
+            {% if sensor.data_store and 'INFLUX' in sensor.data_store %}
                 {% include 'sensors/includes/sensor_influx_details.html' %}
             {% endif %}
 

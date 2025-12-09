@@ -54,6 +54,62 @@ function initializeGlobalState() {
     return true;
 }
 
+/**
+ * Initializes and manages the state of auto-refresh polling toggles for sensors.
+ * It uses localStorage to persist the user's preference for each sensor.
+ */
+function initializePollingToggles(container) {
+    const toggles = (container || document).querySelectorAll('.refresh-toggle');
+    if (commonConfig.debug && toggles.length > 0) {
+        console.log(`[PollingToggles] Found ${toggles.length} refresh toggles.`);
+    }
+
+    toggles.forEach(toggle => {
+        const pollTargetSelector = toggle.dataset.pollTarget;
+        const pollTarget = document.querySelector(pollTargetSelector);
+        const sensorId = pollTargetSelector.split('-').pop(); // A bit fragile, but works for now
+        const storageKey = `sensor-refresh-${sensorId}`;
+
+        if (!pollTarget) {
+            console.warn(`[PollingToggles] Could not find polling target: ${pollTargetSelector}`);
+            return;
+        }
+
+        // Function to update the trigger attribute
+        const updateTrigger = (isPolling) => {
+            const currentTrigger = pollTarget.getAttribute('hx-trigger') || 'load';
+            let triggers = currentTrigger.split(',').map(t => t.trim());
+
+            // Remove existing polling trigger to avoid duplicates
+            triggers = triggers.filter(t => !t.startsWith('every'));
+
+            if (isPolling) {
+                triggers.push('every 30s');
+                if (commonConfig.debug) console.log(`[PollingToggles] Enabling polling for ${sensorId}`);
+            } else {
+                if (commonConfig.debug) console.log(`[PollingToggles] Disabling polling for ${sensorId}`);
+            }
+
+            pollTarget.setAttribute('hx-trigger', triggers.join(', '));
+        };
+
+        // Set initial state from localStorage
+        const savedState = localStorage.getItem(storageKey);
+        // Default to polling 'on' if no setting is saved
+        const shouldPoll = savedState === null ? true : savedState === 'true';
+        toggle.checked = shouldPoll;
+        updateTrigger(shouldPoll);
+
+        // Add change event listener
+        toggle.addEventListener('change', () => {
+            const isPolling = toggle.checked;
+            localStorage.setItem(storageKey, isPolling);
+            updateTrigger(isPolling);
+        });
+    });
+}
+
+
 // Initialize core functionality
 function initializeCore() {
     if (commonConfig.debug) console.log('[initializeCore] Starting initialization sequence');
@@ -89,6 +145,7 @@ function initializeCore() {
 document.addEventListener('DOMContentLoaded', () => {
     if (commonConfig.debug) console.log('[DOMContentLoaded] Starting initialization');
     initializeCore();
+    initializePollingToggles(document.body);
 
     // Initialize all Bootstrap popovers
     const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
@@ -129,6 +186,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.show();
             }
         }
+    });
+
+    // Run toggle initializer after any HTMX swap
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        initializePollingToggles(evt.detail.target);
     });
 
     // Global listener to close Bootstrap modals based on a custom event
@@ -183,224 +245,59 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-});
 
-class LiveValueFetcher {
-    constructor(placeSlug, interval = 30000) {
-        this.placeSlug = placeSlug;
-        this.interval = interval;
-        this.timer = null;
-        this.containers = [];
-    }
+    // Device Class Filtering
+    const filterSelect = document.getElementById('device-class-filter');
+    if (filterSelect) {
+        const deviceList = document.getElementById('sensor-list-table');
 
-    start() {
-        this.fetch(); // Initial fetch
-        if (this.timer) clearInterval(this.timer);
-        this.timer = setInterval(() => this.fetch(), this.interval);
-    }
+        const filterDevices = () => {
+            const selectedClass = filterSelect.value;
+            const deviceRows = deviceList.querySelectorAll('.device-row');
+            const locationRows = deviceList.querySelectorAll('.location-row');
+            const hideInactiveSwitch = document.getElementById('hide-inactive-switch-device');
+            const hideInactive = hideInactiveSwitch && hideInactiveSwitch.checked;
 
-    stop() {
-        if (this.timer) clearInterval(this.timer);
-    }
+            // Filter device rows
+            deviceRows.forEach(row => {
+                const deviceClass = row.dataset.deviceClass;
+                const isActive = row.dataset.deviceActive === 'true';
 
-    forceRefresh() {
-        if(commonConfig.debug) console.log('[LiveValueFetcher] Forcing refresh for all live values on page.');
-        return this.fetch(true);
-    }
+                const shouldBeHiddenByInactive = hideInactive && !isActive;
+                const shouldBeHiddenByFilter = !(selectedClass === 'all' || deviceClass === selectedClass);
 
-    async fetch(force = false) {
-        this.containers = document.querySelectorAll('.live-value-container');
-
-        // Filter for containers that are visible and marked as active
-        const activeAndVisibleContainers = [...this.containers].filter(c => {
-            const isActive = c.dataset.active === 'true';
-            const isVisible = c.offsetParent !== null; // A simple visibility check
-            return isActive && isVisible;
-        });
-
-        const allPksOnPage = [...new Set(activeAndVisibleContainers.map(c => c.dataset.sensorPk).filter(Boolean))];
-
-        if (allPksOnPage.length === 0) {
-            if(commonConfig.debug) console.log('[LiveValueFetcher] No active and visible live value containers found on page.');
-            return;
-        }
-
-        const pksToFetch = new Set();
-        const now = new Date().getTime();
-
-        allPksOnPage.forEach(pk => {
-            const lastCheck = sessionStorage.getItem(`sensor-${pk}-lastcheck`);
-            const cachedDataStr = sessionStorage.getItem(`sensor-${pk}-data`);
-            let staleThreshold = this.interval; // Default
-
-            if (cachedDataStr) {
-                try {
-                    const cachedData = JSON.parse(cachedDataStr);
-                    if (cachedData.stale_threshold) {
-                        staleThreshold = cachedData.stale_threshold * 1000; // Convert seconds to ms
-                    }
-                } catch (e) {
-                    // Ignore if parsing fails, will use default
-                }
-            }
-
-            if (force || !lastCheck || (now - parseInt(lastCheck) > staleThreshold)) {
-                pksToFetch.add(pk);
-            }
-        });
-
-        this.updateAllContainersFromCache();
-
-        if (pksToFetch.size === 0) {
-            if(commonConfig.debug) console.log('[LiveValueFetcher] All values fresh in cache. Nothing to fetch.');
-            return Promise.resolve();
-        }
-
-        if(commonConfig.debug) console.log('[LiveValueFetcher] Fetching stale/forced values for pks:', [...pksToFetch]);
-
-        try {
-            const url = `/api/${this.placeSlug}/sensors/live-values/?pks=${[...pksToFetch].join(',')}`;
-            const response = await fetch(url); // Assuming fetchWithCSRF is a wrapper around fetch
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if(commonConfig.debug) console.log('[LiveValueFetcher] Received data from API:', data);
-
-            if (data.status === 'success' && data.payload) {
-                Object.entries(data.payload).forEach(([pk, sensorData]) => {
-                    sessionStorage.setItem(`sensor-${pk}-lastcheck`, now.toString());
-                    sessionStorage.setItem(`sensor-${pk}-data`, JSON.stringify(sensorData));
-
-                    // If the fetch was successful, fire an event to tell the card to refresh itself via HTMX
-                    if (sensorData.status === 'success') {
-                        const event = new CustomEvent(`refresh-live-details-${pk}`);
-                        document.body.dispatchEvent(event);
-                        if(commonConfig.debug) console.log(`[LiveValueFetcher] Dispatched refresh-live-details-${pk} event.`);
-                    }
-                });
-
-                // We no longer need to manually update the containers from cache here,
-                // as the HTMX swap will handle the entire card update.
-                // this.updateAllContainersFromCache();
-            } else {
-                // Handle cases where the top-level status is not 'success'
-                throw new Error(data.message || 'API returned a non-success status');
-            }
-        } catch (error) {
-            console.error('[LiveValueFetcher] Error fetching or processing data:', error);
-            // Only render error for the specific containers that were part of this failed fetch
-            this.containers.forEach(container => {
-                if (pksToFetch.has(container.dataset.sensorPk)) {
-                    this.renderErrorForContainer(container, error.message);
+                if (shouldBeHiddenByInactive || shouldBeHiddenByFilter) {
+                    row.classList.add('d-none');
+                } else {
+                    row.classList.remove('d-none');
                 }
             });
-        }
-    }
 
-    updateAllContainersFromCache() {
-        const allContainers = document.querySelectorAll('.live-value-container');
-        allContainers.forEach(container => {
-            const pk = container.dataset.sensorPk;
-            const cachedDataStr = sessionStorage.getItem(`sensor-${pk}-data`);
-            if (cachedDataStr) {
-                const sensorData = JSON.parse(cachedDataStr);
-                this.updateSingleContainer(container, sensorData);
-            }
-        });
-    }
+            // Update visibility of location headers
+            locationRows.forEach(locationRow => {
+                const locationId = locationRow.dataset.locationId;
+                const devicesInLocation = deviceList.querySelectorAll(`.device-row[data-location-id="${locationId}"]`);
+                const anyVisible = Array.from(devicesInLocation).some(deviceRow => !deviceRow.classList.contains('d-none'));
 
-    updateSingleContainer(container, sensorData) {
-        let html = '';
-        if (sensorData && sensorData.status === 'success') {
-            const value = parseFloat(sensorData.value);
-            const unit = sensorData.unit_symbol || '';
-            const isBoolean = (sensorData.unit_name && sensorData.unit_name.toLowerCase() === 'boolean');
-
-            let valueDisplay;
-            if (isBoolean) {
-                valueDisplay = value > 0 ? 'True' : 'False';
-            } else if (!isNaN(value)) {
-                valueDisplay = value.toFixed(sensorData.decimal_places || 1);
-            } else {
-                valueDisplay = 'N/A'; // Handle case where value is not a number
-            }
-
-            const timestamp = sensorData.timestamp ? new Date(sensorData.timestamp) : null;
-            const naturalTime = timestamp && window.utils ? window.utils.getNaturalTime(timestamp) : '';
-
-            html = `
-                <span class="badge bg-success-subtle text-success-emphasis rounded-1">${valueDisplay}${unit ? ' ' + unit : ''}</span>
-                ${naturalTime ? `<small class="text-muted ms-1">(${naturalTime})</small>` : ''}
-            `;
-        } else if (sensorData && sensorData.status === 'no_reading') {
-            html = `<span class="badge bg-secondary-subtle text-secondary-emphasis rounded-1" title="No reading available from source.">No Reading</span>`;
-        } else {
-            const errorMessage = sensorData ? sensorData.message : 'An error occurred';
-            html = `<span class="badge bg-danger-subtle text-danger-emphasis rounded-1" title="${errorMessage}">Error</span>`;
-        }
-        container.innerHTML = html;
-
-        if (sensorData && sensorData.status === 'success') {
-            const pk = container.dataset.sensorPk;
-            const wrapper = document.getElementById(`sensor-live-details-wrapper-${pk}`);
-
-            if (wrapper) {
-                const timeElements = wrapper.querySelectorAll('.updatable-naturaltime');
-                if (timeElements.length > 0 && sensorData.timestamp) {
-                    timeElements[0].dataset.timestamp = sensorData.timestamp;
+                if (anyVisible) {
+                    locationRow.classList.remove('d-none');
+                } else {
+                    locationRow.classList.add('d-none');
                 }
-                if (timeElements.length > 1 && sensorData.last_checked_timestamp) {
-                    timeElements[1].dataset.timestamp = sensorData.last_checked_timestamp;
-                }
-            }
-        }
-    }
+            });
+        };
 
-    renderErrorForContainer(container, errorMessage) {
-        container.innerHTML = `<span class="badge bg-danger-subtle text-danger-emphasis rounded-1" title="${errorMessage}">Error</span>`;
-    }
+        filterSelect.addEventListener('change', filterDevices);
 
-    updateSensorValueFromGraph(sensorId, latestData, unitSymbol, decimalPlaces) {
-        if (commonConfig.debug) console.log(`[LiveValueFetcher] Received update from graph for sensor ${sensorId}`, { latestData });
-        if (!latestData) return;
-
-        const [timestamp, value] = latestData;
-        const cacheKey = `sensor-${sensorId}-data`;
-        const cachedDataStr = sessionStorage.getItem(cacheKey);
-        let sensorData;
-
-        if (cachedDataStr) {
-            sensorData = JSON.parse(cachedDataStr);
-        } else {
-            // If no data exists, create a shell object from what the graph knows.
-            sensorData = {
-                status: 'success',
-                unit_symbol: unitSymbol,
-                decimal_places: decimalPlaces,
-            };
+        const hideInactiveSwitch = document.getElementById('hide-inactive-switch-device');
+        if (hideInactiveSwitch) {
+            hideInactiveSwitch.addEventListener('change', filterDevices);
         }
 
-        const newTimestamp = new Date(timestamp);
-        const currentTimestamp = sensorData.timestamp ? new Date(sensorData.timestamp) : new Date(0);
-
-        // Only update if the new data is newer
-        if (newTimestamp > currentTimestamp) {
-            if (commonConfig.debug) console.log(`[LiveValueFetcher] Graph data is newer. Updating cache and view for sensor ${sensorId}.`);
-            sensorData.value = value;
-            sensorData.timestamp = newTimestamp.toISOString();
-            sessionStorage.setItem(cacheKey, JSON.stringify(sensorData));
-            this.updateAllContainersFromCache();
-        } else {
-            if (commonConfig.debug) console.log(`[LiveValueFetcher] Graph data is not newer. Ignoring update for sensor ${sensorId}.`);
-        }
+        // Initial filter on page load
+        filterDevices();
     }
-}
-
-// Explicitly attach to window for other scripts
-window.LiveValueFetcher = LiveValueFetcher;
+});
 
 // Export initialization status checker
 window.sensorPlaces.isInitialized = function(module) {

@@ -5,6 +5,16 @@
             <span class="text-nowrap">Device List</span>
         </h5>
         <div class="d-flex align-items-center">
+            <div class="input-group input-group-sm me-2">
+                <label class="input-group-text" for="device-class-filter">Class</label>
+                <select class="form-select" id="device-class-filter">
+                    <option value="all" selected>All</option>
+                    <option value="shelly">Shelly</option>
+                    <option value="switchbot">SwitchBot</option>
+                    <option value="lorawan">LoRaWAN</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
             {% include "sensors/partials/hide_inactive_switch.html" with model="device" hide_inactive=hide_inactive %}
         </div>
     </div>

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path, include
 from .views import (
     place_views,
@@ -21,7 +22,6 @@ from .views.sensor_views import (
     SensorUpdateView,
     SensorDeleteView,
     SensorGraphCardView,
-    SensorLiveValueView,
     SensorDetailCardView,
     SensorLiveDetailsView,
     SensorInfluxUpdateView,
@@ -67,19 +67,18 @@ urlpatterns = [
 
     # SwitchBot Integration
     path('<slug:place_slug>/switchbot/', switchbot_views.switchbot_management_view, name='switchbot_management'),
-    path('<slug:place_slug>/switchbot/existing-devices/', switchbot_views.switchbot_existing_devices_view, name='switchbot_existing_devices'),
-    path('<slug:place_slug>/switchbot/api-sync/', switchbot_views.switchbot_api_sync_view, name='switchbot_api_sync'),
-    path('<slug:place_slug>/switchbot/config/', switchbot_views.switchbot_config_update_view, name='switchbot_config_update'),
-    path('<slug:place_slug>/switchbot/edit-influx-store/', switchbot_views.switchbot_influx_store_edit_view, name='switchbot_influx_store_edit'),
-    path('<slug:place_slug>/switchbot/update-influx-store/', switchbot_views.update_switchbot_influx_store, name='switchbot_influx_store_update'),
-    path('<slug:place_slug>/switchbot/import-device/', switchbot_views.import_switchbot_device_view, name='import_switchbot_device'),
-    path('<slug:place_slug>/switchbot/inspect-api-device/<str:device_id>/', switchbot_views.switchbot_inspect_api_device_view, name='switchbot_inspect_api_device'),
+    # path('<slug:place_slug>/switchbot/existing-devices/', switchbot_views.switchbot_existing_devices_view, name='switchbot_existing_devices'),
+    # path('<slug:place_slug>/switchbot/api-sync/', switchbot_views.switchbot_api_sync_view, name='switchbot_api_sync'),
+    # path('<slug:place_slug>/switchbot/config/', switchbot_views.switchbot_config_update_view, name='switchbot_config_update'),
+    # path('<slug:place_slug>/switchbot/edit-influx-store/', switchbot_views.switchbot_influx_store_edit_view, name='switchbot_influx_store_edit'),
+    # path('<slug:place_slug>/switchbot/update-influx-store/', switchbot_views.update_switchbot_influx_store, name='switchbot_influx_store_update'),
+    # path('<slug:place_slug>/switchbot/import-device/', switchbot_views.import_switchbot_device_view, name='import_switchbot_device'),
+    # path('<slug:place_slug>/switchbot/inspect-api-device/<str:device_id>/', switchbot_views.switchbot_inspect_api_device_view, name='switchbot_inspect_api_device'),
 
     # API URLs that are place-specific
     path('api/<slug:place_slug>/stats/', place_views.place_stats, name='place_stats_api'),
     path('api/<slug:place_slug>/toggle-active/', toggle_active.ToggleActiveView.as_view(), name='toggle_active'),
     path('api/<slug:place_slug>/toasts/', toast_views.ToastAPIView.as_view(), name='toast_api'),
-    path('api/<slug:place_slug>/sensors/live-values/', sensor_views.SensorLiveValueView.as_view(), name='sensor_live_values_api'),
 
     # Location URLs
     path('<slug:place_slug>/location/', location_views.LocationListView.as_view(), name='location_list'),
@@ -102,6 +101,9 @@ urlpatterns = [
 
     # API endpoints for devices
     path('api/<slug:place_slug>/device/<int:pk>/move/', device_views.DeviceMoveLocationView.as_view(), name='device_move_location'),
+    # path('api/<slug:place_slug>/device/<int:device_pk>/switchbot_missing_sensors/', device_views.get_missing_switchbot_sensors, name='get_missing_switchbot_sensors'),
+    # path('api/<slug:place_slug>/device/<int:device_pk>/switchbot_get_devices/', device_views.get_switchbot_devices, name='get_switchbot_devices'),
+    # path('api/<slug:place_slug>/device/<int:device_pk>/switchbot_add_sensor/', device_views.add_switchbot_sensor, name='add_switchbot_sensor'),
 
     # Toast URLs
     path('<slug:place_slug>/toasts/', toast_views.ToastListView.as_view(), name='toast_list'),
@@ -119,7 +121,8 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:pk>/delta/<str:delta>/', SensorDetailView.as_view(), name='sensor_detail_delta'),
     path('<slug:place_slug>/sensor/<int:pk>/<str:start_date>/<str:end_date>/', SensorDetailView.as_view(), name='sensor_detail_daterange'),
     path('<slug:place_slug>/sensor/<int:pk>/graph-card/', SensorGraphCardView.as_view(), name='sensor_graph_card'),
-    path('<slug:place_slug>/sensor/<int:pk>/live-value/', SensorLiveValueView.as_view(), name='sensor_live_value'),
+    path('<slug:place_slug>/sensor/<int:pk>/live-value/', sensor_views.sensor_live_value_view, name='sensor_live_value'),
+    path('<slug:place_slug>/sensor/<int:pk>/live-row/', sensor_views.sensor_live_row_view, name='sensor_live_row'),
     path('<slug:place_slug>/sensor/<int:pk>/update/', SensorUpdateView.as_view(), name='sensor_update'),
     path('<slug:place_slug>/sensor/<int:pk>/update-influx/', SensorInfluxUpdateView.as_view(), name='sensor_influx_update'),
     path('<slug:place_slug>/sensor/<int:pk>/delete/', SensorDeleteView.as_view(), name='sensor_delete'),
@@ -142,3 +145,8 @@ urlpatterns = [
     path('api/<slug:place_slug>/influx-stores/<int:pk>/test-write/', influx_views.test_influx_store_write_read_view, name='test_influx_store_write'),
     path('<slug:place_slug>/sensor/<int:pk>/test-influx-write/', sensor_views.test_influx_write, name='test_influx_write'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += [
+        path('dev/', include('sensors.dev_urls', namespace='sensors_dev')),
+    ]

@@ -1,0 +1,24 @@
+{% extends "sensors/base.html" %}
+{% load static %}
+
+{% block title %}Siteplan Test Page for {{ place.name }}{% endblock title %}
+
+{% block page_class %}page-siteplan-test{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h1>Siteplan Test: {{ place.name }}</h1>
+            <p>This is a test page to isolate and debug the siteplan component.</p>
+
+            {% include "sensors/includes/siteplan_card.html" %}
+
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/siteplan.js' %}?v={{ APP_VERSION }}"></script>
+{% endblock %}

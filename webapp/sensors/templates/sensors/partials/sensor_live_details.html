@@ -59,8 +59,8 @@
     <div class="col-5 text-end">
         <span class="text-muted">Last Checked: </span>
         <span class="text-monospace updatable-naturaltime"
-              data-timestamp="{{ sensor.last_checked_timestamp.isoformat }}">
-            {{ sensor.last_checked_timestamp|naturaltime|default:"Never" }}
+              data-timestamp="{{ sensor.last_cached_timestamp.isoformat }}">
+            {{ sensor.last_cached_timestamp|naturaltime|default:"Never" }}
         </span>
     </div>
 </div>

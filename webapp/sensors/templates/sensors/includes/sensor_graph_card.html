@@ -1,63 +1,43 @@
 {% load humanize %}
 <div class="card my-2" id="sensor-graph-card"
-    data-sensor-id="{{ sensor.pk }}"
-    data-place-slug="{{ place.slug }}"
-    data-sensor-name="{{ sensor.name }}"
-    data-device-name="{{ sensor.device.name }}"
-    data-sensor-type="{{ sensor.sensor_type.name }}"
-    data-sensor-unit="{{ sensor.effective_unit.symbol }}"
-    data-sensor-unit-name="{{ sensor.effective_unit.name }}"
-    data-min-value="{{ sensor.effective_min_value|default_if_none:'' }}"
-    data-max-value="{{ sensor.effective_max_value|default_if_none:'' }}"
-    data-decimal-places="{{ sensor.effective_decimal_places|default_if_none:'' }}"
-    data-graph-type="{{ sensor.graph_type }}"
-    data-start-date="{{ start_date_iso|default:'' }}"
-    data-end-date="{{ end_date_iso|default:'' }}"
-    data-api-url="{% if sensor.device.is_lorawan %}{% url 'sensors:lorawan_sensor_data_api' place_slug=place.slug pk=sensor.pk %}{% else %}{% url 'sensors:sensor_readings_api' place_slug=place.slug pk=sensor.pk %}{% endif %}">
-    <div class="card-header d-flex align-items-center">
-        <h5 class="card-title mb-0 d-flex align-items-center">
-            <i class="bi bi-graph-up me-2"></i> Data Graph
+     data-sensor-id="{{ sensor.pk }}"
+     data-place-slug="{{ place.slug }}"
+     data-sensor-name="{{ sensor.name }}"
+     data-device-name="{{ sensor.device.name }}"
+     data-sensor-type="{{ sensor.sensor_type.name|default:'N/A' }}"
+     data-sensor-unit="{{ sensor.effective_unit.symbol|default:'' }}"
+     data-graph-type="{{ sensor.effective_graph_type }}"
+     data-min-value="{{ sensor.effective_min_value|default:'' }}"
+     data-max-value="{{ sensor.effective_max_value|default:'' }}"
+     data-decimal-places="{{ sensor.effective_decimal_places|default:2 }}"
+     data-api-url="{% url 'sensors:sensor_readings_api' place_slug=place.slug pk=sensor.pk %}">
+
+    <div class="card-header d-flex justify-content-between align-items-center py-1">
+        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
+            <i class="bi bi-graph-up me-2"></i>Data Graph
         </h5>
-        <div class="ms-auto d-flex align-items-center">
-            {% if sensor.sensor_type.name == 'Temperature' %}
-            <select id="temp-unit-select" class="form-select form-select-sm ms-3" style="width: auto;">
-                <option value="C" {% if 'C' in sensor.effective_unit.symbol %}selected{% endif %}>Celsius (°C)</option>
-                <option value="F" {% if 'F' in sensor.effective_unit.symbol %}selected{% endif %}>Fahrenheit (°F)</option>
-            </select>
-            {% endif %}
-        </div>
+        {% include 'sensors/partials/_graph_controls.html' %}
     </div>
-    <div class="card-body">
-        <div class="d-flex align-items-center mb-2 flex-wrap">
-            <div class="btn-group btn-group-sm me-3 mb-2" role="group">
-                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="6h">6h</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="24h">24h</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset active" data-range="3d">3d</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="7d">7d</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="14d">14d</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="30d">30d</button>
-                <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="60d">60d</button>
-            </div>
-            <div class="d-flex align-items-center mb-2">
-                <input type="text" id="start-date-picker" class="form-control form-control-sm" placeholder="Start Date">
-                <span class="mx-2">to</span>
-                <input type="text" id="end-date-picker" class="form-control form-control-sm" placeholder="End Date">
-                <button id="apply-date-range" class="btn btn-primary btn-sm ms-2">Graph</button>
-            </div>
-        </div>
-        <div id="graph-content-{{ sensor.pk }}" class="d-none" style="position: relative; height:400px;">
+
+    <div class="card-body p-2" style="min-height: 400px; position: relative;">
+        <div id="graph-content-{{ sensor.pk }}" style="height: 400px;">
             <canvas id="sensorChart"></canvas>
         </div>
-        <div id="graph-warning-{{ sensor.pk }}" class="alert alert-warning mt-2 d-none" role="alert">
+        <div id="graph-loading-{{ sensor.pk }}" class="d-none position-absolute top-50 start-50 translate-middle">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
         </div>
+        <div id="graph-placeholder-{{ sensor.pk }}" class="position-absolute top-50 start-50 translate-middle text-center">
+            {# Content will be injected by JS if there's no data #}
+        </div>
+        <div id="graph-warning-{{ sensor.pk }}" class="alert alert-warning d-none" role="alert"></div>
     </div>
-    <div class="card-footer d-flex justify-content-between text-muted small">
-        <span><i class="bi bi-info-circle me-1"></i> Data from InfluxDB</span>
-        <div class="d-flex">
-            <span id="first-reading-time" class="me-3"></span>
-            <span id="last-reading-time" class="me-3"></span>
-            <span id="datapoint-count" class="me-3"></span>
-            <span id="graph-query-time"></span>
+    <div class="card-footer bg-light py-1 px-2 small text-muted">
+        <div class="d-flex justify-content-between align-items-center">
+            <span id="dp-stats-source-{{ sensor.pk }}"></span>
+            <span id="dp-stats-range-{{ sensor.pk }}"></span>
+            <span id="dp-stats-query-time-{{ sensor.pk }}"></span>
         </div>
     </div>
 </div>

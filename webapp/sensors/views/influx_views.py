@@ -31,6 +31,8 @@ from icecream import ic
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from ..models import InfluxStore, Sensor
+from django.http import HttpResponseBadRequest
+from django.utils import timezone
 
 
 @login_required
@@ -64,7 +66,7 @@ def test_influx_store_write_read_view(request, place_slug, pk):
     start_time = time.time()
     results = test_influx_write_read(store)
     end_time = time.time()
-    
+
     query_time_ms = int((end_time - start_time) * 1000)
 
     context = {
@@ -115,11 +117,14 @@ def influxstore_test(request, place_slug, pk, test_type_override=None):
         }
     elif test_type == 'sensor_read':
         sensor_pk = request.GET.get('sensor_pk')
+        if not sensor_pk:
+            return HttpResponseBadRequest("Sensor PK not provided for sensor_read test.")
         sensor = get_object_or_404(Sensor, pk=sensor_pk)
         start_time = time.time()
         results = get_latest_influx_reading(sensor)
         end_time = time.time()
         query_time_ms = int((end_time - start_time) * 1000)
+
         context = {
             'test_name': 'Read Sensor Data',
             'sensor': sensor,
@@ -141,7 +146,7 @@ class InfluxStoreListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
 
     def get_queryset(self):
         place = get_object_or_404(Place, slug=self.kwargs['place_slug'])
-        
+
         queryset = InfluxStore.objects.filter(place=place)
 
         # Annotate and order the queryset
@@ -157,7 +162,7 @@ class InfluxStoreListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
                 output_field=BooleanField()
             )
         ).order_by('-is_default', '-is_switchbot', 'name')
-        
+
         return queryset
 
     def get_context_data(self, **kwargs):

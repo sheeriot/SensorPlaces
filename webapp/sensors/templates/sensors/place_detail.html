@@ -1,51 +1,33 @@
 {% extends "sensors/base.html" %}
-{% load sensor_filters %}
 {% load static %}
+{% load i18n %}
+{% load sensors_tags %}
 
-{% block title %}Sensor Places - {{ place.name }}{% endblock %}
+{% block title %}{{ place.name }} Details{% endblock %}
 
-{% block extra_css %}
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <link rel="stylesheet" href="{% static 'sensors/css/siteplan.css' %}">
-{% endblock %}
+{% block page_class %}page-place-detail{% endblock %}
 
 {% block content %}
-    <div class="row gx-2 my-1">
-    <!-- Left Column: Place Details -->
-    <div class="col-md-4">
+    <div class="row">
+        <!-- Main Content Column -->
+        <div class="col-lg-7">
+            <!-- Place Information Card -->
+            {% include "sensors/includes/place_detail_card.html" %}
 
-        {% include "sensors/includes/place_detail_card.html" with place=place place_map_html=place_map_html %}
+            <!-- Siteplan Card -->
+            {% include "sensors/includes/siteplan_card.html" with editable=request.user.is_authenticated %}
+        </div>
 
-        {% if place.switchbot_enable %}
-            {% include "sensors/includes/switchbot_summary_card.html" %}
-        {% endif %}
+        <!-- Right Sidebar Column -->
+        <div class="col-lg-5">
+            <div class="vstack gap-1">
+                <!-- Locations Card -->
+                {% include "sensors/includes/location_list_card.html" %}
 
-        <!-- {% include 'sensors/includes/place_nav_card.html' %} -->
-        {% if place.is_active %}
+                <!-- Devices Card -->
+                {% include "sensors/includes/device_list_card.html" %}
 
-            {% include 'sensors/includes/live_counts_card.html' %}
-        {% endif %}
-
+            </div>
+        </div>
     </div>
-
-    <!-- Right Column: Locations and Site Plan/Map -->
-    <div class="col-md-8 {% if not place.is_active %}opacity-50{% endif %}">
-        {# include "sensors/includes/siteplan_card.html" with editable=True #}
-
-        <!-- Device List Card -->
-        {% include "sensors/includes/device_list_card.html" with object_list=locations %}
-        <!-- Unassigned Devices Card -->
-        {% include "sensors/includes/unassigned_devices_card.html" %}
-
-        <!-- InfluxDB Store Card -->
-        {% include "sensors/includes/influxstore_list_card.html" %}
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<!-- <script src="{% static 'sensors/js/siteplan-view.js' %}?v={{ APP_VERSION }}"></script> -->
-<!-- <script src="{% static 'sensors/js/siteplan-editor.js' %}?v={{ APP_VERSION }}"></script> -->
-<script src="{% static 'sensors/js/device-move.js' %}?v={{ APP_VERSION }}"></script>
-{% endblock %}
+{% endblock content %}

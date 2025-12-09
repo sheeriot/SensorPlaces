@@ -49,7 +49,7 @@ def get_influxdb_client(influx_store):
     )
 
 def get_sensor_readings(sensor, start=None, stop=None, limit=100):
-    if not sensor.influx_store or sensor.data_type != 'INFLUX':
+    if not sensor.influx_store or sensor.data_store != 'INFLUX':
         return []
 
     client = get_influxdb_client(sensor.influx_store)
@@ -265,31 +265,58 @@ def _verify_influx_write(sensor):
     record_count = get_influx_record_count(sensor)
 
 
-def update_sensor_live_value(sensor):
+def update_sensor_live_value(sensor, force_update=False):
     """
-    Fetches and updates the live value for a single sensor if it's time to check.
-    This function now uses `last_checked_timestamp` to determine if a check is needed,
-    preventing excessive queries for sensors that update infrequently.
-    Returns True if a new value was fetched and saved, False otherwise.
+    Fetches and updates the live value for a single sensor. This function is the
+    central point for keeping sensor data current.
+
+    Logic:
+    1. Always records the time of the check in `last_cached_timestamp`.
+    2. Determines if a new value needs to be fetched from the source (e.g., API, InfluxDB)
+       based on the `effective_stale_threshold` or if `force_update` is True.
+    3. If a fetch is required, it queries the appropriate data source.
+    4. If a new, fresher value is obtained, it updates the sensor's cached fields.
+    5. All updates are performed in a single, efficient database query.
     """
     from django.utils import timezone
     from datetime import timedelta
 
-    # Decide if it's time to check based on the stale threshold.
-    if 'DISABLE_STALE_CHECK' in globals() and globals()['DISABLE_STALE_CHECK']:
-        pass # Skip the check if the debug flag is set
-    elif sensor.last_checked_timestamp:
-        time_since_last_check = timezone.now() - sensor.last_checked_timestamp
-        if time_since_last_check < timedelta(seconds=sensor.effective_stale_threshold):
-            return False  # Not time to check yet.
+    now = timezone.now()
+    update_kwargs = {'last_cached_timestamp': now}
+    value_was_updated = False
 
-    # Proceed with the check.
+    # Determine if it's time to fetch a new reading based on the stale threshold.
+    time_to_fetch = True
+    check_age_str = "Never"
+    if sensor.last_cached_timestamp and not force_update:
+        check_age = now - sensor.last_cached_timestamp
+        check_age_str = f"{int(check_age.total_seconds())}s"
+        if check_age < timedelta(seconds=sensor.effective_stale_threshold):
+            time_to_fetch = False
+    elif not sensor.last_cached_timestamp:
+        check_age_str = "N/A"
+    else: # force_update is True
+        check_age = now - sensor.last_cached_timestamp
+        check_age_str = f"{int(check_age.total_seconds())}s"
+
+    # ic(f"Update Check for '{sensor.name}' (pk={sensor.pk}): Last Cached Age={check_age_str}, Time to Fetch={time_to_fetch}, Force={force_update}")
+
+    if not time_to_fetch:
+        # ic(f"-> Stale check passed for {sensor.name}. Not fetching new reading.")
+        # If stale check passes, the source is whatever is already in the cache.
+        return (False, sensor.cached_reading_source or 'cache')
+
+    # --- If we are here, a fetch is required ---
+
     from .switchbot_client import get_status
 
     new_value = None
     new_timestamp = None
+    source = "Unknown"
 
     if sensor.device.is_switchbot:
+        source = "SwitchBot API"
+        # ic(f"-> Fetching from {source} for {sensor.name}")
         place = sensor.device.location.place
         if place.switchbot_token and place.switchbot_secret:
             try:
@@ -302,184 +329,64 @@ def update_sensor_live_value(sensor):
                     new_timestamp = timezone.now()
 
             except Exception as e:
-                pass
+                ic(f"-> ERROR fetching from {source}: {e}")
         else:
-            pass
-    elif sensor.data_type and sensor.data_type.startswith('INFLUX'):
+            ic(f"-> SKIPPED {source}: Credentials not set for place '{place.name}'")
+
+    elif sensor.data_store and sensor.data_store.startswith('INFLUX'):
+        source = "InfluxDB"
+        # ic(f"-> Fetching from {source} for {sensor.name}")
         try:
             latest_reading = get_latest_influx_reading(sensor)
             if latest_reading and latest_reading.get('value') is not None:
                 new_value = latest_reading['value']
                 new_timestamp = latest_reading['time']
         except Exception as e:
-            pass  # Errors are logged in get_latest_influx_reading
+            ic(f"-> ERROR fetching from {source}: {e}")
 
     else:
-        # Fallback for DIRECT or other types: check local DB for the latest reading
+        source = "Local DB"
+        ic(f"-> Fetching from {source} for {sensor.name}")
         try:
-            # Import locally to avoid circular import
             from .models import SensorReading
             latest_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
             if latest_reading:
                 new_value = latest_reading.value
                 new_timestamp = latest_reading.timestamp
-            else:
-                pass
         except Exception as e:
-            pass
+            ic(f"-> ERROR fetching from {source}: {e}")
 
-
-
-    # --- Update the sensor object ---
-
-    # Always update the last_checked time
-    # Use .update() to bypass the full_clean() called in Sensor.save()
-    # This prevents validation errors from blocking live value updates
-
-    update_kwargs = {
-        'last_checked_timestamp': timezone.now()
-    }
-
-    value_was_updated = False
-    # Only update the cached value if the new reading is actually newer
-    if new_timestamp and (sensor.cached_reading_timestamp is None or new_timestamp > sensor.cached_reading_timestamp):
+    # If a new value was successfully fetched, add it to the update.
+    if new_timestamp:
+        # ic(f"-> New value received. Updating cache for {sensor.name}.")
         update_kwargs['cached_reading_value'] = new_value
         update_kwargs['cached_reading_timestamp'] = new_timestamp
-
-        # Update the instance as well (though refresh_from_db in view would catch it)
-        sensor.cached_reading_value = new_value
-        sensor.cached_reading_timestamp = new_timestamp
+        update_kwargs['cached_reading_source'] = source
         value_was_updated = True
-
-        # For SwitchBot devices, the live value check is also the data collection mechanism,
-        # so we write the newly fetched value to InfluxDB for historical logging.
-        # For all other sensor types, this function only reads and caches.
-        if sensor.device.is_switchbot:
-            write_sensor_reading_to_influx(sensor, new_value)
     else:
-        pass
+        ic(f"-> No new value could be fetched for {sensor.name}. Not updating value.")
+        # If no new value is fetched, we don't update anything and report failure.
+        # The source is where we tried to fetch from.
+        return (False, source)
 
-    sensor.last_checked_timestamp = update_kwargs['last_checked_timestamp']
+    # For SwitchBot devices, write the newly fetched value to InfluxDB for history.
+    if sensor.device.is_switchbot and value_was_updated:
+        ic(f"-> Writing SwitchBot value to InfluxDB for {sensor.name}.")
+        write_sensor_reading_to_influx(sensor, new_value)
+
+
+    # Update the instance for immediate use in the calling view/template
+    sensor.last_cached_timestamp = now
+    if value_was_updated:
+        sensor.cached_reading_value = update_kwargs['cached_reading_value']
+        sensor.cached_reading_timestamp = update_kwargs['cached_reading_timestamp']
+        sensor.cached_reading_source = source
+
+    # Perform a single, efficient DB update query.
     sensor.__class__.objects.filter(pk=sensor.pk).update(**update_kwargs)
+    # ic(f"-> DB updated for {sensor.name} with fields: {list(update_kwargs.keys())}")
 
-    return value_was_updated
-
-
-# def calculate_zoom(distance=0):
-#     """Calculate appropriate zoom level based on distance in kilometers"""
-#     if distance <= 0.4:
-#         return 16
-#     if distance <= 1:
-#         return 15
-#     if distance <= 2:
-#         return 14
-#     elif distance <= 4:
-#         return 13
-#     elif distance <= 10:
-#         return 12
-#     elif distance <= 17:
-#         return 11
-#     elif distance <= 30:
-#         return 10
-#     elif distance <= 60:
-#         return 9
-#     elif distance <= 120:
-#         return 8
-#     elif distance <= 250:
-#         return 7
-#     elif distance <= 550:
-#         return 6
-#     elif distance <= 1100:
-#         return 5
-#     elif distance <= 2000:
-#         return 4
-#     elif distance <= 5000:
-#         return 3
-#     else:
-#         return 2
-
-
-# def add_toast_message(request, title: str, message: str, message_type: str = 'info'):
-#     """Add a toast message directly to the request object.
-
-#     Args:
-#         request: The request object to attach the message to
-#         title: The title of the message (may be used in modal views)
-#         message: The main message content
-#         message_type: Type of message ('success', 'info', 'warning', 'danger')
-#     """
-#     # ic("add_toast_message called:", {
-#     #     'title': title,
-#     #     'message': message,
-#     #     'type': message_type
-#     # })
-
-#     # Ensure message type is valid
-#     valid_types = ['success', 'info', 'warning', 'danger']
-#     if message_type not in valid_types:
-#         message_type = 'info'
-
-#     # Format the message if title is provided
-#     formatted_message = f"{title}: {message}" if title else message
-
-#     request.toast_message = {
-#         'message': formatted_message,
-#         'type': message_type,
-#         'addToHistory': True  # API responses should be added to history
-#     }
-
-#     # ic("Toast message added to request:", request.toast_message)
-
-# def mark_toast_as_read(request, toast_id, read_status=True):
-#     """Mark a toast notification as read/unread.
-
-#     Args:
-#         request: The request object
-#         toast_id: The ID of the toast to mark
-#         read_status: Boolean indicating whether to mark as read (True) or unread (False)
-
-#     Returns:
-#         JsonResponse with updated unread count
-#     """
-#     if not request.user.is_authenticated:
-#         return JsonResponse({'error': 'Authentication required'}, status=401)
-
-#     try:
-#         toast = ToastNotification.objects.get(id=toast_id, user=request.user)
-#         toast.read = read_status
-#         toast.save()
-
-#         # Get updated unread count
-#         unread_count = ToastNotification.objects.filter(
-#             user=request.user,
-#             read=False
-#         ).count()
-
-#         return JsonResponse({
-#             'success': True,
-#             'unread_count': unread_count
-#         })
-#     except ToastNotification.DoesNotExist:
-#         return JsonResponse({'error': 'Toast not found'}, status=404)
-
-# def clear_toast_history(request):
-#     """Clear all toast notifications for the current user.
-
-#     Args:
-#         request: The request object
-
-#     Returns:
-#         JsonResponse indicating success/failure
-#     """
-#     if not request.user.is_authenticated:
-#         return JsonResponse({'error': 'Authentication required'}, status=401)
-
-#     try:
-#         ToastNotification.objects.filter(user=request.user).delete()
-#         return JsonResponse({'success': True})
-#     except Exception as e:
-#         return JsonResponse({'error': str(e)}, status=500)
-
+    return (value_was_updated, source)
 
 def generate_sparkline(timestamps: List[datetime]) -> Optional[str]:
     """

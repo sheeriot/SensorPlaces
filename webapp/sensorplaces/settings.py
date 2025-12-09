@@ -134,6 +134,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'sensors.context_processors.app_version_processor',
+                'sensors.context_processors.timezone_context_processor',
             ],
             'builtins': [
                 'django.templatetags.static',
@@ -362,3 +363,6 @@ SWITCHBOT_SECRET = os.environ.get("SWITCHBOT_SECRET", None)
 # Webhook Sniffer
 WEBHOOK_SNIFFER = os.environ.get('WEBHOOK_SNIFFER', 'False').lower() in ('true', '1', 't')
 ic(WEBHOOK_SNIFFER)
+
+# Global sensor settings
+DEFAULT_STALE_THRESHOLD_SECONDS = 300

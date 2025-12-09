@@ -1,7 +1,41 @@
 let liveValueFetcher = null;
 let isChartInitialized = false;
+const watchedSensors = new Set();
 
 const SCRIPT_DEBUG = false;
+
+function updateWatchToggleUI(toggleButton) {
+    if (!toggleButton) return;
+    const sensorId = toggleButton.dataset.sensorId;
+    const icon = toggleButton.querySelector('i');
+    if (watchedSensors.has(sensorId)) {
+        toggleButton.classList.add('active');
+        toggleButton.classList.replace('btn-outline-secondary', 'btn-secondary');
+        if (icon) icon.classList.replace('bi-eye', 'bi-eye-slash-fill');
+        toggleButton.title = 'Stop watching this sensor';
+    } else {
+        toggleButton.classList.remove('active');
+        toggleButton.classList.replace('btn-secondary', 'btn-outline-secondary');
+        if (icon) icon.classList.replace('bi-eye-slash-fill', 'bi-eye');
+        toggleButton.title = 'Watch this sensor';
+    }
+}
+
+function toggleWatchState(sensorId) {
+    if (watchedSensors.has(sensorId)) {
+        watchedSensors.delete(sensorId);
+    } else {
+        watchedSensors.add(sensorId);
+    }
+    const toggleButton = document.querySelector(`.watch-toggle[data-sensor-id="${sensorId}"]`);
+    updateWatchToggleUI(toggleButton);
+}
+
+function reapplyWatchState(container) {
+    container.querySelectorAll('.watch-toggle').forEach(toggleButton => {
+        updateWatchToggleUI(toggleButton);
+    });
+}
 
 function initializeLiveValueFetcher() {
     if (!liveValueFetcher) {
@@ -27,8 +61,21 @@ document.addEventListener('DOMContentLoaded', function () {
     if(SCRIPT_DEBUG) console.log('sensor-detail.js: DOMContentLoaded. Initializing live value fetcher.');
     initializeLiveValueFetcher();
 
+    document.body.addEventListener('click', function(evt) {
+        const toggleButton = evt.target.closest('.watch-toggle');
+        if (toggleButton) {
+            const sensorId = toggleButton.dataset.sensorId;
+            if (sensorId) {
+                toggleWatchState(sensorId);
+            }
+        }
+    });
+
     document.body.addEventListener('htmx:afterSwap', function(evt) {
         if(SCRIPT_DEBUG) console.log('sensor-detail.js: htmx:afterSwap event triggered.');
+        // Re-apply watch state to any toggles in the swapped content
+        reapplyWatchState(evt.detail.target);
+
         // Check if the swapped-in content contains the graph card.
         const graphCard = document.querySelector('#sensor-graph-card');
 
