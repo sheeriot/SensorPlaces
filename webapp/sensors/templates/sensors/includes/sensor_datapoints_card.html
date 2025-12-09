@@ -1,38 +1,39 @@
-<!-- Data points card, hidden by default -->
-<div class="card my-2 d-none" id="graph-datapoints-{{ sensor.pk }}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">Data Points</h5>
-        <div class="d-flex align-items-center gap-2">
-            <div class="form-check form-switch form-check-inline" title="Show/hide data points with no value">
-                <input class="form-check-input" type="checkbox" id="show-na-toggle-{{ sensor.pk }}">
-                <label class="form-check-label small" for="show-na-toggle-{{ sensor.pk }}">Show N/A</label>
+<div id="graph-datapoints-container-{{ sensor.pk }}" class="d-none">
+    <div class="card my-2" id="graph-datapoints-{{ sensor.pk }}">
+        <div class="card-header py-2"
+             id="heading-datapoints-{{ sensor.pk }}"
+             style="cursor: pointer;">
+            <div class="d-flex justify-content-between align-items-center w-100">
+                <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
+                    <i class="bi bi-table me-2"></i>Data Points
+                </h5>
+                <div class="d-flex align-items-center small text-muted">
+                    <span id="dp-stats-count-{{ sensor.pk }}" class="me-2"></span>
+                    <i class="bi bi-chevron-down ms-2"></i>
+                </div>
             </div>
-            <div class="d-flex align-items-center gap-3 small text-muted me-3">
-                 <span>Count: <strong id="dp-stats-count-{{ sensor.pk }}">-</strong></span>
-                 <span>Min: <strong id="dp-stats-min-{{ sensor.pk }}">-</strong></span>
-                 <span>Max: <strong id="dp-stats-max-{{ sensor.pk }}">-</strong></span>
+            <hr class="my-1">
+            <div class="d-flex justify-content-between align-items-center small text-muted w-100">
+                <span id="dp-stats-first-{{ sensor.pk }}"></span>
+                <span id="dp-stats-last-{{ sensor.pk }}"></span>
             </div>
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDataPoints-{{ sensor.pk }}" aria-expanded="false" aria-controls="collapseDataPoints-{{ sensor.pk }}">
-                <i class="bi bi-chevron-down"></i>
-            </button>
         </div>
-    </div>
-    <div class="collapse" id="collapseDataPoints-{{ sensor.pk }}">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-sm table-striped table-hover mb-0">
-                    <thead class="table-light sticky-top">
-                        <tr>
-                            <th>Timestamp</th>
-                            <th class="text-end" id="data-points-value-header-{{ sensor.pk }}">
-                                Value ({{ sensor.effective_unit.symbol|default:'' }})
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="data-points-body-{{ sensor.pk }}">
-                        <!-- Rows will be inserted by JS -->
-                    </tbody>
-                </table>
+        <div id="collapse-datapoints-{{ sensor.pk }}" class="collapse show" aria-labelledby="heading-datapoints-{{ sensor.pk }}">
+            <div class="card-body p-2">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped font-monospace">
+                        <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th id="data-points-value-header-{{ sensor.pk }}">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="data-points-body-{{ sensor.pk }}">
+                                {# Rows will be dynamically inserted here by sensor-chart.js #}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

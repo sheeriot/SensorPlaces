@@ -52,7 +52,7 @@ class WebhookReceiverView(View):
 
                     influx_action = "Skipped"
                     # Log based on what the service likely did.
-                    if sensor_obj and sensor_obj.data_type.startswith('INFLUX'):
+                    if sensor_obj and sensor_obj.data_store.startswith('INFLUX'):
                             influx_action = "Sent to Influx"
                     elif not place.default_influx_store:
                             influx_action = "Influx Not Configured"
@@ -107,10 +107,10 @@ class SwitchBotWebhookReceiverView(View):
                 try:
                     value = float(context[key])
                     # The service now handles its own InfluxStore, so we don't pass it here.
-                    sensor_obj = process_sensor_reading(device, measurement, value)
+                    sensor_obj = process_sensor_reading(device, measurement, value, source='switchbot-webhook')
 
                     influx_action = "Skipped Influx"
-                    if sensor_obj and sensor_obj.data_type.startswith('INFLUX'):
+                    if sensor_obj and sensor_obj.data_store.startswith('INFLUX'):
                         # The service's write method will handle the logic, so we just queue the fields.
                             influx_fields[measurement] = value
                             influx_action = "Queued for Influx"

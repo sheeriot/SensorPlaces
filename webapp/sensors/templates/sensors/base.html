@@ -177,7 +177,7 @@
 
     <!-- Toast Message Container -->
 <div id="toast-messages" class="d-none">
-    
+
 </div>
 
 
@@ -255,12 +255,19 @@
     <script src="{% static 'sensors/js/place-map-popout.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/hide-inactive-handler.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/toggle-active-handler.js' %}?v={{ APP_VERSION }}"></script>
-    <script src="{% static 'sensors/js/modal-handlers.js' %}?v={{ APP_VERSION }}"></script>
+
     <script src="{% static 'sensors/js/live-counts-updater.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/htmx-event-handler.js' %}?v={{ APP_VERSION }}"></script>
 
     {% block extra_js %}
     {% endblock %}
+
+    <!-- Site Plan Scripts -->
+    {% if 'page-place-detail' in page_class or 'page-siteplan-test' in page_class %}
+        <script src="{% static 'sensors/js/siteplan.js' %}?v={{ APP_VERSION }}"></script>
+    {% endif %}
+
+    <script src="{% static 'sensors/js/modal-handlers.js' %}?v={{ APP_VERSION }}"></script>
 
     {% block debug_js %}
     {% endblock %}

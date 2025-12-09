@@ -200,15 +200,11 @@
     width: 100%;
     background-color: var(--bs-light);
     overflow: hidden;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
+    /* Maintain a 4:3 aspect ratio before JS loads */
+    padding-top: 75%;
 }
 
-.siteplan-wrapper.loaded {
-    opacity: 1;
-}
-
-#siteplan-container,
+#siteplan-container-main,
 #siteplan-editor-map {
     position: absolute;
     top: 0;
@@ -249,19 +245,47 @@
     to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-/* Location Markers - Add fade in */
+/* Location Markers - New Box Style */
 .location-marker {
-    display: inline-flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
-    white-space: nowrap;
-    opacity: 0;
-    transition: all 0.3s ease-in-out;
+    border-radius: var(--bs-border-radius);
+    transition: all 0.2s ease-in-out;
+    background-color: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    box-shadow: var(--bs-box-shadow-sm);
+    opacity: 0; /* Initially hidden */
 }
 
 .siteplan-wrapper.loaded .location-marker {
-    opacity: 1;
+    opacity: 1; /* Fade in when loaded */
 }
+
+.location-marker.active {
+    border-color: var(--bs-primary);
+    background-color: var(--bs-primary-bg-subtle);
+}
+
+.location-marker.active .bi {
+    color: var(--bs-primary);
+}
+
+.location-marker.inactive {
+    border-color: var(--bs-secondary-border-subtle);
+    background-color: var(--bs-light);
+}
+
+.location-marker.inactive .bi {
+    color: var(--bs-secondary);
+}
+
+.location-marker:hover {
+    transform: scale(1.1);
+    box-shadow: var(--bs-box-shadow);
+    z-index: 1001 !important; /* Ensure it's on top */
+}
+
 
 .location-marker .marker-label {
     font-size: 0.75rem;

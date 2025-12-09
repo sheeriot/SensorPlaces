@@ -26,14 +26,7 @@ SHELLY_PRODUCT_MAP = {
     'shwt-1': {'model': 'Flood G1', 'device_type': 'Water Detector'},
     'htg3': {'model': 'H&T G3', 'device_type': 'Data Logger'},
     'mini1pmg4': {'model': '1PM Mini G4', 'device_type': 'Power Control'},
-
-
-    # # Common URL prefixes
-    # 'shellyht': {'model': 'H&T G1', 'device_type': 'Data Logger'},
-    # 'shellyflood': {'model': 'Flood G1', 'device_type': 'Water Detector'},
-
-    # # Fallbacks or other observed values
-    # 'shelly-plus-ht': {'model': 'Shelly H&T G3 (HTG3)', 'device_type': 'Data Logger'},
+    'floodsensorg4': {'model': 'Flood G4', 'device_type': 'Water Detector'},
 }
 
 
@@ -104,6 +97,9 @@ class ShellyService:
         """
         Process Shelly data.
         """
+        # if request:
+        #     # ic(request.body)
+
         if not device_id:
             raise ValueError("Device identifier is missing from the request.")
 
@@ -123,8 +119,8 @@ class ShellyService:
         4. If not found, creates a new device, determining its model and type
            from the request headers and URL using a standardized product map.
         """
-        ic("--- Shelly Service: Get or Create Device ---")
-        ic(f"Incoming device_id_str: '{device_id_str}'")
+        # ic("--- Shelly Service: Get or Create Device ---")
+        # ic(f"Incoming device_id_str: '{device_id_str}'")
 
         # --- Step 1: Determine the canonical unique ID (the MAC address) ---
         parsed_id = None
@@ -142,13 +138,13 @@ class ShellyService:
                 f"Could not parse a MAC address from '{device_id_str}'. "
                 f"Using the full string as the unique device_id."
             )
-        ic(f"Parsed device MAC: {parsed_id}")
+        # ic(f"Parsed device MAC: {parsed_id}")
 
         # --- Step 2: Attempt to find and update existing device ---
         device = Device.objects.select_for_update().filter(device_id=parsed_id).first()
 
         if device:
-            ic("Found existing device:", device.name, f"(ID: {device.id})")
+            # ic("Found existing device:", device.name, f"(ID: {device.id})")
 
             # Always update last_seen timestamp
             device.last_seen = timezone.now()
@@ -299,14 +295,24 @@ class ShellyService:
             elif processed_params['switch'].lower() == 'off':
                 processed_params['switch'] = False
 
+        # Handle boolean values for Water/Flood detectors from 'true'/'false' strings
+        for key in ['water', 'flood']:
+            if key in processed_params:
+                value = processed_params[key]
+                if isinstance(value, str):
+                    if value.lower() == 'true':
+                        processed_params[key] = True
+                    elif value.lower() == 'false':
+                        processed_params[key] = False
+
         key_map = {
             'power': 'Power',
             'apower': 'Power',
             'current': 'Current',
             'voltage': 'Voltage',
-            'temperature': 'Temperature', 'temp': 'Temperature', 'humidity': 'Humidity', 'hum': 'Humidity',
+            'temperature': 'Temperature', 'temp': 'Temperature', 'tempf': 'Temperature', 'humidity': 'Humidity', 'hum': 'Humidity',
             'pm2.5': 'PM2.5', 'pm25': 'PM2.5', 'battery': 'battery',
-            'flood': 'Water Detector', 'batV': 'Battery Voltage',
+            'flood': 'Water Detector', 'batV': 'Battery Voltage', 'water': 'Water Detector',
             'switch': 'Switch'
         }
 
@@ -346,21 +352,28 @@ class ShellyService:
                     else:
                         measurement_name = 'Battery Voltage'
 
-                # If Influx is configured, we won't store locally.
-                skip_local = bool(self.influx_store)
+                # If Influx is configured, we will still update the cache but not create a new local DB reading.
+                update_cache_only = bool(self.influx_store)
 
-                sensor_obj = process_sensor_reading(device, measurement_name, value_to_store, skip_local_storage=skip_local)
+                sensor_obj = process_sensor_reading(
+                    device,
+                    measurement_name,
+                    value_to_store,
+                    source='shelly-webhook',
+                    skip_local_storage=update_cache_only
+                )
                 processed_sensors.append({'sensor': sensor_obj, 'value': value_to_store, 'name': measurement_name})
 
                 if not sensor_obj:
                     continue
 
-                # Special post-creation configuration for specific sensor types
-                if measurement_name in ('Water Detector', 'Switch') and not sensor_obj.unit:
-                    bool_unit = Unit.objects.filter(name__iexact='Boolean').first()
-                    if bool_unit:
-                        sensor_obj.unit = bool_unit
-                        sensor_obj.save(update_fields=['unit'])
+                # Special handling for Fahrenheit temperature
+                if key == 'tempf' and not sensor_obj.unit:
+                    unit_f, _ = Unit.objects.get_or_create(name='Fahrenheit', defaults={'symbol': '°F'})
+                    sensor_obj.unit = unit_f
+                    sensor_obj.min_value = 50
+                    sensor_obj.max_value = 90
+                    sensor_obj.save(update_fields=['unit', 'min_value', 'max_value'])
 
                 # Group for InfluxDB if source is configured
                 if self.influx_store:
@@ -373,8 +386,10 @@ class ShellyService:
                         if influx_details:
                             influx_measurement, influx_field = influx_details
                         else:
-                            # Skip if no mapping is found for this sensor type
-                            continue
+                            # Fallback for unmapped types: use a slugified measurement name for both measurement and field.
+                            influx_measurement = slugify(measurement_name)
+                            influx_field = slugify(measurement_name)
+                            ic(f"WARNING: No Influx mapping for '{measurement_name}'. Using fallback: M='{influx_measurement}', F='{influx_field}'")
 
                     grouped_readings[influx_measurement]['fields'][influx_field] = value_to_store
                     # Store the sensor and its intended influx field for potential update
@@ -391,11 +406,10 @@ class ShellyService:
                     write_to_influx(self.influx_store, measurement_group, fields, tags)
                     storage_status = "Stored"
 
-                    # Update Sensor Configuration on Success, but only if not already set
+                    # Update Sensor Configuration on Success
                     for info in sensors_info:
                         sensor = info['sensor']
 
-                        # Only set these if they are not already configured.
                         if not sensor.influx_store:
                             sensor.influx_store = self.influx_store
                         if not sensor.influx_measurement:
@@ -405,13 +419,10 @@ class ShellyService:
                         if not sensor.influx_tag_key:
                             sensor.influx_tag_key = 'device_id'
 
-                        # Data type can still be overridden
-                        st = sensor.sensor_type
-                        can_override = st.allow_override if st else True
-                        if can_override and sensor.data_type != 'INFLUX':
-                            sensor.data_type = 'INFLUX'
+                        if sensor.data_store != 'INFLUX':
+                            sensor.data_store = 'INFLUX'
 
-                        sensor.save()
+                        sensor.save(update_fields=['influx_store', 'influx_measurement', 'influx_field_name', 'influx_tag_key', 'data_store'])
 
                 except Exception as e:
                     storage_status = "Failed"
@@ -419,9 +430,9 @@ class ShellyService:
                     # Ensure fallback to DIRECT on failure
                     for info in sensors_info:
                         sensor = info['sensor']
-                        if sensor.data_type == 'INFLUX':
-                             sensor.data_type = 'DIRECT'
-                             sensor.save()
+                        if sensor.data_store == 'INFLUX':
+                             sensor.data_store = 'DIRECT'
+                             sensor.save(update_fields=['data_store'])
 
                 # Log the action for this group
                 if settings.WEBHOOK_SNIFFER:

@@ -2,13 +2,26 @@ import logging
 from icecream import ic
 from django.utils import timezone
 from sensors.models import Sensor, SensorReading, SensorType, Device
+from sensors.models import Unit
 
 logger = logging.getLogger(__name__)
 
-def process_sensor_reading(device: Device, measurement_type: str, value: float, skip_local_storage: bool = False, activate_sensor: bool = False):
+def process_sensor_reading(device: Device, measurement_type: str, value: float, source: str = None, skip_local_storage: bool = False, activate_sensor: bool = False):
     """
-    Helper to store sensor reading in local DB. Finds or creates a sensor.
-    Returns the sensor object on success, None otherwise.
+    Finds or creates a sensor for a given measurement and updates its cached value.
+    Optionally stores a historical reading in the local DB.
+
+    Args:
+        device (Device): The device the reading belongs to.
+        measurement_type (str): The name/type of the measurement (e.g., "Temperature").
+        value (float): The value of the reading.
+        source (str, optional): The origin of the reading (e.g., 'shelly-webhook', 'switchbot-api').
+        skip_local_storage (bool): If True, a historical `SensorReading` object will NOT be created.
+                                   The sensor's cache fields will still be updated.
+        activate_sensor (bool): If a new sensor is created, this flag determines if it's active.
+
+    Returns:
+        The updated Sensor object, or None on failure.
     """
     try:
         # Try to find a sensor with a type matching the measurement name
@@ -27,6 +40,14 @@ def process_sensor_reading(device: Device, measurement_type: str, value: float, 
         created = False
         if not sensor:
             sensor_type = SensorType.objects.filter(name__iexact=measurement_type).first()
+
+            # Ensure that boolean-type sensors have their unit set on the SensorType.
+            if sensor_type and sensor_type.name in ('Switch', 'Water Detector') and not sensor_type.unit:
+                bool_unit, _ = Unit.objects.get_or_create(name='Boolean')
+                sensor_type.unit = bool_unit
+                sensor_type.save(update_fields=['unit'])
+                ic(f"Associated 'Boolean' unit with '{sensor_type.name}' SensorType.")
+
             # Special case for SwitchBot battery readings
             if measurement_type == 'battery':
                 sensor_type = SensorType.objects.filter(name__iexact='Battery Level').first()
@@ -34,7 +55,7 @@ def process_sensor_reading(device: Device, measurement_type: str, value: float, 
             # Ensure name is human-readable (replace underscores with spaces)
             sensor_name = measurement_type.replace('_', ' ').title()
 
-            # Initial default data_type is DIRECT (from model default)
+            # Initial default data_store is DIRECT (from model default)
             sensor = Sensor.objects.create(
                 device=device,
                 name=sensor_name,
@@ -62,19 +83,29 @@ def process_sensor_reading(device: Device, measurement_type: str, value: float, 
             elif value == 0.0:
                 val_bool = False
 
-            ic(f"Updating Sensor Reading for {sensor.name}: Value={value}")
+            # ic(f"Updating Sensor Reading for {sensor.name}: Value={value}")
 
+            # Always update the cache fields on the Sensor model
+            sensor.cached_reading_value = value
+            sensor.cached_reading_timestamp = timezone.now()
+            sensor.last_cached_timestamp = timezone.now()
+            update_fields = ['cached_reading_value', 'cached_reading_timestamp', 'last_cached_timestamp']
+
+            if source:
+                sensor.cached_reading_source = source
+                update_fields.append('cached_reading_source')
+
+            # Only create a historical reading if not skipping local storage
             if not skip_local_storage:
                 SensorReading.objects.create(
                     sensor=sensor,
                     value=value,
                     value_boolean=val_bool
                 )
+                ic(f"Created new historical reading for {sensor.name}.")
 
-            sensor.cached_reading_value = value
-            sensor.cached_reading_timestamp = timezone.now()
-            sensor.last_checked_timestamp = timezone.now()
-            sensor.save(update_fields=['cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp'])
+            sensor.save(update_fields=update_fields)
+            # ic(f"Updated sensor cache for {sensor.name} with fields: {update_fields}")
 
             return sensor
 

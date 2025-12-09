@@ -156,15 +156,32 @@ class ToastMiddleware:
 
 class TimezoneMiddleware(MiddlewareMixin):
     def __call__(self, request):
-        user_timezone = request.session.get('user_timezone')
+        # ic(f"--- TimezoneMiddleware --- Path: {request.path}")
+
+        # Prioritize cookie, then fall back to session
+        user_timezone = request.COOKIES.get('user_timezone')
+
+        if user_timezone:
+            # ic(f"Read 'user_timezone' from COOKIE: {user_timezone}")
+            pass
+        else:
+            user_timezone = request.session.get('user_timezone')
+            # ic(f"Read 'user_timezone' from SESSION: {user_timezone}")
+
         if user_timezone:
             try:
                 timezone.activate(user_timezone)
+                # ic(f"Successfully activated timezone: {user_timezone}")
+                # Ensure session is also updated for other parts of app
+                if request.session.get('user_timezone') != user_timezone:
+                    request.session['user_timezone'] = user_timezone
             except Exception:
-                # ic(f"Invalid timezone '{user_timezone}' found in session. Deactivating.")
+                # ic(f"Invalid timezone '{user_timezone}' found. Deactivating.")
                 timezone.deactivate()
+                # ic("-> Invalid timezone, deactivated.")
         else:
             timezone.deactivate()
+            # ic("-> No timezone in session or cookie, deactivated.")
 
         response = self.get_response(request)
 

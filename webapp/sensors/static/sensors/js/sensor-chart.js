@@ -1,5 +1,21 @@
+console.log('--- SENSOR-CHART.JS v.DEBUG.2 LOADED ---');
+
 // Local debug flag - set to true during development, false in production
-const SENSOR_CHART_DEBUG = false;
+const SENSOR_CHART_DEBUG = true;
+
+// Helper function to get display strings for boolean values
+function getBooleanDisplay(value, sensorTypeName) {
+    const isPositive = value > 0;
+    switch (sensorTypeName) {
+        case 'Switch':
+            return isPositive ? 'On' : 'Off';
+        case 'Water Detector':
+            return isPositive ? 'Water' : 'No Water';
+        default:
+            return isPositive ? 'True' : 'False';
+    }
+}
+
 if (SENSOR_CHART_DEBUG) console.log('sensor-chart.js');
 class SensorChart {
     constructor(graphCardId) {
@@ -14,6 +30,7 @@ class SensorChart {
 
         if (this.debug) {
             console.log('SensorChart: Initializing...', { graphCardId });
+            console.log('SensorChart: Initial dataset from DOM:', JSON.parse(JSON.stringify(this.graphCard.dataset)));
         }
 
         this.chart = null;
@@ -25,8 +42,29 @@ class SensorChart {
         this.originalMinValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
         this.originalMaxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
         this.dataTable = null;
+        this.sensorConfig = {};
+        this.queryRange = {}; // Initialize queryRange
 
         this.initialize();
+    }
+
+    initializeDataTable() {
+        const sensorId = this.graphCard.dataset.sensorId;
+        const dataTableElement = document.querySelector(`#graph-datapoints-${sensorId} table`);
+
+        if (dataTableElement && !this.dataTable) {
+            if (this.debug) console.log("SensorChart: Initializing empty DataTable.");
+            this.dataTable = new simpleDatatables.DataTable(dataTableElement, {
+                searchable: false,
+                perPageSelect: false,
+                paging: true,
+                perPage: 10,
+                labels: {
+                    noRows: "No data points found",
+                    info: "Showing {start} to {end} of {rows} entries",
+                }
+            });
+        }
     }
 
     // --- Conversion Helpers ---
@@ -110,111 +148,126 @@ class SensorChart {
 
             const responseData = await window.utils.fetchWithCSRF(url.toString());
 
+            if (this.debug) {
+                console.log("SensorChart: Raw API responseData:", JSON.parse(JSON.stringify(responseData)));
+            }
+
             if (responseData.status !== 'success') {
                 throw new Error(responseData.description || 'The server returned an error.');
             }
 
-            const data = responseData.payload;
+            if (responseData && responseData.payload) {
+                if (this.debug) console.log('SensorChart: Raw API responseData:', responseData);
 
-            // --- Log Data ---
-            if (this.debug) {
-                console.log("Sensor Chart Data Payload:");
-                if (data && data.data_points && data.data_points.length > 0) {
-                     // Show first and last few points
-                     console.table(data.data_points.slice(0, 5).concat(data.data_points.slice(-5)));
+                this.sensorConfig = responseData.payload.sensor;
+                this.queryTimeMs = responseData.payload.query_time_ms;
+                this.queryRange = responseData.payload.query_range; // This was missing
+
+                if (this.debug) console.log('SensorChart: Stored sensorConfig:', this.sensorConfig);
+
+                // --- Log Data ---
+                if (this.debug) {
+                    console.log("Sensor Chart Data Payload:");
+                    if (responseData.payload && responseData.payload.data_points && responseData.payload.data_points.length > 0) {
+                         // Show first and last few points
+                         console.table(responseData.payload.data_points.slice(0, 5).concat(responseData.payload.data_points.slice(-5)));
+                    } else {
+                        console.log("No data points returned.");
+                    }
+                    console.log(`Query Time: ${responseData.payload.query_time_ms}ms`);
+                }
+
+                // --- Populate Footer Stats ---
+                const queryTimeEl = document.getElementById('graph-query-time');
+                if (queryTimeEl && responseData.payload.query_time_ms) {
+                    queryTimeEl.textContent = `Data: ${responseData.payload.query_time_ms.toFixed(0)}ms`;
+                }
+
+                const datapointCountEl = document.getElementById('datapoint-count');
+                if (datapointCountEl && responseData.payload.data_points) {
+                    datapointCountEl.textContent = `${responseData.payload.data_points.length} points`;
+                }
+
+                const firstReadingEl = document.getElementById('first-reading-time');
+                const lastReadingEl = document.getElementById('last-reading-time');
+                if (responseData.payload.data_points && responseData.payload.data_points.length > 0) {
+                    const firstPoint = responseData.payload.data_points[0][0];
+                    const lastPoint = responseData.payload.data_points[responseData.payload.data_points.length - 1][0];
+
+                    const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+
+                    if (firstReadingEl) {
+                        firstReadingEl.textContent = `First: ${new Date(firstPoint).toLocaleString(undefined, options)}`;
+                    }
+                    if (lastReadingEl) {
+                        lastReadingEl.textContent = `Last: ${new Date(lastPoint).toLocaleString(undefined, options)}`;
+                    }
                 } else {
-                    console.log("No data points returned.");
+                    if (firstReadingEl) firstReadingEl.textContent = '';
+                    if (lastReadingEl) lastReadingEl.textContent = '';
                 }
-                console.log(`Query Time: ${data.query_time_ms}ms`);
-            }
 
-            // --- Populate Footer Stats ---
-            const queryTimeEl = document.getElementById('graph-query-time');
-            if (queryTimeEl && data.query_time_ms) {
-                queryTimeEl.textContent = `Data: ${data.query_time_ms.toFixed(0)}ms`;
-            }
+                this.currentGraphType = this.sensorConfig.graph_type;
+                this.graphCard.dataset.sensorUnit = this.sensorConfig.unit || 'N/A';
+                this.originalUnit = this.graphCard.dataset.sensorUnit;
 
-            const datapointCountEl = document.getElementById('datapoint-count');
-            if (datapointCountEl && data.data_points) {
-                datapointCountEl.textContent = `${data.data_points.length} points`;
-            }
+                this.originalData = responseData.payload.data_points.map(p => [new Date(p[0]), p[1]]);
 
-            const firstReadingEl = document.getElementById('first-reading-time');
-            const lastReadingEl = document.getElementById('last-reading-time');
-            if (data.data_points && data.data_points.length > 0) {
-                const firstPoint = data.data_points[0][0];
-                const lastPoint = data.data_points[data.data_points.length - 1][0];
+                // Call the summary and table update function with the correct data
+                this.updateDataPointsTable(this.originalData.map(item => ({ x: item[0], y: item[1] })), this.originalUnit, this.graphCard.dataset.decimalPlaces);
 
-                const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
-
-                if (firstReadingEl) {
-                    firstReadingEl.textContent = `First: ${new Date(firstPoint).toLocaleString(undefined, options)}`;
+                const tempUnitSelect = document.getElementById('temp-unit-select');
+                if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
+                    tempUnitSelect.dispatchEvent(new Event('change'));
+                } else {
+                    this.renderChart(this.originalData, this.currentGraphType);
                 }
-                if (lastReadingEl) {
-                    lastReadingEl.textContent = `Last: ${new Date(lastPoint).toLocaleString(undefined, options)}`;
-                }
-            } else {
-                if (firstReadingEl) firstReadingEl.textContent = '';
-                if (lastReadingEl) lastReadingEl.textContent = '';
-            }
 
-            this.currentGraphType = data.sensor.graph_type;
-            this.graphCard.dataset.sensorUnit = data.sensor.unit || 'N/A';
-            this.originalUnit = this.graphCard.dataset.sensorUnit;
+                // Notify user if data is empty but successful
+                const warningEl = document.getElementById(`graph-warning-${this.graphCard.dataset.sensorId}`);
+                if (warningEl) warningEl.classList.add('d-none');
 
-            this.originalData = data.data_points.map(p => [new Date(p[0]), p[1]]);
+                if (this.originalData.length === 0) {
+                    this.showToast('No data found for the selected time range.', 'warning');
+                } else {
+                     // Check if data is outside min/max range
+                     // Use the dataset values which are strings, convert to float if they exist
+                     const effectiveMin = this.originalMinValue;
+                     const effectiveMax = this.originalMaxValue;
 
-            // Call the summary and table update function with the correct data
-            this.updateDataPointsTable(this.originalData.map(item => ({ x: item[0], y: item[1] })), this.originalUnit, this.graphCard.dataset.decimalPlaces);
-
-            const tempUnitSelect = document.getElementById('temp-unit-select');
-            if (tempUnitSelect && tempUnitSelect.value !== this.originalUnit.replace('°','')) {
-                tempUnitSelect.dispatchEvent(new Event('change'));
-            } else {
-                this.renderChart(this.originalData, this.currentGraphType);
-            }
-
-            // Notify user if data is empty but successful
-            const warningEl = document.getElementById(`graph-warning-${this.graphCard.dataset.sensorId}`);
-            if (warningEl) warningEl.classList.add('d-none');
-
-            if (this.originalData.length === 0) {
-                this.showToast('No data found for the selected time range.', 'warning');
-            } else {
-                 // Check if data is outside min/max range
-                 // Use the dataset values which are strings, convert to float if they exist
-                 const effectiveMin = this.originalMinValue;
-                 const effectiveMax = this.originalMaxValue;
-
-                if (effectiveMin !== null || effectiveMax !== null) {
-                    let outOfRangeCount = 0;
-                    this.originalData.forEach(p => {
-                         const val = p[1];
-                         if (val !== null) {
-                             if ((effectiveMin !== null && val < effectiveMin) || (effectiveMax !== null && val > effectiveMax)) {
-                                 outOfRangeCount++;
+                    if (effectiveMin !== null || effectiveMax !== null) {
+                        let outOfRangeCount = 0;
+                        this.originalData.forEach(p => {
+                             const val = p[1];
+                             if (val !== null) {
+                                 if ((effectiveMin !== null && val < effectiveMin) || (effectiveMax !== null && val > effectiveMax)) {
+                                     outOfRangeCount++;
+                                 }
                              }
-                         }
-                    });
+                        });
 
-                    if (outOfRangeCount > 0 && warningEl) {
-                         warningEl.textContent = `Warning: ${outOfRangeCount} of ${this.originalData.length} data points are outside the defined range (${effectiveMin !== null ? effectiveMin : '-∞'} to ${effectiveMax !== null ? effectiveMax : '+∞'}).`;
-                         warningEl.classList.remove('d-none');
+                        if (outOfRangeCount > 0 && warningEl) {
+                             warningEl.textContent = `Warning: ${outOfRangeCount} of ${this.originalData.length} data points are outside the defined range (${effectiveMin !== null ? effectiveMin : '-∞'} to ${effectiveMax !== null ? effectiveMax : '+∞'}).`;
+                             warningEl.classList.remove('d-none');
+                        }
                     }
                 }
-            }
 
-            // Dispatch an event to notify other components that new data is available
-            if (this.originalData.length > 0) {
-                const event = new CustomEvent('graphDataUpdated', {
-                    detail: {
-                        sensorId: this.graphCard.dataset.sensorId,
-                        latestData: this.originalData[this.originalData.length - 1],
-                        unitSymbol: data.sensor.unit,
-                        decimalPlaces: data.sensor.decimal_places
-                    }
-                });
-                document.dispatchEvent(event);
+                // Dispatch an event to notify other components that new data is available
+                if (this.originalData.length > 0) {
+                    const event = new CustomEvent('graphDataUpdated', {
+                        detail: {
+                            sensorId: this.graphCard.dataset.sensorId,
+                            latestData: this.originalData[this.originalData.length - 1],
+                            unitSymbol: this.sensorConfig.unit,
+                            decimalPlaces: this.sensorConfig.decimal_places
+                        }
+                    });
+                    document.dispatchEvent(event);
+                }
+
+            } else {
+                throw new Error('Invalid API response structure.');
             }
 
         } catch (error) {
@@ -279,6 +332,11 @@ class SensorChart {
         const decimalPlaces = this.graphCard.dataset.decimalPlaces !== '' ? parseInt(this.graphCard.dataset.decimalPlaces) : 2;
         const sensorName = this.graphCard.dataset.sensorName || 'Sensor';
         const deviceName = this.graphCard.dataset.deviceName || 'Device';
+
+        const isBoolean = this.sensorConfig && this.sensorConfig.is_boolean;
+        if (this.debug) {
+            console.log('SensorChart->renderChart: isBoolean check:', isBoolean);
+        }
 
         // Calculate effective min/max based on unit conversion
         let effectiveMin = this.originalMinValue;
@@ -346,7 +404,12 @@ class SensorChart {
              showLine = true; // or false depending on specific "Overlay" look
         }
 
-        const yAxisOptions = { title: { display: true, text: `Value (${displayUnit})` } };
+        let yAxisTitle = `Value (${displayUnit})`;
+        if (this.sensorConfig && this.sensorConfig.is_boolean) {
+            yAxisTitle = 'State';
+        }
+
+        const yAxisOptions = { title: { display: true, text: yAxisTitle } };
         // Use strict min/max to adhere to the sensor's defined range
         if (effectiveMin !== null) yAxisOptions.min = effectiveMin;
         if (effectiveMax !== null) yAxisOptions.max = effectiveMax;
@@ -360,6 +423,20 @@ class SensorChart {
         if (typeUpper === 'STEP' || typeUpper === 'ALARM_BAR') {
              // e.g. beginAtZero: true
              // yAxisOptions.beginAtZero = true;
+        }
+
+        if (this.sensorConfig && this.sensorConfig.is_boolean) {
+            yAxisOptions.min = 0;
+            yAxisOptions.max = 1;
+            yAxisOptions.ticks = {
+                stepSize: 1,
+                callback: (value) => {
+                    if (value === 0 || value === 1) {
+                        return getBooleanDisplay(value, this.sensorConfig.sensor_type_name);
+                    }
+                    return null;
+                }
+            };
         }
 
         if (this.debug) {
@@ -522,105 +599,84 @@ class SensorChart {
             plugins: [timezonePlugin]
         });
 
+        // Chart.js expects data to be sorted ascending, which the API now provides.
         this.chart.data.datasets[0].data = chartData;
         this.chart.update();
+        if (this.debug) {
+            console.log('SensorChart->renderChart: Chart updated with new data.');
+        }
 
         this.updateDataPointsTable(chartData, displayUnit, decimalPlaces);
     }
 
     updateDataPointsTable(chartData, displayUnit, decimalPlaces) {
         const sensorId = this.graphCard.dataset.sensorId;
-        const showNaToggle = document.getElementById(`show-na-toggle-${sensorId}`);
-
         const dataPointsBody = document.getElementById(`data-points-body-${sensorId}`);
         const dataPointsHeader = document.getElementById(`data-points-value-header-${sensorId}`);
-        const dataPointsCard = document.getElementById(`graph-datapoints-${sensorId}`);
-        const dataTableElement = document.querySelector(`#graph-datapoints-${sensorId} table`);
+        const dataPointsContainer = document.getElementById(`graph-datapoints-container-${sensorId}`);
 
         // Stats elements
         const statsCountEl = document.getElementById(`dp-stats-count-${sensorId}`);
-        const statsMinEl = document.getElementById(`dp-stats-min-${sensorId}`);
-        const statsMaxEl = document.getElementById(`dp-stats-max-${sensorId}`);
+        const statsFirstEl = document.getElementById(`dp-stats-first-${sensorId}`);
+        const statsLastEl = document.getElementById(`dp-stats-last-${sensorId}`);
+        const statsSourceEl = document.getElementById(`dp-stats-source-${sensorId}`);
+        const statsQueryTimeEl = document.getElementById(`dp-stats-query-time-${sensorId}`);
+        const statsRangeEl = document.getElementById(`dp-stats-range-${sensorId}`);
 
-        if (this.dataTable) {
-            this.dataTable.destroy();
-            this.dataTable = null;
+
+        if (this.debug) {
+            console.log('SensorChart->updateDataPointsTable: Checking queryRange', JSON.parse(JSON.stringify(this.queryRange)));
         }
 
-        if (dataPointsHeader) dataPointsHeader.textContent = `Value (${displayUnit})`;
+        let tableHeader = `Value (${displayUnit})`;
+        const isBoolean = this.sensorConfig && this.sensorConfig.is_boolean;
+        if (this.debug) {
+            console.log('SensorChart->updateDataPointsTable: isBoolean check:', isBoolean);
+        }
 
-        if (dataPointsBody && dataPointsCard) {
-            dataPointsBody.innerHTML = '';
+        if (isBoolean) {
+            tableHeader = 'State';
+        }
+        if (dataPointsHeader) dataPointsHeader.textContent = tableHeader;
+
+        if (dataPointsBody && dataPointsContainer) {
+            dataPointsBody.innerHTML = ''; // Clear previous data
 
             if (chartData.length > 0) {
-                dataPointsCard.classList.remove('d-none');
+                dataPointsContainer.classList.remove('d-none');
 
-                // Calculate Stats
-                // We need to convert strings to floats for calculation
-                const values = chartData.map(d => {
-                    if (typeof d.y === 'string') return parseFloat(d.y);
-                    return d.y;
-                }).filter(y => y !== null && typeof y !== 'undefined' && !isNaN(y));
-
-                const count = values.length;
-                const min = values.length > 0 ? Math.min(...values) : null;
-                const max = values.length > 0 ? Math.max(...values) : null;
-
-                if (statsCountEl) statsCountEl.textContent = count;
-                if (statsMinEl) statsMinEl.textContent = min !== null ? `${min.toFixed(decimalPlaces)} ${displayUnit}` : '-';
-                if (statsMaxEl) statsMaxEl.textContent = max !== null ? `${max.toFixed(decimalPlaces)} ${displayUnit}` : '-';
-
-                let rows = [];
-                const isBoolean = (this.originalUnit === '' && this.sensorType && this.sensorType.toLowerCase() === 'boolean');
-                const showNa = showNaToggle ? showNaToggle.checked : false;
-
-                chartData.slice().reverse().forEach(item => {
-                    const timestamp = item.x;
-                    const value = item.y;
-
-                    if (value !== null && typeof value !== 'undefined') {
-                        let valueDisplay;
-                        if (isBoolean) {
-                            valueDisplay = value > 0 ? 'True' : 'False';
-                        } else {
-                            valueDisplay = value.toFixed(decimalPlaces);
-                        }
-                        rows.push([window.utils.formatTimestamp(timestamp), valueDisplay]);
-                    } else if (showNa) {
-                        rows.push([window.utils.formatTimestamp(timestamp), 'N/A']);
-                    }
-                });
-
-                // Clear the table body before re-populating
-                dataPointsBody.innerHTML = '';
-                rows.forEach(rowData => {
-                    const tr = document.createElement('tr');
-                    rowData.forEach(cellData => {
-                        const td = document.createElement('td');
-                        td.textContent = cellData;
-                        tr.appendChild(td);
-                    });
-                    dataPointsBody.appendChild(tr);
-                });
-
-
-                // Using the new library
-                if (dataTableElement && window.simpleDatatables) {
-                    this.dataTable = new simpleDatatables.DataTable(dataTableElement, {
-                        searchable: false,
-                        perPageSelect: false,
-                        paging: true,
-                        perPage: 10,
-                        labels: {
-                            noRows: "No data points found",
-                            info: "Showing {start} to {end} of {rows} entries",
-                        }
-                    });
-                } else {
-                     if (this.debug) console.warn('Simple-DataTables library not found or table element missing', { element: dataTableElement, library: window.simpleDatatables });
+                // Populate stats without icons
+                if (statsCountEl) statsCountEl.innerHTML = `Record Count: <strong>${chartData.length}</strong>`;
+                if (statsFirstEl) statsFirstEl.innerHTML = `First: <strong>${window.utils.formatTimestamp(chartData[0].x, true)}</strong>`;
+                if (statsLastEl) statsLastEl.innerHTML = `Last: <strong>${window.utils.formatTimestamp(chartData[chartData.length - 1].x, true)}</strong>`;
+                if (statsSourceEl) statsSourceEl.innerHTML = `Source: <strong>${this.sensorConfig.data_store}</strong>`;
+                if (statsQueryTimeEl && this.queryTimeMs !== undefined) {
+                    statsQueryTimeEl.innerHTML = `Query: <strong>${this.queryTimeMs}ms</strong>`;
                 }
+                if (statsRangeEl && this.queryRange && this.queryRange.start_date && this.queryRange.end_date) {
+                    const start = window.utils.formatTimestamp(this.queryRange.start_date, true);
+                    const end = window.utils.formatTimestamp(this.queryRange.end_date, true);
+                    statsRangeEl.innerHTML = `Range: <strong>${start} to ${end}</strong>`;
+                }
+
+                // To show newest first in the table, we iterate over a reversed copy of the array.
+                chartData.slice().reverse().forEach(dp => {
+                    const row = dataPointsBody.insertRow();
+                    const cell1 = row.insertCell(0);
+                    const cell2 = row.insertCell(1);
+
+                    cell1.textContent = window.utils.formatTimestamp(dp.x);
+                    let valueDisplay;
+                    if (isBoolean) {
+                        valueDisplay = getBooleanDisplay(dp.y, this.sensorConfig.sensor_type_name);
+                    } else {
+                        valueDisplay = dp.y.toFixed(decimalPlaces);
+                    }
+                    cell2.textContent = valueDisplay;
+                });
+
             } else {
-                dataPointsCard.classList.add('d-none');
+                dataPointsContainer.classList.add('d-none');
             }
         }
     }
@@ -662,6 +718,25 @@ class SensorChart {
         this.fp_end.setDate(end, false);
         if (this.debug) console.log("SensorChart: Initial date range set:", start, "to", end);
 
+        // Set the initial query range and trigger a fetch
+        this.queryRange = { start: start, end: end };
+        const applyBtn = document.getElementById('apply-date-range');
+        if (applyBtn) {
+            // Use the 'active' preset button's logic if available, otherwise click Apply
+            const activePreset = document.querySelector('.date-range-preset.active');
+            if (activePreset) {
+                activePreset.click();
+            } else {
+                // Default to clicking the first preset button if none are active
+                const firstPreset = document.querySelector('.date-range-preset');
+                if (firstPreset) {
+                    firstPreset.click();
+                } else {
+                     applyBtn.click();
+                }
+            }
+        }
+
         this.setupEventListeners();
     }
 
@@ -694,6 +769,7 @@ class SensorChart {
                     endDt.setHours(23, 59, 59, 999);
                 }
 
+                this.queryRange = { start: startDt, end: endDt };
                 this.graphCard.dataset.startDate = startDt.toISOString();
                 this.graphCard.dataset.endDate = endDt.toISOString();
 
@@ -747,6 +823,7 @@ class SensorChart {
                     start.setDate(start.getDate() - parseInt(range));
                 }
 
+                this.queryRange = { start: start, end: end };
                 this.graphCard.dataset.startDate = start.toISOString();
                 this.graphCard.dataset.endDate = end.toISOString();
 

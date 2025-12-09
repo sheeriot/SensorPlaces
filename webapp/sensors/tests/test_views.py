@@ -66,7 +66,7 @@ class SensorsViewTestCase(TestCase):
             is_active=True,
             sensor_type=sensor_type,
             unit=unit,
-            data_type='DIRECT'
+            data_store='DIRECT'
         )
 
     def setUp(self):
@@ -473,7 +473,7 @@ class SensorsViewTestCase(TestCase):
                 'is_active': True,
                 'sensor_type': self.sensor.sensor_type.pk,
                 'unit': self.sensor.unit.pk,
-                'data_type': 'DIRECT',
+                'data_store': 'DIRECT',
                 'graph_type': 'LINE',
             }
         )
@@ -539,7 +539,7 @@ class SensorsViewTestCase(TestCase):
                 'device': self.sensor.device.pk,
                 'sensor_type': self.sensor.sensor_type.pk,
                 'unit': self.sensor.unit.pk,
-                'data_type': self.sensor.data_type,
+                'data_store': self.sensor.data_store,
                 'graph_type': self.sensor.graph_type or '',
                 'description': 'An updated test sensor.'
             }

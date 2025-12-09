@@ -1,3 +1,7 @@
-{% if unit and unit.symbol %}
-    {{ unit.symbol }}
+{% if unit %}
+    {% if unit.symbol %}
+        {{ unit.symbol }}
+    {% else %}
+        {{ unit.name }}
+    {% endif %}
 {% endif %}

@@ -1,14 +1,14 @@
 <div class="list-group-item device-row py-2 {% if not device.is_active and hide_inactive %}d-none{% elif not device.is_active %}list-group-item-light text-muted opacity-50{% endif %}"
     data-device-active="{{ device.is_active|lower }}"
     data-device-id="{{ device.pk }}"
+    data-device-class="{% if device.is_lorawan %}lorawan{% elif device.manufacturer|lower == 'shelly' %}shelly{% elif device.manufacturer|lower == 'switchbot' %}switchbot{% else %}other{% endif %}"
     data-location-active="{% if device.location %}{{ device.location.is_active|lower }}{% else %}true{% endif %}"
     data-location-id="{% if device.location %}{{ device.location.pk }}{% else %}unassigned{% endif %}">
     <div class="row g-0 align-items-center">
         <!-- Name -->
         <div class="col-4">
             <a href="{% url 'sensors:device_detail' place_slug=device.location.place.slug pk=device.pk %}" class="d-flex align-items-start text-decoration-none fw-bold">
-                <i class="bi bi-hdd-rack me-2"></i>
-                <span>{{ device.name }}</span>
+                {% include "sensors/partials/device_label.html" with device=device %}
             </a>
         </div>
         <!-- Model -->

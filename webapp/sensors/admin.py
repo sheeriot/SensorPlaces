@@ -93,30 +93,25 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(Sensor)
 class SensorAdmin(admin.ModelAdmin):
-    list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'data_type_display', 'is_active')
+    list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'data_store_display', 'is_active')
     list_filter = ('sensor_type', 'is_active', 'device__location')
     search_fields = ('name', 'device__name')
     readonly_fields = ()
     autocomplete_fields = ['device', 'sensor_type', 'influx_store']
 
     fieldsets = (
-        (None, {
+        ('General', {
             'fields': ('name', 'device', 'sensor_type', 'is_active')
         }),
-        ('Live Data', {
-            'fields': ('cached_reading_value', 'cached_reading_timestamp', 'last_checked_timestamp', 'stale_threshold_seconds')
+        ('Data Source', {
+            'fields': ('data_store', 'influx_store', 'influx_measurement', 'influx_field_name', 'influx_tag_key')
         }),
-        ('Display & Data Type Settings', {
-            'fields': ('graph_type', ('unit', 'unit_override'), 'data_type')
+        ('Overrides', {
+            'fields': ('unit_override', 'unit', 'min_value_override', 'min_value', 'max_value_override', 'max_value', 'graph_type')
         }),
-        ('InfluxDB Configuration', {
-            'classes': ('collapse',),
-            'fields': ('influx_store', 'influx_measurement', 'influx_field_name', 'influx_tag_key'),
+        ('Cached Value', {
+            'fields': ('cached_reading_value', 'cached_reading_timestamp', 'last_cached_timestamp', 'stale_threshold_seconds')
         }),
-        ('Metadata', {
-            'fields': (('created_at', 'updated_at'),),
-            'classes': ('collapse',)
-        })
     )
 
     def get_queryset(self, request):
@@ -125,7 +120,7 @@ class SensorAdmin(admin.ModelAdmin):
         """
         queryset = super().get_queryset(request)
         for sensor in queryset:
-            if sensor.data_type and sensor.data_type.startswith('INFLUX'):
+            if sensor.data_store and sensor.data_store.startswith('INFLUX'):
                 update_sensor_live_value(sensor)
         return queryset
 
@@ -134,7 +129,7 @@ class SensorAdmin(admin.ModelAdmin):
         Override to update the live value for a single sensor when viewing its detail page.
         """
         obj = super().get_object(request, object_id, from_field)
-        if obj and obj.data_type and obj.data_type.startswith('INFLUX'):
+        if obj and obj.data_store and obj.data_store.startswith('INFLUX'):
             update_sensor_live_value(obj)
         return obj
 
@@ -144,9 +139,9 @@ class SensorAdmin(admin.ModelAdmin):
         return "N/A"
     effective_unit_display.short_description = 'Unit'
 
-    def data_type_display(self, obj):
-        return obj.get_data_type_display
-    data_type_display.short_description = 'Data Type'
+    def data_store_display(self, obj):
+        return obj.get_data_store_display()
+    data_store_display.short_description = 'Data Store'
 
     class Meta:
         verbose_name_plural = '4. Sensors'

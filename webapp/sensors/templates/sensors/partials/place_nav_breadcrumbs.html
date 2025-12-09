@@ -28,9 +28,7 @@
                 {% if model_name not in 'place,location' %}
                     <i class="bi bi-chevron-right"></i>
                     {% if device %}
-                        <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none text-reset">
-                            <i class="bi bi-hdd-rack"></i> {{ device.name }}
-                        </a>
+                        {% include "sensors/partials/device_label.html" with device=device icon_margin="" %}
                     {% else %}
                         <a href="{% url 'sensors:device_list' place.slug %}" class="text-decoration-none text-reset">
                             <i class="bi bi-hdd-rack"></i> Devices

@@ -90,7 +90,7 @@ class JavaScriptInteractionTestCase(unittest.TestCase):
             is_active=True,
             sensor_type='TEMP',
             unit='°C',
-            data_type='API'
+            data_store='API'
         )
 
         # Set up the base URL
@@ -232,25 +232,25 @@ class JavaScriptInteractionTestCase(unittest.TestCase):
         self.assertFalse(sensor_active_checkbox.is_enabled())
 
     @unittest.skip("Requires browser and server running")
-    def test_data_type_changes_form_fields(self):
-        """Test that changing the data type in sensor form shows/hides appropriate fields"""
+    def test_data_store_changes_form_fields(self):
+        """Test that changing the data store in sensor form shows/hides appropriate fields"""
         # Navigate to the sensor creation form
         self.driver.get(
             f"{self.live_server_url}/sensors/{self.place.slug}/device/{self.device.pk}/sensor/create/"
         )
 
-        # Find the data type select element
-        data_type_select = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "select[name='data_type']"))
+        # Find the data store select element
+        data_store_select = WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "select[name='data_store']"))
         )
 
         # Check initial state - InfluxDB fields should be hidden
         influx_fields = self.driver.find_element(By.CSS_SELECTOR, ".influx-fields")
         self.assertEqual(influx_fields.get_attribute("style"), "display: none;")
 
-        # Select InfluxDB as data type
+        # Select InfluxDB as data store
         from selenium.webdriver.support.ui import Select
-        select = Select(data_type_select)
+        select = Select(data_store_select)
         select.select_by_value("INFLUX")
 
         # Check that InfluxDB fields are now visible

@@ -45,34 +45,32 @@
         }
     }
 
-    function formatTimestamp(date) {
-        const d = (date instanceof Date) ? date : new Date(date);
-        if (isNaN(d)) {
-            return 'Invalid Date';
+    function formatTimestamp(timestamp, short = false) {
+        if (!timestamp) return 'N/A';
+
+        const date = new Date(timestamp);
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const tzShort = date.toLocaleDateString(undefined, { day:'2-digit', timeZoneName: 'short' }).substring(4);
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+
+        // Get timezone offset in +/-HHMM format
+        const offset = -date.getTimezoneOffset();
+        const offsetSign = offset >= 0 ? '+' : '-';
+        const offsetHours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+        const offsetMinutes = String(Math.abs(offset) % 60).padStart(2, '0');
+        const tzOffset = `${offsetSign}${offsetHours}${offsetMinutes}`;
+
+        if (short) {
+            return `${year}/${month}/${day} ${hours}:${minutes}`;
         }
 
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const dateStr = `${year}/${month}/${day}`;
-
-        const timeStr = d.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-
-        const shortTZ = new Intl.DateTimeFormat('en', { timeZoneName: 'short' })
-            .formatToParts(d)
-            .find(part => part.type === 'timeZoneName')?.value || '';
-
-        const offset = -d.getTimezoneOffset();
-        const offsetHours = Math.floor(Math.abs(offset) / 60);
-        const offsetMinutes = Math.abs(offset) % 60;
-        const offsetString = `${offset >= 0 ? '+' : '-'}${String(offsetHours).padStart(2, '0')}${String(offsetMinutes).padStart(2, '0')}`;
-
-        return `${dateStr} ${timeStr} ${offsetString} (${shortTZ})`;
+        return `${year}/${month}/${day} ${hours}:${minutes}:${seconds} ${tzOffset} (${tzShort})`;
     }
 
     function setCookie(name, value, days) {

@@ -114,7 +114,7 @@ class URLAccessTestCase(TestCase):
             is_active=True,
             sensor_type=sensor_type,
             unit=unit,
-            data_type='DIRECT'
+            data_store='DIRECT'
         )
 
     def setUp(self):
@@ -307,7 +307,7 @@ class FormSubmissionTestCase(TestCase):
             is_active=True,
             sensor_type=sensor_type,
             unit=unit,
-            data_type='DIRECT'
+            data_store='DIRECT'
         )
 
     def setUp(self):
@@ -408,7 +408,7 @@ class FormSubmissionTestCase(TestCase):
             'is_active': True,  # Set to True to match our test expectation
             'sensor_type': self.sensor.sensor_type.pk,
             'unit': self.sensor.unit.pk,
-            'data_type': 'DIRECT',
+            'data_store': 'DIRECT',
             'graph_type': 'LINE',
             'influx_measurement': 'test_measurement',
             'referrer': '',

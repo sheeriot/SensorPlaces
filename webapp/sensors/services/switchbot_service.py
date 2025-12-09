@@ -33,7 +33,7 @@ class SwitchBotService:
         self.place = place
         self.token = place.switchbot_token
         self.secret = place.switchbot_secret
-        
+
         # Prioritize the SwitchBot-specific store, then fall back to the place's default
         self.influx_store = place.switchbot_influx_store or place.default_influx_store
 
@@ -115,44 +115,6 @@ class SwitchBotService:
                 if sensor_api_key and sensor_api_key in live_body:
                     value = live_body[sensor_api_key]
                     ic(f"Service: Got value '{value}' for key '{sensor_api_key}'")
-
-                    # For humidity, ensure the value is numeric before returning
-                    is_valid = False
-                    if sensor_api_key == 'humidity':
-                        try:
-                            float(value)
-                            is_valid = True
-                        except (ValueError, TypeError):
-                            ic(f"Service: Ignored non-numeric humidity value for sensor '{sensor.name}': {value}")
-                            return None
-                    else:
-                        is_valid = True
-
-                    if is_valid:
-                        ic(f"Service: Live reading for '{sensor.name}' is valid. Persisting value: {value}")
-                        # Persist the reading since we went to the trouble of fetching it
-                        from sensors.models import SensorReading
-                        from django.utils import timezone
-                        
-                        # Update cache
-                        sensor.cached_reading_value = value
-                        sensor.cached_reading_timestamp = timezone.now()
-                        sensor.save(update_fields=['cached_reading_value', 'cached_reading_timestamp'])
-
-                        # Create historical reading
-                        SensorReading.objects.create(sensor=sensor, value=value)
-
-                        # Write to InfluxDB (the function handles the `is_active` check)
-                        write_sensor_reading_to_influx(sensor, value)
-
-                        # Record the activity
-                        log_message = (
-                            f"WEBHOOK: Reading | Place: {sensor.device.location.place.name} | "
-                            f"Device: {sensor.device.name} | Sensor: {sensor.name} | "
-                            f"Value: {value} | Action: Live-API Stored, cached."
-                        )
-                        record_webhook_activity(log_message)
-
                     return value
             else:
                 ic(f"Service: Live reading API returned status {status_data.get('statusCode')}: {status_data.get('message')}")
@@ -247,6 +209,7 @@ class SwitchBotService:
                         device=device,
                         measurement_type=measurement_name,
                         value=val_float,
+                        source='switchbot-api',
                         skip_local_storage=skip_local,
                         activate_sensor=activate_sensors
                     )
@@ -296,7 +259,7 @@ class SwitchBotService:
                         st = sensor.sensor_type
                         can_override = st.allow_override if st else True
                         if can_override:
-                            sensor.data_type = 'INFLUX'
+                            sensor.data_store = 'INFLUX'
                         sensor.save()
 
                 except Exception as e:
@@ -304,8 +267,8 @@ class SwitchBotService:
                     # Ensure fallback to DIRECT on failure
                     for item in sensor_field_map:
                         sensor = item['sensor']
-                        if sensor.data_type == 'INFLUX':
-                             sensor.data_type = 'DIRECT'
+                        if sensor.data_store == 'INFLUX':
+                             sensor.data_store = 'DIRECT'
                              sensor.save()
 
         # Log readings that were not sent to InfluxDB

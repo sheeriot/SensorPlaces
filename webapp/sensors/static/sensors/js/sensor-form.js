@@ -7,10 +7,10 @@ const sensorFormManager = {
         if (this.config.debug) console.log('[SensorForm] Initializing');
 
         // --- InfluxDB fields toggle ---
-        const dataTypeSelectForInflux = document.getElementById('id_data_type');
-        if (dataTypeSelectForInflux) {
+        const dataStoreSelectForInflux = document.getElementById('id_data_store');
+        if (dataStoreSelectForInflux) {
             this.toggleInfluxFields();
-            dataTypeSelectForInflux.addEventListener('change', () => this.toggleInfluxFields());
+            dataStoreSelectForInflux.addEventListener('change', () => this.toggleInfluxFields());
         }
 
         // --- Override toggles ---
@@ -32,11 +32,11 @@ const sensorFormManager = {
             this.handleSensorTypeChange();
         }
 
-        // --- Data Type Change Handler ---
+        // --- Data Store Change Handler ---
         // Just for Influx toggling now
-        const dataTypeSelect = document.getElementById('id_data_type');
-        if (dataTypeSelect) {
-            // dataTypeSelect.addEventListener('change', () => this.handleDataTypeSelection()); // Removed override logic
+        const dataStoreSelect = document.getElementById('id_data_store');
+        if (dataStoreSelect) {
+            // dataStoreSelect.addEventListener('change', () => this.handleDataStoreSelection()); // Removed override logic
         }
     },
 
@@ -52,7 +52,7 @@ const sensorFormManager = {
                     const defaults = sensorFormManager.getSensorTypeDefaults();
                     const defaultValue = {
                         'unit': defaults.unitId || '',
-                        // 'data_type': defaults.dataType || '', // Removed
+                        // 'data_store': defaults.dataStore || '', // Removed
                         'min_value': '',
                         'max_value': ''
                     }[type];
@@ -208,15 +208,15 @@ const sensorFormManager = {
         if (this.config.debug) console.log('[SensorForm] Form fields updated with defaults.');
     },
 
-    // handleDataTypeSelection() { ... } // Removed entire method
+    // handleDataStoreSelection() { ... } // Removed entire method
 
 
     toggleInfluxFields() {
-        const dataTypeSelect = document.getElementById('id_data_type');
+        const dataStoreSelect = document.getElementById('id_data_store');
         const influxFields = document.getElementById('influx-fields');
 
-        if (dataTypeSelect && influxFields) {
-            const isInflux = dataTypeSelect.value.startsWith('INFLUX');
+        if (dataStoreSelect && influxFields) {
+            const isInflux = dataStoreSelect.value.startsWith('INFLUX');
             if (isInflux) {
                 influxFields.classList.remove('d-none');
             } else {

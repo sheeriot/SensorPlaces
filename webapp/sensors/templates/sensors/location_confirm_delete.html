@@ -29,11 +29,7 @@
                     Warning: This location has {{ object.devices.count }} device(s) associated with it.
                     <ul class="mb-0 mt-2">
                     {% for device in object.devices.all %}
-                        <li><i class="bi bi-hdd-rack"></i> {{ device.name }}
-                            {% if device.sensors.exists %}
-                            ({{ device.sensors.count }} sensor{{ device.sensors.count|pluralize }})
-                            {% endif %}
-                        </li>
+                        <li>{% include "sensors/partials/device_label.html" with device=device icon_margin="" %}</li>
                     {% endfor %}
                     </ul>
                 </div>

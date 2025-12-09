@@ -49,7 +49,7 @@ class SensorForm(forms.ModelForm):
         fields = [
             'device', 'name', 'is_active', 'sensor_type',
             'unit', 'unit_override',
-            'data_type',
+            'data_store',
             'min_value', 'min_value_override',
             'max_value', 'max_value_override',
             'graph_type',
@@ -69,7 +69,7 @@ class SensorForm(forms.ModelForm):
             'unit': forms.Select(attrs={'class': 'form-select'}),
             'unit_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'graph_type': forms.Select(attrs={'class': 'form-select'}),
-            'data_type': forms.Select(attrs={'class': 'form-select'}),
+            'data_store': forms.Select(attrs={'class': 'form-select'}),
             'min_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'min_value_override': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'max_value': forms.NumberInput(attrs={'class': 'form-control'}),
@@ -88,9 +88,9 @@ class SensorForm(forms.ModelForm):
 
         super().__init__(*args, **kwargs)
 
-        # Set the initial value for data_type right away
+        # Set the initial value for data_store right away
         if self.instance and self.instance.pk:
-            self.initial['data_type'] = self.instance.data_type
+            self.initial['data_store'] = self.instance.data_store
 
         # Set default device if provided
         if self.device:
@@ -128,7 +128,7 @@ class SensorForm(forms.ModelForm):
         self.fields['name'].label = False
         self.fields['sensor_type'].label = "Sensor Type"
         self.fields['graph_type'].label = "Graph Type"
-        self.fields['data_type'].label = False
+        self.fields['data_store'].label = False
         self.fields['unit'].label = False
         self.fields['min_value'].label = False
         self.fields['max_value'].label = False
@@ -158,7 +158,7 @@ class SensorForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             if not self.instance.unit_override:
                 self.initial['unit'] = self.instance.effective_unit.pk if self.instance.effective_unit else None
-            self.initial['data_type'] = self.instance.data_type
+            self.initial['data_store'] = self.instance.data_store
 
         # Set labels for the override fields and remove help text for cleaner layout
         self.fields['unit_override'].label = "Override"
@@ -179,11 +179,11 @@ class SensorForm(forms.ModelForm):
             # Disable override fields if not allowed
             self.fields['unit'].disabled = True
             self.fields['unit_override'].disabled = True
-            # data_type is now always editable or controlled by other means,
-            # but since we removed the override flag, we just let it be.
-            # Or should we disable data_type dropdown if allow_override is false?
-            # The user asked to remove data_type_override logic.
-            pass
+            self.fields['min_value'].disabled = True
+            self.fields['min_value_override'].disabled = True
+            self.fields['max_value'].disabled = True
+            self.fields['max_value_override'].disabled = True
+
         else:
             pass
         # --- End of new logic ---
@@ -208,8 +208,8 @@ class SensorForm(forms.ModelForm):
                         {{ form.name }}
                     </div>
                     <div class="col-md-4">
-                        <label for="{{ form.data_type.id_for_label }}" class="form-label">Data Type</label>
-                        {{ form.data_type }}
+                        <label for="{{ form.data_store.id_for_label }}" class="form-label">Data Store</label>
+                        {{ form.data_store }}
                     </div>
                 </div>
             """),
@@ -289,7 +289,7 @@ class SensorForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        data_type = cleaned_data.get('data_type')
+        data_store = cleaned_data.get('data_store')
         device = cleaned_data.get('device') or self.device
         unit_override = cleaned_data.get('unit_override')
         min_value_override = cleaned_data.get('min_value_override')
@@ -348,8 +348,8 @@ class SensorForm(forms.ModelForm):
             cleaned_data['is_active'] = False
             self.add_error('is_active', "Sensor cannot be active when its device's location is inactive.")
 
-        # If data_type is INFLUX, validate that influx fields are present
-        if data_type == 'INFLUX':
+        # If data_store is INFLUX, validate that influx fields are present
+        if data_store == 'INFLUX':
             # These fields are not on the form, so we can't add errors to them.
             # The validation should happen on the model or a different form.
             pass

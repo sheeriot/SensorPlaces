@@ -1,0 +1,104 @@
+{% load humanize %}
+{% load timezone_filters %}
+
+<div id="live-value-display-{{ sensor.pk }}">
+
+{% if style == 'card' %}
+    {# Detailed layout for the sensor detail page #}
+    <div class="row">
+        <!-- Left side: Current Reading -->
+        <div class="col-md-7">
+            <div class="d-flex align-items-center mb-1">
+                <label class="form-label mb-0 small text-muted me-1">Current Reading</label>
+                <div id="watch-toggle-wrapper-{{ sensor.pk }}" hx-preserve="true" class="form-check form-switch form-check-inline d-inline-flex align-items-center small me-2">
+                    <input class="form-check-input refresh-toggle" type="checkbox" role="switch" id="refresh-toggle-{{ sensor.pk }}" data-poll-target="#sensor-live-details-wrapper-{{ sensor.pk }}">
+                    <label class="form-check-label" for="refresh-toggle-{{ sensor.pk }}">Watch</label>
+                </div>
+                <button class="btn btn-sm"
+                        title="Force refresh of this sensor's value"
+                        hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card&force=true"
+                        hx-target="#sensor-live-details-wrapper-{{ sensor.pk }}"
+                        hx-swap="innerHTML">
+                    <i class="bi bi-hammer"></i>
+                </button>
+            </div>
+            {% include "sensors/partials/_sensor_reading_badge.html" %}
+            <div class="small mt-2">
+                <strong class="text-muted">Source:</strong>
+                <span class="badge bg-light text-dark fw-normal">{{ source|default:sensor.cached_reading_source|default:'N/A' }}</span>
+            </div>
+        </div>
+
+        <!-- Right side: Timestamps & Controls -->
+        <div class="col-md-5 text-md-end">
+            <div class="small">
+                <span class="text-muted">Last Reading:</span>
+                <span class="updatable-naturaltime" data-timestamp="{{ sensor.cached_reading_timestamp|default_if_none:''|isoformat }}">
+                    {{ sensor.cached_reading_timestamp|naturaltime }}
+                </span>
+            </div>
+            <div class="small mb-1">
+                <span class="text-muted">Last Checked:</span>
+                <span class="updatable-naturaltime" data-timestamp="{{ sensor.last_cached_timestamp|default_if_none:''|isoformat }}">
+                    {{ sensor.last_cached_timestamp|naturaltime }}
+                </span>
+            </div>
+            <div class="small">
+                <span class="text-muted">Stale Time:</span>
+                <span class="text-monospace">{{ sensor.effective_stale_threshold }}s</span>
+            </div>
+        </div>
+    </div>
+
+{% elif style == 'badge_lg' %}
+    <div class="d-flex align-items-center justify-content-between w-100">
+        <div>
+            {% include "sensors/partials/_sensor_reading_badge.html" %}
+            {% if sensor.cached_reading_timestamp %}
+            <span class="small text-muted" title="Reading age: {{ sensor.cached_reading_timestamp|naturaltime }}">
+                {{ sensor.reading_age_str }}
+            </span>
+            {% endif %}
+        </div>
+
+        <div class="d-flex align-items-center">
+            <div class="form-check form-switch me-2" title="Watch value">
+                <input class="form-check-input" type="checkbox" role="switch" id="watch-{{ sensor.pk }}">
+            </div>
+            <button class="btn btn-sm btn-outline-secondary"
+                    title="Get Now"
+                    hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=badge_lg&force=true"
+                    hx-target="#live-value-display-{{ sensor.pk }}"
+                    hx-swap="innerHTML">
+                <i class="bi bi-hammer"></i>
+            </button>
+        </div>
+    </div>
+
+{% elif style == 'row' %}
+    {# Compact layout for sensor list rows #}
+    <div class="d-flex justify-content-between align-items-center w-100">
+        <!-- Reading Badge -->
+        <div style="width: 100px;" class="text-start">
+            {% include "sensors/partials/_sensor_reading_badge.html" %}
+        </div>
+
+        <!-- Active Toggle & Refresh -->
+        <div style="width: 90px;" class="text-start d-flex align-items-center">
+            {% if sensor.device.is_active and sensor.device.location.is_active %}
+                {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug object_name=sensor.name %}
+            {% else %}
+                <span class="badge bg-secondary">inactive</span>
+            {% endif %}
+            <button class="btn btn-sm p-0 ms-2"
+                    title="Force refresh"
+                    hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=row&force=true"
+                    hx-target="#live-value-display-{{ sensor.pk }}"
+                    hx-swap="outerHTML">
+                <i class="bi bi-hammer"></i>
+            </button>
+        </div>
+    </div>
+{% endif %}
+
+</div>

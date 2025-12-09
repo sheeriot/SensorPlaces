@@ -1,6 +1,19 @@
 <div class="card my-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-database me-2"></i>InfluxDB Details</span>
+        <h5 class="mb-0 d-flex align-items-center">
+            <i class="bi bi-database me-2"></i>
+            InfluxDB Store: {{ sensor.influx_store.name|default:"Not Set" }}
+            {% if sensor.influx_store %}
+            <a class="btn btn-outline-secondary btn-sm ms-2"
+                data-bs-toggle="collapse"
+                href="#collapse-influx-{{ sensor.pk }}"
+                role="button"
+                aria-expanded="false"
+                aria-controls="collapse-influx-{{ sensor.pk }}">
+                <i class="bi bi-info-circle"></i> Details
+            </a>
+            {% endif %}
+        </h5>
         <div class="btn-group">
             <button class="btn btn-sm btn-warning"
                     hx-get="{% url 'sensors:sensor_influx_update' place_slug=place.slug pk=sensor.pk %}"
@@ -10,13 +23,15 @@
                 <i class="bi bi-pencil"></i> Edit
             </button>
             <div class="btn-group" role="group">
-                <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <button type="button" class="btn btn-sm btn-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false"
+                        {% if not sensor.influx_store %}disabled{% endif %}>
                     <i class="bi bi-activity"></i> Test
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
                         <a class="dropdown-item" href="#"
-                           hx-post="{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=bucket_read"
+                           hx-post="{% if sensor.influx_store %}{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=bucket_read{% endif %}"
                            hx-target="#influx-test-results-{{ sensor.pk }}"
                            hx-swap="innerHTML">
                            <i class="bi bi-box-seam me-2"></i>Bucket Read Test
@@ -24,7 +39,7 @@
                     </li>
                     <li>
                         <a class="dropdown-item" href="#"
-                           hx-post="{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=sensor_read&sensor_pk={{ sensor.pk }}"
+                           hx-post="{% if sensor.influx_store %}{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=sensor_read&sensor_pk={{ sensor.pk }}{% endif %}"
                            hx-target="#influx-test-results-{{ sensor.pk }}"
                            hx-swap="innerHTML">
                            <i class="bi bi-graph-up me-2"></i>Read Sensor Data
@@ -33,7 +48,7 @@
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <a class="dropdown-item" href="#"
-                           hx-post="{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=write"
+                           hx-post="{% if sensor.influx_store %}{% url 'sensors:influxstore_test' place.slug sensor.influx_store.pk %}?test_type=write{% endif %}"
                            hx-target="#influx-test-results-{{ sensor.pk }}"
                            hx-swap="innerHTML">
                            <i class="bi bi-pencil-square me-2"></i>Write/Read Perms
@@ -43,7 +58,34 @@
             </div>
         </div>
     </div>
-    <div id="sensor-influx-details-{{ sensor.pk }}" class="card-body" hx-trigger="refresh-sensor-card-{{ sensor.pk }} from:body" hx-get="{% url 'sensors:sensor_detail_card' place_slug=place.slug pk=sensor.pk %}?card=influx" hx-target="this">
-        {% include 'sensors/partials/_sensor_influx_card_body.html' %}
+    <div class="collapse" id="collapse-influx-{{ sensor.pk }}">
+        <div id="sensor-influx-details-{{ sensor.pk }}" class="card-body"
+             hx-trigger="refresh-sensor-card-{{ sensor.pk }} from:body"
+             hx-get="{% url 'sensors:sensor_detail_card' place_slug=place.slug pk=sensor.pk %}?card=influx_body"
+             hx-target="this">
+
+            {% if sensor.influx_store %}
+                <div class="row text-center">
+                    <div class="col">
+                        <small class="text-muted text-uppercase">Measurement</small>
+                        <p class="fw-bold">{{ sensor.influx_measurement|default:"-" }}</p>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted text-uppercase">Tag Key</small>
+                        <p class="fw-bold">{{ sensor.influx_tag_key|default:"-" }}</p>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted text-uppercase">Field</small>
+                        <p class="fw-bold">{{ sensor.influx_field_name|default:"-" }}</p>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-center text-muted">No InfluxDB store configured for this sensor.</p>
+            {% endif %}
+
+        </div>
+    </div>
+    <div id="influx-test-results-{{ sensor.pk }}" class="card-footer bg-white border-top-0 p-0">
+        {# Test results will be loaded here via HTMX #}
     </div>
 </div>

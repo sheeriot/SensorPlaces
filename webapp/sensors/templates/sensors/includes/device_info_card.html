@@ -1,21 +1,62 @@
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
+<div class="card my-1">
+    <div class="card-header d-flex justify-content-between align-items-center py-1">
+        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
             <i class="bi bi-hdd-rack me-2"></i>Device Info
         </h5>
-        <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-primary">
+        <a href="{% url 'sensors:device_update' place_slug=place.slug pk=device.pk %}" class="btn btn-sm btn-outline-warning">
             <i class="bi bi-pencil-fill"></i> Edit
         </a>
     </div>
-    <div class="card-body">
-        <h6 class="card-subtitle mb-2 text-muted">{{ device.name }}</h6>
-        <p class="card-text">
-            <strong>Model:</strong> {{ device.model|default:"N/A" }}<br>
-            <strong>Manufacturer:</strong> {{ device.manufacturer|default:"N/A" }}<br>
-            <strong>Device ID:</strong> {{ device.device_id|default:"N/A" }}
+    <div class="card-body p-2">
+        <h5 class="card-title mb-2">
+            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none">
+                {% if device.device_type and device.device_type.icon %}
+                    <i class="{{ device.device_type.icon }} me-2"></i>
+                {% else %}
+                    <i class="bi bi-hdd-rack me-2"></i>
+                {% endif %}
+                {{ device.name }}
+            </a>
+            {% if device.is_active %}
+                <span class="badge bg-success-subtle text-success-emphasis rounded-pill ms-2">active</span>
+            {% else %}
+                <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill ms-2">inactive</span>
+            {% endif %}
+            {% if device.is_lorawan %}
+                <i class="bi bi-broadcast ms-2" title="LoRaWAN Device"></i>
+            {% endif %}
+            {% if device.is_switchbot %}
+                <i class="bi bi-robot ms-2" title="SwitchBot Device"></i>
+            {% endif %}
+        </h5>
+
+        <p class="card-text mb-1">
+            <i class="bi bi-box-seam me-2" title="Model"></i><strong>Model:</strong> {{ device.model|default:"N/A" }}
         </p>
+        <p class="card-text mb-1">
+            <i class="bi bi-building me-2" title="Manufacturer"></i><strong>Manufacturer:</strong>
+            {{ device.manufacturer|default:"N/A" }}
+        </p>
+        {% if device.device_type %}
+            <p class="card-text mb-1">
+                <i class="bi bi-tags me-2" title="Device Type"></i><strong>Type:</strong>
+                <a href="{% url 'sensors:devicetype_detail' pk=device.device_type.pk %}"
+                   class="text-decoration-none">{{ device.device_type.name }}</a>
+            </p>
+        {% endif %}
         <p class="card-text">
-            <small class="text-muted">Location: {{ device.location.name }}</small>
+            <i class="bi bi-hash me-2" title="Device ID"></i><strong>Device ID:</strong> {{ device.device_id|default:"N/A" }}
+        </p>
+        {% if device.last_seen %}
+            <p class="card-text text-muted">
+                <i class="bi bi-clock-history me-2"></i>Last seen: {{ device.last_seen|timesince }} ago
+            </p>
+        {% endif %}
+
+        <p class="card-text mt-2 text-muted">
+            <i class="bi bi-geo-alt me-2"></i>Location:
+            <a href="{% url 'sensors:location_detail' place_slug=place.slug slug=device.location.slug %}"
+               class="text-decoration-none text-muted">{{ device.location.name }}</a>
         </p>
     </div>
 </div>

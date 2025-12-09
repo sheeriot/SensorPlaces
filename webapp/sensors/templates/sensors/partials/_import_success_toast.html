@@ -6,7 +6,7 @@
             <tr>
                 <th>Sensor</th>
                 <th>Type</th>
-                <th>Data Type</th>
+                <th>Data Store</th>
             </tr>
         </thead>
         <tbody>
@@ -14,7 +14,7 @@
             <tr>
                 <td>{{ sensor.name }}</td>
                 <td>{{ sensor.sensor_type.name }}</td>
-                <td>{{ sensor.get_data_type_display }}</td>
+                <td>{{ sensor.get_data_store_display }}</td>
             </tr>
             {% endfor %}
         </tbody>

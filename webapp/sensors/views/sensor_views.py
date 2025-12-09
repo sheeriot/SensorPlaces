@@ -32,6 +32,7 @@ from ..influx_client import (
     get_latest_influx_reading,
 )
 from .utils import get_switchbot_service_from_place
+from . import influx_views
 import time
 from datetime import datetime, timedelta
 
@@ -281,6 +282,9 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # Add device and location to context
         sensor = self.get_object()
 
+        # Ensure the sensor's live value is up-to-date before rendering
+        update_sensor_live_value(sensor, force_update=False)
+
         device_qs = Device.objects.annotate(
             active_sensors_count=Count('sensors', filter=Q(sensors__is_active=True)),
             inactive_sensors_count=Count('sensors', filter=Q(sensors__is_active=False))
@@ -330,6 +334,7 @@ class SensorDetailView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
 
         # Add locations for the place_nav_card
         context['locations'] = get_annotated_locations(self._place)
+        context['global_stale_threshold'] = getattr(settings, 'DEFAULT_STALE_THRESHOLD_SECONDS', 300)
 
         return context
 
@@ -353,70 +358,70 @@ def test_influx_write(request, place_slug, pk):
     return influx_views.influxstore_test(request, place_slug=place_slug, pk=sensor.influx_store.pk, test_type_override='write')
 
 
-class SensorLiveValueView(LoginRequiredMixin, View):
+
+
+@login_required
+def sensor_live_value_view(request, place_slug, pk):
     """
-    A view that fetches the live value for one or more sensors and returns it as JSON.
-    It can handle a single sensor via a URL kwarg or multiple sensors via a 'pks' query param.
+    Returns a rendered HTML partial for a sensor's live value.
+    Can return different partials based on the 'style' query parameter.
+    - 'card': Renders the detailed live reading display.
+    - 'badge': Renders a compact badge.
     """
-    def get(self, request, *args, **kwargs):
-        place_slug = kwargs.get('place_slug')
-        pks_str = request.GET.get('pks', '')
+    # ic(f"sensor_live_value_view called for pk={pk}, style='{request.GET.get('style')}'")
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
+    style = request.GET.get('style', 'card')
+    force_update = request.GET.get('force', 'false').lower() == 'true'
+    source = 'unknown'
 
-        if pks_str:
-            # Handle multiple PKs from query parameter
-            pks = [int(pk) for pk in pks_str.split(',') if pk.isdigit()]
-            sensors = Sensor.objects.filter(pk__in=pks, device__location__place__slug=place_slug)
+    try:
+        # This function now returns a tuple: (value_was_updated, source)
+        _, source = update_sensor_live_value(sensor, force_update=force_update)
+    except Exception as e:
+        # If the update fails, we can still render the card with an error state.
+        # The template will handle displaying the error.
+        ic(f"Error in sensor_live_value_view for sensor {pk}: {e}")
 
-            payload = {}
-            for sensor in sensors:
-                try:
-                    update_sensor_live_value(sensor)
-                    sensor.refresh_from_db(fields=['cached_reading_value', 'cached_reading_timestamp'])
 
-                    if sensor.cached_reading_timestamp:
-                        payload[sensor.pk] = {
-                            'status': 'success',
-                            'value': sensor.cached_reading_value,
-                            'timestamp': sensor.cached_reading_timestamp.isoformat(),
-                            'unit_symbol': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                            'decimal_places': sensor.effective_decimal_places
-                        }
-                    else:
-                        payload[sensor.pk] = {'status': 'no_reading'}
-                except Exception as e:
-                    payload[sensor.pk] = {'status': 'error', 'message': str(e)}
+    template_name = 'sensors/partials/_sensor_live_display.html'
 
-            # Note any PKs that were not found
-            found_pks = {s.pk for s in sensors}
-            for pk in pks:
-                if pk not in found_pks:
-                    payload[pk] = {'status': 'error', 'message': 'Sensor not found or access denied.'}
+    context = {
+        'sensor': sensor,
+        'place': sensor.device.location.place,
+        'device': sensor.device,
+        'location': sensor.device.location,
+        'global_stale_threshold': getattr(settings, 'DEFAULT_STALE_THRESHOLD_SECONDS', 300),
+        'source': source,
+        'style': style
+    }
 
-            return JsonResponse({'status': 'success', 'payload': payload})
+    # ic(f"Rendering template: {template_name} with style: {style}")
+    return render(request, template_name, context)
 
-        else:
-            # Handle a single sensor from URL
-            sensor_pk = kwargs.get('pk')
-        try:
-            sensor = get_object_or_404(Sensor, pk=sensor_pk)
-            update_sensor_live_value(sensor)
 
-            if sensor.cached_reading_value is not None:
-                response_data = {
-                    'status': 'success',
-                    'value': sensor.cached_reading_value,
-                    'timestamp': sensor.cached_reading_timestamp.isoformat() if sensor.cached_reading_timestamp else None,
-                    'unit_symbol': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                    'decimal_places': sensor.effective_decimal_places
-                }
-                return JsonResponse(response_data)
-            else:
-                return JsonResponse({'status': 'no_reading', 'message': 'No current reading available.'})
+@login_required
+def sensor_live_row_view(request, place_slug, pk):
+    """
+    Returns a rendered HTML partial for a sensor's live data for a list row.
+    This view always forces an update.
+    """
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
+    source = 'unknown'
 
-        except Sensor.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Sensor not found.'}, status=404)
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    # Always force an update for this view
+    try:
+        _, source = update_sensor_live_value(sensor, force_update=True)
+    except Exception as e:
+        ic(f"Error in sensor_live_row_view for sensor {pk}: {e}")
+
+    context = {
+        'sensor': sensor,
+        'place': get_object_or_404(Place, slug=place_slug),
+        'source': source,
+        'style': 'row'
+        }
+
+    return render(request, 'sensors/partials/_sensor_live_display.html', context)
 
 
 class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
@@ -434,9 +439,9 @@ class SensorGraphCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
         # The live value is now exclusively handled by the frontend LiveValueFetcher,
         # so we no longer need to update it here.
         #
-        # if sensor.data_type and sensor.data_type.startswith('INFLUX'):
+        # if sensor.data_store and sensor.data_store.startswith('INFLUX'):
         #     update_sensor_live_value(sensor)
-        # elif sensor.data_type == 'DIRECT':
+        # elif sensor.data_store == 'DIRECT':
         #      update_sensor_live_value(sensor)
 
         # Add device and location to context
@@ -585,7 +590,7 @@ class SensorCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             f"<small class='text-muted'>"
             f"Type: {sensor.sensor_type.name if sensor.sensor_type else 'N/A'}<br>"
             f"Unit: {sensor.effective_unit}<br>"
-            f"Data Type: {sensor.get_data_type_display}<br>"
+            f"Data Store: {sensor.get_data_store_display()}<br>"
             f"Status: {'Active' if sensor.is_active else 'inactive'}"
             f"</small>"
         )
@@ -735,10 +740,10 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             'device': self._device,
         })
 
-        # Explicitly set the initial data_type for the form
-        if self.object and hasattr(self.object, 'data_type'):
+        # Explicitly set the initial data_store for the form
+        if self.object and hasattr(self.object, 'data_store'):
             initial = kwargs.get('initial', {})
-            initial['data_type'] = self.object.data_type
+            initial['data_store'] = self.object.data_store
             kwargs['initial'] = initial
 
         return kwargs
@@ -787,7 +792,7 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
             'is_active': sensor.is_active,
             'device': sensor.device,
             'sensor_type': sensor.sensor_type,
-            'data_type': sensor.data_type,
+            'data_store': sensor.data_store,
             'unit_id': sensor.unit_id
         }
 
@@ -814,8 +819,8 @@ class SensorUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
                 changes.append(f"device: {self._original_values['device'].name} → {sensor.device.name}")
             if self._original_values['sensor_type'] != sensor.sensor_type:
                 changes.append(f"type: {self._original_values['sensor_type']} → {sensor.sensor_type}")
-            if 'data_type' in self._original_values and self._original_values['data_type'] != sensor.data_type:
-                changes.append(f"data type: {self._original_values['data_type']} → {sensor.get_data_type_display}")
+            if 'data_store' in self._original_values and self._original_values['data_store'] != sensor.data_store:
+                changes.append(f"data store: {self._original_values['data_store']} → {sensor.get_data_store_display()}")
             if 'unit_id' in self._original_values and self._original_values['unit_id'] != (sensor.effective_unit.id if sensor.effective_unit else None):
                 # Need to import Unit at the top
                 from ..models import Unit
@@ -948,21 +953,20 @@ class SensorReadingListView(LoginRequiredMixin, PlaceAnnotationMixin, ListView):
         queryset = super().get_queryset().filter(sensor=sensor)
 
         # Filter by date range if provided
-        start_date = self.request.GET.get('start_date')
-        end_date = self.request.GET.get('end_date')
-        if start_date and end_date:
+        start_date_str = self.request.GET.get('start_date')
+        end_date_str = self.request.GET.get('end_date')
+
+        if start_date_str and end_date_str:
             try:
-                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
                 queryset = queryset.filter(timestamp__date__range=[start_date, end_date])
             except ValueError:
-                # Use toast_message instead of messages
                 setattr(self.request, 'toast_message', {
                     'message': 'Invalid date format. Please use YYYY-MM-DD.',
                     'type': 'error'
                 })
-        elif start_date or end_date:
-            # Use toast_message instead of messages
+        elif start_date_str or end_date_str:
             setattr(self.request, 'toast_message', {
                 'message': 'Both start_date and end_date must be provided.',
                 'type': 'error'
@@ -1115,7 +1119,7 @@ def test_sensor_readings(request, place_slug, sensor_pk):
                               device__location__place__slug=place_slug)
 
     # Only test InfluxDB sensors
-    if sensor.data_type != 'INFLUX':
+    if sensor.data_store != 'INFLUX':
         return JsonResponse({
             'status': 'error',
             'message': 'This sensor does not use InfluxDB as its data source'
@@ -1130,7 +1134,8 @@ def test_sensor_readings(request, place_slug, sensor_pk):
         stop = timezone.now()
         start = stop - timedelta(minutes=60)
 
-        # readings = get_sensor_readings(sensor=sensor, start=start, stop=stop, limit=100) # Removed as per edit hint
+        from ..influx_graphs import get_sensor_readings
+        readings = get_sensor_readings(sensor=sensor, start=start, stop=stop, limit=100)
 
         if not readings: # Changed from 'not readings' to 'if not readings'
             return JsonResponse({
@@ -1179,7 +1184,7 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
         )
 
         # If this is an InfluxDB sensor, use the InfluxDB data path.
-        if sensor.data_type.startswith('INFLUX'):
+        if sensor.data_store.startswith('INFLUX'):
             return lorawan_sensor_data_api(request, place_slug, pk)
 
         # --- The rest of this function is for local DB sensors ---
@@ -1210,8 +1215,9 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
         serializable_data_points = []
         if readings:
             for r in readings:
-                serializable_val = float(r['value']) if r['value'] is not None else None
-                serializable_data_points.append((r['timestamp'].isoformat(), serializable_val))
+                if r['value'] is not None:
+                    serializable_val = float(r['value'])
+                    serializable_data_points.append((r['timestamp'].isoformat(), serializable_val))
 
         end_time = timezone.now()
         query_time_ms = (end_time - start_time).total_seconds() * 1000
@@ -1224,11 +1230,13 @@ def sensor_readings_api(request: HttpRequest, place_slug: str, pk: int) -> JsonR
                 'sensor': {
                     'name': sensor.name,
                     'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                    'data_type': sensor.data_type,
+                    'data_store': sensor.data_store,
                     'graph_type': sensor.effective_graph_type,
                     'min_value': sensor.effective_min_value,
                     'max_value': sensor.effective_max_value,
-                    'decimal_places': sensor.effective_decimal_places
+                    'decimal_places': sensor.effective_decimal_places,
+                    'is_boolean': sensor.sensor_type.is_boolean if sensor.sensor_type else False,
+                    'sensor_type_name': sensor.sensor_type.name if sensor.sensor_type else None,
                 },
                 'query_range': {
                     'start_date': start_date.isoformat() if start_date else None,
@@ -1276,14 +1284,14 @@ def lorawan_sensor_data_api(request, place_slug, pk):
         serializable_data_points = []
         if data_points:
             for ts, val in data_points:
-                # Ensure value is float for Chart.js, or None if it's null
-                serializable_val = float(val) if val is not None else None
-                serializable_data_points.append((ts.isoformat(), serializable_val))
+                if val is not None:
+                    serializable_val = float(val)
+                    serializable_data_points.append((ts.isoformat(), serializable_val))
 
         # ic("Building response payload...")
         # ic(f"Sensor Name: {sensor.name}")
         # ic(f"Effective unit: {sensor.effective_unit.symbol if sensor.effective_unit else ''}")
-        # ic(f"Data type: {sensor.data_type}")
+        # ic(f"Data store: {sensor.data_store}")
         # ic(f"Effective min value: {sensor.effective_min_value}")
         # ic(f"Effective max value: {sensor.effective_max_value}")
         # ic(f"Effective graph type: {sensor.effective_graph_type}")
@@ -1295,11 +1303,13 @@ def lorawan_sensor_data_api(request, place_slug, pk):
                 'sensor': {
                     'name': sensor.name,
                     'unit': sensor.effective_unit.symbol if sensor.effective_unit else '',
-                    'data_type': sensor.data_type,
+                    'data_store': sensor.data_store,
                     'graph_type': sensor.effective_graph_type,
                     'min_value': sensor.effective_min_value,
                     'max_value': sensor.effective_max_value,
                     'decimal_places': sensor.effective_decimal_places,
+                    'is_boolean': sensor.sensor_type.is_boolean if sensor.sensor_type else False,
+                    'sensor_type_name': sensor.sensor_type.name if sensor.sensor_type else None,
                 },
                 'query_range': {
                     'start_date': start_date.isoformat(),

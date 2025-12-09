@@ -453,7 +453,7 @@ class SensorFormTest(TestCase):
             'is_active': True,
             'sensor_type': 1, # Use ID because SensorTypeSelect expects IDs
             'unit': 1,
-            'data_type': 'DIRECT', # Should match choice keys
+            'data_store': 'DIRECT', # Should match choice keys
             'graph_type': 'SCATTER',
         }
         # Create dummy instances for form to valid against
@@ -485,7 +485,7 @@ class SensorFormTest(TestCase):
             'is_active': False,
             'sensor_type': st.pk,
             'unit': u.pk,
-            'data_type': 'DIRECT',
+            'data_store': 'DIRECT',
             'graph_type': 'SCATTER',
         }
 
@@ -520,7 +520,7 @@ class SensorFormTest(TestCase):
             'is_active': True,
             'sensor_type': st.pk,
             'unit': u.pk,
-            'data_type': 'INFLUX',
+            'data_store': 'INFLUX',
             'graph_type': 'SCATTER',
         }
 
@@ -536,7 +536,7 @@ class SensorFormTest(TestCase):
             'is_active': True,
             'sensor_type': st.pk,
             'unit': u.pk,
-            'data_type': 'INFLUX',
+            'data_store': 'INFLUX',
             'graph_type': 'SCATTER',
             'influx_store': self.influx_store.pk,
             'influx_measurement': 'test_measurement',
@@ -569,7 +569,7 @@ class SensorFormTest(TestCase):
         self.assertIn('name="is_active"', form_html)
         self.assertIn('name="sensor_type"', form_html)
         self.assertIn('name="unit"', form_html)
-        self.assertIn('name="data_type"', form_html)
+        self.assertIn('name="data_store"', form_html)
 
         # Check if the submit button is included
         has_submit = self._layout_has_submit(form.helper.layout)

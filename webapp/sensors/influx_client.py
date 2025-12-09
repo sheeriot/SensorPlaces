@@ -6,6 +6,8 @@ import logging
 from icecream import ic
 import time
 import random
+from django.utils import timezone
+from datetime import timezone as dt_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +15,7 @@ def write_sensor_reading_to_influx(sensor, value):
     """
     Finds the correct InfluxDB store for a sensor and writes a reading to it.
     """
+    ic(f"InfluxClient: Attempting to write to InfluxDB for sensor '{sensor.name}' with value '{value}'")
     from .models import Place  # Local import to avoid circular dependency
     place = sensor.device.location.place
 
@@ -76,11 +79,11 @@ def write_to_influx(influx_store: InfluxStore, measurement: str, fields: dict, t
                 point.field(key, float(value))
 
         client.write(database=influx_store.bucket_name, record=point)
-        
+
         # Enhanced success log
-        field_log = ", ".join([f"{k}={v}" for k, v in fields.items()])
-        tag_log = ", ".join([f"{k}={v}" for k, v in tags.items()]) if tags else "No tags"
-        ic(f"Success: WritePoint to measurement '{measurement}'", f"fields=[{field_log}]", f"tags=[{tag_log}]")
+        # field_log = ", ".join([f"{k}={v}" for k, v in fields.items()])
+        # tag_log = ", ".join([f"{k}={v}" for k, v in tags.items()]) if tags else "No tags"
+        # ic(f"Success: WritePoint to measurement '{measurement}'", f"fields=[{field_log}]", f"tags=[{tag_log}]")
 
     except Exception as e:
         ic(f"Failed to write to InfluxDB v3 for store {influx_store.name}: {e}")
@@ -106,7 +109,7 @@ def test_influx_bucket(url: str, token: str, org: str, bucket_name:str):
     start_time = time.perf_counter()
     try:
         client = InfluxDBClient3(host=url, token=token, org=org, database=bucket_name)
-        
+
         query = "SELECT 1"
         # This will raise an exception on failure.
         client.query(query=query, database=bucket_name, language="sql")
@@ -166,7 +169,7 @@ def get_influx_sensor_stats(sensor):
         return {'error': 'No InfluxDB store configured for this sensor.'}
 
     latest_reading_result = get_latest_influx_reading(sensor)
-    
+
     # The user wants to see the query and the result.
     # The view will handle the logic of what to display.
     return {
@@ -191,7 +194,7 @@ def test_influx_sensor_read(sensor):
     # Add a check to see if any data was returned
     if stats['record_count'] == 0 and not stats['latest_reading']:
         stats['error'] = "No records found for this sensor's measurement in the store."
-    
+
     return stats
 
 
@@ -261,7 +264,7 @@ def get_latest_influx_reading(sensor: 'Sensor'):
 
     client = get_influxdb_client(sensor.influx_store)
     field_to_select = sensor.influx_field_name or 'value'
-    
+
     # Build the WHERE clause for filtering by the specific device
     tag_key = sensor.influx_tag_key or 'device_id'
     tag_value = sensor.device.device_id
@@ -270,20 +273,25 @@ def get_latest_influx_reading(sensor: 'Sensor'):
     # Using SQL for InfluxDB v3. Order by time descending and take the first one.
     query = f'SELECT "time", "{field_to_select}" FROM "{sensor.influx_measurement}" {where_clause} ORDER BY time DESC LIMIT 1'
 
-    ic("Latest source query:", query)
+    # ic("Latest source query:", query)
     try:
         table = client.query(query=query, database=sensor.influx_store.bucket_name, language='sql')
-        
+
         if table.num_rows > 0:
             # PyArrow table access
             time_val = table.column(0)[0].as_py()
+
+            # Ensure the datetime is timezone-aware (it's UTC from InfluxDB)
+            if time_val.tzinfo is None:
+                time_val = timezone.make_aware(time_val, dt_timezone.utc)
+
             value = table.column(1)[0].as_py()
             # Construct a record-like object for template compatibility
             latest = {'time': time_val, field_to_select: value}
-            ic("Latest source query result:", latest)
+            # ic("Latest source query result:", latest)
             return {'reading': latest, 'query': query}
-            
-        ic("Latest source query result: No records found.")
+
+        # ic("Latest source query result: No records found.")
         return {'reading': None, 'query': query}
 
     except Exception as e:
@@ -313,33 +321,44 @@ def test_influx_write_read(store: InfluxStore):
         "field_name": test_field,
         "field_value": test_value
     }
-    
+
     client = None
     try:
         client = InfluxDBClient3(host=store.url, token=store.token, org=store.org, database=store.bucket_name)
-        
+
         # --- Write Test ---
         start_write = time.time()
         point = Point(test_measurement).tag(test_tag_key, test_tag_value).field(test_field, test_value)
+        # ic("Writing test point:", point.to_line_protocol())
         client.write(record=point)
         end_write = time.time()
         write_time_ms = int((end_write - start_write) * 1000)
+        # ic(f"Write completed in {write_time_ms}ms.")
+
+        # Delay to account for InfluxDB Cloud's eventual consistency
+        # ic("Waiting for 1 second before reading...")
+        # time.sleep(1)
 
         # --- Read Test (immediately after) ---
         start_read = time.time()
         query = f'SELECT * FROM "{test_measurement}" WHERE "{test_tag_key}" = \'{test_tag_value}\' ORDER BY time DESC LIMIT 1'
-        ic(f"Performing read test with query: {query}")
+        # ic(f"Performing read test with query: {query}")
         table = client.query(query=query, language='sql')
         end_read = time.time()
         read_time_ms = int((end_read - start_read) * 1000)
+        # ic(f"Read completed in {read_time_ms}ms. Found {table.num_rows} rows.")
+
 
         # --- Verification ---
         if table.num_rows == 0:
-            return {"success": False, "message": "Write succeeded, but no data was returned on read.", "record": record_details}
+            ic("Read test failed: No rows returned.")
+            return {"success": False, "message": "Write succeeded, but no data was returned on read. This might be due to propagation delay.", "record": record_details}
 
         read_value = table.to_pydict()[test_field][0]
+        # ic(f"Read back value: {read_value}")
 
         if read_value == test_value:
+            # ic("Read value matches written value. Test successful.")
             return {
                 "success": True,
                 "message": f"Successfully wrote {test_value} and read it back.",
@@ -348,6 +367,7 @@ def test_influx_write_read(store: InfluxStore):
                 "read_time_ms": read_time_ms
             }
         else:
+            # ic(f"Read value {read_value} does not match written value {test_value}. Test failed.")
             return {
                 "success": False,
                 "message": f"Value mismatch. Wrote {test_value}, but read back {read_value}.",

@@ -19,24 +19,17 @@
 
     {% if not narrow_view %}
         <!-- Current Value -->
-        <div style="width: 100px;" class="text-start">
-            {% if sensor.live_value is not None %}
-                <div class="d-flex flex-column">
-                    <span class="badge bg-success-subtle text-success-emphasis rounded-1">
-                        {% if sensor.effective_unit.name|lower == 'boolean' or sensor.unit.name|lower == 'boolean' %}
-                            {% if sensor.live_value > 0 %}True{% else %}False{% endif %}
-                        {% else %}
-                            {{ sensor.live_value|floatformat:sensor.effective_decimal_places }}{{ sensor.effective_unit.symbol }}
-                        {% endif %}
-                    </span>
-                    {% if sensor.current_reading_timestamp %}
-                        <small class="text-muted" style="font-size: 0.75em;">{{ sensor.current_reading_timestamp|naturaltime }}</small>
-                    {% endif %}
-                </div>
-            {% else %}
-                &nbsp;
-            {% endif %}
+        {% if sensor.is_active %}
+        <div style="width: 200px;" class="text-start"
+             id="sensor-live-value-{{ sensor.pk }}"
+             hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=badge_lg"
+             hx-trigger="every 30s"
+             hx-swap="innerHTML">
+            {% with style="badge_lg" %}{% include "sensors/partials/_sensor_live_display.html" %}{% endwith %}
         </div>
+        {% else %}
+        <div style="width: 200px;"></div>
+        {% endif %}
 
         <!-- Active toggle -->
         <div style="width: 90px;" class="text-start">

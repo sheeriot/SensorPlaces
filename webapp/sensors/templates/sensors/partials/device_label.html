@@ -1,0 +1,8 @@
+{% with icon_margin=icon_margin|default:"me-2" %}
+    {% if device.device_type and device.device_type.icon %}
+        <i class="{{ device.device_type.icon }} {{ icon_margin }}"></i>
+    {% else %}
+        <i class="bi bi-question-circle {{ icon_margin }}"></i>
+    {% endif %}
+    <span>{{ device.name }}</span>
+{% endwith %}

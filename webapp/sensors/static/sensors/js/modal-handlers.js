@@ -87,8 +87,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (scriptConfig.debug) console.log('[MapplanModal] HTMX content loaded into mapplan-modal.');
 
                     const mapContainer = modalContent.querySelector('#placeMapContainer');
-                    const siteplanViewContainer = modalContent.querySelector('#siteplan-container-modal');
-                    const siteplanEditorContainer = modalContent.querySelector('#siteplan-editor-map');
 
                     if (mapContainer) {
                         if (scriptConfig.debug) console.log('[MapplanModal] Found #placeMapContainer, initializing map popout.');
@@ -96,20 +94,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             window.placeMapPopout.initialize(modalContent);
                         } else {
                             console.error('[MapplanModal] placeMapPopout.initialize is not available.');
-                        }
-                    } else if (siteplanViewContainer) {
-                        if (scriptConfig.debug) console.log('[MapplanModal] Found #siteplan-container-modal, initializing site plan view.');
-                        if (window.sitePlanView && typeof window.sitePlanView.initializeModal === 'function') {
-                            window.sitePlanView.initializeModal(modalContent);
-                        } else {
-                            console.error('[MapplanModal] sitePlanView.initializeModal is not available.');
-                        }
-                    } else if (siteplanEditorContainer) {
-                        if (scriptConfig.debug) console.log('[MapplanModal] Found #siteplan-editor-map, initializing site plan editor.');
-                        if (window.sitePlanSystem && typeof window.sitePlanSystem.initializeEditor === 'function') {
-                            window.sitePlanSystem.initializeEditor(modalContent);
-                        } else {
-                            console.error('[MapplanModal] sitePlanSystem.initializeEditor is not available.');
                         }
                     }
                 }
@@ -139,28 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // When the modal is shown, ensure it's brought to the front and focused.
             modal.on('shown.bs.modal', function() {
                 if (scriptConfig.debug) console.log('[MapplanModal] #mapplan-modal shown.bs.modal event triggered.');
-
                 const zIndex = 1050;
                 $(this).css('z-index', zIndex);
-
-                // Find the backdrop and adjust its z-index to be below the modal
-                const backdrop = $('.modal-backdrop');
-                if (backdrop.length) {
-                    const backdropZIndex = zIndex - 1;
-                    backdrop.css('z-index', backdropZIndex);
-                }
-
-                $(this).trigger('focus');
-            });
-
-            // Add cleanup for when modal is hidden
-            modal.on('hidden.bs.modal', function () {
-                const modalContent = modal.find('#mapplan-modal-content');
-                if (modalContent.length) {
-                    modalContent.html('');
-                }
-                // Also remove the backdrop manually to prevent lingering muted effect
-                $('.modal-backdrop').remove();
             });
         }
     }
