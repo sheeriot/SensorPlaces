@@ -7,13 +7,13 @@
     <!-- Left Column -->
     <div class="col-md-4">
     <!-- Place Navigation Card -->
-    {% if not place.is_active %}
+    {% if place.is_active %}
         {% include "sensors/includes/place_nav_card.html" %}
     {% else %}
         {% include "sensors/includes/place_nav_card.html" %}
     {% endif %}
         <!-- Include Site Plan Card -->
-        {% include "sensors/includes/siteplan_card.html" with editable=False %}
+        {# {% include "sensors/includes/siteplan_card.html" with editable=False %} #}
     </div>
 
     <!-- Right Column -->
@@ -34,6 +34,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="{% static 'sensors/js/siteplan-view.js' %}"></script>
-<script src="{% static 'sensors/js/sensor-watch.js' %}?v={{ APP_VERSION }}"></script>
+<!-- <script src="{% static 'sensors/js/siteplan-view.js' %}"></script> -->
 {% endblock %}

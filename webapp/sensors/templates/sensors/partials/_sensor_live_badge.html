@@ -14,7 +14,7 @@
             {% endif %}
         {% else %}
             {# Numeric display #}
-            <span class="badge fs-4 p-2 {{ sensor.get_reading_class }} rounded-1">
+            <span class="badge {{ sensor.get_reading_class }} rounded-1 p-2 fs-4">
                 {{ sensor.cached_reading_value|floatformat:sensor.effective_decimal_places|default:"-" }}
                 <span class="small">{{ sensor.effective_unit.symbol|default:"" }}</span>
             </span>

@@ -1,0 +1,72 @@
+{% load widget_tweaks %}
+{% load humanize %}
+
+<!-- Name column -->
+<td class="align-middle">
+    <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none text-body d-flex align-items-center" style="min-width: 0;">
+        <div class="sensor-name-container">
+            {{ sensor.name }}
+            <div class="small text-muted">{{ sensor.get_sensor_type_display }}</div>
+        </div>
+    </a>
+</td>
+
+<!-- Current Value -->
+<td class="align-middle">
+    {% include "sensors/partials/_sensor_badge_cell.html" with sensor=sensor %}
+</td>
+
+<td class="text-start ps-1 align-middle d-none d-lg-table-cell" id="sensor-age-cell-{{ sensor.pk }}">
+    {% include "sensors/partials/_sensor_age_cell.html" with sensor=sensor %}
+</td>
+<!-- Watch/Get Now buttons -->
+<td class="text-center ps-3 align-top" style="width: 100px;">
+    <div class="d-flex align-items-center">
+        <button class="btn btn-sm btn-outline-secondary watch-toggle"
+                data-sensor-id="{{ sensor.pk }}"
+                data-poll-url="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}"
+                title="Watch Sensor">
+            <i class="bi bi-eye"></i>
+        </button>
+        <button class="btn btn-sm"
+                id="hammer-btn-{{ sensor.pk }}"
+                title="Force refresh"
+                hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?force=true"
+                hx-swap="none">
+            <i class="bi bi-hammer"></i>
+        </button>
+    </div>
+</td>
+{% if not narrow_view %}
+<!-- Active toggle -->
+<td class="text-center align-middle d-none d-lg-table-cell">
+    <div class="d-flex justify-content-center">
+    {% if sensor.device.is_active %}
+        {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug object_name=sensor.name %}
+    {% else %}
+        <span class="badge bg-secondary">inactive</span>
+    {% endif %}
+    </div>
+</td>
+
+<!-- Actions buttons -->
+<td class="text-end align-middle">
+    <div class="btn-group btn-group-sm">
+        <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="btn btn-info" title="View Sensor">
+            <i class="bi bi-info-circle"></i>
+        </a>
+        <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-warning" title="Edit Sensor">
+            <i class="bi bi-pencil"></i>
+        </a>
+        <a href="#"
+            class="btn btn-danger"
+            title="Delete Sensor"
+            data-bs-toggle="modal"
+            data-bs-target="#htmx-modal"
+            data-hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+            hx-target="#htmx-modal-content">
+            <i class="bi bi-trash"></i>
+        </a>
+    </div>
+</td>
+{% endif %}

@@ -2,85 +2,10 @@
 {% load humanize %}
 
 <tr id="sensor-row-{{ sensor.pk }}"
-     class="{% if not sensor.is_active or not sensor.device.is_active %}opacity-50 sensor-inactive{% endif %} {% if model_name == 'sensor' and sensor.pk == object.pk %}bg-primary-subtle{% endif %}"
-     data-sensor-id="{{ sensor.pk }}"
-     data-sensor-name="{{ sensor.name }}"
-     data-sensor-active="{{ sensor.is_active|lower }}"
-     hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}"
-     hx-trigger="load"
-     hx-target="this"
-     hx-swap="none"
-     {% if not sensor.is_active and hide_inactive %}style="display: none !important;"{% endif %}>
-
-    <!-- Name column -->
-    <td class="align-middle">
-        <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none text-body d-flex align-items-center" style="min-width: 0;">
-            <div class="sensor-name-container">
-                <strong>{{ sensor.name }}</strong>
-                <div class="small text-muted">{{ sensor.get_sensor_type_display }}</div>
-            </div>
-        </a>
-    </td>
-
-    {% if not narrow_view %}
-        <!-- Current Value -->
-        <td class="align-middle">
-            <div id="sensor-badge-cell-{{ sensor.pk }}" class="d-flex justify-content-end align-items-center">
-                <span class="badge bg-light text-dark" style="min-width: 60px; min-height: 24px;">&nbsp;</span>
-            </div>
-        </td>
-
-        <td class="text-start ps-2 align-middle d-none d-lg-table-cell" id="sensor-age-cell-{{ sensor.pk }}">
-            {# This will be populated by the HTMX swap #}
-        </td>
-
-        <!-- Watch/Get Now buttons -->
-        <td class="text-center ps-3 align-middle" style="width: 100px;">
-            <div class="d-flex align-items-center">
-                <button class="btn btn-sm btn-outline-secondary watch-toggle"
-                        data-sensor-id="{{ sensor.pk }}"
-                        title="Watch Sensor">
-                    <i class="bi bi-eye"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-secondary"
-                        title="Force refresh"
-                        hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?force=true"
-                        hx-swap="none">
-                    <i class="bi bi-hammer"></i>
-                </button>
-            </div>
-        </td>
-
-        <!-- Active toggle -->
-        <td class="text-center align-middle d-none d-lg-table-cell">
-            <div class="d-flex justify-content-center">
-            {% if sensor.device.is_active %}
-                {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug object_name=sensor.name %}
-            {% else %}
-                <span class="badge bg-secondary">inactive</span>
-            {% endif %}
-            </div>
-        </td>
-
-        <!-- Actions buttons -->
-        <td class="text-end align-middle">
-            <div class="btn-group btn-group-sm">
-                <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="btn btn-info" title="View Sensor">
-                    <i class="bi bi-info-circle"></i>
-                </a>
-                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-warning" title="Edit Sensor">
-                    <i class="bi bi-pencil"></i>
-                </a>
-                <a href="#"
-                   class="btn btn-danger"
-                   title="Delete Sensor"
-                   data-bs-toggle="modal"
-                   data-bs-target="#htmx-modal"
-                   data-hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
-                   hx-target="#htmx-modal-content">
-                    <i class="bi bi-trash"></i>
-                </a>
-            </div>
-        </td>
-    {% endif %}
+    class="{% if not sensor.is_active or not sensor.device.is_active %}opacity-50 sensor-inactive{% endif %} {% if model_name == 'sensor' and sensor.pk == object.pk %}bg-warning-subtle{% endif %}"
+    data-sensor-id="{{ sensor.pk }}"
+    data-sensor-name="{{ sensor.name }}"
+    data-sensor-active="{{ sensor.is_active|lower }}"
+    {% if not sensor.is_active and hide_inactive %}style="display: none !important;"{% endif %}>
+    {% include "sensors/partials/_sensor_row_content.html" %}
 </tr>

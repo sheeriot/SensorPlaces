@@ -35,7 +35,7 @@
                     <div id="graph-card-container"
                         hx-get="{% url 'sensors:sensor_graph_card' place_slug=place.slug pk=sensor.pk %}"
                         hx-trigger="load"
-                        hx-swap="outerHTML">
+                        hx-swap="innerHTML">
                         <div class="card my-2">
                             <div class="card-body text-center p-5">
                                 <div class="spinner-border text-primary" role="status">
@@ -53,7 +53,7 @@
                             <button class="btn btn-primary"
                                     hx-get="{% url 'sensors:sensor_graph_card' place_slug=place.slug pk=sensor.pk %}"
                                     hx-target="#graph-card-container"
-                                    hx-swap="outerHTML">
+                                    hx-swap="innerHTML">
                                 <i class="bi bi-graph-up me-1"></i>
                                 Show Historical Graph
                             </button>
@@ -78,5 +78,4 @@
 {% block extra_js %}
     <script src="{% static 'sensors/js/sensor-chart.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/sensor-detail.js' %}?v={{ APP_VERSION }}"></script>
-    <script src="{% static 'sensors/js/sensor-watch.js' %}?v={{ APP_VERSION }}"></script>
 {% endblock %}

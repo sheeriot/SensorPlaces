@@ -28,6 +28,8 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'sensors/css/common.css' %}?v={{ APP_VERSION }}">
+    <link rel="stylesheet" href="{% static 'sensors/css/animations.css' %}?v={{ APP_VERSION }}">
+    <link rel="stylesheet" href="{% static 'sensors/css/sensor-list.css' %}?v={{ APP_VERSION }}">
     {% block extra_css %}
     {% endblock %}
 
@@ -249,6 +251,8 @@
     <script src="{% static 'sensors/js/toast-ui-manager.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/htmx-event-handler.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/modal-loader.js' %}?v={{ APP_VERSION }}"></script>
+    <script src="{% static 'sensors/js/time-updater.js' %}?v={{ APP_VERSION }}" defer></script>
+    <script src="{% static 'sensors/js/sensor-watch.js' %}?v={{ APP_VERSION }}" defer></script>
 
     {% block extra_js %}{% endblock %}
 

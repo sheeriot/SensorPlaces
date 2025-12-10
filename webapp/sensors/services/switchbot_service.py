@@ -40,97 +40,64 @@ class SwitchBotService:
         if not self.token or not self.secret:
             logger.warning(f"SwitchBot service for place {place.name} is missing API credentials.")
 
-    def fetch_and_process_single_device_reading(self, device: Device):
-        """
-        Fetches the latest reading for a single SwitchBot device, updates the cache,
-        creates a historical reading, and writes to InfluxDB if active.
-        """
-        ic(f"Service: Fetching single device reading for '{device.name}'")
-        status_response = switchbot_client.get_status(device.device_id, self.token, self.secret)
-
-        if status_response.get('statusCode') != 100:
-            raise Exception(f"API error: {status_response.get('message', 'Unknown error')}")
-
-        body = status_response.get('body', {})
-        ic(f"Service: API response for {device.name}:", body)
-
-        from sensors.models import SensorReading
-        from django.utils import timezone
-
-        readings_found = 0
-        reading_map = {
-            'temperature': ('Temperature', body.get('temperature')),
-            'humidity': ('Humidity', body.get('humidity')),
-            'battery': ('Battery', body.get('battery')),
-        }
-
-        for api_key, (sensor_type_name, value) in reading_map.items():
-            if value is not None:
-                try:
-                    sensor = device.sensors.get(sensor_type__name__icontains=sensor_type_name)
-                    ic(f"Service: Found sensor '{sensor.name}' for type '{sensor_type_name}' with value: {value}")
-
-                    # Update cache
-                    sensor.cached_reading_value = value
-                    sensor.cached_reading_timestamp = timezone.now()
-                    sensor.save(update_fields=['cached_reading_value', 'cached_reading_timestamp'])
-
-                    # Create historical reading
-                    SensorReading.objects.create(sensor=sensor, value=value)
-
-                    # Write to InfluxDB (the function handles the `is_active` check)
-                    write_sensor_reading_to_influx(sensor, value)
-
-                    readings_found += 1
-                except Sensor.DoesNotExist:
-                    ic(f"Service: Sensor for type '{sensor_type_name}' not found for device '{device.name}'.")
-                except Exception as e:
-                    ic(f"Service: An unexpected error occurred processing '{sensor_type_name}': {e}")
-                    # Re-raise or handle as appropriate
-                    raise e
-
-        return readings_found
-
     def get_live_reading_for_sensor(self, sensor: Sensor):
         """
-        Gets a live value for a single SwitchBot sensor from the API.
-        Does not save, just returns the value.
+        Gets a live value for a single SwitchBot sensor from the API,
+        but updates all sensors on the same device from the single API call.
         """
-        ic("SWITCHBOT_SERVICE: Getting live reading from API")
-        ic(f"Service: Getting live reading for sensor '{sensor.name}'")
+        ic("SWITCHBOT_SERVICE: Getting live reading from API and updating all related sensors")
+        ic(f"Service: Triggered by sensor '{sensor.name}'")
+        device = sensor.device
+
         try:
-            status_data = switchbot_client.get_status(sensor.device.device_id, self.token, self.secret)
+            status_data = switchbot_client.get_status(device.device_id, self.token, self.secret)
             if status_data.get('statusCode') == 100:
                 live_body = status_data.get('body', {})
-                ic(f"Service: Live reading API success. Body: {live_body}")
+                ic(f"Service: Live reading API success for device {device.name}. Body: {live_body}")
 
-                # New logic: a sensor can now have a `switchbot_sensor_name`
-                sensor_api_key = sensor.switchbot_sensor_name
+                # Now, iterate over all sensors on this device and update them
+                for sensor_to_update in device.sensors.all():
+                    sensor_api_key = sensor_to_update.switchbot_sensor_name
+                    if not sensor_api_key:
+                        # Fallback logic to find the key if not explicitly set
+                        sensor_type_name = sensor_to_update.sensor_type.name.lower()
+                        if sensor_type_name in ('battery level', 'battery voltage'):
+                            sensor_api_key = 'battery'
+                        else:
+                            for api_key, std_name in KEY_MAP.items():
+                                if std_name.lower() == sensor_type_name:
+                                    sensor_api_key = api_key
+                                    break
 
-                if not sensor_api_key:
-                    # Fallback for older sensors: Find the API key for our sensor type
-                    sensor_type_name = sensor.sensor_type.name.lower()
-                    if sensor_type_name in ('battery level', 'battery voltage'):
-                        sensor_api_key = 'battery'
-                    else:
-                        for api_key, std_name in KEY_MAP.items():
-                            if std_name.lower() == sensor.sensor_type.name.lower():
-                                sensor_api_key = api_key
-                                break
+                    if sensor_api_key and sensor_api_key in live_body:
+                        value = live_body[sensor_api_key]
+                        ic(f"Service: Updating sensor '{sensor_to_update.name}' with value '{value}' for key '{sensor_api_key}'")
 
+                        # Use the existing service to process the reading
+                        # This handles caching, historical records, and InfluxDB writes
+                        process_sensor_reading(
+                            device=device,
+                            measurement_type=sensor_to_update.sensor_type.name,
+                            value=value,
+                            source='switchbot-api-live',
+                            skip_local_storage=bool(self.influx_store),
+                            activate_sensor=False, # We are not activating sensors here
+                            switchbot_sensor_name=sensor_api_key
+                        )
 
-                ic(f"Service: Mapped sensor type '{sensor.sensor_type.name}' to API key '{sensor_api_key}'")
+                # Return the value for the originally requested sensor
+                original_sensor_api_key = sensor.switchbot_sensor_name or \
+                                          next((k for k, v in KEY_MAP.items() if v.lower() == sensor.sensor_type.name.lower()), None)
 
-                if sensor_api_key and sensor_api_key in live_body:
-                    value = live_body[sensor_api_key]
-                    ic(f"Service: Got value '{value}' for key '{sensor_api_key}'")
-                    return value
+                return live_body.get(original_sensor_api_key)
+
             else:
                 ic(f"Service: Live reading API returned status {status_data.get('statusCode')}: {status_data.get('message')}")
         except Exception as e:
             ic(f"Service: Error getting SwitchBot status for live reading: {e}")
 
         return None
+
 
     def import_device(self, device_id: str, device_name_from_form: str, location, is_active: bool):
         """

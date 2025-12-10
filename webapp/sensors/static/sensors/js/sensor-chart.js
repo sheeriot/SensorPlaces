@@ -83,7 +83,7 @@ class SensorChart {
             // Keep content visible but maybe dimmed? Or just show spinner overlay
             if (loadingSpinner) loadingSpinner.classList.remove('d-none');
 
-            const chartCanvas = document.getElementById('sensorChart');
+            const chartCanvas = document.getElementById(`sensor-chart-${sensorId}`);
              // Don't destroy chart immediately to avoid flicker, just maybe show loading
         } else {
              if (loadingSpinner) loadingSpinner.classList.add('d-none');
@@ -310,7 +310,7 @@ class SensorChart {
         const sensorId = this.graphCard.dataset.sensorId;
         const placeholder = document.getElementById(`graph-placeholder-${sensorId}`);
         const content = document.getElementById(`graph-content-${sensorId}`);
-        const chartCanvas = document.getElementById('sensorChart');
+        const chartCanvas = document.getElementById(`sensor-chart-${sensorId}`);
         if (!chartCanvas) return;
 
         // Handle visibility
@@ -359,6 +359,8 @@ class SensorChart {
         } else {
             // Safety check: verify if a chart instance is already attached to this canvas context
             // This handles cases where this.chart ref was lost but Chart.js still tracks it
+            const sensorId = this.graphCard.dataset.sensorId;
+            const chartCanvas = document.getElementById(`sensor-chart-${sensorId}`);
             const existingChart = Chart.getChart(chartCanvas);
             if (existingChart) {
                 existingChart.destroy();

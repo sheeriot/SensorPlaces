@@ -370,12 +370,14 @@ def sensor_live_value_view(request, place_slug, pk):
     Returns a rendered HTML partial for a sensor's live value.
     Can return different partials based on the 'style' query parameter.
     - 'card': Renders the detailed live reading display.
-    - 'badge': Renders a compact badge.
+    - 'row_content': Renders the inner content of a sensor row.
+    - 'multi': Renders multiple components for OOB swaps.
     """
-    ic(f"sensor_live_value_view called for pk={pk}, style='{request.GET.get('style')}'")
+    # ic(f"sensor_live_value_view called for pk={pk}, style='{request.GET.get('style')}'")
     sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
     style = request.GET.get('style', 'badge')
     force_update = request.GET.get('force', 'false').lower() == 'true'
+    narrow_view = request.GET.get('narrow_view', 'false').lower() == 'true'
     source = 'unknown'
 
     try:
@@ -385,35 +387,28 @@ def sensor_live_value_view(request, place_slug, pk):
 
     if style == 'card':
         template_name = 'sensors/partials/sensor_live_card.html'
+    elif style == 'multi':
+        template_name = 'sensors/partials/_sensor_live_multi.html'
+    elif style == 'row_content':
+        template_name = 'sensors/partials/_sensor_row_content.html'
     else:
         template_name = 'sensors/partials/_sensor_live_row.html'
 
+    # The `object` context variable is needed for the initial render of the sensor list
+    # to determine which row to highlight. Subsequent HTMX swaps don't need it as the `<tr>`
+    # is not being replaced.
     context = {
         'sensor': sensor,
         'place': sensor.device.location.place,
-        'source': source
+        'source': source,
+        'model_name': 'sensor',
+        'narrow_view': narrow_view,
     }
-    ic(f"Rendering template: {template_name} with context for sensor {sensor.name}")
-    return render(request, template_name, context)
 
-
-@login_required
-def sensor_live_value_htmx(request, place_slug, pk):
-    """
-    Returns a multi-part HTMX response for a sensor's live value,
-    age, and tooltip content.
-    """
-    ic(f"sensor_live_value_htmx called for pk={pk}")
-    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
-    force_update = request.GET.get('force', 'false').lower() == 'true'
-
-    try:
-        update_sensor_live_value(sensor, force_update=force_update)
-    except Exception as e:
-        ic(f"Error in sensor_live_value_htmx for sensor {pk}: {e}")
-
-    context = {'sensor': sensor}
-    return render(request, 'sensors/partials/sensor_live_value_htmx.html', context)
+    # ic(f"Rendering template: {template_name} with context for sensor {sensor.name}")
+    html_response = render(request, template_name, context)
+    # ic(html_response.content.decode())
+    return html_response
 
 
 @login_required

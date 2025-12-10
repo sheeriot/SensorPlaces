@@ -10,17 +10,7 @@
                     {{ sensor.cached_reading_value|floatformat:sensor.effective_decimal_places }}
                     {% if sensor.effective_unit %}{{ sensor.effective_unit.symbol }}{% endif %}
                 </span>
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-clock-history me-2 text-muted"></i>
-                    <div>
-                        <div class="small text-monospace" title="{{ sensor.cached_reading_timestamp|date:'Y-m-d H:i:s T' }}">
-                            {{ sensor.cached_reading_timestamp|date:"SHORT_DATETIME_FORMAT" }}
-                        </div>
-                        <div class="small text-muted">
-                            ({{ sensor.cached_reading_timestamp|naturaltime }})
-                        </div>
-                    </div>
-                </div>
+                {% include "sensors/partials/_timestamp_reading.html" with timestamp=sensor.cached_reading_timestamp %}
             {% else %}
                 <div class="spinner-border spinner-border-sm text-secondary" role="status">
                     <span class="visually-hidden">Loading...</span>
@@ -32,23 +22,21 @@
     <!-- Right side: Controls and Metadata -->
     <div class="col-auto">
         <div class="d-flex align-items-center justify-content-end">
-            <div class="form-check form-switch me-2" title="Watch for new readings">
-                <input class="form-check-input refresh-toggle" type="checkbox" role="switch" id="watch-{{ sensor.pk }}"
-                       data-poll-url="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card"
-                       data-poll-target="#sensor-live-details-wrapper-{{ sensor.pk }}">
-                <label class="form-check-label" for="watch-{{ sensor.pk }}">Watch</label>
-            </div>
-            <button class="btn btn-sm"
-                    title="Force a new reading"
-                    hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card&force=true"
-                    hx-target="#sensor-live-details-wrapper-{{ sensor.pk }}"
-                    hx-swap="innerHTML">
-                <i class="bi bi-hammer"></i>
+            <button class="btn btn-sm watch-toggle me-2"
+                    data-sensor-id="{{ sensor.pk }}"
+                    title="Watch Sensor">
+                <i class="bi bi-eye"></i>
             </button>
-        </div>
-        <div class="small text-muted text-end mt-1" title="{{ sensor.last_cached_timestamp|date:'Y-m-d H:i:s T' }}">
-            Last Checked: {{ sensor.last_cached_timestamp|naturaltime|default:"Never" }}
-        </div>
+                <button class="btn btn-sm"
+                    id="hammer-btn-card-{{ sensor.pk }}"
+                        title="Force a new reading"
+                        hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card&force=true"
+                        hx-target="#sensor-live-details-wrapper-{{ sensor.pk }}"
+                        hx-swap="innerHTML">
+                    <i class="bi bi-hammer"></i>
+                </button>
+            </div>
+        {% include "sensors/partials/_timestamp_checked.html" with timestamp=sensor.last_cached_timestamp %}
     </div>
 </div>
 

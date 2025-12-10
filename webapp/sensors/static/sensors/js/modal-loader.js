@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const htmxModal = document.getElementById('htmx-modal');
     if (htmxModal) {
+        // console.log('htmxModal found');
         htmxModal.addEventListener('show.bs.modal', function (event) {
             const triggerElement = event.relatedTarget;
             if (triggerElement) {
