@@ -12,11 +12,16 @@
      data-decimal-places="{{ sensor.effective_decimal_places|default:2 }}"
      data-api-url="{% url 'sensors:sensor_readings_api' place_slug=place.slug pk=sensor.pk %}">
 
-    <div class="card-header d-flex justify-content-between align-items-center py-1">
-        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
-            <i class="bi bi-graph-up me-2"></i>Data Graph
-        </h5>
-        {% include 'sensors/partials/_graph_controls.html' %}
+    <div class="card-header py-2">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
+                <i class="bi bi-graph-up me-2"></i>Data Graph
+            </h5>
+            <button class="btn btn-sm btn-primary" id="apply-date-range">Graph</button>
+        </div>
+        <div class="mt-2">
+            {% include 'sensors/partials/_graph_controls.html' %}
+        </div>
     </div>
 
     <div class="card-body p-2" style="min-height: 400px; position: relative;">

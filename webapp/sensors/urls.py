@@ -67,13 +67,14 @@ urlpatterns = [
 
     # SwitchBot Integration
     path('<slug:place_slug>/switchbot/', switchbot_views.switchbot_management_view, name='switchbot_management'),
-    # path('<slug:place_slug>/switchbot/existing-devices/', switchbot_views.switchbot_existing_devices_view, name='switchbot_existing_devices'),
-    # path('<slug:place_slug>/switchbot/api-sync/', switchbot_views.switchbot_api_sync_view, name='switchbot_api_sync'),
-    # path('<slug:place_slug>/switchbot/config/', switchbot_views.switchbot_config_update_view, name='switchbot_config_update'),
-    # path('<slug:place_slug>/switchbot/edit-influx-store/', switchbot_views.switchbot_influx_store_edit_view, name='switchbot_influx_store_edit'),
-    # path('<slug:place_slug>/switchbot/update-influx-store/', switchbot_views.update_switchbot_influx_store, name='switchbot_influx_store_update'),
-    # path('<slug:place_slug>/switchbot/import-device/', switchbot_views.import_switchbot_device_view, name='import_switchbot_device'),
-    # path('<slug:place_slug>/switchbot/inspect-api-device/<str:device_id>/', switchbot_views.switchbot_inspect_api_device_view, name='switchbot_inspect_api_device'),
+    path('<slug:place_slug>/switchbot/existing-devices/', switchbot_views.switchbot_existing_devices_view, name='switchbot_existing_devices'),
+    path('<slug:place_slug>/switchbot/api-sync/', switchbot_views.switchbot_api_sync_view, name='switchbot_api_sync'),
+    path('<slug:place_slug>/switchbot/config/', switchbot_views.switchbot_config_update_view, name='switchbot_config_update'),
+    path('<slug:place_slug>/switchbot/edit-influx-store/', switchbot_views.switchbot_influx_store_edit_view, name='switchbot_influx_store_edit'),
+    path('<slug:place_slug>/switchbot/update-influx-store/', switchbot_views.switchbot_influxstore_update, name='switchbot_influx_store_update'),
+    path('<slug:place_slug>/switchbot/import-options/<str:device_id>/', switchbot_views.switchbot_import_options_view, name='switchbot_import_options'),
+    path('<slug:place_slug>/switchbot/import-device/', switchbot_views.import_switchbot_device_view, name='import_switchbot_device'),
+    path('<slug:place_slug>/switchbot/inspect-api-device/<str:device_id>/', switchbot_views.switchbot_inspect_api_device_view, name='switchbot_inspect_api_device'),
 
     # API URLs that are place-specific
     path('api/<slug:place_slug>/stats/', place_views.place_stats, name='place_stats_api'),
@@ -122,6 +123,7 @@ urlpatterns = [
     path('<slug:place_slug>/sensor/<int:pk>/<str:start_date>/<str:end_date>/', SensorDetailView.as_view(), name='sensor_detail_daterange'),
     path('<slug:place_slug>/sensor/<int:pk>/graph-card/', SensorGraphCardView.as_view(), name='sensor_graph_card'),
     path('<slug:place_slug>/sensor/<int:pk>/live-value/', sensor_views.sensor_live_value_view, name='sensor_live_value'),
+
     path('<slug:place_slug>/sensor/<int:pk>/live-row/', sensor_views.sensor_live_row_view, name='sensor_live_row'),
     path('<slug:place_slug>/sensor/<int:pk>/update/', SensorUpdateView.as_view(), name='sensor_update'),
     path('<slug:place_slug>/sensor/<int:pk>/update-influx/', SensorInfluxUpdateView.as_view(), name='sensor_influx_update'),

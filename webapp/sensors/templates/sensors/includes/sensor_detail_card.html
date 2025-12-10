@@ -20,7 +20,7 @@
                title="Delete Sensor"
                data-bs-toggle="modal"
                data-bs-target="#htmx-modal"
-               hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
+               data-hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
                hx-target="#htmx-modal-content">
                 <i class="bi bi-trash-fill"></i> Delete
             </a>
@@ -87,7 +87,13 @@
             <div class="col-md-6">
                 <div class="mb-2">
                     <label class="form-label mb-0 small text-muted">Data Store</label>
-                    <div>{{ sensor.get_data_store_display }}</div>
+                    <div>
+                        {% if sensor.data_store == 'NONE' %}
+                            Cached
+                        {% else %}
+                            {{ sensor.get_data_store_display }}
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -96,13 +102,13 @@
             <div class="col-md-6">
                 <div class="mb-2">
                     <label class="form-label mb-0 small text-muted">Effective Min</label>
-                    <div>{{ sensor.effective_min_value|default_if_none:"-" }}</div>
+                    <div>{{ sensor.effective_min_value|floatformat:sensor.effective_decimal_places|default_if_none:"-" }}</div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-2">
                     <label class="form-label mb-0 small text-muted">Effective Max</label>
-                    <div>{{ sensor.effective_max_value|default_if_none:"-" }}</div>
+                    <div>{{ sensor.effective_max_value|floatformat:sensor.effective_decimal_places|default_if_none:"-" }}</div>
                 </div>
             </div>
         </div>
@@ -114,7 +120,7 @@
         <div id="sensor-live-details-wrapper-{{ sensor.pk }}"
              hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card"
              hx-swap="innerHTML"
-             hx-trigger="load, every 30s">
+             hx-trigger="load">
             <div class="text-center">
                 <div class="spinner-border spinner-border-sm" role="status">
                     <span class="visually-hidden">Loading live details...</span>

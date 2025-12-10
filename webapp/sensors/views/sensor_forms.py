@@ -120,10 +120,27 @@ class SensorForm(forms.ModelForm):
                 f'Sensor cannot be active because Device "{self.instance.device.name}" is inactive.'
             )
         # For existing instances that are inactive for other reasons
-        elif self.instance and self.instance.pk and not self.instance.is_active:
+        if self.instance and self.instance.pk and not self.instance.is_active:
             self.fields['is_active'].label = 'Inactive'
         else:
             self.fields['is_active'].label = 'Active'  # Set initial label
+
+        # Handle data_store field based on instance state
+        if self.instance and self.instance.pk:
+            # For existing sensors
+            if self.instance.data_store == 'INFLUX':
+                self.fields['data_store'].disabled = True
+                self.fields['data_store'].help_text = "Data store is managed by InfluxDB."
+            else:
+                # Allow changing between NONE and DIRECT
+                self.fields['data_store'].choices = [
+                    ('NONE', 'None'),
+                    ('DIRECT', 'Direct (Local Database)'),
+                ]
+        else:
+            # For new sensors, hide the data_store field
+            self.fields['data_store'].widget = forms.HiddenInput()
+            self.fields['data_store'].initial = 'NONE'
 
         self.fields['name'].label = False
         self.fields['sensor_type'].label = "Sensor Type"
@@ -348,10 +365,8 @@ class SensorForm(forms.ModelForm):
             cleaned_data['is_active'] = False
             self.add_error('is_active', "Sensor cannot be active when its device's location is inactive.")
 
-        # If data_store is INFLUX, validate that influx fields are present
+        # If data_store is INFLUX, the validation should happen on the model or a different form.
         if data_store == 'INFLUX':
-            # These fields are not on the form, so we can't add errors to them.
-            # The validation should happen on the model or a different form.
             pass
 
         return cleaned_data

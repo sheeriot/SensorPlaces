@@ -1,5 +1,10 @@
-<div class="d-flex align-items-center">
-    <div class="btn-group btn-group-sm me-2" role="group" aria-label="Date range presets">
+<div class="d-flex align-items-center justify-content-between gap-2">
+    <div class="input-group input-group-sm flex-grow-1" style="min-width: 340px;">
+        <input type="text" class="form-control" id="start-date-picker" placeholder="Start datetime">
+        <span class="input-group-text">to</span>
+        <input type="text" class="form-control" id="end-date-picker" placeholder="End datetime">
+    </div>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Date range presets">
         <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="6h">6h</button>
         <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="24h">24h</button>
         <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="7d">7d</button>
@@ -7,10 +12,4 @@
         <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="30d">30d</button>
         <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="60d">60d</button>
     </div>
-    <div class="input-group input-group-sm me-2" style="width: 300px;">
-        <input type="text" class="form-control" id="start-date-picker" placeholder="Start date">
-        <span class="input-group-text">to</span>
-        <input type="text" class="form-control" id="end-date-picker" placeholder="End date">
-    </div>
-    <button class="btn btn-sm btn-primary" id="apply-date-range">Graph</button>
 </div>

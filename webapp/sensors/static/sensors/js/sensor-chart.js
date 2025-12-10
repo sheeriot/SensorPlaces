@@ -1,7 +1,7 @@
 console.log('--- SENSOR-CHART.JS v.DEBUG.2 LOADED ---');
 
 // Local debug flag - set to true during development, false in production
-const SENSOR_CHART_DEBUG = true;
+const SENSOR_CHART_DEBUG = false;
 
 // Helper function to get display strings for boolean values
 function getBooleanDisplay(value, sensorTypeName) {
@@ -690,9 +690,11 @@ class SensorChart {
         }
         if (this.debug) console.log("SensorChart: Initializing flatpickr and event listeners.");
         this.fp_start = flatpickr("#start-date-picker", {
+            enableTime: true,
             altInput: true,
-            altFormat: "M j, Y",
-            dateFormat: "Y-m-d",
+            altFormat: "M j, Y H:i",
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
             onChange: (selectedDates, dateStr, instance) => {
                 if (this.fp_end) {
                     this.fp_end.set("minDate", selectedDates[0]);
@@ -700,9 +702,11 @@ class SensorChart {
             }
         });
         this.fp_end = flatpickr("#end-date-picker", {
+            enableTime: true,
             altInput: true,
-            altFormat: "M j, Y",
-            dateFormat: "Y-m-d",
+            altFormat: "M j, Y H:i",
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
             onChange: (selectedDates, dateStr, instance) => {
                 if (this.fp_start) {
                     this.fp_start.set("maxDate", selectedDates[0]);
@@ -750,23 +754,12 @@ class SensorChart {
                 document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
 
                 const startDt = this.fp_start.selectedDates[0];
-                const endDt_raw = this.fp_end.selectedDates[0];
-                if (this.debug) console.log("SensorChart: Apply dates:", startDt, endDt_raw);
+                const endDt = this.fp_end.selectedDates[0];
+                if (this.debug) console.log("SensorChart: Apply dates:", startDt, endDt);
 
-                if (!startDt || !endDt_raw) {
+                if (!startDt || !endDt) {
                     alert("Please select both a start and end date.");
                     return;
-                }
-
-                let endDt = new Date(endDt_raw.getTime());
-
-                const today = new Date();
-                if (endDt.getFullYear() === today.getFullYear() &&
-                    endDt.getMonth() === today.getMonth() &&
-                    endDt.getDate() === today.getDate()) {
-                    endDt = today;
-                } else {
-                    endDt.setHours(23, 59, 59, 999);
                 }
 
                 this.queryRange = { start: startDt, end: endDt };

@@ -1,10 +1,9 @@
-{% extends "sensors/base_modal.html" %}
+<div class="modal-header">
+    <h5 class="modal-title">Delete Device: {{ object.name }}</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
 
-{% block modal_title %}
-    Delete Device: {{ object.name }}
-{% endblock %}
-
-{% block modal_body %}
+<div class="modal-body">
     <div class="alert alert-danger">
         <i class="bi bi-exclamation-triangle-fill"></i>
         <strong>Warning:</strong> This action cannot be undone.
@@ -37,11 +36,11 @@
             {% endif %}
         </div>
     </form>
-{% endblock %}
+</div>
 
-{% block modal_footer %}
+<div class="modal-footer">
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
     <button id="confirm-delete-btn" type="submit" form="delete-device-form" class="btn btn-danger">
         Delete Device
     </button>
-{% endblock %}
+</div>

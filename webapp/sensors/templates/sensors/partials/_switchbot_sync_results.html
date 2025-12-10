@@ -1,19 +1,31 @@
-{% if error_message %}
-    <div class="alert alert-danger" role="alert">
-        {{ error_message }}
-    </div>
-{% endif %}
+<div class="my-3">
+    {% if api_status.success %}
+        <div class="alert alert-success d-flex align-items-center" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <div>
+                Successfully fetched {{ devices|length }} device(s) from the SwitchBot API.
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-danger d-flex align-items-center" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div>
+                <strong>Error fetching devices:</strong> {{ api_status.error_message }}
+            </div>
+        </div>
+    {% endif %}
+</div>
 
-{% if devices %}
-    <p>{{ devices|length }} devices found on your SwitchBot account.</p>
-    {% if not influx_test_success %}
+
+{% if api_status.success and devices %}
+    {% if influx_store and not influx_test_success %}
     <div class="alert alert-warning" role="alert">
         <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>InfluxDB Connection Failed</h5>
-        <p>Could not connect to the InfluxDB store '{{ place.switchbot_influx_store.name }}'. Please check the configuration and test the connection again.</p>
+        <p>Could not connect to the InfluxDB store '{{ influx_store.name }}'. Please check the configuration and test the connection again.</p>
         <hr>
         <p class="mb-0">{{ influx_test_message }}</p>
     </div>
-{% endif %}
+    {% endif %}
 
     <table class="table table-sm table-striped">
     <thead>
@@ -33,9 +45,9 @@
             {% include 'sensors/partials/switchbot_device_row.html' %}
         {% endfor %}
     </tbody>
-</table>
-{% else %}
-    <div class="alert alert-info" role="alert">
-        No devices found on your SwitchBot account.
+    </table>
+{% elif api_status.success %}
+     <div class="alert alert-info mt-3" role="alert">
+        No devices were found on your SwitchBot account.
     </div>
 {% endif %}

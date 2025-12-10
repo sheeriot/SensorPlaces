@@ -38,7 +38,7 @@
                    title="Delete Device"
                    data-bs-toggle="modal"
                    data-bs-target="#htmx-modal"
-                   hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
+                   data-hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
                    hx-target="#htmx-modal-content">
                     <i class="bi bi-trash"></i>
                 </a>
@@ -65,9 +65,10 @@
                     <li>
                         <a class="dropdown-item text-danger"
                            href="#"
+                           title="Delete Device"
                            data-bs-toggle="modal"
                            data-bs-target="#htmx-modal"
-                           hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
+                           data-hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
                            hx-target="#htmx-modal-content">
                             <i class="bi bi-trash me-2"></i>Delete
                         </a>

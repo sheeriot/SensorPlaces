@@ -46,6 +46,10 @@ from icecream import ic
 from django.conf import settings
 from django.db import models
 
+# Configure icecream
+ic.configureOutput(prefix='ic| ', includeContext=True)
+
+# Create your views here.
 
 class SensorDetailCardView(LoginRequiredMixin, PlaceAnnotationMixin, DetailView):
     """
@@ -368,35 +372,48 @@ def sensor_live_value_view(request, place_slug, pk):
     - 'card': Renders the detailed live reading display.
     - 'badge': Renders a compact badge.
     """
-    # ic(f"sensor_live_value_view called for pk={pk}, style='{request.GET.get('style')}'")
+    ic(f"sensor_live_value_view called for pk={pk}, style='{request.GET.get('style')}'")
     sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
-    style = request.GET.get('style', 'card')
+    style = request.GET.get('style', 'badge')
     force_update = request.GET.get('force', 'false').lower() == 'true'
     source = 'unknown'
 
     try:
-        # This function now returns a tuple: (value_was_updated, source)
         _, source = update_sensor_live_value(sensor, force_update=force_update)
     except Exception as e:
-        # If the update fails, we can still render the card with an error state.
-        # The template will handle displaying the error.
         ic(f"Error in sensor_live_value_view for sensor {pk}: {e}")
 
-
-    template_name = 'sensors/partials/_sensor_live_display.html'
+    if style == 'card':
+        template_name = 'sensors/partials/sensor_live_card.html'
+    else:
+        template_name = 'sensors/partials/_sensor_live_row.html'
 
     context = {
         'sensor': sensor,
         'place': sensor.device.location.place,
-        'device': sensor.device,
-        'location': sensor.device.location,
-        'global_stale_threshold': getattr(settings, 'DEFAULT_STALE_THRESHOLD_SECONDS', 300),
-        'source': source,
-        'style': style
+        'source': source
     }
-
-    # ic(f"Rendering template: {template_name} with style: {style}")
+    ic(f"Rendering template: {template_name} with context for sensor {sensor.name}")
     return render(request, template_name, context)
+
+
+@login_required
+def sensor_live_value_htmx(request, place_slug, pk):
+    """
+    Returns a multi-part HTMX response for a sensor's live value,
+    age, and tooltip content.
+    """
+    ic(f"sensor_live_value_htmx called for pk={pk}")
+    sensor = get_object_or_404(Sensor, pk=pk, device__location__place__slug=place_slug)
+    force_update = request.GET.get('force', 'false').lower() == 'true'
+
+    try:
+        update_sensor_live_value(sensor, force_update=force_update)
+    except Exception as e:
+        ic(f"Error in sensor_live_value_htmx for sensor {pk}: {e}")
+
+    context = {'sensor': sensor}
+    return render(request, 'sensors/partials/sensor_live_value_htmx.html', context)
 
 
 @login_required
@@ -863,7 +880,7 @@ class SensorDeleteView(LoginRequiredMixin, PlaceAnnotationMixin, DeleteView):
         self.object = self.get_object()
         context = self.get_context_data(object=self.object)
 
-        # If it's an HTMX request, render the modal partial
+        # If it's an HTMX request, render the modal body content
         if 'HX-Request' in request.headers:
             return render(request, 'sensors/partials/sensor_confirm_delete_modal.html', context)
 

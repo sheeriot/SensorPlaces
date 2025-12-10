@@ -31,12 +31,10 @@
     {% block extra_css %}
     {% endblock %}
 
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <!-- <script>
-        htmx.logAll();
-    </script> -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
-<body data-toast-unread-count="{{ toast_unread_count|default:0 }}"
+<body hx-ext="response-targets"
+      data-toast-unread-count="{{ toast_unread_count|default:0 }}"
       data-place-slug="{{ place.slug|default:'none' }}"
       {% for key, value in body_data_attributes.items %}
       data-{{ key }}="{{ value }}"
@@ -184,8 +182,12 @@
     <!-- Generic Modal for HTMX content -->
     <div class="modal fade" id="htmx-modal" tabindex="-1" aria-labelledby="htmx-modal-label" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div id="htmx-modal-content" class="modal-content">
-                <!-- Content will be loaded here by HTMX -->
+            <div class="modal-content" id="htmx-modal-content">
+                 <div class="modal-body text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -235,39 +237,25 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Third-party Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    {# Vendor JS #}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
+    <!-- <script>htmx.logAll();</script> -->
+    <script src="https://unpkg.com/htmx.org/dist/ext/response-targets.js"></script>
 
-    <!-- Simple-DataTables JS -->
-    <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" type="text/javascript"></script>
-
-
-    <!-- Application Core JavaScript -->
+    {# Custom JS #}
     <script src="{% static 'sensors/js/utils.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/common.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/toast-ui-manager.js' %}?v={{ APP_VERSION }}"></script>
-    <script src="{% static 'sensors/js/time-display.js' %}?v={{ APP_VERSION }}"></script>
-
-    <!-- Application Feature JavaScript -->
-    <script src="{% static 'sensors/js/place-map-popout.js' %}?v={{ APP_VERSION }}"></script>
-    <script src="{% static 'sensors/js/hide-inactive-handler.js' %}?v={{ APP_VERSION }}"></script>
-    <script src="{% static 'sensors/js/toggle-active-handler.js' %}?v={{ APP_VERSION }}"></script>
-
-    <script src="{% static 'sensors/js/live-counts-updater.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/htmx-event-handler.js' %}?v={{ APP_VERSION }}"></script>
+    <script src="{% static 'sensors/js/modal-loader.js' %}?v={{ APP_VERSION }}"></script>
 
-    {% block extra_js %}
-    {% endblock %}
+    {% block extra_js %}{% endblock %}
 
     <!-- Site Plan Scripts -->
     {% if 'page-place-detail' in page_class or 'page-siteplan-test' in page_class %}
         <script src="{% static 'sensors/js/siteplan.js' %}?v={{ APP_VERSION }}"></script>
     {% endif %}
-
-    <script src="{% static 'sensors/js/modal-handlers.js' %}?v={{ APP_VERSION }}"></script>
 
     {% block debug_js %}
     {% endblock %}

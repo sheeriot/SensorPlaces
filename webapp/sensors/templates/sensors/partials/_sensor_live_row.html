@@ -1,0 +1,17 @@
+{% load humanize %}
+
+{# This block will be swapped into the 'Latest' column cell #}
+<div id="sensor-badge-cell-{{ sensor.pk }}" hx-swap-oob="innerHTML">
+    {% include "sensors/partials/_sensor_live_badge.html" with sensor=sensor %}
+</div>
+
+{# This block will be swapped into the 'Age' column cell #}
+<div id="sensor-age-cell-{{ sensor.pk }}" hx-swap-oob="innerHTML">
+    {% if sensor.cached_reading_timestamp %}
+        <span title="{{ sensor.cached_reading_timestamp|date:'Y-m-d H:i:s T' }}">
+            {{ sensor.cached_reading_timestamp|naturaltime }}
+        </span>
+    {% else %}
+        <span class="text-muted">Never</span>
+    {% endif %}
+</div>
