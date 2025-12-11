@@ -1,0 +1,54 @@
+{% with form_url=form_url|default:"#" %}
+<form hx-post="{{ form_url }}">
+    {% csrf_token %}
+    <input type="hidden" name="device_name" value="{{ device_name|escape }}">
+    <div class="modal-header">
+        <h5 class="modal-title">Import SwitchBot Device</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+        <p>Importing device <strong>{{ device_name }}</strong> (<code>{{ device_id }}</code>) will create the following sensors:</p>
+        <ul>
+            {% for sensor in potential_sensors %}
+                <li>{{ sensor.sensor_name }}</li>
+            {% empty %}
+                <li>No compatible sensors found for this device type.</li>
+            {% endfor %}
+        </ul>
+        <hr>
+
+        <div class="mb-3">
+            <label for="location-select" class="form-label"><strong>Import to Location:</strong></label>
+            <select id="location-select" name="location_id" class="form-select">
+                {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if loc.id == location.id %}selected{% endif %} data-is-active="{{ loc.is_active|lower }}">
+                        {{ loc.name }} {% if not loc.is_active %}(Inactive){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_active" id="is-active-checkbox"
+                   {% if location.is_active %}checked{% else %}disabled{% endif %}>
+            <label class="form-check-label" for="is-active-checkbox">
+                Import as <strong>Active</strong>
+            </label>
+            <div id="is-active-help" class="form-text">
+                {% if location.is_active %}
+                    Uncheck to import the device as Inactive, even though the location is Active.
+                {% else %}
+                    Device must be Inactive because the location is Inactive.
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-hdd-rack me-1"></i>Confirm Import
+        </button>
+    </div>
+</form>
+{% endwith %}

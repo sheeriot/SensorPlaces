@@ -1,5 +1,5 @@
 {% load static %}
 {% url 'sensors:switchbot_influx_store_edit' place.slug as switchbot_edit_url %}
-{% with card_title="SwitchBot InfluxDB Store" store=place.switchbot_influx_store place=place edit_url=switchbot_edit_url htmx_modal=True results_id="influx-results-switchbot" %}
+{% with card_title="SwitchBot InfluxDB Store" store=place.switchbot_influx_store edit_url=switchbot_edit_url htmx_modal=True results_id="influx-results-switchbot" %}
     {% include 'sensors/includes/influxstore_details_card.html' %}
 {% endwith %}

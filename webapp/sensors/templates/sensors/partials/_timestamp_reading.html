@@ -1,0 +1,31 @@
+{% load humanize %}
+{% load timezone_filters %}
+
+{% if timestamp %}
+    {% with now_local=request.user.get_local_time %}
+        <div class="d-flex align-items-center">
+            <div>
+                <div class="small text-monospace" title="{{ timestamp|date:'Y-m-d H:i:s T' }}">
+                    {% with day_display=timestamp|naturalday %}
+                        {% if day_display == 'today' %}
+                            {{ timestamp|date:"H:i" }}
+                        {% else %}
+                            {{ day_display|capfirst }}
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                <div class="small text-muted text-nowrap time-ago" data-timestamp="{{ timestamp.isoformat }}">
+                    {% with day_display=timestamp|naturalday %}
+                        {% if day_display == 'today' %}
+                            {{ timestamp|timesince }}
+                        {% else %}
+                            {{ timestamp|date:"H:i" }}
+                        {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+    {% endwith %}
+{% else %}
+    <span class="text-muted">Never</span>
+{% endif %}

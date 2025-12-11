@@ -236,7 +236,7 @@ def write_sensor_reading_to_influx(sensor, value):
                 "device_id": str(sensor.device.device_id) if sensor.device.device_id else 'N/A',
                 "sensor_id": str(sensor.id),
                 "sensor_name": sensor.name,
-                "sensor_type": sensor.get_sensor_type_display(),
+                "sensor_type": sensor.sensor_type.name if sensor.sensor_type else 'N/A',
                 "place_name": place.name,
                 "location_name": sensor.device.location.name,
             },
@@ -369,8 +369,9 @@ def update_sensor_live_value(sensor, force_update=False):
         # The source is where we tried to fetch from.
         return (False, source)
 
-    # For SwitchBot devices, write the newly fetched value to InfluxDB for history.
-    if sensor.device.is_switchbot and value_was_updated:
+    # For SwitchBot devices, write the newly fetched value to InfluxDB for history
+    # only if the sensor's data_store is set to INFLUX.
+    if sensor.device.is_switchbot and value_was_updated and sensor.data_store == 'INFLUX':
         ic(f"-> Writing SwitchBot value to InfluxDB for {sensor.name}.")
         write_sensor_reading_to_influx(sensor, new_value)
 

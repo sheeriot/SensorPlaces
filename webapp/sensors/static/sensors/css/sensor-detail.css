@@ -1,1 +1,14 @@
+@keyframes highlight-action {
+    0% {
+        box-shadow: 0 0 8px 4px rgba(0, 123, 255, 0.5);
+    }
+    100% {
+        box-shadow: none;
+    }
+}
+
+.highlight-for-action {
+    animation: highlight-action 1.5s ease-out;
+}
+
 /* No custom styles needed at this time. */

@@ -1,0 +1,8 @@
+/* static/sensors/css/sensor-list.css */
+
+.table-hover > tbody > tr.bg-warning-subtle:hover > td,
+.table-hover > tbody > tr.bg-warning-subtle:hover > th,
+.table-hover > tbody > tr.bg-warning-subtle > td,
+.table-hover > tbody > tr.bg-warning-subtle > th {
+    background-color: var(--bs-warning-bg-subtle) !important;
+}

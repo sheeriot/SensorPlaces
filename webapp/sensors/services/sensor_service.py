@@ -6,7 +6,15 @@ from sensors.models import Unit
 
 logger = logging.getLogger(__name__)
 
-def process_sensor_reading(device: Device, measurement_type: str, value: float, source: str = None, skip_local_storage: bool = False, activate_sensor: bool = False):
+def process_sensor_reading(
+    device: Device,
+    measurement_type: str,
+    value: float,
+    source: str = None,
+    skip_local_storage: bool = False,
+    activate_sensor: bool = False,
+    switchbot_sensor_name: str = None
+):
     """
     Finds or creates a sensor for a given measurement and updates its cached value.
     Optionally stores a historical reading in the local DB.
@@ -19,18 +27,28 @@ def process_sensor_reading(device: Device, measurement_type: str, value: float, 
         skip_local_storage (bool): If True, a historical `SensorReading` object will NOT be created.
                                    The sensor's cache fields will still be updated.
         activate_sensor (bool): If a new sensor is created, this flag determines if it's active.
+        switchbot_sensor_name (str, optional): The original sensor name from the SwitchBot API.
 
     Returns:
         The updated Sensor object, or None on failure.
     """
     try:
-        # Try to find a sensor with a type matching the measurement name
-        sensor = Sensor.objects.filter(
-            device=device,
-            sensor_type__name__iexact=measurement_type
-        ).first()
+        sensor = None
+        # If a switchbot_sensor_name is provided, use it for lookup first
+        if switchbot_sensor_name:
+            sensor = Sensor.objects.filter(
+                device=device,
+                switchbot_sensor_name=switchbot_sensor_name
+            ).first()
 
-        # If not found, try matching by sensor name directly
+        # If not found, try to find a sensor with a type matching the measurement name
+        if not sensor:
+            sensor = Sensor.objects.filter(
+                device=device,
+                sensor_type__name__iexact=measurement_type
+            ).first()
+
+        # If not found, try matching by sensor name directly (legacy)
         if not sensor:
             sensor = Sensor.objects.filter(
                 device=device,
@@ -61,6 +79,7 @@ def process_sensor_reading(device: Device, measurement_type: str, value: float, 
                 name=sensor_name,
                 sensor_type=sensor_type,
                 is_active=activate_sensor,
+                switchbot_sensor_name=switchbot_sensor_name,
             )
             created = True
 

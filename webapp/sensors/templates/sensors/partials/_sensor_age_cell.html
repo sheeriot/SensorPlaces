@@ -1,0 +1,3 @@
+<div id="sensor-age-cell-{{ sensor.pk }}" class="text-start ps-2 align-middle d-none d-lg-table-cell">
+    {% include "sensors/partials/_timestamp_reading.html" with timestamp=sensor.cached_reading_timestamp %}
+</div>

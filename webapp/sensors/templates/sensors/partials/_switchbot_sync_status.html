@@ -1,0 +1,13 @@
+<div id="sync-status" class="d-inline-block align-middle ms-3">
+    {% if api_status.success %}
+        <span class="text-success">
+            <i class="bi bi-check-circle-fill me-1"></i>
+            Successfully fetched {{ devices|length }} device(s) from API.
+        </span>
+    {% else %}
+        <span class="text-danger">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            Error: {{ api_status.error_message }}
+        </span>
+    {% endif %}
+</div>

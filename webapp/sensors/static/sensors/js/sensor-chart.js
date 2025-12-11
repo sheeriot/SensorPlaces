@@ -1,7 +1,7 @@
 console.log('--- SENSOR-CHART.JS v.DEBUG.2 LOADED ---');
 
 // Local debug flag - set to true during development, false in production
-const SENSOR_CHART_DEBUG = true;
+const SENSOR_CHART_DEBUG = false;
 
 // Helper function to get display strings for boolean values
 function getBooleanDisplay(value, sensorTypeName) {
@@ -39,8 +39,8 @@ class SensorChart {
         this.originalUnit = this.graphCard.dataset.sensorUnit;
         this.unitName = this.graphCard.dataset.sensorUnitName; // Need to add this data attr
         this.sensorType = this.graphCard.dataset.sensorType;
-        this.originalMinValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
-        this.originalMaxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
+        this.originalMinValue = this.graphCard.dataset.minValue !== undefined && this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
+        this.originalMaxValue = this.graphCard.dataset.maxValue !== undefined && this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
         this.dataTable = null;
         this.sensorConfig = {};
         this.queryRange = {}; // Initialize queryRange
@@ -83,7 +83,7 @@ class SensorChart {
             // Keep content visible but maybe dimmed? Or just show spinner overlay
             if (loadingSpinner) loadingSpinner.classList.remove('d-none');
 
-            const chartCanvas = document.getElementById('sensorChart');
+            const chartCanvas = document.getElementById(`sensor-chart-${sensorId}`);
              // Don't destroy chart immediately to avoid flicker, just maybe show loading
         } else {
              if (loadingSpinner) loadingSpinner.classList.add('d-none');
@@ -310,7 +310,7 @@ class SensorChart {
         const sensorId = this.graphCard.dataset.sensorId;
         const placeholder = document.getElementById(`graph-placeholder-${sensorId}`);
         const content = document.getElementById(`graph-content-${sensorId}`);
-        const chartCanvas = document.getElementById('sensorChart');
+        const chartCanvas = document.getElementById(`sensor-chart-${sensorId}`);
         if (!chartCanvas) return;
 
         // Handle visibility
@@ -359,6 +359,8 @@ class SensorChart {
         } else {
             // Safety check: verify if a chart instance is already attached to this canvas context
             // This handles cases where this.chart ref was lost but Chart.js still tracks it
+            const sensorId = this.graphCard.dataset.sensorId;
+            const chartCanvas = document.getElementById(`sensor-chart-${sensorId}`);
             const existingChart = Chart.getChart(chartCanvas);
             if (existingChart) {
                 existingChart.destroy();
@@ -411,8 +413,12 @@ class SensorChart {
 
         const yAxisOptions = { title: { display: true, text: yAxisTitle } };
         // Use strict min/max to adhere to the sensor's defined range
-        if (effectiveMin !== null) yAxisOptions.min = effectiveMin;
-        if (effectiveMax !== null) yAxisOptions.max = effectiveMax;
+        if (effectiveMin !== null) {
+            yAxisOptions.min = effectiveMin;
+        }
+        if (effectiveMax !== null) {
+            yAxisOptions.max = effectiveMax;
+        }
 
         if (this.sensorType && this.sensorType.toLowerCase().includes('humidity')) {
             yAxisOptions.min = 0;
@@ -690,9 +696,11 @@ class SensorChart {
         }
         if (this.debug) console.log("SensorChart: Initializing flatpickr and event listeners.");
         this.fp_start = flatpickr("#start-date-picker", {
+            enableTime: true,
             altInput: true,
-            altFormat: "M j, Y",
-            dateFormat: "Y-m-d",
+            altFormat: "M j, Y H:i",
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
             onChange: (selectedDates, dateStr, instance) => {
                 if (this.fp_end) {
                     this.fp_end.set("minDate", selectedDates[0]);
@@ -700,9 +708,11 @@ class SensorChart {
             }
         });
         this.fp_end = flatpickr("#end-date-picker", {
+            enableTime: true,
             altInput: true,
-            altFormat: "M j, Y",
-            dateFormat: "Y-m-d",
+            altFormat: "M j, Y H:i",
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
             onChange: (selectedDates, dateStr, instance) => {
                 if (this.fp_start) {
                     this.fp_start.set("maxDate", selectedDates[0]);
@@ -750,23 +760,12 @@ class SensorChart {
                 document.querySelectorAll('.date-range-preset').forEach(btn => btn.classList.remove('active'));
 
                 const startDt = this.fp_start.selectedDates[0];
-                const endDt_raw = this.fp_end.selectedDates[0];
-                if (this.debug) console.log("SensorChart: Apply dates:", startDt, endDt_raw);
+                const endDt = this.fp_end.selectedDates[0];
+                if (this.debug) console.log("SensorChart: Apply dates:", startDt, endDt);
 
-                if (!startDt || !endDt_raw) {
+                if (!startDt || !endDt) {
                     alert("Please select both a start and end date.");
                     return;
-                }
-
-                let endDt = new Date(endDt_raw.getTime());
-
-                const today = new Date();
-                if (endDt.getFullYear() === today.getFullYear() &&
-                    endDt.getMonth() === today.getMonth() &&
-                    endDt.getDate() === today.getDate()) {
-                    endDt = today;
-                } else {
-                    endDt.setHours(23, 59, 59, 999);
                 }
 
                 this.queryRange = { start: startDt, end: endDt };

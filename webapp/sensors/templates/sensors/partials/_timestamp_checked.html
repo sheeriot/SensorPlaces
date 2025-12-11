@@ -1,0 +1,8 @@
+{% load humanize %}
+{% load timezone_filters %}
+
+{% if timestamp %}
+    <div class="small text-muted text-end" title="{{ timestamp|date:'Y-m-d H:i:s T' }}">
+        Last Checked: {{ timestamp|naturaltime|default:"Never" }}
+    </div>
+{% endif %}

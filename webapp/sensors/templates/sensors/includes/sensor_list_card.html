@@ -5,7 +5,7 @@
         <h5 class="card-title mb-0">
             <i class="bi bi-thermometer me-2"></i>
             {% if device and model_name == 'sensor' %}
-                Sensors on {{ device.name }}
+                 {% if device.is_switchbot %}<i class="bi bi-robot me-1"></i>{% endif %}Sensors on {{ device.name }}
             {% else %}
                 Sensors
             {% endif %}
@@ -21,50 +21,63 @@
         </div>
         {% endif %}
     </div>
-    <div class="card-body p-0">
-        <!-- Custom List Header -->
-        <div class="d-flex align-items-center text-muted fw-bold px-3 py-2 border-bottom bg-light">
-            <div class="flex-grow-1 ps-3" style="min-width: 0;">Name</div>
-            {% if not narrow_view %}
-            <div style="width: 100px;" class="text-start">Current</div>
-            <div style="width: 90px;" class="text-start">Active</div>
-            <div style="width: 120px;" class="text-end">Actions</div>
-            {% endif %}
-        </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0" style="table-layout: fixed;">
+            <thead>
+                <tr class="bg-light">
+                    <th class="ps-3 text-nowrap" style="min-width: 130px;">Name</th>
+                    <th class="text-end text-nowrap" style="width: 100px;">Latest</th>
+                    <th class="text-start text-nowrap ps-0 d-none d-lg-table-cell">
+                        <span class="text-nowrap"><i class="bi bi-clock-history me-1"></i>Age</span>
+                    </th>
+                    <th class="text-center text-nowrap" style="width: 110px;">Watch</th>
+                    {% if not narrow_view %}
+                    <th class="text-center text-nowrap d-none d-lg-table-cell" style="width: 40px;">Active</th>
+                    <th class="text-end text-nowrap">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody id="sensor-list-{% if device %}{{ device.pk }}{% elif location %}{{ location.pk }}{% else %}{{ place.pk }}{% endif %}">
 
-        <div id="sensor-list-{% if device %}{{ device.pk }}{% elif location %}{{ location.pk }}{% else %}{{ place.pk }}{% endif %}" class="list-group list-group-flush">
-
-            {% if device %}
-                {# Device View: just list the sensors for this device #}
-                {% for sensor in sensors %}
-                    {% include 'sensors/partials/sensor_row.html' with sensor=sensor device_is_active=device.is_active parent_is_active=device.location.is_active hide_inactive=hide_inactive %}
-                {% empty %}
-                <div class="list-group-item text-center text-muted p-5">
-                    <i class="bi bi-inbox fs-4"></i>
-                    <p class="mb-0 mt-2">No sensors found for this device.</p>
-                </div>
-                {% endfor %}
-            {% elif location %}
-                {# Location View: loop through devices in this location #}
-                {% for device_item in location.devices_sorted %}
-                    {% include 'sensors/includes/sensor_list_device_row.html' with device=device_item parent_is_active=location.is_active hide_inactive=hide_inactive %}
-                {% endfor %}
-            {% else %}
-                {# Place View: show the full hierarchy #}
-                {% for location_item in locations %}
-                    {% include 'sensors/includes/sensor_list_location_row.html' with location=location_item hide_inactive=hide_inactive %}
-
-                    {% for device_item in location_item.devices_sorted %}
-                        {% include 'sensors/includes/sensor_list_device_row.html' with device=device_item parent_is_active=location_item.is_active hide_inactive=hide_inactive %}
+                {% if device %}
+                    {# Device View: just list the sensors for this device #}
+                    {% for sensor in sensors %}
+                        {% include 'sensors/partials/sensor_row.html' with sensor=sensor device_is_active=device.is_active parent_is_active=device.location.is_active hide_inactive=hide_inactive %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if not narrow_view %}6{% else %}1{% endif %}" class="text-center text-muted p-5">
+                            <i class="bi bi-inbox fs-4"></i>
+                            <p class="mb-0 mt-2">No sensors found for this device.</p>
+                        </td>
+                    </tr>
                     {% endfor %}
-                {% empty %}
-                    <div class="list-group-item text-center text-muted p-5">
-                        <i class="bi bi-inbox fs-4"></i>
-                        <p class="mb-0 mt-2">No sensors found for this place.</p>
-                    </div>
-                {% endfor %}
-            {% endif %}
+                {% elif location %}
+                    {# Location View: loop through devices in this location #}
+                    {% for device_item in location.devices_sorted %}
+                        {% include 'sensors/includes/sensor_list_device_row.html' with device=device_item parent_is_active=location.is_active hide_inactive=hide_inactive %}
+                    {% endfor %}
+                {% else %}
+                    {# Place View: show the full hierarchy #}
+                    {% for location_item in locations %}
+                        {% include 'sensors/includes/sensor_list_location_row.html' with location=location_item hide_inactive=hide_inactive %}
 
-        </div>
+                        {% for device_item in location_item.devices_sorted %}
+                            {% include 'sensors/includes/sensor_list_device_row.html' with device=device_item parent_is_active=location_item.is_active hide_inactive=hide_inactive %}
+                        {% endfor %}
+                    {% empty %}
+                        <tr>
+                            <td colspan="{% if not narrow_view %}6{% else %}1{% endif %}" class="text-center text-muted p-5">
+                                <i class="bi bi-inbox fs-4"></i>
+                                <p class="mb-0 mt-2">No sensors found for this place.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer text-muted small text-end">
+        Page generated: {% now "Y-m-d H:i:s" %} {{ request.user.preferences.timezone }}
     </div>
 </div>

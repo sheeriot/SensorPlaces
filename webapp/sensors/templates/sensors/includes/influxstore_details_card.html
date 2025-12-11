@@ -27,7 +27,7 @@
                 <button class="btn btn-warning btn-sm"
                         hx-get="{{ edit_url }}"
                         hx-target="#htmx-modal-content"
-                        data-bs-toggle="modal" 
+                        data-bs-toggle="modal"
                         data-bs-target="#htmx-modal">
                     <i class="bi bi-pencil"></i> Edit
                 </button>
@@ -38,7 +38,7 @@
             {% endif %}
 
             <div class="btn-group" role="group">
-                <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" 
+                <button type="button" class="btn btn-sm btn-secondary dropdown-toggle"
                         data-bs-toggle="dropdown" aria-expanded="false"
                         {% if not store %}disabled{% endif %}>
                     <i class="bi bi-activity"></i> Test
@@ -75,7 +75,15 @@
             <p><strong>Selected Store:</strong> {{ store.name|default:"Not Set" }}</p>
         {% endif %}
         <hr class="border-secondary my-1 mx-4">
+        {% if store %}
         <div id="{{ results_id }}" class="mt-3">
+            {# Test results will be loaded here via HTMX #}
         </div>
+        {% else %}
+        <div class="alert alert-info small p-2 mt-3" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            No InfluxDB store is configured. Imports will use local caching.
+        </div>
+        {% endif %}
     </div>
 </div>

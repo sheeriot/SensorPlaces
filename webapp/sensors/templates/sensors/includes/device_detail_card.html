@@ -4,6 +4,7 @@
     <div class="card-header d-flex justify-content-between align-items-center py-1">
         <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
             <a href="{{ device.get_absolute_url }}" class="text-body text-decoration-none d-flex align-items-center">
+                {% if device.is_switchbot %}<i class="bi bi-robot me-1"></i>{% endif %}
                 {% include "sensors/partials/device_label.html" with device=device %}
             </a>
             <div class="text-nowrap ms-2">
@@ -38,7 +39,7 @@
                    title="Delete Device"
                    data-bs-toggle="modal"
                    data-bs-target="#htmx-modal"
-                   hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
+                   data-hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
                    hx-target="#htmx-modal-content">
                     <i class="bi bi-trash"></i>
                 </a>
@@ -65,9 +66,10 @@
                     <li>
                         <a class="dropdown-item text-danger"
                            href="#"
+                           title="Delete Device"
                            data-bs-toggle="modal"
                            data-bs-target="#htmx-modal"
-                           hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
+                           data-hx-get="{% url 'sensors:device_delete' place_slug=place.slug pk=device.pk %}"
                            hx-target="#htmx-modal-content">
                             <i class="bi bi-trash me-2"></i>Delete
                         </a>

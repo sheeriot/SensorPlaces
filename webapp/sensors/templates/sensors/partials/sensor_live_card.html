@@ -1,0 +1,52 @@
+{% load timezone_filters %}
+{% load humanize %}
+
+<div class="row align-items-center">
+    <!-- Left side: Reading and Timestamp -->
+    <div class="col">
+        <div class="d-flex align-items-center mt-1">
+            {% if sensor.cached_reading_value is not None %}
+                <span class="badge bg-success-subtle text-success-emphasis rounded-1 fs-4 me-2">
+                    {{ sensor.cached_reading_value|floatformat:sensor.effective_decimal_places }}
+                    {% if sensor.effective_unit %}{{ sensor.effective_unit.symbol }}{% endif %}
+                </span>
+                {% include "sensors/partials/_timestamp_reading.html" with timestamp=sensor.cached_reading_timestamp %}
+            {% else %}
+                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Right side: Controls and Metadata -->
+    <div class="col-auto">
+        <div class="d-flex align-items-center justify-content-end">
+            <button class="btn btn-sm watch-toggle me-2"
+                    data-sensor-id="{{ sensor.pk }}"
+                    title="Watch Sensor">
+                <i class="bi bi-eye"></i>
+            </button>
+                <button class="btn btn-sm"
+                    id="hammer-btn-card-{{ sensor.pk }}"
+                        title="Force a new reading"
+                        hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card&force=true"
+                        hx-target="#sensor-live-details-wrapper-{{ sensor.pk }}"
+                        hx-swap="innerHTML">
+                    <i class="bi bi-hammer"></i>
+                </button>
+            </div>
+        {% include "sensors/partials/_timestamp_checked.html" with timestamp=sensor.last_cached_timestamp %}
+    </div>
+</div>
+
+<div class="row small mt-2">
+    <div class="col">
+        <span class="text-muted">Data Source:</span>
+        <span>{{ source|default:"Cache" }}</span>
+    </div>
+    <div class="col text-end">
+        <span class="text-muted">Stale Time:</span>
+        <span>{{ sensor.effective_stale_threshold }}s</span>
+    </div>
+</div>

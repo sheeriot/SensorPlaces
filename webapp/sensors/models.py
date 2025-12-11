@@ -454,11 +454,15 @@ class Sensor(models.Model):
     is_active: BooleanField = models.BooleanField(default=True, verbose_name='Active Status')
     sensor_type = models.ForeignKey('SensorType', on_delete=models.SET_NULL, null=True, blank=True)
 
+    # store the original sensor name from Switchbot API
+    switchbot_sensor_name = models.CharField(max_length=100, null=True, blank=True, help_text="Original sensor name from SwitchBot API")
+
+
     # Modified fields to allow fallback to SensorType defaults
     unit = models.ForeignKey('Unit', on_delete=models.SET_NULL, null=True, blank=True)
     unit_override = models.BooleanField(default=False)
 
-    data_store: CharField = models.CharField(max_length=30, choices=DATA_STORES, default='DIRECT', null=True, blank=True, verbose_name="Data Store")
+    data_store: CharField = models.CharField(max_length=30, choices=DATA_STORES, default='NONE', null=True, blank=True, verbose_name="Data Store")
     # Removed data_type_override as per user request
 
     graph_type: CharField = models.CharField(
@@ -586,6 +590,29 @@ class Sensor(models.Model):
             return f"{int(seconds // 60)}m"
         else:
             return f"{int(seconds // 3600)}h"
+
+    @property
+    def last_checked_age(self):
+        if self.last_cached_timestamp:
+            return timezone.now() - self.last_cached_timestamp
+        return None
+
+    @property
+    def last_checked_age_str(self):
+        age = self.last_checked_age
+        if age is None:
+            return ""
+
+        seconds = age.total_seconds()
+        if seconds < 1:
+            return "now"
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        elif seconds < 3600:
+            return f"{int(seconds // 60)}m"
+        else:
+            return f"{int(seconds // 3600)}h"
+
 
     def __str__(self):
         return self.name

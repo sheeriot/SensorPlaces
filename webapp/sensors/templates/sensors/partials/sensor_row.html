@@ -1,97 +1,14 @@
 {% load widget_tweaks %}
 {% load humanize %}
 
-<div id="sensor-row-{{ sensor.pk }}"
-     class="list-group-item list-group-item-action d-flex align-items-center py-2 px-3 {% if not sensor.is_active or not sensor.device.is_active %}opacity-50 sensor-inactive{% endif %} {% if model_name == 'sensor' and sensor.pk == object.pk %}bg-primary-subtle{% endif %}"
-     data-sensor-id="{{ sensor.pk }}"
-     data-sensor-name="{{ sensor.name }}"
-     data-sensor-active="{{ sensor.is_active|lower }}"
-     {% if not sensor.is_active and hide_inactive %}style="display: none !important;"{% endif %}>
-
-    <!-- Name column -->
-    <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="text-decoration-none text-body flex-grow-1 d-flex align-items-center" style="min-width: 0;">
-        <i class="bi bi-thermometer me-2"></i>
-        <div>
-            <strong>{{ sensor.name }}</strong>
-            <div class="small text-muted">{{ sensor.get_sensor_type_display }}</div>
-        </div>
-    </a>
-
-    {% if not narrow_view %}
-        <!-- Current Value -->
-        {% if sensor.is_active %}
-        <div style="width: 200px;" class="text-start"
-             id="sensor-live-value-{{ sensor.pk }}"
-             hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=badge_lg"
-             hx-trigger="every 30s"
-             hx-swap="innerHTML">
-            {% with style="badge_lg" %}{% include "sensors/partials/_sensor_live_display.html" %}{% endwith %}
-        </div>
-        {% else %}
-        <div style="width: 200px;"></div>
-        {% endif %}
-
-        <!-- Active toggle -->
-        <div style="width: 90px;" class="text-start">
-            {% if sensor.device.is_active and sensor.device.location.is_active and sensor.device.location.place.is_active %}
-                {% include "sensors/partials/toggle_active_button.html" with type="sensor" id=sensor.pk is_active=sensor.is_active place_slug=place.slug object_name=sensor.name %}
-            {% else %}
-                <span class="badge bg-secondary">inactive</span>
-            {% endif %}
-        </div>
-
-        <!-- Actions buttons -->
-        <div style="width: 120px;" class="text-end">
-            <div class="btn-group btn-group-sm">
-                <a href="{% url 'sensors:sensor_detail' place_slug=place.slug pk=sensor.pk %}" class="btn btn-info" title="View Sensor">
-                    <i class="bi bi-eye"></i>
-                </a>
-                <a href="{% url 'sensors:sensor_update' place_slug=place.slug pk=sensor.pk %}" class="btn btn-warning" title="Edit Sensor">
-                    <i class="bi bi-pencil"></i>
-                </a>
-                <a href="#"
-                   class="btn btn-danger"
-                   title="Delete Sensor"
-                   data-bs-toggle="modal"
-                   data-bs-target="#htmx-modal"
-                   hx-get="{% url 'sensors:sensor_delete' place_slug=place.slug pk=sensor.pk %}"
-                   hx-target="#htmx-modal-content">
-                    <i class="bi bi-trash"></i>
-                </a>
-            </div>
-        </div>
-    {% endif %}
-</div>
-
-{% if sensor.is_active and device_is_active and parent_is_active %}
-<div id="readings-results-{{ sensor.pk }}" class="readings-results d-none sensor-row p-3 border-bottom" data-device-id="{{ device.pk }}">
-    <div class="alert mb-3" role="alert"></div>
-    <div class="readings-summary d-none">
-        <h6>Summary</h6>
-        <dl class="row mb-3">
-            <dt class="col-sm-3">Count</dt>
-            <dd class="col-sm-9 count">-</dd>
-            <dt class="col-sm-3">Range</dt>
-            <dd class="col-sm-9">
-                <span class="min">-</span> to <span class="max">-</span>
-            </dd>
-            <dt class="col-sm-3">Average</dt>
-            <dd class="col-sm-9 avg">-</dd>
-            <dt class="col-sm-3">Time Range</dt>
-            <dd class="col-sm-9 timerange">-</dd>
-        </dl>
-    </div>
-    <div class="recent-readings d-none">
-        <h6>Recent Readings</h6>
-        <table class="table table-sm">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Value</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
+<tr id="sensor-row-{{ sensor.pk }}"
+    class="{% if not sensor.is_active or not sensor.device.is_active %}opacity-50 sensor-inactive{% endif %} {% if model_name == 'sensor' and sensor.pk == object.pk %}bg-warning-subtle{% endif %}"
+    data-sensor-id="{{ sensor.pk }}"
+    data-sensor-name="{{ sensor.name }}"
+    data-sensor-active="{{ sensor.is_active|lower }}"
+    data-poll-url="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}"
+    data-poll-style="row_content"
+    data-narrow-view="{{ narrow_view|lower }}"
+    {% if not sensor.is_active and hide_inactive %}style="display: none !important;"{% endif %}>
+    {% include "sensors/partials/_sensor_row_content.html" %}
+</tr>

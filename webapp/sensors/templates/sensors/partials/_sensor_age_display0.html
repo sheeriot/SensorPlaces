@@ -1,0 +1,10 @@
+{% load humanize %}
+
+<div class="small text-muted lh-1" style="font-size: 0.75em; white-space: nowrap;">
+    <div title="Last successful reading from source.">
+        <i class="bi bi-clock-history"></i> {{ sensor.cached_reading_timestamp|naturaltime }}
+    </div>
+    <div title="Last attempt to check for a new reading.">
+        <i class="bi bi-check-lg"></i> {{ sensor.last_cached_timestamp|naturaltime }}
+    </div>
+</div>

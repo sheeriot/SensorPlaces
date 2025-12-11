@@ -16,7 +16,7 @@
             <div id="device-info-card-container">
                  {% include 'sensors/includes/device_info_card.html' %}
             </div>
-            <div id="sensor-list-card-container" class="mt-3">
+            <div id="sensor-list-card-container" class="mt-1">
                 {% include 'sensors/includes/sensor_list_card.html' %}
             </div>
         </div>
@@ -30,39 +30,42 @@
                 {% include 'sensors/includes/sensor_influx_details.html' %}
             {% endif %}
 
-            {% if sensor.is_active %}
-                <div id="graph-card-container"
-                    hx-get="{% url 'sensors:sensor_graph_card' place_slug=place.slug pk=sensor.pk %}"
-                    hx-trigger="load"
-                    hx-swap="outerHTML">
-                    <div class="card my-2">
-                        <div class="card-body text-center p-5">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading Graph...</span>
+            {% if sensor.data_store != 'NONE' %}
+                {% if sensor.is_active %}
+                    <div id="graph-card-container"
+                        hx-get="{% url 'sensors:sensor_graph_card' place_slug=place.slug pk=sensor.pk %}"
+                        hx-trigger="load"
+                        hx-swap="innerHTML">
+                        <div class="card my-2">
+                            <div class="card-body text-center p-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading Graph...</span>
+                                </div>
+                                <p class="mt-2">Loading graph component...</p>
                             </div>
-                            <p class="mt-2">Loading graph component...</p>
                         </div>
                     </div>
-                </div>
-            {% else %}
-                <div id="graph-card-container" class="card my-2">
-                    <div class="card-body text-center">
-                        <h5 class="card-title">Sensor is Inactive</h5>
-                        <p class="card-text">Live data is not being collected, but you can view historical data.</p>
-                        <button class="btn btn-primary"
-                                hx-get="{% url 'sensors:sensor_graph_card' place_slug=place.slug pk=sensor.pk %}"
-                                hx-target="#graph-card-container"
-                                hx-swap="outerHTML">
-                            <i class="bi bi-graph-up me-1"></i>
-                            Show Historical Graph
-                        </button>
+                {% else %}
+                    <div id="graph-card-container" class="card my-2">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">Sensor is Inactive</h5>
+                            <p class="card-text">Live data is not being collected, but you can view historical data.</p>
+                            <button class="btn btn-primary"
+                                    hx-get="{% url 'sensors:sensor_graph_card' place_slug=place.slug pk=sensor.pk %}"
+                                    hx-target="#graph-card-container"
+                                    hx-swap="innerHTML">
+                                <i class="bi bi-graph-up me-1"></i>
+                                Show Historical Graph
+                            </button>
+                        </div>
                     </div>
-                </div>
+                {% endif %}
+                <div id="sensor-readings-table-container">
+                    {% include 'sensors/includes/sensor_datapoints_card.html' %}
+               </div>
             {% endif %}
 
-            <div id="sensor-readings-table-container">
-                 {% include 'sensors/includes/sensor_datapoints_card.html' %}
-            </div>
+
         </div>
     </div>
 </div>
@@ -75,5 +78,4 @@
 {% block extra_js %}
     <script src="{% static 'sensors/js/sensor-chart.js' %}?v={{ APP_VERSION }}"></script>
     <script src="{% static 'sensors/js/sensor-detail.js' %}?v={{ APP_VERSION }}"></script>
-    <script src="{% static 'sensors/js/modal-handlers.js' %}?v={{ APP_VERSION }}"></script>
 {% endblock %}

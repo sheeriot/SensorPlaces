@@ -42,11 +42,13 @@ function initializeGlobalState() {
     window.sensorPlaces.currentPlaceSlug = body.dataset.placeSlug || 'none';
     window.sensorPlaces.toastUnreadCount = parseInt(body.dataset.toastUnreadCount || '0', 10);
 
-    if (commonConfig.debug) console.log('[initializeGlobalState] Global state initialized:', {
-        placeSlug: window.sensorPlaces.currentPlaceSlug,
-        unreadCount: window.sensorPlaces.toastUnreadCount,
-        allBodyData: window.sensorPlaces.bodyData
-    });
+    if (commonConfig.debug) {
+        console.log('[initializeGlobalState] Global state initialized:');
+        console.table({
+            'Place Slug': window.sensorPlaces.currentPlaceSlug,
+            'Unread Count': window.sensorPlaces.toastUnreadCount,
+        });
+    }
 
     // For backward compatibility (can be removed later)
     window.currentPlaceSlug = window.sensorPlaces.currentPlaceSlug;
@@ -109,6 +111,29 @@ function initializePollingToggles(container) {
     });
 }
 
+/**
+ * Initializes and manages the state of Bootstrap popovers, tooltips, and dropdowns.
+ * This function is called on both DOMContentLoaded and htmx:afterSwap to ensure
+ * components are always correctly initialized.
+ */
+function initializeBootstrap(element) {
+    if (commonConfig.debug) console.log('[initializeBootstrap] Initializing Bootstrap components in', element);
+
+    // Initialize all Bootstrap popovers
+    const popoverTriggerList = element.querySelectorAll('[data-bs-toggle="popover"]');
+    [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl, {
+        container: 'body' // Append popovers to the body to avoid positioning issues
+    }));
+
+    // Initialize all tooltips
+    const tooltipTriggerList = element.querySelectorAll('[data-bs-toggle="tooltip"]');
+    [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+
+    // Initialize all dropdowns
+    const dropdownTriggerList = element.querySelectorAll('[data-bs-toggle="dropdown"]');
+    [...dropdownTriggerList].map(dropdownTriggerEl => new bootstrap.Dropdown(dropdownTriggerEl));
+};
+
 
 // Initialize core functionality
 function initializeCore() {
@@ -146,23 +171,54 @@ document.addEventListener('DOMContentLoaded', () => {
     if (commonConfig.debug) console.log('[DOMContentLoaded] Starting initialization');
     initializeCore();
     initializePollingToggles(document.body);
+    initializeBootstrap(document.body);
 
-    // Initialize all Bootstrap popovers
-    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    popoverTriggerList.map(function (popoverTriggerEl) {
-        return new bootstrap.Popover(popoverTriggerEl);
+    // Before a request that might replace a popover, dispose of it first to prevent errors.
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        const requestingElement = evt.detail.elt;
+        let swapTarget;
+
+        // Determine the actual target of the swap.
+        const targetSelector = requestingElement.getAttribute('hx-target');
+        if (targetSelector) {
+            swapTarget = htmx.find(targetSelector);
+        } else {
+            swapTarget = requestingElement;
+        }
+
+        if (swapTarget && swapTarget.id.startsWith('sensor-live-value-')) {
+            if (commonConfig.debug) console.log(`[htmx:beforeRequest] Preparing to swap ${swapTarget.id}. Checking for popovers.`);
+            const popoverTrigger = swapTarget.querySelector('[data-bs-toggle="popover"]');
+            if (popoverTrigger) {
+                const instance = bootstrap.Popover.getInstance(popoverTrigger);
+                if (instance) {
+                    if (commonConfig.debug) console.log(`[htmx:beforeRequest] Disposing of active popover instance for ${swapTarget.id}.`);
+                    instance.dispose();
+                }
+            }
+        }
     });
 
-    // Initialize all tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
-    // Initialize all dropdowns
-    const dropdownTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
-    dropdownTriggerList.map(function (dropdownTriggerEl) {
-        return new bootstrap.Dropdown(dropdownTriggerEl);
+    // Dispose of Bootstrap components before they are swapped out by HTMX
+    document.body.addEventListener('htmx:beforeSwap', function(evt) {
+        // This is a broader cleanup. The beforeRequest handler is more targeted.
+        const target = evt.detail.target;
+        if (target) {
+            const popovers = target.querySelectorAll('[data-bs-toggle="popover"]');
+            popovers.forEach(el => {
+                const instance = bootstrap.Popover.getInstance(el);
+                if (instance) {
+                    instance.dispose();
+                }
+            });
+            const tooltips = target.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltips.forEach(el => {
+                const instance = bootstrap.Tooltip.getInstance(el);
+                if (instance) {
+                    instance.dispose();
+                }
+            });
+        }
     });
 
     // Handle accessibility for modals: blur focus before hiding
@@ -191,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Run toggle initializer after any HTMX swap
     document.body.addEventListener('htmx:afterSwap', function(evt) {
         initializePollingToggles(evt.detail.target);
+        initializeBootstrap(evt.detail.target);
     });
 
     // Global listener to close Bootstrap modals based on a custom event
@@ -239,6 +296,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (commonConfig.debug) {
             const xhr = evt.detail.xhr;
             console.log('HTMX request completed to:', xhr.responseURL);
+            console.table({
+                'URL': xhr.responseURL,
+                'Status': xhr.status,
+                'Success': evt.detail.successful,
+                'Target': evt.detail.target.id,
+            });
             const triggerHeader = xhr.getResponseHeader('HX-Trigger-After-Settle');
             if (triggerHeader) {
                 console.log('Server sent HX-Trigger-After-Settle:', triggerHeader);

@@ -51,14 +51,14 @@
                 <a href="{% url 'sensors:device_update' place_slug=device.location.place.slug pk=device.pk %}?next={{ absolute_url|urlencode }}" class="btn btn-sm btn-outline-warning">
                     <i class="bi bi-pencil-fill"></i>
                 </a>
-                <button type="button" class="btn btn-sm btn-outline-danger delete-device"
-                        hx-get="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}"
-                        hx-target="#htmx-modal-content"
-                        data-bs-toggle="modal"
-                        data-bs-target="#htmx-modal"
-                        title="Delete">
+                <a href="#" class="btn btn-sm btn-outline-danger delete-device"
+                   data-bs-toggle="modal"
+                   data-bs-target="#htmx-modal"
+                   data-hx-get="{% url 'sensors:device_delete' place_slug=device.location.place.slug pk=device.pk %}"
+                   hx-target="#htmx-modal-content"
+                   title="Delete">
                     <i class="bi bi-trash-fill"></i>
-                </button>
+                </a>
             </div>
         </div>
     </div>
