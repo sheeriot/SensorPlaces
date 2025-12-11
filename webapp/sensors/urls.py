@@ -56,13 +56,11 @@ urlpatterns = [
     path('webhook/<slug:place_slug>/<uuid:uuid>/', webhook_views.WebhookReceiverView.as_view(), name='webhook_receiver'),
 
     # Place-specific URLs
-    path('<slug:place_slug>/', place_views.PlaceDetailView.as_view(), name='place_detail'),
+    path('<slug:place_slug>/siteplan/update/', place_views.siteplan_update, name='siteplan_update'),
+     path('<slug:place_slug>/', place_views.PlaceDetailView.as_view(), name='place_detail'),
     path('<slug:place_slug>/update/', place_views.PlaceUpdateView.as_view(), name='place_update'),
     path('<slug:place_slug>/delete/', place_views.PlaceDeleteView.as_view(), name='place_delete'),
-    path('<slug:place_slug>/map/', place_views.place_map_modal_view, name='place_map_modal'),
     path('<slug:place_slug>/siteplan/', place_views.siteplan_view, name='siteplan'),
-    path('<slug:place_slug>/siteplan/view-modal/', place_views.siteplan_view_modal, name='siteplan_view_modal'),
-    path('<slug:place_slug>/siteplan/edit-modal/', place_views.siteplan_editor_modal, name='siteplan_editor_modal'),
     path('<slug:place_slug>/siteplan/update/', place_views.siteplan_update, name='siteplan_update'),
 
     # SwitchBot Integration

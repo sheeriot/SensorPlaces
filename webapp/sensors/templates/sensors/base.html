@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="htmx-config" content='{"withCredentials": true}'>
     <title>{% block title %}Sensor Places{% endblock %}</title>
     <link rel="shortcut icon" type="image/png" href="{% static 'sensors/graphics/favicon.ico' %}" >
 
@@ -198,7 +199,35 @@
     <div class="modal fade" id="mapplan-modal" tabindex="-1" aria-labelledby="mapplan-modal-label" aria-hidden="true">
         <div class="modal-dialog modal-xl">
             <div id="mapplan-modal-content" class="modal-content">
-                <!-- Content will be loaded here -->
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mapplan-modal-label">Site Plan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Content will be loaded here by htmx -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Siteplan Modal -->
+    <div class="modal fade" id="siteplan-modal" tabindex="-1" aria-labelledby="siteplan-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="siteplan-modal-title">Site Plan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- ⭐ Leave body empty; JS will build the wrapper -->
+                <div class="modal-body p-0"></div>
+
+                <div class="modal-footer">
+                    <!-- JS injects footer contents -->
+                </div>
             </div>
         </div>
     </div>
