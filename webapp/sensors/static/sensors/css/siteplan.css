@@ -137,7 +137,7 @@
 }
 
 .siteplan-wrapper #siteplan-editor-map {
-    max-height: 70vh; /* 70% of the viewport height */
+    /* max-height: 70vh;  70% of the viewport height */
     position: relative;
     padding-bottom: 0 !important; /* Override inline style */
 }

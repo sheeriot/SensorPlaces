@@ -7,7 +7,7 @@ console.log('[siteplan.js] --- SCRIPT LOADED ---');
 const sitePlanModule = (function () {
     console.log('[siteplan.js] IIFE executing.');
     const scriptConfig = {
-        debug: true,
+        debug: false,
         version: '{{ APP_VERSION }}'
     };
     console.log('[siteplan.js] scriptConfig:', scriptConfig);
@@ -31,81 +31,77 @@ const sitePlanModule = (function () {
     };
 
     function createMap(containerId, locationsDataId, isModal) {
-        if (scriptConfig.debug) console.log(`[createMap] Attempting to load site plan. Image URL: ${document.getElementById(containerId).dataset.imageUrl}`);
         const locationsDataEl = document.getElementById(locationsDataId);
         if (!locationsDataEl) {
-            console.error(`[createMap] Locations data element #${locationsDataId} not found!`);
             return;
         }
-        if (scriptConfig.debug) console.log(`[createMap] Raw locations data from #${locationsDataId}: ${locationsDataEl.textContent}`);
-
         const imageUrl = document.getElementById(containerId).dataset.imageUrl;
         if (!imageUrl) {
-            console.error(`[createMap] Image URL not found on container #${containerId}!`);
             return;
         }
-
-        console.log(`[createMap] Image URL is: ${imageUrl}. Creating new Image object.`);
         const img = new Image();
         img.onload = function () {
-            console.log(`[createMap] >>> img.onload has fired for ${imageUrl}.`);
             createMapFromImage(img, containerId, locationsDataId, imageUrl, isModal);
         };
         img.onerror = function () {
             console.error(`[createMap] >>> img.onerror has fired for ${imageUrl}. Image failed to load.`);
         };
-        console.log(`[createMap] Setting img.src to start loading...`);
         img.src = imageUrl;
-        console.log(`[createMap] img.src has been set.`);
     }
 
     function initializeMainView() {
-        console.log('[initializeMainView] Function called.');
         const siteplanContainer = document.getElementById('siteplan-container-main');
         if (siteplanContainer) {
-            console.log('[initializeMainView] Found #siteplan-container-main. Calling createMap().');
             createMap('siteplan-container-main', 'locations-data-main', false);
         } else {
             console.error('[initializeMainView] FAILED to find main page container #siteplan-container-main!');
         }
     }
 
-    function createMapFromImage(img, containerId, locationsDataId, imageUrl, isModal) {
-        console.log(`[createMapFromImage] Function called for container: ${containerId}.`);
-        if (scriptConfig.debug) console.log(`[createMapFromImage] Successfully loaded image: ${imageUrl}`);
+    function initializeModalView() {
+        const siteplanContainer = document.getElementById('siteplan-container-modal');
+        if (siteplanContainer) {
+            createMap('siteplan-container-modal', 'locations-data-modal', true);
+        } else {
+            console.error('[initializeModalView] FAILED to find modal container #siteplan-container-modal!');
+        }
+    }
 
+    function createMapFromImage(img, containerId, locationsDataId, imageUrl, isModal) {
         const container = document.getElementById(containerId);
         if (!container) {
-            if (scriptConfig.debug) console.error(`[createMapFromImage] Container element #${containerId} not found! Cannot create map.`);
+            console.error(`[createMapFromImage] Container element #${containerId} not found! Cannot create map.`);
             return;
         }
-        console.log(`[createMapFromImage] Container found. Initial offsetWidth: ${container.offsetWidth}px, offsetHeight: ${container.offsetHeight}px`);
 
-        // The padding-top trick in CSS now handles the initial height, so we can set the final height directly.
-        // We also clear the padding-top to avoid extra space.
         const imageAspectRatio = img.naturalHeight / img.naturalWidth;
-        console.log(`[createMapFromImage] Image natural dimensions: ${img.naturalWidth}x${img.naturalHeight}, Aspect ratio: ${imageAspectRatio}`);
-
         container.style.paddingTop = '0';
-        console.log(`[createMapFromImage] Cleared container padding-top.`);
 
+        const siteplanWrapper = container.closest('.siteplan-wrapper');
         const calculatedHeight = container.offsetWidth * imageAspectRatio;
-        container.style.height = `${calculatedHeight}px`;
-        console.log(`[createMapFromImage] Calculated and set container height to: ${calculatedHeight}px`);
+        if (siteplanWrapper) {
+            siteplanWrapper.style.height = `${calculatedHeight}px`;
+        } else {
+            container.style.height = `${calculatedHeight}px`;
+        }
 
         if (container._leaflet_id) {
             const existingMap = L.DomUtil.getMap(container);
             if (existingMap) existingMap.remove();
         }
 
-        const map = L.map(containerId, { crs: L.CRS.Simple, minZoom: -5, maxZoom: 5 });
         const bounds = [[0, 0], [img.naturalHeight, img.naturalWidth]];
+        const map = L.map(containerId, {
+            crs: L.CRS.Simple,
+            minZoom: -5,
+            maxZoom: 5,
+            maxBounds: bounds,
+            maxBoundsViscosity: 1.0
+        });
         L.imageOverlay(imageUrl, bounds).addTo(map);
 
-        const siteplanWrapper = container.closest('.siteplan-wrapper');
         if (siteplanWrapper) {
             siteplanWrapper.classList.add('loaded');
-            console.log(`[createMapFromImage] Added 'loaded' class to .siteplan-wrapper`);
         }
 
         const locationsDataEl = document.getElementById(locationsDataId);
@@ -127,11 +123,16 @@ const sitePlanModule = (function () {
             const icon = createIcon(location);
             const marker = L.marker([pixelY, pixelX], { icon }).addTo(map);
             marker.bindPopup(createMarkerPopup(location), { offset: L.point(0, -30) });
+            marker.bindTooltip(location.name, {
+                permanent: true,
+                direction: 'bottom',
+                offset: [0, 20],
+                className: 'location-label'
+            });
             markerBounds.push([pixelY, pixelX]);
         });
 
-        if (markerBounds.length > 0) map.fitBounds(markerBounds);
-        else map.fitBounds(bounds);
+        map.fitBounds(bounds);
 
         state.maps[containerId] = map;
         state.locations = locations;
@@ -174,13 +175,13 @@ const sitePlanModule = (function () {
 
         state: state,
 
-        get saveButton() { return document.getElementById('save-siteplan-positions'); },
+        get saveButton() { return document.getElementById('siteplan-save'); },
         get resetButton() { return document.getElementById('siteplan-editor-reset'); },
 
-        initializeEditor(modalBody) {
+        initializeEditor(modalEl) {
             this.logDebug('initialization', 'Site plan editor initializing inside modal.');
 
-            const container = modalBody.querySelector('#siteplan-editor-map');
+            const container = modalEl.querySelector('#siteplan-editor-map');
             const viewContainer = document.getElementById('siteplan-container-main');
 
             if (!container || !viewContainer) {
@@ -194,12 +195,12 @@ const sitePlanModule = (function () {
                 return;
             }
 
-            const saveButton = modalBody.querySelector('#save-siteplan-positions');
+            const saveButton = modalEl.querySelector('#siteplan-save');
             if (saveButton) {
                 saveButton.addEventListener('click', () => this.saveChanges());
             }
 
-            const resetButton = modalBody.querySelector('#siteplan-editor-reset');
+            const resetButton = modalEl.querySelector('#siteplan-editor-reset');
             if (resetButton) {
                 resetButton.addEventListener('click', () => this.resetView());
             }
@@ -279,7 +280,7 @@ const sitePlanModule = (function () {
                 const availableWidth = siteplanWrapper.offsetWidth;
                 let calculatedHeight = availableWidth * aspectRatio;
                 const maxHeight = window.innerHeight * 0.8;
-                const finalHeight = Math.min(calculatedHeight, maxHeight);
+                const finalHeight = calculatedHeight;
                 siteplanWrapper.style.height = `${finalHeight}px`;
             }
 
@@ -493,32 +494,13 @@ const sitePlanModule = (function () {
                 this.logDebug('saves', 'Saving location updates to backend:', { locations: changedLocations });
                 this.showToast('Saving changes...', 'info');
 
-                const response = await window.utils.fetchWithCSRF(
-                    `/${document.body.dataset.placeSlug}/siteplan/update/`,
-                    {
+                const data = await window.utils.fetchWithCSRF(
+                    `/${document.body.dataset.placeSlug}/siteplan/update/`,                    {
                         method: 'POST',
                         body: JSON.stringify({ locations: changedLocations })
                     }
                 );
 
-                this.logDebug('network', 'Received response from server:', { status: response.status, ok: response.ok });
-
-                if (!response.ok) {
-                    let errorMessage = `Failed to save changes. Server responded with status ${response.status}.`;
-                    try {
-                        const errorData = await response.json();
-                        errorMessage = errorData.message || errorMessage;
-                        this.logDebug('error', 'Server error response body:', errorData);
-                    } catch (e) {
-                        this.logDebug('error', 'Could not parse error response body.');
-                        errorMessage = `Error ${response.status}: ${response.statusText}`;
-                    }
-                    this.showToast(errorMessage, 'danger');
-                    this.logDebug('error', 'Save failed with non-OK response:', response);
-                    return;
-                }
-
-                const data = await response.json();
                 this.logDebug('network', 'Parsed response data:', data);
 
                 if (data.type === 'error' || data.type === 'danger') {
@@ -529,28 +511,26 @@ const sitePlanModule = (function () {
 
                 this.state.isDirty = false;
 
-                if (data.changes && data.changes.locations) {
-                    const updatedLocations = data.changes.locations.reduce((acc, change) => {
-                        const slug = change.slug;
-                        const existingLocation = window.sitePlanView.state.locations.find(loc => loc.slug === slug);
-                        if (existingLocation) {
-                            acc[slug] = {
-                                ...existingLocation,
-                                x_pos: parseFloat(change.new_position.x_pos),
-                                y_pos: parseFloat(change.new_position.y_pos)
-                            };
-                        } else {
-                            this.logDebug('error', `Could not find existing location for slug: ${slug}`);
-                        }
-                        return acc;
-                    }, {});
+                // Create a new array with the updated locations
+                const updatedLocations = state.locations.map(loc => {
+                    const changedLoc = data.changes.locations.find(c => c.slug === loc.slug);
+                    if (changedLoc) {
+                        return {
+                            ...loc,
+                            x_pos: parseFloat(changedLoc.new_position.x_pos),
+                            y_pos: parseFloat(changedLoc.new_position.y_pos)
+                        };
+                    }
+                    return loc;
+                });
 
-                    this.logDebug('saves', 'Dispatching siteplan-update event with locations:', updatedLocations);
+                // Update the shared state
+                state.locations = updatedLocations;
 
-                    window.dispatchEvent(new CustomEvent('siteplan-update', {
-                        detail: { locations: updatedLocations }
-                    }));
-                }
+                this.logDebug('saves', 'Dispatching siteplan-update event with new locations:', updatedLocations);
+                window.dispatchEvent(new CustomEvent('siteplan-update', {
+                    detail: { locations: updatedLocations }
+                }));
 
                 const modal = bootstrap.Modal.getInstance(document.getElementById('mapplan-modal'));
                 if (modal) {
@@ -591,7 +571,7 @@ const sitePlanModule = (function () {
         },
 
         logDebug(type, message, data = null) {
-            if (!scriptConfig.debug) return;
+            if (!scriptConfig.debug && type !== 'error') return;
             const icon = '🔷';
             const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
             console.log(`${timestamp} ${icon} ${message}`, data || '');
@@ -600,6 +580,7 @@ const sitePlanModule = (function () {
 
     window.sitePlanView = {
         initializeMainView: initializeMainView,
+        initializeModalView: initializeModalView,
         state: state,
         createMarkerPopup: createMarkerPopup,
         getRandomIcon: getRandomIcon,
@@ -608,29 +589,49 @@ const sitePlanModule = (function () {
     window.sitePlanSystem = sitePlanSystem;
 
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('[siteplan.js] >>> DOMContentLoaded event fired.');
-        if (document.getElementById('siteplan-container-main')) {
-            console.log('[siteplan.js] Found #siteplan-container-main in DOM, calling initializeMainView().');
+        const mainContainer = document.getElementById('siteplan-container-main');
+        if (mainContainer) {
             window.sitePlanView.initializeMainView();
         } else {
-            console.log('[siteplan.js] #siteplan-container-main not in DOM at DOMContentLoaded.');
+            console.log('[DOMContentLoaded] No main site plan container found.');
+        }
+    });
+
+    document.addEventListener('htmx:afterSwap', function(event) {
+        if (event.target.id === 'mapplan-modal-content') {
+            const editorMapEl = event.target.querySelector('#siteplan-editor-map');
+            const viewMapEl = event.target.querySelector('#siteplan-container-modal');
+
+            if (editorMapEl) {
+                sitePlanSystem.initializeEditor(document.getElementById('mapplan-modal'));
+            } else if (viewMapEl) {
+                sitePlanView.initializeModalView();
+            } else {
+                console.log('[htmx:afterSwap] No map container found in swapped content.');
+            }
+        }
+    });
+
+    window.addEventListener('siteplan-update', (event) => {
+        if (scriptConfig.debug) console.log('[siteplan-update] Event received', event.detail);
+
+        // Update the locations data in the main view's data script tag
+        const locationsDataEl = document.getElementById('locations-data-main');
+        if (locationsDataEl) {
+            // The event detail contains the full updated locations array
+            locationsDataEl.textContent = JSON.stringify(event.detail.locations);
         }
 
-        // Add a listener specifically for the mapplan-modal
-        const modalEl = document.getElementById('mapplan-modal');
-        if (modalEl) {
-            modalEl.addEventListener('shown.bs.modal', function (event) {
-                const editorMap = modalEl.querySelector('#siteplan-editor-map');
-                if (editorMap) {
-                    const modalBody = modalEl.querySelector('.modal-body');
-                    if (window.sitePlanSystem && typeof window.sitePlanSystem.initializeEditor === 'function') {
-                        console.log('[siteplan.js] >>> Calling sitePlanSystem.initializeEditor() for modal.');
-                        window.sitePlanSystem.initializeEditor(modalBody);
-                    } else {
-                        console.error('[siteplan.js] sitePlanSystem.initializeEditor is not available when modal was shown.');
-                    }
-                }
-            });
+        // Re-initialize the main view to reflect the updated locations
+        const mainContainer = document.getElementById('siteplan-container-main');
+        if (mainContainer) {
+            // Clear the existing map
+            if (state.maps['siteplan-container-main']) {
+                state.maps['siteplan-container-main'].remove();
+                delete state.maps['siteplan-container-main'];
+            }
+            // Re-initialize the view
+            initializeMainView();
         }
     });
 

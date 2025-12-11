@@ -1,7 +1,7 @@
 // static/sensors/js/sensor-watch.js
 
 const sensorWatchConfig = {
-    debug: true, // Master debug switch
+    debug: false, // Master debug switch
 };
 
 class SensorWatcher {
