@@ -11,6 +11,7 @@ const state = {
     showLabels: true,
     isDirty: false,
     locations: [],
+    changed: [],
     imageBounds: null,
     dom: {}   // elements populated in init()
 };
@@ -99,13 +100,12 @@ function initMainMap() {
 
         L.imageOverlay(imageUrl, bounds).addTo(state.mainMap);
         addMarkersToMap(state.mainMap, "view");
-        state.mainMap.fitBounds(bounds);
 
         setTimeout(() => {
+            console.log('⏰ Delayed map fit');
             state.mainMap.invalidateSize();
-            state.mainMap.fitBounds(bounds);
-        }, 100);
-
+            state.mainMap.fitBounds(bounds, { padding: [20, 20] });
+        }, 0);
 
         console.log("🟩 Main map initialized");
     };
@@ -168,9 +168,14 @@ function addMarkersToMap(map, mode) {
 
         if (editable) {
             marker.on("dragend", e => {
-                loc.x_pos = (e.target.getLatLng().lng / state.imageBounds[1][1]) * 100;
-                loc.y_pos = (e.target.getLatLng().lat / state.imageBounds[1][0]) * 100;
+                const newX = (e.target.getLatLng().lng / state.imageBounds[1][1]) * 100;
+                const newY = (e.target.getLatLng().lat / state.imageBounds[1][0]) * 100;
+                loc.x_pos = parseFloat(newX.toFixed(2));
+                loc.y_pos = parseFloat(newY.toFixed(2));
                 state.isDirty = true;
+                if (!state.changed.find(c => c.slug === loc.slug)) {
+                    state.changed.push(loc);
+                }
                 console.log("✏️ Marker moved:", loc);
             });
         }
@@ -185,23 +190,7 @@ function hookModalEvents() {
 
     state.dom.modal.addEventListener("shown.bs.modal", () => {
         console.log("🔶 Modal visible, recomputing height");
-
-        const wrapper = document.getElementById("siteplan-wrapper-modal");
-        const container = document.getElementById("siteplan-container-modal");
-
-        if (!wrapper || !container) return;
-
-        const w = wrapper.offsetWidth;
-        const aspect = state.imageBounds[1][0] / state.imageBounds[1][1];
-        const h = Math.round(w * aspect);
-
-        wrapper.style.height = `${h}px`;
-        console.log("📐 Modal wrapper height:", h);
-
-        if (state.modalMap) {
-            state.modalMap.invalidateSize();
-            state.modalMap.fitBounds(state.imageBounds);
-        }
+        resizeModalMap();
     });
 
     state.dom.modal.addEventListener("hidden.bs.modal", () => {
@@ -221,6 +210,7 @@ function openModal(mode) {
     state.modalMode = mode;
     state.showLabels = true;
     state.isDirty = false;
+    state.changed = [];
 
     buildModalBody();
     buildModalFooter(mode);
@@ -287,18 +277,39 @@ function refreshModalLabels() {
     });
 }
 
+function resizeModalMap() {
+    if (!state.modalMap) return;
+    console.log("📐 Resizing modal map");
+    const wrapper = document.getElementById("siteplan-wrapper-modal");
+    if (!wrapper) return;
+
+    const w = wrapper.offsetWidth;
+    const aspect = state.imageBounds[1][0] / state.imageBounds[1][1];
+    const h = Math.round(w * aspect);
+
+    wrapper.style.height = `${h}px`;
+    state.modalMap.invalidateSize();
+    state.modalMap.fitBounds(state.imageBounds);
+}
+
 
 // ------------------------------------------------------------
 // Save edits via POST
 // ------------------------------------------------------------
 function saveEdits() {
-    console.log("💾 Saving edits...");
+    if (!state.isDirty || state.changed.length === 0) {
+        console.log("💾 No changes to save.");
+        bootstrap.Modal.getInstance(state.dom.modal).hide();
+        return;
+    }
+
+    console.log("💾 Saving edits...", state.changed);
     const placeSlug = document.getElementById("siteplan-container-main").dataset.placeSlug;
     const url = `/${placeSlug}/siteplan/update/`;
 
     window.utils.fetchWithCSRF(url, {
         method: "POST",
-        body: JSON.stringify({ locations: state.locations }),
+        body: JSON.stringify({ locations: state.changed }),
     })
     .then(data => {
         console.log("💾 Save successful:", data);
