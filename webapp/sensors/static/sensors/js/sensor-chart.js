@@ -39,8 +39,8 @@ class SensorChart {
         this.originalUnit = this.graphCard.dataset.sensorUnit;
         this.unitName = this.graphCard.dataset.sensorUnitName; // Need to add this data attr
         this.sensorType = this.graphCard.dataset.sensorType;
-        this.originalMinValue = this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
-        this.originalMaxValue = this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
+        this.originalMinValue = this.graphCard.dataset.minValue !== undefined && this.graphCard.dataset.minValue !== '' ? parseFloat(this.graphCard.dataset.minValue) : null;
+        this.originalMaxValue = this.graphCard.dataset.maxValue !== undefined && this.graphCard.dataset.maxValue !== '' ? parseFloat(this.graphCard.dataset.maxValue) : null;
         this.dataTable = null;
         this.sensorConfig = {};
         this.queryRange = {}; // Initialize queryRange
@@ -413,8 +413,12 @@ class SensorChart {
 
         const yAxisOptions = { title: { display: true, text: yAxisTitle } };
         // Use strict min/max to adhere to the sensor's defined range
-        if (effectiveMin !== null) yAxisOptions.min = effectiveMin;
-        if (effectiveMax !== null) yAxisOptions.max = effectiveMax;
+        if (effectiveMin !== null) {
+            yAxisOptions.min = effectiveMin;
+        }
+        if (effectiveMax !== null) {
+            yAxisOptions.max = effectiveMax;
+        }
 
         if (this.sensorType && this.sensorType.toLowerCase().includes('humidity')) {
             yAxisOptions.min = 0;

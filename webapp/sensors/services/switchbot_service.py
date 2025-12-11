@@ -200,7 +200,7 @@ class SwitchBotService:
                 tags = {'device_id': device.device_id, 'device_name': slugify(device.name)}
 
                 # Construct the full measurement name
-                measurement = f"switchbot_{slugify(device.name)}_{measurement_group}"
+                measurement = measurement_group
 
                 try:
                     # Write the initial reading to InfluxDB
@@ -237,19 +237,21 @@ class SwitchBotService:
             ic(f"SwitchBot service for place {self.place.name} has no InfluxDB store configured for writing.")
             return
 
-        if not fields:
-            return
+        for field, value in fields.items():
+            tags = {'device_id': device.device_id, 'device_name': slugify(device.name)}
+            # The measurement name is now just the field name (e.g., 'temperature', 'humidity')
+            measurement = field
 
-        tags = {'device_id': device.device_id, 'device_name': slugify(device.name)}
-        measurement = f"{slugify(device.name)}_switchbot"
+            # The value needs to be in a dictionary, with a key like 'value'
+            field_data = {'value': value}
 
-        try:
-            write_to_influx(self.influx_store, measurement, fields, tags)
-            ic(f"Successfully wrote webhook data for {device.name} to InfluxDB measurement {measurement}.")
-        except Exception as e:
-            logger.error(f"Failed to write SwitchBot webhook data to InfluxDB for device '{device.device_id}': {e}")
-            # Optionally re-raise or handle the exception as needed
-            raise e
+            try:
+                write_to_influx(self.influx_store, measurement, field_data, tags)
+                ic(f"Successfully wrote webhook data for {device.name} to InfluxDB measurement {measurement}.")
+            except Exception as e:
+                logger.error(f"Failed to write SwitchBot webhook data to InfluxDB for device '{device.device_id}', measurement '{measurement}': {e}")
+                # Optionally re-raise or handle the exception as needed
+                raise e
 
 
     def sync_devices_status(self):
@@ -350,7 +352,7 @@ class SwitchBotService:
                 tags = {'device_id': device.device_id, 'device_name': slugify(device.name)}
 
                 # Construct the full measurement name
-                measurement = f"{slugify(device.name)}_{measurement_group}"
+                measurement = measurement_group
 
                 try:
                     write_to_influx(self.influx_store, measurement, fields, tags)
