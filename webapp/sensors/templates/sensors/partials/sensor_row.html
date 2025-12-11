@@ -6,6 +6,9 @@
     data-sensor-id="{{ sensor.pk }}"
     data-sensor-name="{{ sensor.name }}"
     data-sensor-active="{{ sensor.is_active|lower }}"
+    data-poll-url="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}"
+    data-poll-style="row_content"
+    data-narrow-view="{{ narrow_view|lower }}"
     {% if not sensor.is_active and hide_inactive %}style="display: none !important;"{% endif %}>
     {% include "sensors/partials/_sensor_row_content.html" %}
 </tr>

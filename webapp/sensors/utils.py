@@ -236,7 +236,7 @@ def write_sensor_reading_to_influx(sensor, value):
                 "device_id": str(sensor.device.device_id) if sensor.device.device_id else 'N/A',
                 "sensor_id": str(sensor.id),
                 "sensor_name": sensor.name,
-                "sensor_type": sensor.get_sensor_type_display(),
+                "sensor_type": sensor.sensor_type.name if sensor.sensor_type else 'N/A',
                 "place_name": place.name,
                 "location_name": sensor.device.location.name,
             },

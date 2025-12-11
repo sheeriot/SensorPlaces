@@ -118,6 +118,9 @@
 
         {% if sensor.is_active %}
         <div id="sensor-live-details-wrapper-{{ sensor.pk }}"
+            data-sensor-id="{{ sensor.pk }}"
+            data-poll-url="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}"
+            data-poll-style="card"
              hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card"
              hx-swap="innerHTML"
              hx-trigger="load">

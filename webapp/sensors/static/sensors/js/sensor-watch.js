@@ -1,7 +1,7 @@
 // static/sensors/js/sensor-watch.js
 
 const sensorWatchConfig = {
-    debug: false, // Master debug switch
+    debug: true, // Master debug switch
 };
 
 class SensorWatcher {
@@ -11,7 +11,11 @@ class SensorWatcher {
         if (sensorWatchConfig.debug) console.log('[SensorWatcher] Initialized. Watched sensors on load:', Array.from(this.watchedSensors));
 
         document.addEventListener('DOMContentLoaded', () => this.initAll(document.body));
-        document.body.addEventListener('htmx:afterSwap', (event) => this.initAll(event.detail.elt));
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+            if (event.detail.elt) {
+                this.initAll(event.detail.elt)
+            }
+        });
     }
 
     initAll(container) {
@@ -30,6 +34,7 @@ class SensorWatcher {
         // Update UI for all sensors and start polling for watched ones
         const allSensorIds = new Set(Array.from(document.querySelectorAll('[data-sensor-id]')).map(el => el.dataset.sensorId));
         allSensorIds.forEach(sensorId => {
+            if (!sensorId) return;
             const isWatched = this.watchedSensors.has(sensorId);
             this.updateUI(sensorId, isWatched);
             if (isWatched && !this.pollingIntervals.has(sensorId)) {
@@ -56,13 +61,12 @@ class SensorWatcher {
         if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Updating UI for all elements of sensor ${sensorId} to state: ${isWatched}`);
         const toggles = document.querySelectorAll(`.watch-toggle[data-sensor-id="${sensorId}"]`);
         toggles.forEach(toggle => {
-toggle.classList.toggle('btn-primary', isWatched);
-        toggle.classList.toggle('btn-link', !isWatched); // Use btn-link for no border
-        const icon = toggle.querySelector('i');
+            toggle.classList.toggle('btn-primary', isWatched);
+            toggle.classList.toggle('btn-outline-secondary', !isWatched);
+            const icon = toggle.querySelector('i');
             if (icon) {
                 icon.classList.toggle('bi-eye-fill', isWatched);
                 icon.classList.toggle('bi-eye', !isWatched);
-                icon.classList.toggle('text-white', isWatched);
             }
         });
     }
@@ -73,33 +77,42 @@ toggle.classList.toggle('btn-primary', isWatched);
             return;
         }
 
-        const placeSlug = document.body.dataset.placeSlug;
-        if (!placeSlug || placeSlug === 'none') {
-            console.error('[SensorWatcher] Error: place_slug not found on body data attribute.');
-            return;
-        }
-
-        const mainSensorContainer = document.querySelector('.container-fluid[data-sensor-pk]');
-        const isNarrowView = !!mainSensorContainer;
-
-        let pollUrl = `/${placeSlug}/sensor/${sensorId}/live-value/?style=row_content`;
-        if (isNarrowView) {
-            pollUrl += '&narrow_view=true';
-        }
-
-        const targetSelector = `#sensor-row-${sensorId}`;
-
-        if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Starting to poll for sensor ${sensorId}: URL=${pollUrl}, Target=${targetSelector}`);
+        const pollableElements = document.querySelectorAll(`[data-sensor-id="${sensorId}"][data-poll-url]`);
+        if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Found ${pollableElements.length} pollable elements for sensor ${sensorId}`);
 
         const performPoll = () => {
-             if (!this.watchedSensors.has(sensorId)) {
+            if (!this.watchedSensors.has(sensorId)) {
                 this.stopPolling(sensorId);
                 return;
             }
-            if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Polling ${pollUrl} for sensor ${sensorId}`);
-            htmx.ajax('GET', pollUrl, {
-                target: htmx.find(targetSelector),
-                swap: 'innerHTML'
+
+            pollableElements.forEach(element => {
+                // Check if the element is still in the DOM
+                if (!document.body.contains(element)) {
+                    return;
+                }
+
+                const pollUrl = new URL(element.dataset.pollUrl, window.location.origin);
+                const style = element.dataset.pollStyle;
+                const isNarrow = element.dataset.narrowView === 'true';
+
+                if (style) {
+                    pollUrl.searchParams.set('style', style);
+                }
+                if (isNarrow) {
+                    pollUrl.searchParams.set('narrow_view', 'true');
+                }
+
+                if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Polling for element:`, {
+                    id: element.id,
+                    url: pollUrl.toString()
+                });
+
+                // The target is the element itself, but we are replacing its content
+                htmx.ajax('GET', pollUrl.toString(), {
+                    target: element,
+                    swap: 'innerHTML'
+                });
             });
         };
 
