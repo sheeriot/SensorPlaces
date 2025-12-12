@@ -18,7 +18,8 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
             'dragging': True,
             'control_scale': True,
             'width': '100%',
-            'height': '100%'
+            'height': '100%',
+            'no_css': True,
         }
 
         # Single place mode
@@ -63,12 +64,9 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
                 folium.Marker(
                     location=[float(place.latitude), float(place.longitude)],
                     popup=folium.Popup(popup_html, max_width=200),
-                    icon=BeautifyIcon(
-                        icon='info-circle',
-                        icon_shape='marker',
-                        border_color= 'blue' if place.is_active else 'red',
-                        background_color= 'blue' if place.is_active else 'red',
-                        text_color='white'
+                    icon=folium.Icon(
+                        color='blue' if place.is_active else 'red',
+                        icon='info-sign'
                     )
                 ).add_to(m)
 

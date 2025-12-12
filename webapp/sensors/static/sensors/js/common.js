@@ -119,6 +119,22 @@ function initializePollingToggles(container) {
 function initializeBootstrap(element) {
     if (commonConfig.debug) console.log('[initializeBootstrap] Initializing Bootstrap components in', element);
 
+    // Programmatically initialize the mobile navbar dropdown to avoid conflicts.
+    // This is more robust than relying solely on data-bs-toggle.
+    const mobileMenuButton = document.getElementById('mobileMenuButton');
+    if (mobileMenuButton && !mobileMenuButton.dataset.initialized) {
+        if (commonConfig.debug) console.log('[initializeBootstrap] Programmatically initializing mobile dropdown.');
+        const dropdownInstance = new bootstrap.Dropdown(mobileMenuButton);
+        
+        mobileMenuButton.addEventListener('click', () => {
+            if (commonConfig.debug) console.log('[initializeBootstrap] Mobile menu button clicked, toggling dropdown.');
+            dropdownInstance.toggle();
+        });
+
+        // Mark as initialized to prevent re-adding listeners on HTMX swaps
+        mobileMenuButton.dataset.initialized = 'true';
+    }
+
     // Initialize all Bootstrap popovers
     const popoverTriggerList = element.querySelectorAll('[data-bs-toggle="popover"]');
     [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl, {

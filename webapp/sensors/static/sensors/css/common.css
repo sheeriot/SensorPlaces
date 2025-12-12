@@ -119,7 +119,7 @@
     position: fixed;
     top: 5rem;
     right: 3rem;
-    z-index: 1070;
+    z-index: 1056; /* Higher than Bootstrap's modal backdrop */
     width: var(--toast-width);
     max-width: 100%;
     pointer-events: none;
@@ -283,10 +283,6 @@
     box-shadow: 0 1px 5px rgba(0,0,0,0.2);
 }
 
-.folium-map .d-none {
-    display: none !important;
-}
-
 .leaflet-control-layers {
     border: none !important;
     border-radius: 4px !important;
@@ -314,11 +310,6 @@
     width: 100%;
     height: 500px;
     position: relative;
-}
-
-/* Hide inactive places when needed */
-.place-marker.d-none {
-    display: none !important;
 }
 
 /* Map Controls */

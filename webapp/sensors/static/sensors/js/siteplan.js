@@ -1,7 +1,11 @@
 // ------------------------------------------------------------
 // SitePlan v4.2
 // ------------------------------------------------------------
-console.log("🚀 [SitePlan v4.2] Loading...");
+const siteplanConfig = {
+    debug: false
+};
+
+if (siteplanConfig.debug) console.log("🚀 [SitePlan v4.2] Loading...");
 
 // Global state
 const state = {
@@ -20,7 +24,7 @@ const state = {
 // Initialize the system ONCE at page load
 // ------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
-    console.log("🚀 [SitePlan v4.2] Initializing SitePlan");
+    if (siteplanConfig.debug) console.log("🚀 [SitePlan v4.2] Initializing SitePlan");
 
     state.dom.cardImageUrl = document.getElementById("siteplan-container-main")?.dataset.imageUrl;
     state.dom.modal = document.getElementById("siteplan-modal");
@@ -28,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.dom.modalFooter = state.dom.modal?.querySelector(".modal-footer");
     state.dom.modalTitle = document.getElementById("siteplan-modal-title");
 
-    console.log("🔍 Modal BODY found:", state.dom.modalBody);
+    if (siteplanConfig.debug) console.log("🔍 Modal BODY found:", state.dom.modalBody);
 
     loadLocations();
     initMainMap();
@@ -52,7 +56,7 @@ function loadLocations() {
     if (!json) return;
 
     state.locations = JSON.parse(json);
-    console.log("🔷 Loaded locations:", state.locations.length);
+    if (siteplanConfig.debug) console.log("🔷 Loaded locations:", state.locations.length);
 }
 
 // ------------------------------------------------------------
@@ -67,14 +71,14 @@ function applyAspectRatio(wrapper, img) {
     const h = Math.round(w * aspect);
 
     wrapper.style.height = `${h}px`;
-    console.log(`📐 Wrapper height set to ${h}px (aspect=${aspect})`);
+    if (siteplanConfig.debug) console.log(`📐 Wrapper height set to ${h}px (aspect=${aspect})`);
 }
 
 // ------------------------------------------------------------
 // Initialize the MAIN CARD MAP (non-modal)
 // ------------------------------------------------------------
 function initMainMap() {
-    console.log("🟩 initMainMap()");
+    if (siteplanConfig.debug) console.log("🟩 initMainMap()");
     const container = document.getElementById("siteplan-container-main");
     if (!container) return;
 
@@ -83,7 +87,7 @@ function initMainMap() {
     const img = new Image();
 
     img.onload = () => {
-        console.log("🖼️ Main image loaded:", img.width, img.height);
+        if (siteplanConfig.debug) console.log("🖼️ Main image loaded:", img.width, img.height);
 
         applyAspectRatio(container, img);
 
@@ -102,12 +106,12 @@ function initMainMap() {
         addMarkersToMap(state.mainMap, "view");
 
         setTimeout(() => {
-            console.log('⏰ Delayed map fit');
+            if (siteplanConfig.debug) console.log('⏰ Delayed map fit');
             state.mainMap.invalidateSize();
             state.mainMap.fitBounds(bounds, { padding: [20, 20] });
         }, 0);
 
-        console.log("🟩 Main map initialized");
+        if (siteplanConfig.debug) console.log("🟩 Main map initialized");
     };
 
     img.src = imageUrl;
@@ -117,12 +121,12 @@ function initMainMap() {
 // Initialize MODAL map (View or Edit mode)
 // ------------------------------------------------------------
 function initModalMap(mode) {
-    console.log("🟣 initModalMap():", mode);
+    if (siteplanConfig.debug) console.log("🟣 initModalMap():", mode);
 
     const wrapper = document.getElementById("siteplan-wrapper-modal");
     const container = document.getElementById("siteplan-container-modal");
     if (!wrapper || !container) {
-        console.error("❌ Missing modal wrapper/container");
+        if (siteplanConfig.debug) console.error("❌ Missing modal wrapper/container");
         return;
     }
 
@@ -142,7 +146,7 @@ function initModalMap(mode) {
     state.modalMap.fitBounds(bounds);
     state.modalMap.invalidateSize();
 
-    console.log("🟣 Modal map initialized");
+    if (siteplanConfig.debug) console.log("🟣 Modal map initialized");
 }
 
 // ------------------------------------------------------------
@@ -176,7 +180,7 @@ function addMarkersToMap(map, mode) {
                 if (!state.changed.find(c => c.slug === loc.slug)) {
                     state.changed.push(loc);
                 }
-                console.log("✏️ Marker moved:", loc);
+                if (siteplanConfig.debug) console.log("✏️ Marker moved:", loc);
             });
         }
     });
@@ -189,12 +193,12 @@ function hookModalEvents() {
     if (!state.dom.modal) return;
 
     state.dom.modal.addEventListener("shown.bs.modal", () => {
-        console.log("🔶 Modal visible, recomputing height");
+        if (siteplanConfig.debug) console.log("🔶 Modal visible, recomputing height");
         resizeModalMap();
     });
 
     state.dom.modal.addEventListener("hidden.bs.modal", () => {
-        console.log("🔻 Modal closed (cleanup)");
+        if (siteplanConfig.debug) console.log("🔻 Modal closed (cleanup)");
         state.modalMap = null;
         state.isDirty = false;
         state.dom.modalBody.innerHTML = "";
@@ -206,7 +210,7 @@ function hookModalEvents() {
 // Open modal (View or Edit)
 // ------------------------------------------------------------
 function openModal(mode) {
-    console.log("🟣 openModal():", mode);
+    if (siteplanConfig.debug) console.log("🟣 openModal():", mode);
     state.modalMode = mode;
     state.showLabels = true;
     state.isDirty = false;
@@ -224,7 +228,7 @@ function openModal(mode) {
 // Build modal body HTML dynamically
 // ------------------------------------------------------------
 function buildModalBody() {
-    console.log("🔵 buildModalBody()");
+    if (siteplanConfig.debug) console.log("🔵 buildModalBody()");
     state.dom.modalBody.innerHTML = `
         <div class="siteplan-wrapper bg-light" id="siteplan-wrapper-modal">
             <div id="siteplan-container-modal" style="width:100%;height:100%;"></div>
@@ -236,7 +240,7 @@ function buildModalBody() {
 // Build modal footer (Cancel, Save, Label Toggle)
 // ------------------------------------------------------------
 function buildModalFooter(mode) {
-    console.log("🔵 buildModalFooter()");
+    if (siteplanConfig.debug) console.log("🔵 buildModalFooter()");
     const isEdit = mode === "edit";
 
     state.dom.modalFooter.innerHTML = `
@@ -279,7 +283,7 @@ function refreshModalLabels() {
 
 function resizeModalMap() {
     if (!state.modalMap) return;
-    console.log("📐 Resizing modal map");
+    if (siteplanConfig.debug) console.log("📐 Resizing modal map");
     const wrapper = document.getElementById("siteplan-wrapper-modal");
     if (!wrapper) return;
 
@@ -298,12 +302,12 @@ function resizeModalMap() {
 // ------------------------------------------------------------
 function saveEdits() {
     if (!state.isDirty || state.changed.length === 0) {
-        console.log("💾 No changes to save.");
+        if (siteplanConfig.debug) console.log("💾 No changes to save.");
         bootstrap.Modal.getInstance(state.dom.modal).hide();
         return;
     }
 
-    console.log("💾 Saving edits...", state.changed);
+    if (siteplanConfig.debug) console.log("💾 Saving edits...", state.changed);
     const placeSlug = document.getElementById("siteplan-container-main").dataset.placeSlug;
     const url = `/${placeSlug}/siteplan/update/`;
 
@@ -312,11 +316,13 @@ function saveEdits() {
         body: JSON.stringify({ locations: state.changed }),
     })
     .then(data => {
-        console.log("💾 Save successful:", data);
+        if (siteplanConfig.debug) console.log("💾 Save successful:", data);
         bootstrap.Modal.getInstance(state.dom.modal).hide();
         location.reload();
     })
-    .catch(err => console.error("❌ Save error:", err));
+    .catch(err => {
+        if (siteplanConfig.debug) console.error("❌ Save error:", err)
+    });
 }
 
 // ------------------------------------------------------------
