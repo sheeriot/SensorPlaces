@@ -58,6 +58,9 @@ def process_sensor_reading(
         created = False
         if not sensor:
             sensor_type = SensorType.objects.filter(name__iexact=measurement_type).first()
+            if not sensor_type:
+                # The name should be correctly capitalized from KEY_MAP or other callers.
+                sensor_type = SensorType.objects.create(name=measurement_type)
 
             # Ensure that boolean-type sensors have their unit set on the SensorType.
             if sensor_type and sensor_type.name in ('Switch', 'Water Detector') and not sensor_type.unit:
