@@ -9,6 +9,48 @@ from ..models import Place, Location, Device, Sensor, SensorType, Unit, DeviceTy
 
 from icecream import ic
 
+# Primary key ranges for data classification:
+# - System seed data: pk < 100
+# - User-created data: pk >= 100 and < 1000
+# - Auto-created data (by webhooks/APIs): pk >= 1000
+AUTO_CREATED_PK_START = 1000
+
+
+def _get_next_auto_pk(model_class):
+    """
+    Get the next available primary key >= AUTO_CREATED_PK_START for auto-created records.
+    """
+    max_pk = model_class.objects.filter(pk__gte=AUTO_CREATED_PK_START).order_by('-pk').values_list('pk', flat=True).first()
+    if max_pk is None:
+        return AUTO_CREATED_PK_START
+    return max_pk + 1
+
+
+def get_or_create_auto_device_type(name: str, defaults: dict = None) -> DeviceType:
+    """
+    Get an existing DeviceType by name (case-insensitive) or create a new one
+    with pk >= 1000 for auto-created types.
+    """
+    # First try to find an existing one (case-insensitive)
+    device_type = DeviceType.objects.filter(name__iexact=name).first()
+    if device_type:
+        return device_type
+
+    # Create a new one with pk >= 1000
+    next_pk = _get_next_auto_pk(DeviceType)
+    create_kwargs = {
+        'id': next_pk,
+        'name': name,
+        'description': f'Auto-created device type for {name}',
+        'icon': 'bi-robot',
+    }
+    if defaults:
+        create_kwargs.update(defaults)
+
+    device_type = DeviceType.objects.create(**create_kwargs)
+    ic(f"Auto-created DeviceType '{name}' with pk={next_pk}")
+    return device_type
+
 def get_annotated_places():
     """Get annotated places with minimal counts for the landing page/index view.
 
@@ -179,8 +221,8 @@ def create_switchbot_device(device_item, location, sensor_types, stdout, style):
         else:
             device_type_name = api_device_type_str
 
-        device_type, _ = DeviceType.objects.get_or_create(
-            name=device_type_name,
+        device_type = get_or_create_auto_device_type(
+            device_type_name,
             defaults={'description': f'A {device_type_name} from SwitchBot.'}
         )
         device.device_type = device_type

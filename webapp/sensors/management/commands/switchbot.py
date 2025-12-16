@@ -9,6 +9,46 @@ from sensors.models import Device, DeviceType, Place, Location, Sensor, SensorTy
 from sensors.switchbot_client import list_devices, get_status
 from sensors.views.views_fun import create_switchbot_device
 
+# Primary key ranges for data classification:
+# - System seed data: pk < 100
+# - User-created data: pk >= 100 and < 1000
+# - Auto-created data (by webhooks/APIs): pk >= 1000
+AUTO_CREATED_PK_START = 1000
+
+
+def _get_next_auto_pk(model_class):
+    """
+    Get the next available primary key >= AUTO_CREATED_PK_START for auto-created records.
+    """
+    max_pk = model_class.objects.filter(pk__gte=AUTO_CREATED_PK_START).order_by('-pk').values_list('pk', flat=True).first()
+    if max_pk is None:
+        return AUTO_CREATED_PK_START
+    return max_pk + 1
+
+
+def get_or_create_auto_sensor_type(name: str, defaults: dict = None) -> SensorType:
+    """
+    Get an existing SensorType by name (case-insensitive) or create a new one
+    with pk >= 1000 for auto-created types.
+    """
+    # First try to find an existing one (case-insensitive)
+    sensor_type = SensorType.objects.filter(name__iexact=name).first()
+    if sensor_type:
+        return sensor_type
+
+    # Create a new one with pk >= 1000
+    next_pk = _get_next_auto_pk(SensorType)
+    create_kwargs = {
+        'id': next_pk,
+        'name': name,
+        'description': f'Auto-created sensor type for {name}',
+    }
+    if defaults:
+        create_kwargs.update(defaults)
+
+    sensor_type = SensorType.objects.create(**create_kwargs)
+    return sensor_type
+
 # --- Helper functions from your script ---
 
 # BASE = "https://api.switch-bot.com"
@@ -232,9 +272,9 @@ class Command(BaseCommand):
         percent_unit, _ = Unit.objects.get_or_create(name="Percent", defaults={'symbol': '%'})
 
         sensor_types = {
-            'temperature': SensorType.objects.get_or_create(name="Temperature", defaults={'unit': celsius_unit})[0],
-            'humidity': SensorType.objects.get_or_create(name="Humidity", defaults={'unit': percent_rh_unit})[0],
-            'battery': SensorType.objects.get_or_create(name="Battery", defaults={'unit': percent_unit})[0]
+            'temperature': get_or_create_auto_sensor_type("Temperature", defaults={'unit': celsius_unit}),
+            'humidity': get_or_create_auto_sensor_type("Humidity", defaults={'unit': percent_rh_unit}),
+            'battery': get_or_create_auto_sensor_type("Battery Level", defaults={'unit': percent_unit}),
         }
 
         unassigned_location = place.get_unassigned_location()

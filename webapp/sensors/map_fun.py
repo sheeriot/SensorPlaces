@@ -31,15 +31,15 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
                     popup=name,
                     icon=folium.Icon(color='blue', icon='info-sign')
                 ).add_to(m)
-            map_html = m.get_root().render()
-            return map_html
+            # Use _repr_html_() to get only the map div, not a full HTML document
+            return m._repr_html_()
 
         # Default to Austin center if no places provided
         if not places:
             # ic("Places Map: No places provided, using Austin center")
             m = folium.Map(location=[30.2672, -97.7431], **map_kwargs)
-            map_html = m.get_root().render()
-            return map_html
+            # Use _repr_html_() to get only the map div, not a full HTML document
+            return m._repr_html_()
 
         # Calculate map center from active places
         active_places = [p for p in places if p.is_active]
@@ -74,7 +74,8 @@ def place_map_create(places=None, latitude=None, longitude=None, name=None, zoom
         if places and len(places) > 1:
             m.fit_bounds([[min(all_lats), min(all_lons)], [max(all_lats), max(all_lons)]])
 
-        return m.get_root().render()
+        # Use _repr_html_() to get only the map div, not a full HTML document
+        return m._repr_html_()
 
     except Exception as e:
         ic("Error creating map:", str(e))

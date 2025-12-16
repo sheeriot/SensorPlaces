@@ -1,0 +1,174 @@
+# Device Types Seed Data
+# PK ranges: 1-99 = system seed, 100-999 = user-created, 1000+ = auto-created
+#
+# Each device type can have 'aliases' - alternative names that should map to this type
+# during migration. This is the SINGLE SOURCE OF TRUTH for name mappings.
+#
+# Organized by vendor and function. Follows common IoT device conventions.
+
+device_types:
+  # Generic/Multi-vendor types
+  - id: 1
+    name: Environmental Sensor
+    aliases: [environmental sensor, environment sensor, temp humidity sensor, temperature sensor, humidity sensor, weather sensor]
+    icon: bi-thermometer-half
+    description: Multi-parameter environmental sensor (temp, humidity, pressure, etc.)
+
+  - id: 2
+    name: Air Quality Monitor
+    aliases: [air quality monitor, air quality sensor, aqi monitor, aqi sensor, air sensor]
+    icon: bi-wind
+    description: Air quality sensor (CO2, VOC, PM2.5, PM10)
+
+  - id: 3
+    name: Motion Sensor
+    aliases: [motion sensor, pir sensor, presence sensor, occupancy sensor]
+    icon: bi-activity
+    description: PIR or presence detection sensor
+
+  - id: 4
+    name: Door/Window Sensor
+    aliases: [door/window sensor, door sensor, window sensor, contact sensor, door/window]
+    icon: bi-door-open
+    description: Magnetic contact sensor for doors and windows
+
+  - id: 5
+    name: Water Leak Sensor
+    aliases: [water leak sensor, water detector, flood sensor, leak sensor, leak detector]
+    icon: bi-droplet
+    description: Water leak detection sensor
+
+  - id: 6
+    name: Smart Plug
+    aliases: [smart plug, power control, plug, outlet, switch plug, power plug]
+    icon: bi-plug
+    description: Smart plug with switching and power monitoring
+
+  - id: 7
+    name: Smart Light
+    aliases: [smart light, smart bulb, led bulb, light, bulb]
+    icon: bi-lightbulb
+    description: Smart light bulb or LED controller
+
+  - id: 8
+    name: Camera
+    aliases: [camera, ip camera, security camera, webcam]
+    icon: bi-camera-video
+    description: IP or security camera
+
+  - id: 9
+    name: Generic Device
+    aliases: [generic device, device, unknown device, other]
+    icon: bi-question-circle
+    description: Generic or unclassified device type
+
+  # Infrastructure/Computing devices (id: 10-19)
+  - id: 10
+    name: Data Logger
+    aliases: [data logger, datalogger, logger]
+    icon: bi-journal-text
+    description: Data logging device that collects and stores sensor readings
+
+  - id: 11
+    name: Server
+    aliases: [server, compute server, host]
+    icon: bi-server
+    description: Server or compute device
+
+  - id: 12
+    name: Controller
+    aliases: [controller, mppt, charge controller, solar controller]
+    icon: bi-cpu
+    description: Controller device (MPPT, charge controller, etc.)
+
+  - id: 13
+    name: Sensor Hub
+    aliases: [sensor hub, hub, gateway, bridge]
+    icon: bi-diagram-3
+    description: Hub or gateway that connects multiple sensors
+
+  # Shelly devices (id: 30-49)
+  - id: 30
+    name: Shelly 1
+    aliases: [shelly 1, shelly1]
+    icon: bi-lightning
+    description: Shelly 1 relay switch
+
+  - id: 31
+    name: Shelly Plus H&T
+    aliases: [shelly plus h&t, shelly ht, shelly h&t, shellyplusht]
+    icon: bi-thermometer-half
+    description: Shelly Plus H&T temperature and humidity sensor
+
+  - id: 32
+    name: Shelly Plug
+    aliases: [shelly plug, shellyplug, shelly plugs]
+    icon: bi-plug
+    description: Shelly smart plug with power monitoring
+
+  - id: 33
+    name: Shelly Button
+    aliases: [shelly button, shellybutton]
+    icon: bi-circle
+    description: Shelly wireless button
+
+  - id: 34
+    name: Shelly Door/Window
+    aliases: [shelly door/window, shelly dw, shellydw]
+    icon: bi-door-open
+    description: Shelly door/window sensor
+
+  - id: 35
+    name: Shelly-TBD
+    aliases: [shelly-tbd, shelly tbd, shelly unknown]
+    icon: bi-question-circle
+    description: Unknown Shelly device (to be classified)
+
+  # SwitchBot devices (id: 60-79)
+  - id: 60
+    name: WoIOSensor
+    aliases: [woiosensor, switchbot io sensor, wo io sensor]
+    icon: bi-thermometer-half
+    description: SwitchBot Indoor/Outdoor Temperature and Humidity Sensor
+
+  - id: 61
+    name: SwitchBot Hub
+    aliases: [switchbot hub, hub, hub mini, hub 2]
+    icon: bi-hub
+    description: SwitchBot Hub (Mini or Hub 2)
+
+  - id: 62
+    name: Plug Mini
+    aliases: [plug mini, switchbot plug, switchbot plug mini, "plug mini (us)", "plug mini (jp)"]
+    icon: bi-plug
+    description: SwitchBot Plug Mini smart plug
+
+  - id: 63
+    name: SwitchBot Meter
+    aliases: [switchbot meter, meter, meter plus, wosenorth]
+    icon: bi-thermometer-half
+    description: SwitchBot Meter/Meter Plus temperature and humidity
+
+  - id: 64
+    name: SwitchBot Bot
+    aliases: [switchbot bot, bot, wohand]
+    icon: bi-hand-index
+    description: SwitchBot Bot physical button presser
+
+  - id: 65
+    name: SwitchBot Contact
+    aliases: [switchbot contact, contact sensor, wocontact]
+    icon: bi-door-open
+    description: SwitchBot Contact Sensor for doors/windows
+
+  - id: 66
+    name: SwitchBot Motion
+    aliases: [switchbot motion, motion, wopresence]
+    icon: bi-activity
+    description: SwitchBot Motion Sensor
+
+  - id: 67
+    name: SwitchBot-TBD
+    aliases: [switchbot-tbd, switchbot tbd, switchbot unknown]
+    icon: bi-question-circle
+    description: Unknown SwitchBot device (to be classified)

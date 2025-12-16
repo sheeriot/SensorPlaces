@@ -1,0 +1,94 @@
+# Units Seed Data
+# PK ranges: 1-99 = system seed, 100-999 = user-created, 1000+ = auto-created
+#
+# Units are associated with SensorTypes, not matched from incoming device data.
+# No aliases needed - matching happens at DeviceType and SensorType level.
+#
+# Follows SI standards and common IoT sensor conventions.
+
+units:
+  # Temperature
+  - id: 1
+    name: Celsius
+    symbol: "°C"
+
+  - id: 2
+    name: Fahrenheit
+    symbol: "°F"
+
+  # Humidity
+  - id: 4
+    name: Relative Humidity
+    symbol: "%RH"
+
+  # Pressure (split correctly per SI)
+  - id: 5
+    name: Pascal
+    symbol: Pa
+
+  - id: 6
+    name: Hectopascal
+    symbol: hPa
+
+  # Light
+  - id: 7
+    name: Lux
+    symbol: lx
+
+  # Sound
+  - id: 8
+    name: Decibel
+    symbol: dB
+
+  # Air Quality
+  - id: 9
+    name: PPM
+    symbol: ppm
+
+  - id: 10
+    name: PPB
+    symbol: ppb
+
+  - id: 11
+    name: Micrograms per Cubic Meter
+    symbol: "µg/m³"
+
+  # Electrical
+  - id: 12
+    name: Watts
+    symbol: W
+
+  - id: 13
+    name: Volts
+    symbol: V
+
+  - id: 14
+    name: Amps
+    symbol: A
+
+  - id: 15
+    name: Kilowatt Hours
+    symbol: kWh
+
+  # General
+  - id: 16
+    name: Percent
+    symbol: "%"
+
+  - id: 17
+    name: Boolean
+    symbol: ""
+
+  # Distance/Length
+  - id: 20
+    name: Meters
+    symbol: m
+
+  - id: 21
+    name: Millimeters
+    symbol: mm
+
+  # Time
+  - id: 22
+    name: Seconds
+    symbol: s

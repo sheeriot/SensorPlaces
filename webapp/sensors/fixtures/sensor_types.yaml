@@ -1,0 +1,201 @@
+# Sensor Types Seed Data
+# PK ranges: 1-99 = system seed, 100-999 = user-created, 1000+ = auto-created
+#
+# Each sensor type can have 'aliases' - alternative names that should map to this type
+# during migration. This is the SINGLE SOURCE OF TRUTH for name mappings.
+#
+# unit_id references units.yaml IDs
+# Follows SI standards and common IoT sensor conventions.
+
+sensor_types:
+  # Environmental
+  - id: 1
+    name: Temperature
+    aliases: [temperature, temp]
+    unit_id: 1  # Celsius
+    graph_type: LINE
+    decimal_places: 1
+    # No min/max - allows outdoor, freezers, weather stations
+    description: Temperature measurement
+
+  - id: 2
+    name: Humidity
+    aliases: [humidity, relative humidity]
+    unit_id: 4  # Relative Humidity
+    graph_type: LINE
+    decimal_places: 0
+    min_value: 0
+    max_value: 100
+    description: Relative humidity measurement (intrinsically 0-100%)
+
+  - id: 3
+    name: Pressure
+    aliases: [pressure, atmospheric pressure, barometric pressure]
+    unit_id: 6  # Hectopascal (standard for weather/IoT)
+    graph_type: LINE
+    decimal_places: 0
+    description: Atmospheric pressure measurement
+
+  - id: 4
+    name: Ambient Light
+    aliases: [ambient light, light level, illuminance, light, lightlevel]
+    unit_id: 7  # Lux
+    graph_type: LINE
+    decimal_places: 0
+    description: Ambient light level measurement
+
+  - id: 5
+    name: Sound Level
+    aliases: [sound level, sound, noise, noise level]
+    unit_id: 8  # Decibel
+    graph_type: LINE
+    decimal_places: 0
+    description: Sound/noise level measurement
+
+  # Motion/Presence (collapsed into one)
+  - id: 6
+    name: Motion
+    aliases: [motion, motion detected, presence, occupancy, pir]
+    unit_id: 17  # Boolean
+    graph_type: STEP
+    description: Motion or presence detection (boolean)
+
+  # Air Quality
+  - id: 8
+    name: Carbon Dioxide
+    aliases: [carbon dioxide, co2]
+    unit_id: 9  # PPM
+    graph_type: LINE
+    decimal_places: 0
+    description: CO2 concentration measurement
+
+  - id: 9
+    name: Volatile Organic Compounds
+    aliases: [volatile organic compounds, voc, tvoc]
+    unit_id: 10  # PPB (VOC sensors often report ppb)
+    graph_type: LINE
+    decimal_places: 0
+    description: VOC concentration measurement
+
+  - id: 10
+    name: PM2.5
+    aliases: [pm2.5, particulate matter 2.5]
+    unit_id: 11  # µg/m³
+    graph_type: LINE
+    decimal_places: 1
+    description: Particulate Matter 2.5 concentration
+
+  - id: 11
+    name: PM10
+    aliases: [pm10, particulate matter 10]
+    unit_id: 11  # µg/m³
+    graph_type: LINE
+    decimal_places: 1
+    description: Particulate Matter 10 concentration
+
+  # Battery
+  - id: 12
+    name: Battery Level
+    aliases: [battery level, battery, battery percent]
+    unit_id: 16  # Percent
+    graph_type: LINE
+    decimal_places: 0
+    min_value: 0
+    max_value: 100
+    description: Battery charge level as percentage (intrinsically 0-100%)
+
+  - id: 13
+    name: Battery Voltage
+    aliases: [battery voltage, batv]
+    unit_id: 13  # Volts
+    graph_type: LINE
+    decimal_places: 2
+    description: Battery voltage measurement
+
+  # Water/Leak Detection
+  - id: 14
+    name: Leak Detected
+    aliases: [leak detected, water detector, water leak, flood, leak]
+    unit_id: 17  # Boolean
+    graph_type: BAR
+    allow_override: true
+    description: Water leak detection (boolean)
+
+  # Electrical - Power (instantaneous)
+  - id: 15
+    name: Power
+    aliases: [power, wattage, active power]
+    unit_id: 12  # Watts
+    graph_type: LINE
+    decimal_places: 1
+    description: Instantaneous power consumption
+
+  - id: 16
+    name: Current
+    aliases: [current, amperage]
+    unit_id: 14  # Amps
+    graph_type: LINE
+    decimal_places: 2
+    description: Electrical current measurement
+
+  - id: 17
+    name: Voltage
+    aliases: [voltage]
+    unit_id: 13  # Volts
+    graph_type: LINE
+    decimal_places: 1
+    description: Electrical voltage measurement
+
+  # Electrical - Energy (cumulative)
+  - id: 18
+    name: Energy
+    aliases: [energy, consumption, total energy, energy consumption]
+    unit_id: 15  # kWh
+    graph_type: LINE
+    decimal_places: 3
+    description: Cumulative energy consumption
+
+  # Switch/Binary
+  - id: 19
+    name: Switch
+    aliases: [switch, relay, on/off, toggle]
+    unit_id: 17  # Boolean
+    graph_type: STEP
+    description: Binary switch state (on/off)
+
+  # Distance/Level
+  - id: 21
+    name: Distance
+    aliases: [distance, range, level, depth]
+    unit_id: 21  # Millimeters
+    graph_type: LINE
+    decimal_places: 1
+    description: Distance or level measurement
+
+  # Weather
+  - id: 22
+    name: Rainfall
+    aliases: [rainfall, rain, precipitation]
+    unit_id: 21  # Millimeters (standard meteorological unit)
+    graph_type: BAR
+    decimal_places: 1
+    description: Rainfall/precipitation measurement
+
+  # System/Server
+  - id: 25
+    name: Memory Available
+    aliases: [memory available, free memory, available memory]
+    unit_id: 16  # Percent
+    graph_type: LINE
+    decimal_places: 0
+    min_value: 0
+    max_value: 100
+    description: Available memory as percentage
+
+  # Other/Generic (fallback)
+  - id: 20
+    name: Other
+    aliases: [other, unknown, generic, status]
+    unit_id: null
+    graph_type: LINE
+    description: Generic sensor type for unclassified measurements
