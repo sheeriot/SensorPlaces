@@ -57,4 +57,3 @@ class Migration(migrations.Migration):
             name='legacy_unit_name',
         ),
     ]
-
