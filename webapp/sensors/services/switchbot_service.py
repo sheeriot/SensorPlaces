@@ -3,7 +3,7 @@ import requests
 from collections import defaultdict
 from django.conf import settings
 from django.utils.text import slugify
-from sensors.models import Place, Device, Sensor
+from sensors.models import Place, Device, Sensor, DeviceType
 from sensors.services.sensor_service import process_sensor_reading
 from sensors.influx_client import write_to_influx
 from sensors.services.measurement_utils import get_influx_details
@@ -14,14 +14,61 @@ from ..utils import write_sensor_reading_to_influx, record_webhook_activity
 
 logger = logging.getLogger(__name__)
 
+# Primary key ranges for data classification:
+# - System seed data: pk < 100
+# - User-created data: pk >= 100 and < 1000
+# - Auto-created data (by webhooks/APIs): pk >= 1000
+AUTO_CREATED_PK_START = 1000
+
+
+def _get_next_auto_pk(model_class):
+    """
+    Get the next available primary key >= AUTO_CREATED_PK_START for auto-created records.
+    """
+    max_pk = model_class.objects.filter(pk__gte=AUTO_CREATED_PK_START).order_by('-pk').values_list('pk', flat=True).first()
+    if max_pk is None:
+        return AUTO_CREATED_PK_START
+    return max_pk + 1
+
+
+def get_or_create_auto_device_type(name: str, defaults: dict = None) -> DeviceType:
+    """
+    Get an existing DeviceType by name or alias (case-insensitive) or create a new one
+    with pk >= 1000 for auto-created types.
+
+    Uses the database aliases field for matching, making type resolution configurable
+    by administrators without code changes.
+    """
+    # First try to find an existing one by name or alias
+    device_type = DeviceType.find_by_alias(name)
+    if device_type:
+        return device_type
+
+    # Create a new one with pk >= 1000
+    next_pk = _get_next_auto_pk(DeviceType)
+    create_kwargs = {
+        'id': next_pk,
+        'name': name,
+        'description': f'Auto-created device type for {name}',
+        'icon': 'bi-robot',
+        'is_system': False,  # User/auto-created, not system
+    }
+    if defaults:
+        create_kwargs.update(defaults)
+
+    device_type = DeviceType.objects.create(**create_kwargs)
+    ic(f"Auto-created DeviceType '{name}' with pk={next_pk}")
+    return device_type
+
 # This key_map is now at the module level so it can be imported elsewhere
+# These map SwitchBot API field names to our standardized SensorType names
 KEY_MAP = {
     'temperature': 'Temperature',
     'humidity': 'Humidity',
-    'lightLevel': 'Light Level',
+    'lightLevel': 'Ambient Light',  # Matches sensor_types.yaml
     'battery': 'Battery Level',
-    'leakState': 'Water Detector',
-    'moveDetected': 'Motion Detected',
+    'leakState': 'Leak Detected',  # Matches sensor_types.yaml
+    'moveDetected': 'Motion',  # Consolidated in sensor_types.yaml
 }
 
 
@@ -115,10 +162,9 @@ class SwitchBotService:
         device_name = device_name_from_form or body.get('deviceName') or device_id
         device_type_name = body.get('deviceType', 'SwitchBot Device')
 
-        # 2. Create DeviceType
-        from ..models import DeviceType
-        device_type, _ = DeviceType.objects.get_or_create(
-            name=device_type_name,
+        # 2. Create DeviceType (auto-created types get pk >= 1000)
+        device_type = get_or_create_auto_device_type(
+            device_type_name,
             defaults={'icon': 'bi-robot'}
         )
 

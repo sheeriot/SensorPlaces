@@ -25,6 +25,47 @@ from ..models import Location
 from .switchbot_forms import SwitchBotInfluxStoreForm
 from django.core.exceptions import ValidationError
 
+# Primary key ranges for data classification:
+# - System seed data: pk < 100
+# - User-created data: pk >= 100 and < 1000
+# - Auto-created data (by webhooks/APIs): pk >= 1000
+AUTO_CREATED_PK_START = 1000
+
+
+def _get_next_auto_pk(model_class):
+    """
+    Get the next available primary key >= AUTO_CREATED_PK_START for auto-created records.
+    """
+    max_pk = model_class.objects.filter(pk__gte=AUTO_CREATED_PK_START).order_by('-pk').values_list('pk', flat=True).first()
+    if max_pk is None:
+        return AUTO_CREATED_PK_START
+    return max_pk + 1
+
+
+def get_or_create_auto_sensor_type(name: str, defaults: dict = None) -> SensorType:
+    """
+    Get an existing SensorType by name (case-insensitive) or create a new one
+    with pk >= 1000 for auto-created types.
+    """
+    # First try to find an existing one (case-insensitive)
+    sensor_type = SensorType.objects.filter(name__iexact=name).first()
+    if sensor_type:
+        return sensor_type
+
+    # Create a new one with pk >= 1000
+    next_pk = _get_next_auto_pk(SensorType)
+    create_kwargs = {
+        'id': next_pk,
+        'name': name,
+        'description': f'Auto-created sensor type for {name}',
+    }
+    if defaults:
+        create_kwargs.update(defaults)
+
+    sensor_type = SensorType.objects.create(**create_kwargs)
+    ic(f"Auto-created SensorType '{name}' with pk={next_pk}")
+    return sensor_type
+
 
 @login_required
 def switchbot_management_view(request, place_slug):
@@ -345,9 +386,8 @@ def add_switchbot_sensor(request, place_slug, device_pk):
         unit, _ = Unit.objects.get_or_create(name=unit_name, defaults={'symbol': unit_symbol})
         defaults['unit'] = unit
 
-    sensor_type, created = SensorType.objects.get_or_create(name=sensor_type_name, defaults=defaults)
-    if created:
-        ic(f"AddSwitchBotSensor: Created new SensorType: '{sensor_type.name}'")
+    # Use helper to ensure auto-created types get pk >= 1000
+    sensor_type = get_or_create_auto_sensor_type(sensor_type_name, defaults=defaults)
 
     if not Sensor.objects.filter(device=device, sensor_type=sensor_type).exists():
         new_sensor = Sensor.objects.create(

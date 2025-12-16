@@ -20,13 +20,14 @@ logger = logging.getLogger(__name__)
 # Map of known Shelly model identifiers to a canonical name and device type hint.
 # Keys can be model names from User-Agent or prefixes from webhook URLs.
 # All keys should be lowercase.
+# Device types should match names in device_types.yaml
 SHELLY_PRODUCT_MAP = {
     # Official Model IDs (from User-Agent)
-    'shht-1': {'model': 'H&T G1', 'device_type': 'Data Logger'},
-    'shwt-1': {'model': 'Flood G1', 'device_type': 'Water Detector'},
-    'htg3': {'model': 'H&T G3', 'device_type': 'Data Logger'},
-    'mini1pmg4': {'model': '1PM Mini G4', 'device_type': 'Power Control'},
-    'floodsensorg4': {'model': 'Flood G4', 'device_type': 'Water Detector'},
+    'shht-1': {'model': 'H&T G1', 'device_type': 'Environmental Sensor'},
+    'shwt-1': {'model': 'Flood G1', 'device_type': 'Water Leak Sensor'},
+    'htg3': {'model': 'H&T G3', 'device_type': 'Environmental Sensor'},
+    'mini1pmg4': {'model': '1PM Mini G4', 'device_type': 'Smart Plug'},
+    'floodsensorg4': {'model': 'Flood G4', 'device_type': 'Water Leak Sensor'},
 }
 
 
@@ -221,10 +222,11 @@ class ShellyService:
         else:
             ic(f"Could not map '{lookup_key or device_id_str}' to a known product. Using fallbacks.")
 
-        device_type = DeviceType.objects.filter(name__iexact=device_type_name).first()
+        # Use find_by_alias to match by name or alias (configurable in admin)
+        device_type = DeviceType.find_by_alias(device_type_name)
         if not device_type:
             # Fallback to the TBD type if the specific one doesn't exist
-            device_type = DeviceType.objects.filter(name__iexact="Shelly-TBD").first()
+            device_type = DeviceType.find_by_alias("Shelly-TBD")
 
         # Construct a standardized device name
         mac_suffix = parsed_id[-6:]
@@ -305,15 +307,25 @@ class ShellyService:
                     elif value.lower() == 'false':
                         processed_params[key] = False
 
+        # Map Shelly webhook field names to our standardized SensorType names
+        # These match the names in sensor_types.yaml
         key_map = {
             'power': 'Power',
             'apower': 'Power',
             'current': 'Current',
             'voltage': 'Voltage',
-            'temperature': 'Temperature', 'temp': 'Temperature', 'tempf': 'Temperature', 'humidity': 'Humidity', 'hum': 'Humidity',
-            'pm2.5': 'PM2.5', 'pm25': 'PM2.5', 'battery': 'battery',
-            'flood': 'Water Detector', 'batV': 'Battery Voltage', 'water': 'Water Detector',
-            'switch': 'Switch'
+            'temperature': 'Temperature',
+            'temp': 'Temperature',
+            'tempf': 'Temperature',
+            'humidity': 'Humidity',
+            'hum': 'Humidity',
+            'pm2.5': 'PM2.5',
+            'pm25': 'PM2.5',
+            'battery': 'battery',  # Special handling below
+            'flood': 'Leak Detected',  # Matches sensor_types.yaml
+            'water': 'Leak Detected',  # Matches sensor_types.yaml
+            'batV': 'Battery Voltage',
+            'switch': 'Switch',
         }
 
         client_ip_for_log = client_ip or 'N/A'

@@ -49,6 +49,10 @@ class LocationManager(models.Manager):
 class Unit(models.Model):
     name = models.CharField(max_length=50, unique=True)
     symbol = models.CharField(max_length=10, blank=True)
+    is_system = models.BooleanField(
+        default=False,
+        help_text="System records (pk < 100) are immutable and cannot be edited"
+    )
 
     def __str__(self):
         if self.symbol:
@@ -72,6 +76,15 @@ class DeviceType(models.Model):
         default='bi-hdd',
         help_text="Bootstrap icon class (e.g., bi-hdd, bi-router)"
     )
+    aliases = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of alternative names that map to this device type (for auto-matching)"
+    )
+    is_system = models.BooleanField(
+        default=False,
+        help_text="System records (pk < 100) are immutable and cannot be edited"
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -86,6 +99,21 @@ class DeviceType(models.Model):
 
     def natural_key(self):
         return (self.name,)
+
+    @classmethod
+    def find_by_alias(cls, name: str):
+        """Find a DeviceType by name or alias (case-insensitive)."""
+        name_lower = name.lower().strip()
+        # First try exact name match
+        device_type = cls.objects.filter(name__iexact=name_lower).first()
+        if device_type:
+            return device_type
+        # Then search aliases
+        for dt in cls.objects.all():
+            if dt.aliases:
+                if name_lower in [a.lower() for a in dt.aliases]:
+                    return dt
+        return None
 
     class Meta:
         verbose_name_plural = '6. Device Types'
@@ -658,6 +686,15 @@ class SensorType(models.Model):
         blank=True,
         help_text="Default stale time for this sensor type, in seconds. Default is 5 minutes."
     )
+    aliases = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of alternative names that map to this sensor type (for auto-matching)"
+    )
+    is_system = models.BooleanField(
+        default=False,
+        help_text="System records (pk < 100) are immutable and cannot be edited"
+    )
 
     @property
     def is_boolean(self):
@@ -674,6 +711,21 @@ class SensorType(models.Model):
 
     def natural_key(self):
         return (self.name,)
+
+    @classmethod
+    def find_by_alias(cls, name: str):
+        """Find a SensorType by name or alias (case-insensitive)."""
+        name_lower = name.lower().strip()
+        # First try exact name match
+        sensor_type = cls.objects.filter(name__iexact=name_lower).first()
+        if sensor_type:
+            return sensor_type
+        # Then search aliases
+        for st in cls.objects.all():
+            if st.aliases:
+                if name_lower in [a.lower() for a in st.aliases]:
+                    return st
+        return None
 
     class Meta:
         verbose_name_plural = '7. Sensor Types'

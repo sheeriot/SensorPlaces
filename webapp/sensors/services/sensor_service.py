@@ -1,10 +1,52 @@
 import logging
 from icecream import ic
+from django.db import connection
 from django.utils import timezone
 from sensors.models import Sensor, SensorReading, SensorType, Device
 from sensors.models import Unit
 
 logger = logging.getLogger(__name__)
+
+# Primary key ranges for data classification:
+# - System seed data: pk < 100
+# - User-created data: pk >= 100 and < 1000
+# - Auto-created data (by webhooks/APIs): pk >= 1000
+AUTO_CREATED_PK_START = 1000
+
+
+def _get_next_auto_pk(model_class):
+    """
+    Get the next available primary key >= AUTO_CREATED_PK_START for auto-created records.
+    """
+    max_pk = model_class.objects.filter(pk__gte=AUTO_CREATED_PK_START).order_by('-pk').values_list('pk', flat=True).first()
+    if max_pk is None:
+        return AUTO_CREATED_PK_START
+    return max_pk + 1
+
+
+def get_or_create_auto_sensor_type(name: str) -> SensorType:
+    """
+    Get an existing SensorType by name or alias (case-insensitive) or create a new one
+    with pk >= 1000 for auto-created types.
+
+    Uses the database aliases field for matching, making type resolution configurable
+    by administrators without code changes.
+    """
+    # First try to find an existing one by name or alias
+    sensor_type = SensorType.find_by_alias(name)
+    if sensor_type:
+        return sensor_type
+
+    # Create a new one with pk >= 1000
+    next_pk = _get_next_auto_pk(SensorType)
+    sensor_type = SensorType.objects.create(
+        id=next_pk,
+        name=name,
+        description=f'Auto-created sensor type for {name}',
+        is_system=False,  # User/auto-created, not system
+    )
+    ic(f"Auto-created SensorType '{name}' with pk={next_pk}")
+    return sensor_type
 
 def process_sensor_reading(
     device: Device,
@@ -57,10 +99,11 @@ def process_sensor_reading(
 
         created = False
         if not sensor:
-            sensor_type = SensorType.objects.filter(name__iexact=measurement_type).first()
+            # Use find_by_alias to match by name or alias (configurable in admin)
+            sensor_type = SensorType.find_by_alias(measurement_type)
             if not sensor_type:
-                # The name should be correctly capitalized from KEY_MAP or other callers.
-                sensor_type = SensorType.objects.create(name=measurement_type)
+                # Auto-create with pk >= 1000 for webhook/API-created types
+                sensor_type = get_or_create_auto_sensor_type(measurement_type)
 
             # Ensure that boolean-type sensors have their unit set on the SensorType.
             if sensor_type and sensor_type.name in ('Switch', 'Water Detector') and not sensor_type.unit:

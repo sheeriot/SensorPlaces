@@ -15,6 +15,7 @@ matplotlib
 pandas
 gunicorn
 django-htmx
+pyyaml
 
 # if dev ?
 django-debug-toolbar

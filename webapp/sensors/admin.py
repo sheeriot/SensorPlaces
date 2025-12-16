@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib import messages
 from icecream import ic
 
 from .models import (
@@ -15,6 +16,35 @@ from .models import (
     ToastReadStatus,
 )
 from .utils import update_sensor_live_value
+
+
+class SystemRecordAdminMixin:
+    """
+    Mixin to protect system records (is_system=True) from being edited or deleted.
+    System records are seeded data with pk < 100 and should remain immutable.
+    """
+
+    def has_change_permission(self, request, obj=None):
+        if obj and getattr(obj, 'is_system', False):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and getattr(obj, 'is_system', False):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        if object_id:
+            obj = self.get_object(request, object_id)
+            if obj and getattr(obj, 'is_system', False):
+                extra_context['show_save'] = False
+                extra_context['show_save_and_continue'] = False
+                extra_context['show_save_and_add_another'] = False
+                extra_context['show_delete_link'] = False
+                messages.warning(request, "This is a system record and cannot be modified.")
+        return super().changeform_view(request, object_id, form_url, extra_context)
 
 
 @admin.register(Place)
@@ -59,23 +89,50 @@ class DeviceAdmin(admin.ModelAdmin):
 
 
 @admin.register(DeviceType)
-class DeviceTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'icon', 'is_active', 'created_at', 'updated_at')
-    list_filter = ('is_active',)
+class DeviceTypeAdmin(SystemRecordAdminMixin, admin.ModelAdmin):
+    list_display = ('name', 'icon', 'is_system', 'is_active', 'aliases_display')
+    list_filter = ('is_active', 'is_system')
     search_fields = ('name', 'description')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'is_system')
     ordering = ('name',)
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description', 'icon')
+        }),
+        ('Matching', {
+            'fields': ('aliases',),
+            'description': 'Aliases are used for auto-matching incoming device types'
+        }),
+        ('Status', {
+            'fields': ('is_active', 'is_system')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def aliases_display(self, obj):
+        if obj.aliases:
+            return ', '.join(obj.aliases[:3]) + ('...' if len(obj.aliases) > 3 else '')
+        return '-'
+    aliases_display.short_description = 'Aliases'
 
 
 @admin.register(SensorType)
-class SensorTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'unit', 'graph_type', 'allow_override', 'min_value', 'max_value', 'decimal_places')
+class SensorTypeAdmin(SystemRecordAdminMixin, admin.ModelAdmin):
+    list_display = ('name', 'unit', 'graph_type', 'is_system', 'aliases_display')
     search_fields = ('name', 'description')
-    list_filter = ('allow_override',)
+    list_filter = ('is_system', 'allow_override', 'graph_type')
+    readonly_fields = ('is_system',)
     ordering = ('name',)
     fieldsets = (
         (None, {
             'fields': ('name', 'description')
+        }),
+        ('Matching', {
+            'fields': ('aliases',),
+            'description': 'Aliases are used for auto-matching incoming sensor types'
         }),
         ('Defaults and Overrides', {
             'fields': ('unit', 'graph_type', 'allow_override')
@@ -83,12 +140,23 @@ class SensorTypeAdmin(admin.ModelAdmin):
         ('Value Configuration', {
             'fields': ('min_value', 'max_value', 'decimal_places')
         }),
+        ('Status', {
+            'fields': ('is_system',)
+        }),
     )
 
+    def aliases_display(self, obj):
+        if obj.aliases:
+            return ', '.join(obj.aliases[:3]) + ('...' if len(obj.aliases) > 3 else '')
+        return '-'
+    aliases_display.short_description = 'Aliases'
+
 @admin.register(Unit)
-class UnitAdmin(admin.ModelAdmin):
-    list_display = ('name', 'symbol')
+class UnitAdmin(SystemRecordAdminMixin, admin.ModelAdmin):
+    list_display = ('name', 'symbol', 'is_system')
     search_fields = ('name', 'symbol')
+    list_filter = ('is_system',)
+    readonly_fields = ('is_system',)
     ordering = ('name',)
 
 @admin.register(Sensor)
