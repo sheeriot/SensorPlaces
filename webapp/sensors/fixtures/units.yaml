@@ -19,7 +19,7 @@ units:
   # Humidity
   - id: 4
     name: Relative Humidity
-    symbol: "%RH"
+    symbol: "%"
 
   # Pressure (split correctly per SI)
   - id: 5
