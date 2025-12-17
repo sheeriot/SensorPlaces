@@ -104,7 +104,7 @@ class SwitchBotService:
 
                 # Now, iterate over all sensors on this device and update them
                 for sensor_to_update in device.sensors.all():
-                    sensor_api_key = sensor_to_update.switchbot_sensor_name
+                    sensor_api_key = sensor_to_update.reading_key
                     if not sensor_api_key:
                         # Fallback logic to find the key if not explicitly set
                         sensor_type_name = sensor_to_update.sensor_type.name.lower()
@@ -121,7 +121,7 @@ class SwitchBotService:
                         ic(f"Service: Updating sensor '{sensor_to_update.name}' with value '{value}' for key '{sensor_api_key}'")
 
                         # Use the existing service to process the reading
-                        # This handles caching, historical records, and InfluxDB writes
+                        # This updates the sensor's cache fields
                         process_sensor_reading(
                             device=device,
                             measurement_type=sensor_to_update.sensor_type.name,
@@ -129,11 +129,19 @@ class SwitchBotService:
                             source='switchbot-api-live',
                             skip_local_storage=bool(self.influx_store),
                             activate_sensor=False, # We are not activating sensors here
-                            switchbot_sensor_name=sensor_api_key
+                            reading_key=sensor_api_key
                         )
 
+                        # Write to InfluxDB for historical storage if configured
+                        if sensor_to_update.data_store == 'INFLUX' and self.influx_store:
+                            try:
+                                write_sensor_reading_to_influx(sensor_to_update, float(value))
+                                ic(f"Service: Wrote '{sensor_to_update.name}' value {value} to InfluxDB")
+                            except Exception as e:
+                                ic(f"Service: Failed to write '{sensor_to_update.name}' to InfluxDB: {e}")
+
                 # Return the value for the originally requested sensor
-                original_sensor_api_key = sensor.switchbot_sensor_name or \
+                original_sensor_api_key = sensor.reading_key or \
                                           next((k for k, v in KEY_MAP.items() if v.lower() == sensor.sensor_type.name.lower()), None)
 
                 return live_body.get(original_sensor_api_key)
@@ -189,54 +197,62 @@ class SwitchBotService:
         imported_sensors = []
 
         for key, value in body.items():
-            if key in KEY_MAP:
-                measurement_name = KEY_MAP[key]
-                try:
-                    val_float = float(value)
+            if key not in KEY_MAP:
+                continue
 
-                    # Remap battery to Battery Level or Battery Voltage based on value
-                    if key == 'battery':
-                        if val_float > 50:
-                            measurement_name = 'Battery Level'
-                        else:
-                            measurement_name = 'Battery Voltage'
+            measurement_name = KEY_MAP[key]
+            try:
+                val_float = float(value)
 
-                    # When importing, we want to activate the sensor based on the form input
-                    # And we skip local storage if an InfluxDB is configured, because the reading
-                    # will be stored there. The cache on the sensor is still updated.
-                    skip_local = bool(self.influx_store)
+                # Remap battery to Battery Level or Battery Voltage based on value
+                if key == 'battery':
+                    if val_float > 50:
+                        measurement_name = 'Battery Level'
+                    else:
+                        measurement_name = 'Battery Voltage'
 
-                    sensor_obj = process_sensor_reading(
-                        device=device,
-                        measurement_type=measurement_name,
-                        value=val_float,
-                        source='switchbot-import',
-                        skip_local_storage=skip_local,
-                        activate_sensor=is_active,
-                        switchbot_sensor_name=key
-                    )
+                # Only import sensors that have a matching SensorType with alias
+                sensor_type = SensorType.find_by_alias(measurement_name)
+                if not sensor_type:
+                    logger.info(f"Skipping sensor '{measurement_name}' - no matching SensorType found")
+                    continue
 
-                    if sensor_obj:
-                        imported_sensors.append(sensor_obj)
+                # When importing, we want to activate the sensor based on the form input
+                # And we skip local storage if an InfluxDB is configured, because the reading
+                # will be stored there. The cache on the sensor is still updated.
+                skip_local = bool(self.influx_store)
 
-                    if not sensor_obj:
-                        continue
+                sensor_obj = process_sensor_reading(
+                    device=device,
+                    measurement_type=measurement_name,
+                    value=val_float,
+                    source='switchbot-import',
+                    skip_local_storage=skip_local,
+                    activate_sensor=is_active,
+                    reading_key=key
+                )
 
-                    # Group for InfluxDB if source is configured
-                    if self.influx_store:
-                        influx_details = get_influx_details(measurement_name)
+                if not sensor_obj:
+                    continue
 
-                        if influx_details:
-                            influx_group, influx_field = influx_details
-                        else:
-                            # Fallback for unmapped types
-                            influx_group, influx_field = 'reading', 'value'
+                imported_sensors.append(sensor_obj)
 
-                        grouped_readings[influx_group]['fields'][influx_field] = val_float
-                        grouped_readings[influx_group]['sensors'].append({'sensor': sensor_obj, 'field': influx_field})
+                # Group for InfluxDB if source is configured
+                if self.influx_store:
+                    # Use the SensorType object to get InfluxDB details from database
+                    influx_details = get_influx_details(sensor_type)
 
-                except (ValueError, TypeError):
-                    logger.warning(f"Could not convert SwitchBot value '{value}' for '{key}' to float during import.")
+                    if influx_details:
+                        influx_measurement, influx_field = influx_details
+                    else:
+                        # Fallback for unmapped types
+                        influx_measurement, influx_field = 'reading', 'value'
+
+                    grouped_readings[influx_measurement]['fields'][influx_field] = val_float
+                    grouped_readings[influx_measurement]['sensors'].append({'sensor': sensor_obj, 'field': influx_field})
+
+            except (ValueError, TypeError):
+                logger.warning(f"Could not convert SwitchBot value '{value}' for '{key}' to float during import.")
 
         # Write grouped readings to InfluxDB
         if self.influx_store:
@@ -366,7 +382,7 @@ class SwitchBotService:
                         source='switchbot-api',
                         skip_local_storage=skip_local,
                         activate_sensor=activate_sensors,
-                        switchbot_sensor_name=key
+                        reading_key=key
                     )
                     processed_sensors.append({'sensor': sensor_obj, 'value': val_float, 'name': measurement_name})
 

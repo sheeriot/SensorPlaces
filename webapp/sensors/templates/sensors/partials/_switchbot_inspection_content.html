@@ -45,7 +45,7 @@
                                 <small class="text-muted ms-2">(Current Value: {{ sensor.value }})</small>
                             </span>
                             <button hx-post="{% url 'sensors:add_switchbot_sensor' place_slug=place.slug device_pk=device.pk %}"
-                                    hx-vals='{"sensor_type_name": "{{ sensor.display_name }}"}'
+                                    hx-vals='{"sensor_type_name": "{{ sensor.display_name }}", "reading_key": "{{ sensor.name }}"}'
                                     hx-target="#inspectModalContent"
                                     hx-swap="innerHTML"
                                     class="btn btn-sm btn-success">
@@ -116,3 +116,7 @@
 <div class="modal-footer">
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
 </div>
+
+{% if oob_sensor_list %}
+{{ oob_sensor_list|safe }}
+{% endif %}

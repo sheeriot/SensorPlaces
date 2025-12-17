@@ -317,25 +317,34 @@ def switchbot_inspect_api_device_view(request, place_slug, device_id):
                 if key in ['version', 'deviceId', 'deviceType', 'hubDeviceId']:
                     continue
 
-                sensor_name = KEY_MAP.get(key, key.capitalize())
+                sensor_name = KEY_MAP.get(key)
+                if not sensor_name:
+                    continue  # Skip keys not in KEY_MAP
 
                 # Custom logic to determine battery sensor type by value
                 if key == 'battery':
-                    if float(value) > 50:
+                    try:
+                        if float(value) > 50:
+                            sensor_name = 'Battery Level'
+                        else:
+                            sensor_name = 'Battery Voltage'
+                    except (ValueError, TypeError):
                         sensor_name = 'Battery Level'
-                    else:
-                        sensor_name = 'Battery Voltage'
 
-                influx_details = get_influx_details(sensor_name)
-                influx_group = influx_details[0] if influx_details else 'reading'
+                # Only include sensors that have a matching SensorType
+                sensor_type = SensorType.find_by_alias(sensor_name)
+                if not sensor_type:
+                    continue  # Skip sensors without matching SensorType
+
+                # Get InfluxDB details from the SensorType object (not string)
+                influx_details = get_influx_details(sensor_type)
+                influx_measurement = influx_details[0] if influx_details else 'N/A'
                 influx_field = influx_details[1] if influx_details else 'value'
-
-                full_measurement_name = f"switchbot_{slugify(device_name)}_{influx_group}"
 
                 inspection_results.append({
                     'sensor_name': sensor_name,
                     'current_reading': value,
-                    'influx_measurement': full_measurement_name,
+                    'influx_measurement': influx_measurement,
                     'influx_field': influx_field,
                 })
             context['results'] = inspection_results
@@ -364,7 +373,8 @@ def add_switchbot_sensor(request, place_slug, device_pk):
         return HttpResponse("Invalid request method.", status=405)
 
     sensor_type_name = request.POST.get('sensor_type_name')
-    ic(f"AddSwitchBotSensor: Attempting to add sensor of type '{sensor_type_name}' to device '{device.name}'.")
+    reading_key = request.POST.get('reading_key')  # API key like 'lightLevel', 'temperature'
+    ic(f"AddSwitchBotSensor: Attempting to add sensor of type '{sensor_type_name}' (key: {reading_key}) to device '{device.name}'.")
 
     if not sensor_type_name:
         messages.error(request, "Sensor type not provided.")
@@ -390,15 +400,35 @@ def add_switchbot_sensor(request, place_slug, device_pk):
     sensor_type = get_or_create_auto_sensor_type(sensor_type_name, defaults=defaults)
 
     if not Sensor.objects.filter(device=device, sensor_type=sensor_type).exists():
+        # Determine InfluxDB configuration from Place
+        influx_store = place.switchbot_influx_store or place.default_influx_store
+
         new_sensor = Sensor.objects.create(
             device=device,
             name=sensor_type_name,
             sensor_type=sensor_type,
-            is_active=False,
-            data_store='DIRECT',
+            is_active=device.is_active,  # Inherit active state from device
+            reading_key=reading_key,  # For matching inbound API readings
+            data_store='INFLUX' if influx_store else 'NONE',
+            influx_store=influx_store,
+            influx_measurement=sensor_type.influx_measurement,
+            influx_field_name=sensor_type.influx_field_name,
+            influx_tag_key='device_id' if influx_store else None,
         )
-        ic(f"AddSwitchBotSensor: Successfully created new Sensor '{new_sensor.name}'.")
-        messages.success(request, f"Successfully added sensor '{new_sensor.name}'. It is inactive by default.")
+        ic(f"AddSwitchBotSensor: Successfully created new Sensor '{new_sensor.name}' (active={new_sensor.is_active}, data_store={new_sensor.data_store}).")
+
+        # Fetch initial reading from SwitchBot API to populate cached value
+        from ..services.switchbot_service import SwitchBotService
+        try:
+            service = SwitchBotService(place)
+            service.get_live_reading_for_sensor(new_sensor)
+            new_sensor.refresh_from_db()
+            ic(f"AddSwitchBotSensor: Fetched initial reading for '{new_sensor.name}': {new_sensor.cached_reading_value}")
+        except Exception as e:
+            ic(f"AddSwitchBotSensor: Could not fetch initial reading: {e}")
+
+        status_msg = "active" if new_sensor.is_active else "inactive"
+        messages.success(request, f"Successfully added sensor '{new_sensor.name}' ({status_msg}).")
     else:
         ic(f"AddSwitchBotSensor: Sensor of type '{sensor_type_name}' already exists for this device.")
         messages.warning(request, f"Sensor '{sensor_type_name}' already exists for this device.")
@@ -421,12 +451,14 @@ def add_switchbot_sensor(request, place_slug, device_pk):
         {'device': device, 'place': place, 'hub_device': hub_device}
     )
 
-    # 2. Re-render the sensor list
+    # 2. Re-render the sensor list with OOB swap attribute
     device.sensors_sorted = device.sensors.select_related('sensor_type', 'sensor_type__unit').order_by('-is_active', Lower('name'))
-    sensor_list_html = render_to_string(
+    sensor_list_inner = render_to_string(
         'sensors/includes/sensor_list_card.html',
         {'device': device, 'place': place, 'request': request, 'sensors': device.sensors_sorted}
     )
+    # Inject hx-swap-oob into the rendered HTML
+    sensor_list_html = sensor_list_inner.replace('id="sensors-card"', 'id="sensors-card" hx-swap-oob="outerHTML"', 1)
 
     # 3. Re-run inspection to get the main content for the response
     context = {
@@ -647,11 +679,39 @@ def switchbot_import_options_view(request, place_slug, device_id):
         if status_data.get('statusCode') == 100:
             body = status_data.get('body', {})
             from ..services.switchbot_service import KEY_MAP
+            from ..models import SensorType
             for key, value in body.items():
                 if key in ['version', 'deviceId', 'deviceType', 'hubDeviceId']:
                     continue
-                sensor_name = KEY_MAP.get(key, key.capitalize())
-                potential_sensors.append({'sensor_name': sensor_name})
+                sensor_name = KEY_MAP.get(key)
+                if not sensor_name:
+                    continue  # Skip keys not in KEY_MAP
+
+                # Custom logic to determine battery sensor type by value
+                if key == 'battery':
+                    try:
+                        if float(value) > 50:
+                            sensor_name = 'Battery Level'
+                        else:
+                            sensor_name = 'Battery Voltage'
+                    except (ValueError, TypeError):
+                        sensor_name = 'Battery Level'
+
+                # Only include sensors that have a matching SensorType with alias
+                sensor_type = SensorType.find_by_alias(sensor_name)
+                if not sensor_type:
+                    continue  # Skip sensors without matching SensorType
+
+                # Get InfluxDB details from the SensorType
+                influx_measurement = sensor_type.influx_measurement or 'N/A'
+                influx_field = sensor_type.influx_field_name or 'value'
+
+                potential_sensors.append({
+                    'sensor_name': sensor_name,
+                    'current_reading': value,
+                    'influx_measurement': influx_measurement,
+                    'influx_field': influx_field,
+                })
     except Exception as e:
         ic(f"Could not pre-fetch sensor list for import options: {e}")
 

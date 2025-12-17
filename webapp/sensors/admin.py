@@ -121,7 +121,7 @@ class DeviceTypeAdmin(SystemRecordAdminMixin, admin.ModelAdmin):
 
 @admin.register(SensorType)
 class SensorTypeAdmin(SystemRecordAdminMixin, admin.ModelAdmin):
-    list_display = ('name', 'unit', 'graph_type', 'is_system', 'aliases_display')
+    list_display = ('name', 'unit', 'graph_type', 'influx_measurement', 'is_system', 'aliases_display')
     search_fields = ('name', 'description')
     list_filter = ('is_system', 'allow_override', 'graph_type')
     readonly_fields = ('is_system',)
@@ -139,6 +139,10 @@ class SensorTypeAdmin(SystemRecordAdminMixin, admin.ModelAdmin):
         }),
         ('Value Configuration', {
             'fields': ('min_value', 'max_value', 'decimal_places')
+        }),
+        ('InfluxDB Configuration', {
+            'fields': ('influx_measurement', 'influx_field_name'),
+            'description': 'Configure InfluxDB measurement and field names for this sensor type'
         }),
         ('Status', {
             'fields': ('is_system',)
@@ -163,13 +167,13 @@ class UnitAdmin(SystemRecordAdminMixin, admin.ModelAdmin):
 class SensorAdmin(admin.ModelAdmin):
     list_display = ('name', 'device', 'sensor_type', 'effective_unit_display', 'data_store_display', 'is_active')
     list_filter = ('sensor_type', 'is_active', 'device__location')
-    search_fields = ('name', 'device__name')
+    search_fields = ('name', 'device__name', 'reading_key')
     readonly_fields = ()
     autocomplete_fields = ['device', 'sensor_type', 'influx_store']
 
     fieldsets = (
         ('General', {
-            'fields': ('name', 'device', 'sensor_type', 'is_active')
+            'fields': ('name', 'device', 'sensor_type', 'reading_key', 'is_active')
         }),
         ('Data Source', {
             'fields': ('data_store', 'influx_store', 'influx_measurement', 'influx_field_name', 'influx_tag_key')

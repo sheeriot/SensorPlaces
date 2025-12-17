@@ -6,6 +6,8 @@
     data-sensor-id="{{ sensor.pk }}"
     data-sensor-name="{{ sensor.name }}"
     data-sensor-active="{{ sensor.is_active|lower }}"
+    data-device-id="{{ sensor.device.pk }}"
+    data-is-switchbot="{{ sensor.device.is_switchbot|yesno:'true,false' }}"
     data-poll-url="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}"
     data-poll-style="row_content"
     data-narrow-view="{{ narrow_view|lower }}"

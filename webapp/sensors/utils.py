@@ -2,6 +2,7 @@ import logging
 import os
 from django.conf import settings
 from datetime import datetime
+from icecream import ic
 
 logger = logging.getLogger(__name__)
 
@@ -222,8 +223,8 @@ def write_sensor_reading_to_influx(sensor, value):
         field_name = sensor.influx_field_name or 'value'
 
         field_value = float(value)
-        # Handle case where InfluxDB expects an integer (e.g., battery percentage or humidity)
-        if sensor.sensor_type and sensor.sensor_type.name in ['Battery Level', 'Humidity']:
+        # Handle case where InfluxDB expects an integer (e.g., battery percentage)
+        if sensor.sensor_type and sensor.sensor_type.name in ['Battery Level']:
             try:
                 field_value = int(float(value))
             except (ValueError, TypeError):
@@ -286,23 +287,33 @@ def update_sensor_live_value(sensor, force_update=False):
     value_was_updated = False
 
     # Determine if it's time to fetch a new reading based on the stale threshold.
+    # We check the READING timestamp (when data was actually recorded), not the check timestamp.
     time_to_fetch = True
-    check_age_str = "Never"
-    if sensor.last_cached_timestamp and not force_update:
-        check_age = now - sensor.last_cached_timestamp
-        check_age_str = f"{int(check_age.total_seconds())}s"
-        if check_age < timedelta(seconds=sensor.effective_stale_threshold):
-            time_to_fetch = False
-    elif not sensor.last_cached_timestamp:
-        check_age_str = "N/A"
-    else: # force_update is True
-        check_age = now - sensor.last_cached_timestamp
-        check_age_str = f"{int(check_age.total_seconds())}s"
+    reading_age_str = "Never"
+    stale_threshold = sensor.effective_stale_threshold
 
-    # ic(f"Update Check for '{sensor.name}' (pk={sensor.pk}): Last Cached Age={check_age_str}, Time to Fetch={time_to_fetch}, Force={force_update}")
+    if sensor.cached_reading_timestamp and not force_update:
+        # Check how old the actual READING is, not when we last checked
+        reading_age = now - sensor.cached_reading_timestamp
+        reading_age_seconds = int(reading_age.total_seconds())
+        reading_age_str = f"{reading_age_seconds}s"
+        if reading_age < timedelta(seconds=stale_threshold):
+            time_to_fetch = False
+    elif not sensor.cached_reading_timestamp:
+        reading_age_str = "N/A (no reading)"
+        reading_age_seconds = None
+    else: # force_update is True
+        reading_age = now - sensor.cached_reading_timestamp
+        reading_age_seconds = int(reading_age.total_seconds())
+        reading_age_str = f"{reading_age_seconds}s"
+
+    ic(f"STALE_CHECK '{sensor.name}' (pk={sensor.pk}): is_switchbot={sensor.device.is_switchbot}, reading_age={reading_age_str}, threshold={stale_threshold}s, time_to_fetch={time_to_fetch}, force={force_update}")
 
     if not time_to_fetch:
-        # ic(f"-> Stale check passed for {sensor.name}. Not fetching new reading.")
+        ic(f"-> NOT STALE: '{sensor.name}' cache still fresh. Returning cached source='{sensor.cached_reading_source}'")
+        # Still update last_cached_timestamp to reflect when we last checked
+        sensor.last_cached_timestamp = now
+        sensor.__class__.objects.filter(pk=sensor.pk).update(last_cached_timestamp=now)
         # If stale check passes, the source is whatever is already in the cache.
         return (False, sensor.cached_reading_source or 'cache')
 
@@ -316,7 +327,7 @@ def update_sensor_live_value(sensor, force_update=False):
 
     if sensor.device.is_switchbot:
         source = "SwitchBot API"
-        # ic(f"-> Fetching from {source} for {sensor.name}")
+        ic(f"-> STALE! Fetching from {source} for '{sensor.name}'")
         place = sensor.device.location.place
         if place.switchbot_token and place.switchbot_secret:
             try:

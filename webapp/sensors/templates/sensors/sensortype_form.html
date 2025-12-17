@@ -1,5 +1,5 @@
 {% extends 'sensors/base.html' %}
-{% load crispy_forms_tags %}
+{% load crispy_forms_tags static %}
 
 {% block content %}
 <div class="container mt-4">
@@ -7,4 +7,8 @@
     <hr>
     {% crispy form %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'sensors/js/sensor-type.js' %}?v={{ APP_VERSION }}"></script>
 {% endblock %}

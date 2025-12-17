@@ -55,7 +55,7 @@ def process_sensor_reading(
     source: str = None,
     skip_local_storage: bool = False,
     activate_sensor: bool = False,
-    switchbot_sensor_name: str = None
+    reading_key: str = None
 ):
     """
     Finds or creates a sensor for a given measurement and updates its cached value.
@@ -69,18 +69,18 @@ def process_sensor_reading(
         skip_local_storage (bool): If True, a historical `SensorReading` object will NOT be created.
                                    The sensor's cache fields will still be updated.
         activate_sensor (bool): If a new sensor is created, this flag determines if it's active.
-        switchbot_sensor_name (str, optional): The original sensor name from the SwitchBot API.
+        reading_key (str, optional): The key used to match inbound readings from webhooks/APIs.
 
     Returns:
         The updated Sensor object, or None on failure.
     """
     try:
         sensor = None
-        # If a switchbot_sensor_name is provided, use it for lookup first
-        if switchbot_sensor_name:
+        # If a reading_key is provided, use it for lookup first
+        if reading_key:
             sensor = Sensor.objects.filter(
                 device=device,
-                switchbot_sensor_name=switchbot_sensor_name
+                reading_key=reading_key
             ).first()
 
         # If not found, try to find a sensor with a type matching the measurement name
@@ -125,7 +125,7 @@ def process_sensor_reading(
                 name=sensor_name,
                 sensor_type=sensor_type,
                 is_active=activate_sensor,
-                switchbot_sensor_name=switchbot_sensor_name,
+                reading_key=reading_key,
             )
             created = True
 

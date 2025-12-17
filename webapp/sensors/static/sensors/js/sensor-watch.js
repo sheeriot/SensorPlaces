@@ -1,7 +1,7 @@
 // static/sensors/js/sensor-watch.js
 
 const sensorWatchConfig = {
-    debug: false, // Master debug switch
+    debug: false, // Master debug switch - TEMPORARILY ENABLED
 };
 
 class SensorWatcher {
@@ -108,10 +108,35 @@ class SensorWatcher {
                     url: pollUrl.toString()
                 });
 
+                // Check if this is a SwitchBot device
+                const isSwitchBot = element.dataset.isSwitchbot === 'true';
+                const deviceId = element.dataset.deviceId;
+
+                // Capture the timestamp before the poll for SwitchBot devices
+                let timestampBefore = null;
+                if (isSwitchBot && deviceId) {
+                    const timeAgoEl = element.querySelector('.time-ago[data-timestamp]');
+                    timestampBefore = timeAgoEl ? timeAgoEl.dataset.timestamp : null;
+                }
+
                 // The target is the element itself, but we are replacing its content
                 htmx.ajax('GET', pollUrl.toString(), {
                     target: element,
                     swap: 'innerHTML'
+                }).then(() => {
+                    // After a SwitchBot sensor poll completes, check if the timestamp actually changed
+                    // Only refresh other sensors if we got a new reading (not cached data)
+                    if (isSwitchBot && deviceId) {
+                        const timeAgoElAfter = element.querySelector('.time-ago[data-timestamp]');
+                        const timestampAfter = timeAgoElAfter ? timeAgoElAfter.dataset.timestamp : null;
+
+                        if (timestampAfter && timestampAfter !== timestampBefore) {
+                            if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Timestamp changed for sensor ${sensorId}: ${timestampBefore} -> ${timestampAfter}`);
+                            this.refreshDeviceSensors(deviceId, sensorId);
+                        } else if (sensorWatchConfig.debug) {
+                            console.log(`[SensorWatcher] Timestamp unchanged for sensor ${sensorId}, skipping device refresh`);
+                        }
+                    }
                 });
             });
         };
@@ -129,6 +154,60 @@ class SensorWatcher {
             clearInterval(this.pollingIntervals.get(sensorId));
             this.pollingIntervals.delete(sensorId);
         }
+    }
+
+    refreshDeviceSensors(deviceId, excludeSensorId) {
+        // Find all pollable elements on the same device (rows and detail cards)
+        const deviceSensorElements = document.querySelectorAll(`[data-device-id="${deviceId}"][data-poll-url]`);
+
+        if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Refreshing ${deviceSensorElements.length} sensor elements on device ${deviceId} (excluding sensor ${excludeSensorId})`);
+
+        // Collect elements to refresh, excluding the trigger sensor
+        const elementsToRefresh = [];
+        deviceSensorElements.forEach(element => {
+            const elementSensorId = element.dataset.sensorId;
+            if (elementSensorId === excludeSensorId) {
+                return;
+            }
+            if (!document.body.contains(element)) {
+                return;
+            }
+            elementsToRefresh.push(element);
+        });
+
+        // Refresh elements sequentially with a small delay to avoid HTMX race conditions
+        elementsToRefresh.forEach((element, index) => {
+            setTimeout(() => {
+                const elementSensorId = element.dataset.sensorId;
+                const pollUrl = new URL(element.dataset.pollUrl, window.location.origin);
+                const style = element.dataset.pollStyle;
+                const isNarrow = element.dataset.narrowView === 'true';
+
+                if (style) {
+                    pollUrl.searchParams.set('style', style);
+                }
+                if (isNarrow) {
+                    pollUrl.searchParams.set('narrow_view', 'true');
+                }
+
+                if (sensorWatchConfig.debug) console.log(`[SensorWatcher] Refreshing sibling sensor ${elementSensorId} on device ${deviceId} (style: ${style})`, element);
+
+                // Use fetch + htmx.swap for more reliable updates
+                fetch(pollUrl.toString())
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return response.text();
+                    })
+                    .then(html => {
+                        element.innerHTML = html;
+                        htmx.process(element); // Re-initialize HTMX on the new content
+                        if (sensorWatchConfig.debug) console.log(`[SensorWatcher] ✓ Refresh completed for sensor ${elementSensorId}`);
+                    })
+                    .catch(err => {
+                        console.error(`[SensorWatcher] ✗ Refresh FAILED for sensor ${elementSensorId}:`, err);
+                    });
+            }, index * 50); // 50ms delay between each request
+        });
     }
 }
 
