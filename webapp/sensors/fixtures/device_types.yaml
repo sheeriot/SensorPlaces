@@ -33,7 +33,7 @@ device_types:
     description: Magnetic contact sensor for doors and windows
 
   - id: 5
-    name: Water Leak Sensor
+    name: Water Detector
     aliases: [water leak sensor, water detector, flood sensor, leak sensor, leak detector]
     icon: bi-droplet
     description: Water leak detection sensor

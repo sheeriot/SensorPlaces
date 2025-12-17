@@ -141,10 +141,10 @@ sensor_types:
 
   # Water/Leak Detection
   - id: 14
-    name: Leak Detected
+    name: Water Detected
     aliases: [leak detected, water detector, water leak, flood, leak]
     unit_id: 17  # Boolean
-    graph_type: BAR
+    graph_type: STEP
     allow_override: true
     influx_measurement: flood
     influx_field_name: flood
@@ -155,7 +155,7 @@ sensor_types:
     name: Power
     aliases: [power, wattage, active power]
     unit_id: 12  # Watts
-    graph_type: LINE
+    graph_type: STEP
     decimal_places: 1
     influx_measurement: powermon
     influx_field_name: power
@@ -165,7 +165,7 @@ sensor_types:
     name: Current
     aliases: [current, amperage]
     unit_id: 14  # Amps
-    graph_type: LINE
+    graph_type: STEP
     decimal_places: 2
     influx_measurement: powermon
     influx_field_name: current
