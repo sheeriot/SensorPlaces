@@ -14,18 +14,30 @@ sensor_types:
   # Environmental (climate measurement group)
   - id: 1
     name: Temperature
-    aliases: [temperature, temp]
+    aliases: [temperature, temp, tempc, temperaturec]
     unit_id: 1  # Celsius
     graph_type: LINE
     decimal_places: 1
     influx_measurement: climate
     influx_field_name: temperature
     # No min/max - allows outdoor, freezers, weather stations
-    description: Temperature measurement
+    description: Temperature measurement (Celsius)
+
+  - id: 26
+    name: Temperature (°F)
+    display_name: Temperature
+    aliases: [tempf, temperaturef, temperature_f, temp_f]
+    unit_id: 2  # Fahrenheit
+    graph_type: LINE
+    decimal_places: 1
+    influx_measurement: climate
+    influx_field_name: temperature_f
+    # No min/max - allows outdoor, freezers, weather stations
+    description: Temperature measurement (Fahrenheit)
 
   - id: 2
     name: Humidity
-    aliases: [humidity, relative humidity]
+    aliases: [humidity, hum, relative humidity]
     unit_id: 4  # Relative Humidity
     graph_type: LINE
     decimal_places: 0
@@ -98,7 +110,7 @@ sensor_types:
 
   - id: 10
     name: PM2.5
-    aliases: [pm2.5, particulate matter 2.5]
+    aliases: [pm2.5, pm25, particulate matter 2.5]
     unit_id: 11  # µg/m³
     graph_type: LINE
     decimal_places: 1
@@ -142,7 +154,7 @@ sensor_types:
   # Water/Leak Detection
   - id: 14
     name: Water Detected
-    aliases: [leak detected, water detector, water leak, flood, leak]
+    aliases: [water, water detected, leak detected, water detector, water leak, flood, leak]
     unit_id: 17  # Boolean
     graph_type: STEP
     allow_override: true
@@ -153,7 +165,7 @@ sensor_types:
   # Electrical - Power (powermon measurement group)
   - id: 15
     name: Power
-    aliases: [power, wattage, active power]
+    aliases: [power, apower, wattage, active power]
     unit_id: 12  # Watts
     graph_type: STEP
     decimal_places: 1

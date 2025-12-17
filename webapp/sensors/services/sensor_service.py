@@ -116,8 +116,11 @@ def process_sensor_reading(
             if measurement_type == 'battery':
                 sensor_type = SensorType.objects.filter(name__iexact='Battery Level').first()
 
-            # Ensure name is human-readable (replace underscores with spaces)
-            sensor_name = measurement_type.replace('_', ' ').title()
+            # Use sensor type's display name, fallback to measurement_type
+            if sensor_type:
+                sensor_name = sensor_type.effective_display_name
+            else:
+                sensor_name = measurement_type.replace('_', ' ').title()
 
             # Initial default data_store is DIRECT (from model default)
             sensor = Sensor.objects.create(

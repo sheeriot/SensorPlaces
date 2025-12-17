@@ -307,26 +307,8 @@ class ShellyService:
                     elif value.lower() == 'false':
                         processed_params[key] = False
 
-        # Map Shelly webhook field names to our standardized SensorType names
-        # These match the names in sensor_types.yaml
-        key_map = {
-            'power': 'Power',
-            'apower': 'Power',
-            'current': 'Current',
-            'voltage': 'Voltage',
-            'temperature': 'Temperature',
-            'temp': 'Temperature',
-            'tempf': 'Temperature',
-            'humidity': 'Humidity',
-            'hum': 'Humidity',
-            'pm2.5': 'PM2.5',
-            'pm25': 'PM2.5',
-            'battery': 'battery',  # Special handling below
-            'flood': 'Leak Detected',  # Matches sensor_types.yaml
-            'water': 'Leak Detected',  # Matches sensor_types.yaml
-            'batV': 'Battery Voltage',
-            'switch': 'Switch',
-        }
+        # Keys to skip - these are metadata, not sensor readings
+        skip_keys = {'id', 'device_id', 'src', 'device'}
 
         client_ip_for_log = client_ip or 'N/A'
         # Dict to hold readings grouped by target Influx measurement
@@ -334,78 +316,71 @@ class ShellyService:
         processed_sensors = []
 
         for key, value in processed_params.items():
-            if key in ['id', 'device_id', 'src', 'device']:
+            if key in skip_keys:
                 continue
 
-            if key in key_map:
-                measurement_name = key_map[key]
-                value_to_store = value
+            # The key itself (e.g., 'tempf', 'humidity', 'batV') is used as the measurement_name
+            # SensorType.find_by_alias() will match it against aliases in sensor_types.yaml
+            measurement_name = key
+            value_to_store = value
 
-                # If not a boolean, process as a float
-                if not isinstance(value_to_store, bool):
-                    try:
-                        if isinstance(value, str):
-                            if value.lower() == 'true':
-                                value_to_store = 1.0
-                            elif value.lower() == 'false':
-                                value_to_store = 0.0
-                            else:
-                                value_to_store = float(value)
+            # If not a boolean, process as a float
+            if not isinstance(value_to_store, bool):
+                try:
+                    if isinstance(value, str):
+                        if value.lower() == 'true':
+                            value_to_store = 1.0
+                        elif value.lower() == 'false':
+                            value_to_store = 0.0
                         else:
                             value_to_store = float(value)
-                    except (ValueError, TypeError):
-                        logger.warning(f"Could not convert Shelly value '{value}' for '{key}' to float.")
-                        continue
-
-                # Remap battery based on value
-                if measurement_name == 'battery' and isinstance(value_to_store, float):
-                    if value_to_store > 25:
-                        measurement_name = 'Battery Level'
                     else:
-                        measurement_name = 'Battery Voltage'
-
-                # If Influx is configured, we will still update the cache but not create a new local DB reading.
-                update_cache_only = bool(self.influx_store)
-
-                sensor_obj = process_sensor_reading(
-                    device,
-                    measurement_name,
-                    value_to_store,
-                    source='shelly-webhook',
-                    skip_local_storage=update_cache_only
-                )
-                processed_sensors.append({'sensor': sensor_obj, 'value': value_to_store, 'name': measurement_name})
-
-                if not sensor_obj:
+                        value_to_store = float(value)
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not convert Shelly value '{value}' for '{key}' to float.")
                     continue
 
-                # Special handling for Fahrenheit temperature
-                if key == 'tempf' and not sensor_obj.unit:
-                    unit_f, _ = Unit.objects.get_or_create(name='Fahrenheit', defaults={'symbol': '°F'})
-                    sensor_obj.unit = unit_f
-                    sensor_obj.min_value = 50
-                    sensor_obj.max_value = 90
-                    sensor_obj.save(update_fields=['unit', 'min_value', 'max_value'])
+            # If Influx is configured, we will still update the cache but not create a new local DB reading.
+            update_cache_only = bool(self.influx_store)
 
-                # Group for InfluxDB if source is configured
-                if self.influx_store:
-                    # If the sensor has a specific measurement set, use it. Otherwise, determine from type.
-                    if sensor_obj.influx_measurement:
-                        influx_measurement = sensor_obj.influx_measurement
-                        influx_field = sensor_obj.influx_field_name or get_influx_details(measurement_name)[1]
+            sensor_obj = process_sensor_reading(
+                device,
+                measurement_name,
+                value_to_store,
+                source='shelly-webhook',
+                skip_local_storage=update_cache_only,
+                reading_key=key  # Store the original key for future matching
+            )
+            processed_sensors.append({'sensor': sensor_obj, 'value': value_to_store, 'name': measurement_name})
+
+            if not sensor_obj:
+                continue
+
+            # Group for InfluxDB if source is configured
+            if self.influx_store:
+                # If the sensor has a specific measurement set, use it. Otherwise, determine from SensorType.
+                if sensor_obj.influx_measurement:
+                    influx_measurement = sensor_obj.influx_measurement
+                    influx_field = sensor_obj.influx_field_name or 'value'
+                elif sensor_obj.sensor_type:
+                    # Use SensorType's configured influx settings
+                    influx_details = get_influx_details(sensor_obj.sensor_type)
+                    if influx_details:
+                        influx_measurement, influx_field = influx_details
                     else:
-                        influx_details = get_influx_details(measurement_name)
-                        if influx_details:
-                            influx_measurement, influx_field = influx_details
-                        else:
-                            # Fallback for unmapped types: use a slugified measurement name for both measurement and field.
-                            influx_measurement = slugify(measurement_name)
-                            influx_field = slugify(measurement_name)
-                            ic(f"WARNING: No Influx mapping for '{measurement_name}'. Using fallback: M='{influx_measurement}', F='{influx_field}'")
+                        # Fallback for unmapped types
+                        influx_measurement = slugify(sensor_obj.sensor_type.name)
+                        influx_field = slugify(sensor_obj.sensor_type.name)
+                        ic(f"WARNING: No Influx mapping for SensorType '{sensor_obj.sensor_type.name}'. Using fallback: M='{influx_measurement}', F='{influx_field}'")
+                else:
+                    # No sensor_type - use raw key as fallback
+                    influx_measurement = slugify(measurement_name)
+                    influx_field = slugify(measurement_name)
+                    ic(f"WARNING: No SensorType for '{measurement_name}'. Using fallback: M='{influx_measurement}', F='{influx_field}'")
 
-                    grouped_readings[influx_measurement]['fields'][influx_field] = value_to_store
-                    # Store the sensor and its intended influx field for potential update
-                    grouped_readings[influx_measurement]['sensors'].append({'sensor': sensor_obj, 'field': influx_field, 'measurement': influx_measurement})
+                grouped_readings[influx_measurement]['fields'][influx_field] = value_to_store
+                # Store the sensor and its intended influx field for potential update
+                grouped_readings[influx_measurement]['sensors'].append({'sensor': sensor_obj, 'field': influx_field, 'measurement': influx_measurement})
 
         # Write grouped readings to InfluxDB
         if self.influx_store:

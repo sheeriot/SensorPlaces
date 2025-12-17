@@ -665,6 +665,7 @@ class Sensor(models.Model):
 
 class SensorType(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    display_name = models.CharField(max_length=50, blank=True, help_text="Friendly name for sensors (defaults to name if blank)")
     description = models.TextField(blank=True)
     # Default graph type for this sensor type
     graph_type = models.CharField(
@@ -724,6 +725,11 @@ class SensorType(models.Model):
 
     def natural_key(self):
         return (self.name,)
+
+    @property
+    def effective_display_name(self):
+        """Returns display_name if set, otherwise name."""
+        return self.display_name or self.name
 
     @classmethod
     def find_by_alias(cls, name: str):
