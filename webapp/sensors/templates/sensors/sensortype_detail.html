@@ -33,8 +33,48 @@
                             <i class="bi bi-x-circle-fill text-danger"></i> No
                         {% endif %}
                     </p>
+                    <p><strong>System Record:</strong>
+                        {% if object.is_system %}
+                            <i class="bi bi-lock-fill text-warning"></i> Yes (read-only)
+                        {% else %}
+                            <i class="bi bi-unlock text-muted"></i> No
+                        {% endif %}
+                    </p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <h5 class="mb-0">InfluxDB Configuration</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Measurement:</strong> <code>{{ object.influx_measurement|default:"N/A" }}</code></p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Field Name:</strong> <code>{{ object.influx_field_name|default:"N/A" }}</code></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <h5 class="mb-0">Matching Aliases</h5>
+        </div>
+        <div class="card-body">
+            {% if object.aliases %}
+                <div class="d-flex flex-wrap gap-2">
+                    {% for alias in object.aliases %}
+                        <span class="badge bg-secondary">{{ alias }}</span>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No aliases defined.</p>
+            {% endif %}
         </div>
     </div>
 

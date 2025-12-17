@@ -3,6 +3,6 @@
 
 {% if timestamp %}
     <div class="small text-muted text-end" title="{{ timestamp|date:'Y-m-d H:i:s T' }}">
-        Last Checked: {{ timestamp|naturaltime|default:"Never" }}
+        Checked: <span class="time-ago" data-timestamp="{{ timestamp.isoformat }}">{{ timestamp|naturaltime }}</span>
     </div>
 {% endif %}

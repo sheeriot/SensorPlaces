@@ -482,8 +482,8 @@ class Sensor(models.Model):
     is_active: BooleanField = models.BooleanField(default=True, verbose_name='Active Status')
     sensor_type = models.ForeignKey('SensorType', on_delete=models.SET_NULL, null=True, blank=True)
 
-    # store the original sensor name from Switchbot API
-    switchbot_sensor_name = models.CharField(max_length=100, null=True, blank=True, help_text="Original sensor name from SwitchBot API")
+    # Key used to match inbound readings from webhooks/APIs (e.g., 'temperature', 'humidity', 'lightLevel')
+    reading_key = models.CharField(max_length=100, null=True, blank=True, help_text="Key used to match inbound readings from webhooks/APIs")
 
 
     # Modified fields to allow fallback to SensorType defaults
@@ -694,6 +694,19 @@ class SensorType(models.Model):
     is_system = models.BooleanField(
         default=False,
         help_text="System records (pk < 100) are immutable and cannot be edited"
+    )
+    # InfluxDB configuration for this sensor type
+    influx_measurement = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="InfluxDB measurement name, e.g., 'climate', 'powermon'"
+    )
+    influx_field_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="InfluxDB field name, e.g., 'temperature', 'humidity'"
     )
 
     @property

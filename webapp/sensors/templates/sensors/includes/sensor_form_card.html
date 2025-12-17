@@ -9,6 +9,10 @@
                 Create New Sensor
             {% endif %}
         </h5>
+        <div class="d-flex align-items-center">
+            <i class="bi {{device_type.icon|default:'bi-hdd-rack'}} me-1"></i>{{ device.name }}
+            <i class="bi bi-geo-alt ms-3"></i>{{ location.name }}
+        </div>
     </div>
     <div class="card-body p-2" id="sensor-form-card-body">
         {% crispy form %}

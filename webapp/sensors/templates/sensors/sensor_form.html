@@ -10,15 +10,14 @@
 {% block content %}
 <div class="row gx-2 my-1">
     <div class="col-md-4">
+    {% include "sensors/includes/device_detail_card.html" %}
     <!-- Place Navigation Card -->
     {% if place.is_active %}
         {% include "sensors/includes/place_nav_card.html" %}
     {% else %}
         {% include "sensors/includes/place_nav_card.html" with show_hidden=True %}
     {% endif %}
-        {% include "sensors/includes/device_detail_card.html" %}
     </div>
-
     <div class="col-md-8">
         {% include "sensors/includes/sensor_form_card.html" %}
     </div>

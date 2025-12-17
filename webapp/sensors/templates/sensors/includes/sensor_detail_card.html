@@ -97,6 +97,16 @@
                 </div>
             </div>
         </div>
+        {% if sensor.reading_key %}
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-2">
+                    <label class="form-label mb-0 small text-muted">Reading Key</label>
+                    <div><code>{{ sensor.reading_key }}</code></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% if sensor.effective_unit and sensor.effective_unit.name != 'Boolean' %}
         <div class="row">
             <div class="col-md-6">
@@ -119,6 +129,8 @@
         {% if sensor.is_active %}
         <div id="sensor-live-details-wrapper-{{ sensor.pk }}"
             data-sensor-id="{{ sensor.pk }}"
+            data-device-id="{{ sensor.device.pk }}"
+            data-is-switchbot="{{ sensor.device.is_switchbot|yesno:'true,false' }}"
             data-poll-url="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}"
             data-poll-style="card"
              hx-get="{% url 'sensors:sensor_live_value' place_slug=place.slug pk=sensor.pk %}?style=card"

@@ -1,7 +1,56 @@
-<div class="d-flex align-items-center justify-content-between gap-2">
-    <div class="input-group input-group-sm flex-grow-1" style="min-width: 340px;">
+<!-- Row 1: Title, action buttons, and preset buttons -->
+<div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2">
+        <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
+            <i class="bi bi-graph-up me-2"></i>Data Graph
+        </h5>
+        <button class="btn btn-sm btn-primary" id="apply-date-range">
+            <i class="bi bi-graph-up me-1"></i>Graph
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-info d-none" id="reset-zoom">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+        </button>
+    </div>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Date range presets">
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="1h">1h</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="6h">6h</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="12h">12h</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="24h">24h</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="3d">3d</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="7d">7d</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="14d">14d</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="30d">30d</button>
+        <button type="button" class="btn btn-outline-secondary date-range-preset" data-range="60d">60d</button>
+    </div>
+</div>
+
+<!-- Row 2: Date inputs -->
+<div class="d-flex align-items-center gap-2 mt-2">
+    <!-- Start datetime with snap button -->
+    <div class="input-group input-group-sm flex-grow-1">
+        <span class="input-group-text" id="start-picker-toggle" style="cursor: pointer;">
+            <i class="bi bi-calendar-event"></i>
+        </span>
         <input type="text" class="form-control" id="start-date-picker" placeholder="Start datetime">
-        <span class="input-group-text">to</span>
+        <button type="button" class="btn btn-outline-secondary" id="snap-start-midnight"
+                title="Set start time to 00:00" data-bs-toggle="tooltip">
+            <i class="bi bi-skip-backward-fill"></i>
+        </button>
+    </div>
+
+    <!-- End datetime with snap buttons -->
+    <div class="input-group input-group-sm flex-grow-1">
+        <span class="input-group-text" id="end-picker-toggle" style="cursor: pointer;">
+            <i class="bi bi-calendar-event"></i>
+        </span>
         <input type="text" class="form-control" id="end-date-picker" placeholder="End datetime">
+        <button type="button" class="btn btn-outline-secondary" id="snap-end-start-of-day"
+                title="Set end time to 00:00" data-bs-toggle="tooltip">
+            <i class="bi bi-skip-backward-fill"></i>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" id="snap-end-end-of-day"
+                title="Set end time to 23:59" data-bs-toggle="tooltip">
+            <i class="bi bi-skip-forward-fill"></i>
+        </button>
     </div>
 </div>

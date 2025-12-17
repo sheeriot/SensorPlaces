@@ -12,13 +12,13 @@
 <div class="container-fluid" data-sensor-pk="{{ sensor.pk }}">
     <div class="row">
         <div class="col-md-4">
-            {% include "sensors/includes/place_nav_card.html" %}
             <div id="device-info-card-container">
                  {% include 'sensors/includes/device_info_card.html' %}
             </div>
             <div id="sensor-list-card-container" class="mt-1">
                 {% include 'sensors/includes/sensor_list_card.html' %}
             </div>
+            {% include "sensors/includes/place_nav_card.html" %}
         </div>
 
         <div class="col-md-8">

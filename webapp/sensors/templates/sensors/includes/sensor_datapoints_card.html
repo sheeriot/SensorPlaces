@@ -6,6 +6,9 @@
             <div class="d-flex justify-content-between align-items-center w-100">
                 <h5 class="card-title mb-0 fs-5 d-flex align-items-center">
                     <i class="bi bi-table me-2"></i>Data Points
+                    <small class="text-muted ms-2 fw-normal" style="font-size: 0.7em;">
+                        <i class="bi bi-info-circle"></i> Click a row to zoom
+                    </small>
                 </h5>
                 <div class="d-flex align-items-center small text-muted">
                     <span id="dp-stats-count-{{ sensor.pk }}" class="me-2"></span>
@@ -17,22 +20,22 @@
                 <span id="dp-stats-first-{{ sensor.pk }}"></span>
                 <span id="dp-stats-last-{{ sensor.pk }}"></span>
             </div>
+            <!-- Data point navigation controls will be inserted here by JS -->
         </div>
         <div id="collapse-datapoints-{{ sensor.pk }}" class="collapse show" aria-labelledby="heading-datapoints-{{ sensor.pk }}">
             <div class="card-body p-2">
                 <div class="table-responsive">
-                    <table class="table table-sm table-striped font-monospace">
+                    <table class="table table-sm table-striped table-hover font-monospace">
                         <thead>
-                                <tr>
-                                    <th>Timestamp</th>
-                                    <th id="data-points-value-header-{{ sensor.pk }}">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody id="data-points-body-{{ sensor.pk }}">
-                                {# Rows will be dynamically inserted here by sensor-chart.js #}
-                            </tbody>
-                        </table>
-                    </div>
+                            <tr>
+                                <th><i class="bi bi-clock-history me-1"></i>Timestamp</th>
+                                <th id="data-points-value-header-{{ sensor.pk }}">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-points-body-{{ sensor.pk }}">
+                            {# Rows will be dynamically inserted here by sensor-chart.js #}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
