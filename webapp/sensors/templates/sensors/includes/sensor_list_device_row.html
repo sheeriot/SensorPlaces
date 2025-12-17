@@ -1,31 +1,26 @@
 <!-- Device Header Row -->
-<div class="list-group-item device-row
+<tr class="table-light device-row
     {% if not parent_is_active or not device.is_active %}text-muted opacity-50{% endif %}
     {% if not device.is_active and hide_inactive or not parent_is_active and hide_inactive %}d-none{% endif %}"
     data-device-id="{{ device.pk }}"
     data-device-active="{{ device.is_active|lower }}"
     data-location-id="{{ device.location.pk }}">
-    <div class="d-flex w-100 align-items-center">
-        <div class="flex-grow-1 ps-4" style="min-width: 0;">
-            <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none text-dark d-flex align-items-center">
-                <i class="bi bi-hdd-rack me-2"></i>
-                <div class="d-flex flex-column">
-                    <strong class="text-nowrap">{{ device.name }}</strong>
-                    <small class="text-muted lh-1">{{ device.device_type }} ({{ device.model }})</small>
-                </div>
-            </a>
-        </div>
-        <div style="width: 100px;" class="text-end">
-            <!-- Placeholder for Current -->
-        </div>
-        <div style="width: 90px;" class="text-end">
-            <!-- Placeholder for Active -->
-        </div>
-        <div style="width: 120px;" class="text-end">
+    <td class="ps-4" colspan="2">
+        <a href="{% url 'sensors:device_detail' place_slug=place.slug pk=device.pk %}" class="text-decoration-none text-dark">
+            <i class="bi bi-hdd-rack me-2"></i>
+            <strong>{{ device.name }}</strong>
+            <small class="text-muted ms-2">{{ device.device_type }} ({{ device.model }})</small>
+        </a>
+    </td>
+    <td class="d-none d-lg-table-cell"></td>
+    <td></td>
+    <td class="d-none d-lg-table-cell"></td>
+    <td class="text-end">
+        {% if not device.is_switchbot and not device.is_shelly %}
             {% include "sensors/partials/sensor_add_button.html" %}
-        </div>
-    </div>
-</div>
+        {% endif %}
+    </td>
+</tr>
 
 {% for sensor in device.sensors_sorted %}
     {% with device_is_active=device.is_active %}

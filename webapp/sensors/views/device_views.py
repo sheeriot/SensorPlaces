@@ -584,13 +584,18 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
 
             new_location_id = request.POST.get('location_id')
             make_active = request.POST.get('make_active')
+            new_name = request.POST.get('device_name', '').strip()
 
             if not new_location_id:
                 return JsonResponse({'error': 'Location ID is required.'}, status=400)
 
             new_location = get_object_or_404(Location, pk=new_location_id, place__slug=place_slug)
 
+            old_name = device.name
             device.location = new_location
+
+            if new_name and new_name != old_name:
+                device.name = new_name
 
             if make_active:
                 device.is_active = True
@@ -598,7 +603,10 @@ class DeviceMoveLocationView(LoginRequiredMixin, View):
 
             device.save()
 
-            messages.success(request, f"Moved '{device.name}' to '{new_location.name}'.")
+            if new_name and new_name != old_name:
+                messages.success(request, f"Renamed '{old_name}' to '{new_name}' and moved to '{new_location.name}'.")
+            else:
+                messages.success(request, f"Moved '{device.name}' to '{new_location.name}'.")
 
             # Redirect to the page that initiated the request to force a full reload.
             # Fallback to the main device list for the place if the header is not present.

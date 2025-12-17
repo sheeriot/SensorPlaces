@@ -5,20 +5,22 @@
 <div class="modal-body">
     <form id="moveDeviceForm" hx-post="{% url 'sensors:device_move_location' place_slug=place.slug pk=device.pk %}" hx-swap="none">
         {% csrf_token %}
+        <div class="mb-3">
+            <label for="deviceName" class="form-label"><i class="bi bi-hdd me-1"></i>Device Name</label>
+            <input type="text" class="form-control" name="device_name" id="deviceName" value="{{ device.name }}" required>
+        </div>
         <div class="mb-2">
-            <p><i class="bi bi-geo-alt"></i> Select a new location for <i class="bi bi-hdd"></i> <strong>{{ device.name }}</strong>:</p>
+            <label for="locationSelect" class="form-label"><i class="bi bi-geo-alt me-1"></i>Move to Location</label>
             <select class="form-select" name="location_id" id="locationSelect" required>
                 <option value="" selected disabled>Choose location...</option>
                 {% for loc in locations %}
                     <option value="{{ loc.pk }}" data-active="{{ loc.is_active|lower }}">
                         {{ loc.name }}
-                        <span class="text-muted">
-                            ({% if loc.is_active %}
-                                {{ loc.active_device_count }} active
-                            {% else %}
-                                inactive, {{ loc.inactive_device_count }} inactive
-                            {% endif %})
-                        </span>
+                        ({% if loc.is_active %}
+                            {{ loc.active_device_count }} active
+                        {% else %}
+                            inactive, {{ loc.inactive_device_count }} inactive
+                        {% endif %})
                     </option>
                 {% endfor %}
             </select>
