@@ -92,6 +92,25 @@
         </div>
     </div>
 
+    <!-- Preview Modal for InfluxDB Field Preview - Always in DOM -->
+    <div class="modal fade" id="preview-modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Preview Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="preview-modal-content">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Mapplan Draggable/Resizable Modal -->
     <div class="modal fade" id="mapplan-modal" tabindex="-1" aria-labelledby="mapplan-modal-label" aria-hidden="true">
         <div class="modal-dialog modal-xl">

@@ -200,8 +200,10 @@ const deviceFormManager = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Only initialize if form exists (for non-modal forms)
     deviceFormManager.init();
 
+    // Handle locationCreated event for adding locations from within device form
     document.body.addEventListener('htmx:beforeSwap', function(evt) {
         if (deviceFormManager.config.debug) {
             console.log('[DeviceForm] htmx:beforeSwap event triggered.');
@@ -217,15 +219,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (deviceFormManager.config.debug) console.log('[DeviceForm] locationCreated trigger found. Handling event.');
                     deviceFormManager.handleLocationCreated({ detail: data.locationCreated });
 
-                    const modalElement = document.getElementById('modal-container');
+                    // Close modal (check both modal containers)
+                    const modalElement = document.getElementById('htmx-modal') || document.getElementById('modal-container');
                     if (modalElement) {
                         const modal = bootstrap.Modal.getInstance(modalElement);
                         if (modal) {
                             if (deviceFormManager.config.debug) console.log('[DeviceForm] Closing modal.');
                             modal.hide();
-                        } else {
-                            if (deviceFormManager.config.debug) console.log('[DeviceForm] Modal instance not found, cannot close.');
                         }
+                    }
+
+                    // Trigger location change to update active status via HTMX
+                    const locationSelect = document.getElementById('id_location');
+                    if (locationSelect) {
+                        locationSelect.dispatchEvent(new Event('change'));
                     }
 
                     // We've handled this response, so we don't want HTMX to swap anything.
@@ -235,5 +242,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Error parsing HX-Trigger header", e);
             }
         }
+    });
+
+    // Handle deviceCreated event to refresh device list
+    document.body.addEventListener('deviceCreated', function(evt) {
+        if (deviceFormManager.config.debug) {
+            console.log('[DeviceForm] deviceCreated event triggered.');
+            console.log('Device data:', evt.detail);
+        }
+        // Reload the page or refresh device list via HTMX
+        window.location.reload();
     });
 });

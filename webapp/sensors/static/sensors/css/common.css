@@ -45,6 +45,11 @@
     height: 300px;
 }
 
+/* Chart Preview Container */
+#preview-chart-container {
+    height: 300px;
+}
+
 /* Form Switch Large */
 .form-switch.form-switch-lg {
     padding-left: 2.5em;

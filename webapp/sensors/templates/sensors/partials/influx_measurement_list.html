@@ -1,0 +1,53 @@
+<div hx-swap-oob="true" id="step-1-store-selection" style="display: none;"></div>
+<div hx-swap-oob="true" id="step-2-measurements" style="display: block;">
+    <h6 class="mb-3"><i class="bi bi-table me-2"></i>Step 2: Select Measurement</h6>
+    {% if measurements %}
+        <div class="list-group">
+            {% for measurement in measurements %}
+                <form method="post"
+                      hx-post="{% url 'sensors:discover_fields' place_slug=place.slug device_pk=device.pk %}"
+                      hx-target="#step-3-fields"
+                      hx-swap="innerHTML"
+                      hx-indicator="#loading-indicator"
+                      class="list-group-item p-0 border-0 mb-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="influx_store" value="{{ influx_store.pk }}">
+                    <input type="hidden" name="measurement" value="{% if measurement.name %}{{ measurement.name }}{% else %}{{ measurement }}{% endif %}">
+                    {% if measurement.tag_key %}<input type="hidden" name="tag_key" value="{{ measurement.tag_key }}">{% endif %}
+                    <button type="submit"
+                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center w-100 text-start border rounded">
+                        <div>
+                            <span><i class="bi bi-table me-2"></i>
+                            {% if measurement.name %}{{ measurement.name }}{% else %}{{ measurement }}{% endif %}</span>
+                            {% if device_id and measurement.total_count is not None %}
+                                <br><small class="text-muted ms-4">
+                                    <i class="bi bi-clock-history me-1"></i>Last hour: {{ measurement.hour_count|default:0 }} |
+                                    Last day: {{ measurement.day_count|default:0 }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </form>
+            {% endfor %}
+        </div>
+        <button type="button"
+                class="btn btn-secondary btn-sm mt-2"
+                hx-get="{% url 'sensors:influx_discovery' place_slug=place.slug device_pk=device.pk %}"
+                hx-target="#htmx-modal-content"
+                hx-swap="innerHTML">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </button>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>No measurements found in this InfluxDB store.
+        </div>
+        <button type="button"
+                class="btn btn-secondary"
+                hx-get="{% url 'sensors:influx_discovery' place_slug=place.slug device_pk=device.pk %}"
+                hx-target="#htmx-modal-content"
+                hx-swap="innerHTML">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </button>
+    {% endif %}
+</div>

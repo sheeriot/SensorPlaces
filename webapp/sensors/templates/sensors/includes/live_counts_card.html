@@ -1,7 +1,13 @@
 {% load sensor_filters %}
 
 <!-- Left Column: Live Counts -->
-<div class="card my-1" id="live_counts_card">
+<div class="card my-1"
+     id="live_counts_card"
+     hx-trigger="refreshLiveCounts from:body"
+     hx-get="{% url 'sensors:device_list' place_slug=place.slug %}"
+     hx-target="this"
+     hx-swap="outerHTML"
+     hx-select="#live_counts_card">
     <div class="card-header py-1" id="live_counts_card_header">
         <div class="row g-0 align-items-center">
             <div class="col">

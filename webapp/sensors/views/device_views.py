@@ -394,6 +394,106 @@ class DeviceCreateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, 
         return super().form_invalid(form)
 
 
+class DeviceCreateModalView(LoginRequiredMixin, PlaceAnnotationMixin, CreateView):
+    """A view to handle creating a device from a modal form."""
+    model = Device
+    form_class = DeviceForm
+    template_name = 'sensors/device_form_modal.html'
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self._place = self.get_place()
+        self._locations = get_annotated_locations(self._place)
+        self._location = None
+        location_slug = self.kwargs.get('location_slug', None)
+        if location_slug:
+            self._location = get_object_or_404(Location, slug=location_slug, place=self._place)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['place'] = self._place
+        kwargs['locations'] = self._locations
+        kwargs['location'] = self._location
+        kwargs['cancel_url'] = '#'
+        # Set form action to the current URL (modal endpoint)
+        kwargs['form_action'] = self.request.path
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if self._location:
+            initial['location'] = self._location
+        return initial
+
+    def form_valid(self, form):
+        if not form.instance.location:
+            form.instance.location = self._place.get_unassigned_location()
+        self.object = form.save()
+
+        device_data = {
+            "id": self.object.id,
+            "name": self.object.name,
+            "location_id": self.object.location.id if self.object.location else None,
+        }
+
+        # Return empty response with HTMX trigger headers
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            "closeModal": "#htmx-modal",
+            "refreshDeviceList": True,
+            "refreshLiveCounts": True,
+            "deviceCreated": device_data
+        })
+        return response
+
+    def form_invalid(self, form):
+        """Re-render the modal with form errors."""
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['modal_title'] = "Create New Device"
+        context['place'] = self._place
+        if self._location:
+            context['location'] = self._location
+        return context
+
+
+class DeviceFormActiveStatusView(LoginRequiredMixin, PlaceAnnotationMixin, View):
+    """Returns active status field partial based on selected location."""
+
+    def get(self, request, place_slug):
+        place = self.get_place()
+        location_id = request.GET.get('location')
+
+        if not location_id:
+            location = None
+        else:
+            try:
+                location = get_object_or_404(Location, pk=location_id, place=place)
+            except (ValueError, Location.DoesNotExist):
+                location = None
+
+        # Create a minimal form instance to render the field
+        form = DeviceForm(place=place, locations=get_annotated_locations(place), location=location, cancel_url='#')
+
+        # Set initial location and configure active field based on location
+        if location:
+            form.initial['location'] = location
+            if not location.is_active:
+                form.fields['is_active'].widget.attrs['disabled'] = True
+                form.fields['is_active'].label = 'inactive'
+            form.fields['is_active'].widget.attrs['checked'] = location.is_active
+        else:
+            # No location selected - default to active and enabled
+            form.fields['is_active'].widget.attrs['checked'] = True
+
+        return render(request, 'sensors/partials/device_active_status_field.html', {
+            'form': form,
+            'location': location,
+        })
+
+
 class DeviceUpdateView(LoginRequiredMixin, PlaceAnnotationMixin, ReferrerMixin, UpdateView):
     model = Device
     form_class = DeviceForm

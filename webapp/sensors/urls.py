@@ -13,6 +13,7 @@ from .views import (
     timezone_views,
     toast_views,
     switchbot_views,
+    influx_discovery_views,
 )
 from .views.sensor_views import (
     SensorCreateView,
@@ -91,12 +92,16 @@ urlpatterns = [
     path('<slug:place_slug>/devices/', device_views.DeviceListView.as_view(), name='device_list'),
     path('<slug:place_slug>/unassigned-devices/', device_views.UnassignedDeviceListView.as_view(), name='unassigned_device_list'),
     path('<slug:place_slug>/device/create/', device_views.DeviceCreateView.as_view(), name='device_create'),
+    path('<slug:place_slug>/device/create-modal/', device_views.DeviceCreateModalView.as_view(), name='device_create_modal'),
     path('<slug:place_slug>/location/<slug:location_slug>/device/create/', device_views.DeviceCreateView.as_view(), name='device_create_in_location'),
+    path('<slug:place_slug>/location/<slug:location_slug>/device/create-modal/', device_views.DeviceCreateModalView.as_view(), name='device_create_modal_in_location'),
+    path('<slug:place_slug>/device/form-active-status/', device_views.DeviceFormActiveStatusView.as_view(), name='device_form_active_status'),
     path('<slug:place_slug>/device/<int:pk>/', device_views.DeviceDetailView.as_view(), name='device_detail'),
     path('<slug:place_slug>/device/<int:pk>/update/', device_views.DeviceUpdateView.as_view(), name='device_update'),
     path('<slug:place_slug>/device/<int:pk>/delete/', device_views.DeviceDeleteView.as_view(), name='device_delete'),
     path('<slug:place_slug>/device/<int:pk>/fetch-reading/', switchbot_views.fetch_switchbot_reading, name='fetch_switchbot_reading'),
     path('<slug:place_slug>/device/<int:pk>/inspect/', switchbot_views.SwitchbotInspectView.as_view(), name='inspect_switchbot_device'),
+    path('<slug:place_slug>/device/<int:device_pk>/discover-sensors/', influx_discovery_views.InfluxDiscoveryView.as_view(), name='influx_discovery'),
 
     # API endpoints for devices
     path('api/<slug:place_slug>/device/<int:pk>/move/', device_views.DeviceMoveLocationView.as_view(), name='device_move_location'),
@@ -134,6 +139,13 @@ urlpatterns = [
     path('api/<slug:place_slug>/sensor/<int:pk>/readings/', sensor_views.sensor_readings_api, name='sensor_readings_api'),
     path('api/<slug:place_slug>/sensor/<int:sensor_pk>/readings_table/', sensor_views.sensor_readings_table_api, name='sensor_readings_table_api'),
     path('api/<slug:place_slug>/sensor/<int:pk>/lorawan_data/', sensor_views.lorawan_sensor_data_api, name='lorawan_sensor_data_api'),
+
+    # InfluxDB Discovery API endpoints
+    path('api/<slug:place_slug>/device/<int:device_pk>/discover-all/', influx_discovery_views.DiscoverAllFieldsView.as_view(), name='discover_all_fields'),
+    path('api/<slug:place_slug>/device/<int:device_pk>/discover-measurements/', influx_discovery_views.DiscoverMeasurementsView.as_view(), name='discover_measurements'),
+    path('api/<slug:place_slug>/device/<int:device_pk>/discover-fields/', influx_discovery_views.DiscoverFieldsView.as_view(), name='discover_fields'),
+    path('api/<slug:place_slug>/device/<int:device_pk>/preview-field/', influx_discovery_views.PreviewFieldView.as_view(), name='preview_field'),
+    path('api/<slug:place_slug>/device/<int:device_pk>/bulk-create-sensors/', influx_discovery_views.BulkCreateSensorsView.as_view(), name='bulk_create_sensors'),
 
     # InfluxStore URLs
     path('<slug:place_slug>/influxstores/create/', influx_views.InfluxStoreCreateView.as_view(), name='influxstore_create'),

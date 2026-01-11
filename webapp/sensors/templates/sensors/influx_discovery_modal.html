@@ -1,0 +1,63 @@
+{% load crispy_forms_tags %}
+
+<div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">
+                <i class="bi bi-search me-2"></i>{{ modal_title }}
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <!-- Device Info -->
+            <div class="alert alert-light border mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ device.name }}</strong>
+                        {% if device.device_id %}
+                            <code class="ms-2 small">{{ device.device_id }}</code>
+                        {% endif %}
+                    </div>
+                    <span class="badge bg-secondary">{{ place.name }}</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Select InfluxStore and Discover -->
+            <div id="discovery-form-container">
+                <form id="influx-store-selection-form"
+                      hx-post="{% url 'sensors:discover_all_fields' place_slug=place.slug device_pk=device.pk %}"
+                      hx-target="#discovery-results"
+                      hx-swap="innerHTML"
+                      hx-indicator="#loading-indicator">
+                    {% csrf_token %}
+                    <div class="row align-items-end">
+                        <div class="col-md-8">
+                            {% crispy form %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i>Discover
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Discovery Results (tree view loaded here) -->
+            <div id="discovery-results">
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-database me-2"></i>
+                    Select an InfluxDB store and click Discover to find available sensors.
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="htmx-indicator text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted mb-0">Discovering measurements and fields...</p>
+            </div>
+        </div>
+    </div>
+</div>

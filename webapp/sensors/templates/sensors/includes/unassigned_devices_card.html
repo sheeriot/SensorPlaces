@@ -7,7 +7,13 @@
 
 {% for location in locations %}
     {% if location.slug == 'unassigned-devices' %}
-        <div id="unassigned-devices-card" class="card my-1 border-warning">
+        <div id="unassigned-devices-card"
+             class="card my-1 border-warning"
+             hx-trigger="refreshDeviceList from:body"
+             hx-get="{% url 'sensors:device_list' place_slug=place.slug %}"
+             hx-target="this"
+             hx-swap="outerHTML"
+             hx-select="#unassigned-devices-card">
             <div class="card-header bg-warning-subtle text-warning-emphasis d-flex justify-content-between align-items-center py-1"
                  role="button"
                  data-bs-toggle="collapse"

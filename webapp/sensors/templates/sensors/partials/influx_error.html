@@ -1,0 +1,22 @@
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    Error: {{ error }}
+</div>
+{% if influx_store_id %}
+    <button type="button"
+            class="btn btn-secondary"
+            hx-post="{% url 'sensors:discover_measurements' place_slug=place.slug device_pk=device.pk %}"
+            hx-vals='{"influx_store": "{{ influx_store_id }}"}'
+            hx-target="#step-2-measurements"
+            hx-swap="innerHTML">
+        <i class="bi bi-arrow-left me-1"></i>Back to Measurements
+    </button>
+{% else %}
+    <button type="button"
+            class="btn btn-secondary"
+            hx-get="{% url 'sensors:influx_discovery' place_slug=place.slug device_pk=device.pk %}"
+            hx-target="#htmx-modal-content"
+            hx-swap="innerHTML">
+        <i class="bi bi-arrow-left me-1"></i>Back
+    </button>
+{% endif %}

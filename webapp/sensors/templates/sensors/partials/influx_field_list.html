@@ -1,0 +1,88 @@
+{% if fields %}
+    <div hx-swap-oob="true" id="step-2-measurements" style="display: none;"></div>
+    <div hx-swap-oob="true" id="step-3-fields" style="display: block;">
+        <h6 class="mb-3"><i class="bi bi-list-columns me-2"></i>Step 3: Select Fields</h6>
+
+        <input type="hidden" id="current-measurement" value="{{ measurement }}">
+        <input type="hidden" id="current-influx-store" value="{{ influx_store.pk }}">
+        <input type="hidden" id="current-tag-key" value="{{ tag_key }}">
+
+        <div class="mb-3">
+            <strong>Measurement:</strong> <code>{{ measurement }}</code>
+            {% if device.device_id %}
+                <br><small class="text-muted">Filtering by device_id: <code>{{ device.device_id }}</code></small>
+            {% endif %}
+        </div>
+
+        <form id="field-selection-form"
+              hx-post="{% url 'sensors:discover_fields' place_slug=place.slug device_pk=device.pk %}"
+              hx-target="#step-4-review"
+              hx-swap="innerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="influx_store" value="{{ influx_store.pk }}">
+            <input type="hidden" name="measurement" value="{{ measurement }}">
+            <input type="hidden" name="action" value="add_selected">
+            <input type="hidden" name="tag_key" value="{{ tag_key }}">
+
+            <div class="list-group mb-3">
+                {% for field in fields %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div class="form-check">
+                            <input class="form-check-input field-checkbox"
+                                   type="checkbox"
+                                   value="{{ field.name }}"
+                                   id="field-{{ forloop.counter }}"
+                                   name="selected_fields"
+                                   data-measurement="{{ measurement }}"
+                                   data-field="{{ field.name }}"
+                                   data-type="{{ field.type }}">
+                            <label class="form-check-label" for="field-{{ forloop.counter }}">
+                                <code>{{ field.name }}</code>
+                                <small class="text-muted ms-2">({{ field.type }})</small>
+                                {% if device.device_id and field.hour_count is not None %}
+                                    <br><small class="text-muted ms-4">
+                                        <i class="bi bi-clock-history me-1"></i>Last hour: {{ field.hour_count|default:0 }} |
+                                        Last day: {{ field.day_count|default:0 }}
+                                    </small>
+                                {% endif %}
+                            </label>
+                        </div>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-info preview-btn"
+                                hx-get="{% url 'sensors:preview_field' place_slug=place.slug device_pk=device.pk %}?influx_store={{ influx_store.pk }}&measurement={{ measurement|urlencode }}&field={{ field.name|urlencode }}&tag_key={{ tag_key }}"
+                                hx-target="#preview-modal-content"
+                                hx-swap="innerHTML">
+                            <i class="bi bi-eye"></i> Preview
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button"
+                        class="btn btn-secondary"
+                        hx-post="{% url 'sensors:discover_measurements' place_slug=place.slug device_pk=device.pk %}"
+                        hx-vals='{"influx_store": "{{ influx_store.pk }}"}'
+                        hx-target="#step-2-measurements"
+                        hx-swap="innerHTML">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Measurements
+                </button>
+                <button type="submit" class="btn btn-primary" id="add-fields-btn">
+                    <i class="bi bi-plus-circle me-1"></i>Add Selected Fields
+                </button>
+            </div>
+        </form>
+    </div>
+{% else %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>No fields found in measurement "{{ measurement }}".
+    </div>
+    <button type="button"
+            class="btn btn-secondary"
+            hx-get="{% url 'sensors:discover_measurements' place_slug=place.slug device_pk=device.pk %}"
+            hx-vals='{"influx_store": "{{ influx_store.pk }}"}'
+            hx-target="#step-2-measurements"
+            hx-swap="innerHTML">
+        <i class="bi bi-arrow-left me-1"></i>Back to Measurements
+    </button>
+{% endif %}
