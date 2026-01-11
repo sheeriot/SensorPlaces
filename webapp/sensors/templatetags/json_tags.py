@@ -1,9 +1,24 @@
+import json
 from django import template
 from django.utils.html import format_html, mark_safe
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from datetime import datetime, timezone as dt_timezone
 
 register = template.Library()
+
+
+@register.filter(name='to_json')
+def to_json(value):
+    """
+    Convert a Python object to JSON string for use in data attributes.
+    Uses HTML entity escaping that browsers will decode automatically.
+    """
+    try:
+        # json.dumps produces valid JSON, then we let Django escape it for HTML attributes
+        # The browser's dataset API will decode the HTML entities back to the original JSON
+        return json.dumps(value)
+    except (TypeError, ValueError):
+        return '[]'
 
 def _generate_html_from_dict(data, level=0):
     """

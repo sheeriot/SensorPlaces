@@ -1,0 +1,18 @@
+{% load crispy_forms_tags %}
+
+<div class="is-active-container form-check form-switch pt-4">
+    {{ form.is_active|as_crispy_field }}
+</div>
+<div class="form-text" data-help-text-container="">
+    {% if location %}
+        {% if location.is_active %}
+            <div class="text-success-emphasis">
+                <i class="bi bi-info-circle me-2"></i>This device will be set to <strong>Active</strong> to match the location.
+            </div>
+        {% else %}
+            <div class="text-warning-emphasis">
+                <i class="bi bi-exclamation-triangle me-2"></i>This device will be inactive because Location "{{ location.name }}" is inactive.
+            </div>
+        {% endif %}
+    {% endif %}
+</div>

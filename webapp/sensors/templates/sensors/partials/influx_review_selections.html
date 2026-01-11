@@ -1,0 +1,53 @@
+<div hx-swap-oob="true" id="step-3-fields" style="display: none;"></div>
+<div hx-swap-oob="true" id="step-4-review" style="display: block;">
+    <h6 class="mb-3"><i class="bi bi-check-circle me-2"></i>Step 4: Review Selections</h6>
+
+    <div class="mb-3">
+        <p class="text-muted">Review your selections before creating sensors:</p>
+        <div class="list-group">
+            {% for selection in selections %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <code>{{ selection.measurement }}</code> → <code>{{ selection.field }}</code>
+                        <br><small class="text-muted">{{ selection.name }}</small>
+                    </div>
+                    <form method="post"
+                          hx-post="{% url 'sensors:discover_fields' place_slug=place.slug device_pk=device.pk %}"
+                          hx-target="#step-4-review"
+                          hx-swap="innerHTML"
+                          style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="influx_store" value="{{ influx_store.pk }}">
+                        <input type="hidden" name="measurement" value="{{ selection.measurement }}">
+                        <input type="hidden" name="action" value="remove">
+                        <input type="hidden" name="field" value="{{ selection.field }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <form id="bulk-create-form"
+          hx-post="{% url 'sensors:bulk_create_sensors' place_slug=place.slug device_pk=device.pk %}"
+          hx-target="body"
+          hx-swap="none">
+        {% csrf_token %}
+        <input type="hidden" name="influx_store" value="{{ influx_store.pk }}">
+        <input type="hidden" name="tag_key" value="{{ tag_key }}">
+        <div class="d-flex justify-content-between">
+            <button type="button"
+                    class="btn btn-secondary"
+                    hx-get="{% url 'sensors:influx_discovery' place_slug=place.slug device_pk=device.pk %}"
+                    hx-target="#htmx-modal-content"
+                    hx-swap="innerHTML">
+                Start Over
+            </button>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-plus-circle me-1"></i>Create {{ selections|length }} Sensor{{ selections|length|pluralize }}
+            </button>
+        </div>
+    </form>
+</div>

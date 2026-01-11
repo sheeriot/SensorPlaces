@@ -192,14 +192,23 @@ class SensorForm(forms.ModelForm):
             sensor_type = self.instance.sensor_type
 
         # If a sensor type is selected, check its allow_override flag
+        # Only disable override fields if not allowed AND the sensor doesn't already have that override set
+        # This allows editing/removing existing overrides even when allow_override is False
         if sensor_type and not sensor_type.allow_override:
-            # Disable override fields if not allowed
-            self.fields['unit'].disabled = True
-            self.fields['unit_override'].disabled = True
-            self.fields['min_value'].disabled = True
-            self.fields['min_value_override'].disabled = True
-            self.fields['max_value'].disabled = True
-            self.fields['max_value_override'].disabled = True
+            # Only disable unit override if sensor doesn't already have it set
+            if not (self.instance and self.instance.pk and self.instance.unit_override):
+                self.fields['unit'].disabled = True
+                self.fields['unit_override'].disabled = True
+
+            # Only disable min_value override if sensor doesn't already have it set
+            if not (self.instance and self.instance.pk and self.instance.min_value_override):
+                self.fields['min_value'].disabled = True
+                self.fields['min_value_override'].disabled = True
+
+            # Only disable max_value override if sensor doesn't already have it set
+            if not (self.instance and self.instance.pk and self.instance.max_value_override):
+                self.fields['max_value'].disabled = True
+                self.fields['max_value_override'].disabled = True
 
         else:
             pass

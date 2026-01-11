@@ -17,6 +17,17 @@
             </div>
             {% if device and device.is_active %}
                 {% include 'sensors/partials/sensor_add_button.html' %}
+                {% if device.device_id %}
+                    <button type="button"
+                            class="btn btn-sm btn-outline-info ms-2"
+                            title="Discover sensors from InfluxDB"
+                            hx-get="{% url 'sensors:influx_discovery' place_slug=place.slug device_pk=device.pk %}"
+                            hx-target="#htmx-modal-content"
+                            data-bs-toggle="modal"
+                            data-bs-target="#htmx-modal">
+                        <i class="bi bi-search me-1"></i>Discover
+                    </button>
+                {% endif %}
             {% endif %}
         </div>
         {% endif %}

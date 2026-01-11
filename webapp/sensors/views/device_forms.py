@@ -1,6 +1,7 @@
 from django import forms
 from django.db import models
 from django.utils.safestring import mark_safe
+from django.urls import reverse
 from ..models import Device
 
 from crispy_forms.helper import FormHelper
@@ -43,6 +44,7 @@ class DeviceForm(forms.ModelForm):
         self.devices_active = kwargs.pop('devices_active', None)
         kwargs.pop('inactive_help_text', None) # Pop and discard
         cancel_url = kwargs.pop('cancel_url', None)
+        form_action = kwargs.pop('form_action', None)
 
         super().__init__(*args, **kwargs)
 
@@ -63,6 +65,15 @@ class DeviceForm(forms.ModelForm):
         self.helper.form_show_errors = True
         self.helper.error_text_inline = True
         self.helper.help_text_inline = True
+
+        # Set form action if provided (for modal forms)
+        if form_action:
+            self.helper.form_action = form_action
+            self.helper.attrs = {
+                'hx-post': form_action,
+                'hx-target': '#htmx-modal',
+                'hx-swap': 'outerHTML',
+            }
 
         # Setup Active field with proper ID and label
         checkbox_id = f"device-active-checkbox-{self.instance.pk if self.instance and self.instance.pk else 'new'}"
@@ -136,18 +147,31 @@ class DeviceForm(forms.ModelForm):
 
         # Determine if we should include data-bs-dismiss="modal"
         cancel_attrs = 'data-bs-dismiss="modal"' if cancel_url == '#' else ''
+        is_modal = cancel_url == '#'
+        modal_target = '#htmx-modal' if is_modal else '#modal-container'
+
+        # Add HTMX attributes to location field if modal
+        if is_modal and self.place:
+            self.fields['location'].widget.attrs.update({
+                'hx-get': reverse('sensors:device_form_active_status', kwargs={'place_slug': self.place.slug}),
+                'hx-trigger': 'change',
+                'hx-target': '#device-active-status-container',
+                'hx-include': '[name="location"]',
+                'hx-swap': 'innerHTML',
+            })
 
         self.helper.layout = Layout(
             Field('referrer', type='hidden'),
             Row(
                 Column('name', css_class='col-md-8'),
                 Column(
+                    HTML('<div id="device-active-status-container">'),
                     Div(
                         Field('is_active'),
                         css_class='is-active-container form-check form-switch pt-4'
                     ),
-                    # This empty div is the target for our JS to inject help text
                     Div(css_class="form-text", data_help_text_container=""),
+                    HTML('</div>'),
                     css_class='col-md-4 d-flex flex-column align-items-start'
                 ),
                 css_class='mb-3'
@@ -155,13 +179,13 @@ class DeviceForm(forms.ModelForm):
             Row(
                 Column(
                     Div(
-                        HTML("""
+                        HTML(f"""
                             <label for="id_location" class="form-label d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-geo-alt me-1"></i> Location</span>
-                                <button type="button" hx-get="{% url 'sensors:location_create_modal' place_slug=place.slug %}"
-                                        hx-target="#modal-container"
+                                <button type="button" hx-get="{reverse('sensors:location_create_modal', kwargs={'place_slug': self.place.slug}) if self.place else '#'}"
+                                        hx-target="{modal_target}"
                                         data-bs-toggle="modal"
-                                        data-bs-target="#modal-container"
+                                        data-bs-target="{modal_target}"
                                         class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-plus-circle me-1"></i> Add
                                 </button>
