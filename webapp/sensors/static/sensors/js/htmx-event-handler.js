@@ -3,9 +3,8 @@ const scriptConfig = {
 };
 
 document.body.addEventListener('htmx:afterSwap', function (evt) {
+    const targetId = evt.detail.target.id;
     if (scriptConfig.debug) {
-        // More concise log, focusing on the target element's ID
-        const targetId = evt.detail.target.id;
         console.log(`[HTMX-Handler] 'htmx:afterSwap' event processed for target #${targetId}.`);
     }
 

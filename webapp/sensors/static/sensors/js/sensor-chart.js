@@ -1,5 +1,3 @@
-console.log('--- SENSOR-CHART.JS v.DEBUG.3 LOADED ---');
-
 // Local debug flag - set to true during development, false in production
 const SENSOR_CHART_DEBUG = false;
 

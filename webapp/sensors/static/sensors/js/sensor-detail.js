@@ -11,7 +11,7 @@ document.addEventListener('click', function(event) {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
-    const SCRIPT_DEBUG = true;
+    const SCRIPT_DEBUG = false;
     if(SCRIPT_DEBUG) console.log('--- SENSOR-DETAIL.JS v.DEBUG.2 LOADED ---');
 
     let liveValueFetcher;

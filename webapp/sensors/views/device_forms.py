@@ -71,8 +71,8 @@ class DeviceForm(forms.ModelForm):
             self.helper.form_action = form_action
             self.helper.attrs = {
                 'hx-post': form_action,
-                'hx-target': '#htmx-modal',
-                'hx-swap': 'outerHTML',
+                'hx-target': '#htmx-modal-content',
+                'hx-swap': 'innerHTML',
             }
 
         # Setup Active field with proper ID and label
